@@ -48,4 +48,7 @@
 - When production database is set up, bootstrap first owner through privileged cloud task with secrets not stored in Git.
 
 ## Evidence
-- Final Playwright run and GitHub commit are recorded once remote checks pass.
+- Full cloud Playwright/TypeScript/API run passed: https://github.com/Aayush20253534/Digimarket-software/actions/runs/39233484660\n- This checks the first-login password change, privileged MFA enrollment, staff provisioning, employee role isolation and signed-out redirect.\n- GitHub main-branch workflow evidence should be checked again following the final merge.
+
+## CI operational policy
+The browser workflow uses frozen dependencies, read-only repository permissions, dynamically generated CI-only passwords and isolated PostgreSQL. No CI-generated account is reused in live environments. Changes to user credentials are not stored in browser localStorage.

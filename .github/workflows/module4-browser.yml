@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   browser:
@@ -32,11 +32,8 @@ jobs:
       DIRECT_DATABASE_URL: postgresql://digimarket_ci:ephemeral-ci-only@127.0.0.1:5432/digimarket_ci
       API_INTERNAL_URL: http://127.0.0.1:4000
       CORS_ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
-      E2E_ADMIN_INITIAL_PASSWORD: "E2E-Temporary-CI-Only-2026!"
-      E2E_ADMIN_UPDATED_PASSWORD: "E2E-Permanent-CI-Only-2026!"
       BOOTSTRAP_ORG_NAME: "DigiMarket Isolated Browser CI"
       BOOTSTRAP_ADMIN_LOGIN: admin-e2e
-      BOOTSTRAP_ADMIN_PASSWORD: "E2E-Temporary-CI-Only-2026!"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -45,17 +42,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-      - name: Install dependencies and resolve lockfile on feature branch
-        if: github.ref == 'refs/heads/feature/module-04-ui'
-        run: pnpm install --no-frozen-lockfile
       - name: Install frozen dependencies
-        if: github.ref != 'refs/heads/feature/module-04-ui'
         run: pnpm install --frozen-lockfile
       - name: Generate temporary identity test secrets
         run: |
           echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
           echo "JWT_CHALLENGE_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
           echo "MFA_ENCRYPTION_KEY_BASE64=$(openssl rand -base64 32 | tr -d '\n')" >> "$GITHUB_ENV"
+          INITIAL=$(openssl rand -hex 24)
+          UPDATED=$(openssl rand -hex 24)
+          echo "::add-mask::$INITIAL"
+          echo "::add-mask::$UPDATED"
+          echo "BOOTSTRAP_ADMIN_PASSWORD=$INITIAL" >> "$GITHUB_ENV"
+          echo "E2E_ADMIN_INITIAL_PASSWORD=$INITIAL" >> "$GITHUB_ENV"
+          echo "E2E_ADMIN_UPDATED_PASSWORD=$UPDATED" >> "$GITHUB_ENV"
       - name: Generate DB client and run existing migrations
         run: |
           pnpm --filter @digimarket/db db:generate
@@ -80,13 +80,3 @@ jobs:
           WEB_PID=$!
           trap 'kill "$API_PID" "$WEB_PID" 2>/dev/null || true; tail -n 120 /tmp/module4-api.log; tail -n 120 /tmp/module4-web.log' EXIT
           pnpm --filter @digimarket/web test:e2e
-      - name: Commit tested dependency lockfile
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/module-04-ui'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(m04): lock browser-test dependencies after successful CI"
-            git push origin HEAD:feature/module-04-ui
-          fi
