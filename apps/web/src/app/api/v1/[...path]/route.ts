@@ -65,7 +65,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   let body: ArrayBuffer | undefined;
   if (request.method !== "GET") {
-    if (!request.headers.get("content-type")?.startsWith("application/json") && path !== "auth/logout" && path !== "auth/refresh") {
+    if (!request.headers.get("content-type")?.startsWith("application/json") && path !== "auth/logout" && path !== "auth/refresh" && !path.endsWith("/cancel")) {
       return NextResponse.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "JSON required" } }, { status: 415 });
     }
     body = await request.arrayBuffer();
