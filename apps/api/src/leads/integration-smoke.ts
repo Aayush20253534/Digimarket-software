@@ -35,6 +35,8 @@ try{
  await assert.rejects(()=>crm.detail(outside,initial.id),(e:{status?:number})=>e.status===404);
  await assert.rejects(()=>crm.assign(outside,initial.id,1,bob.id),(e:{status?:number})=>e.status===404);
  await assert.rejects(()=>crm.assign(admin,initial.id,1,distant.id),(e:{status?:number})=>e.status===422);
+ assert.equal((await crm.assignees(admin)).length,2);
+ await assert.rejects(()=>crm.assignees(employee),(e:{status?:number})=>e.status===403);
  const assigned=await crm.assign(admin,initial.id,1,bob.id);
  assert.equal(assigned.version,2);
  const edited=await crm.update(employee,initial.id,{version:2,status:"CONTACTED",

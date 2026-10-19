@@ -66,6 +66,11 @@ export class LeadsService {
      })),skipDuplicates:true});
    }
  }
+ async assignees(a:Principal){
+   deny(a,"leads.assign");
+   return this.db.user.findMany({where:{organizationId:a.organizationId,status:"ACTIVE"},
+     select:{id:true,displayName:true,loginId:true},orderBy:{displayName:"asc"},take:500});
+ }
  async create(a:Principal,input:LeadCreateInput){
    deny(a,"leads.create");
    return this.db.$transaction(tx=>this.addIn(tx,a,input));

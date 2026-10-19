@@ -30,6 +30,10 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
  app.post(root,authenticated,async(req,res)=>{
    res.status(201).json({data:await svc.create(actor(res),parse(leadCreateSchema,req.body))});
  });
+ app.get(root+"/assignees",authenticated,async(_req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.assignees(actor(res))});
+ });
  app.get(root+"/duplicates",authenticated,async(_req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.duplicates(actor(res))});

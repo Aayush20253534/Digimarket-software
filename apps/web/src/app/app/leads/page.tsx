@@ -45,7 +45,6 @@ export default function LeadsPage(){
  const canAssign=!!session?.identity.permissions.includes("leads.assign");
  const canBulk=!!session?.identity.permissions.includes("leads.bulk");
  const canReview=!!session?.identity.permissions.includes("leads.duplicates.review");
- const canUsers=!!session?.identity.permissions.includes("users.read");
  const [items,setItems]=useState<Lead[]>([]);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [cursor,setCursor]=useState<string|null>(null);
@@ -79,7 +78,7 @@ export default function LeadsPage(){
    }catch(e){setError(errText(e));}finally{setLoading(false);}
  },[canRead,request,stage,search,cursor]);
  useEffect(()=>{void load();},[load]);
- useEffect(()=>{if(!canUsers)return;void request<StaffUser[]>("/users").then(setStaff).catch(()=>{});},[canUsers,request]);
+ useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const open=async(id:string)=>{
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
@@ -242,7 +241,7 @@ export default function LeadsPage(){
              <FormField id="lead-owner" label="Assigned owner"><select id="lead-owner" className="field" value={owner} onChange={e=>setOwner(e.target.value)}>
                <option value="">Unassigned</option>{staff.filter(u=>u.status==="ACTIVE").map(u=><option key={u.id} value={u.id}>{u.displayName} ({u.loginId})</option>)}
              </select></FormField>
-             <button className="btn-secondary" type="submit" disabled={busy||!canUsers}>Update owner</button>
+             <button className="btn-secondary" type="submit" disabled={busy}>Update owner</button>
            </form>}
            {selected.canEdit&&<form className="space-y-2 border-t pt-4" onSubmit={saveNote}>
              <FormField id="activity-note" label="Activity note"><textarea id="activity-note" className="field min-h-20" required maxLength={2000}

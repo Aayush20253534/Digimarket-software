@@ -36,6 +36,7 @@ Phone is normalized to digits (7–15 digits), and business names to case-folded
 - PUT `/api/v1/leads/:id` (optimistic version)
 - PUT `/api/v1/leads/:id/assign`
 - POST `/api/v1/leads/:id/notes`
+- GET `/api/v1/leads/assignees` (active organization staff; leads.assign)
 - GET `/api/v1/leads/duplicates`
 - POST `/api/v1/leads/duplicates/:id/review`
 - POST `/api/v1/leads/import`

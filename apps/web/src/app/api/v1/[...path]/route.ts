@@ -22,6 +22,7 @@ const endpoints: Record<string, string[]> = {
   "finance/export": ["GET"],
   "leads": ["GET","POST"],
   "leads/duplicates": ["GET"],
+  "leads/assignees": ["GET"],
   "leads/import": ["POST"],
   "leads/export": ["GET"],
 };
