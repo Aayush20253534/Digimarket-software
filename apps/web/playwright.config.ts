@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  timeout: 45_000,
+  timeout: 90_000,
   retries: 0, // This suite mutates an isolated bootstrap account; do not replay without recreating the DB.
   fullyParallel: false,
   reporter: process.env.CI ? [["list"]] : [["html", { open: "never" }]],

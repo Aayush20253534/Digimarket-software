@@ -71,7 +71,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 2: initial database models, migrations and isolated PostgreSQL validation
 - [x] Module 3: authentication, admin user provisioning, JWT sessions, MFA and RBAC
 - [x] Module 4: secure login UI, protected dashboard, admin user management and app shell
-- [ ] Modules 5–17: workflows, finance, CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
+- [x] Module 5: approval policies, request queue, atomic decisions, role-aware UI and PostgreSQL integration
+- [ ] Modules 6–17: finance, CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -83,3 +84,6 @@ Secure identity routes and server-side authorization are implemented in `apps/ap
 
 ## Module 4 interface
 The actual browser application exposes `/login`, `/app/dashboard`, `/app/profile` and `/app/team/users`. It uses same-origin `/api/v1/*` for an allowlisted set of backend API routes and keeps bearer access tokens only in memory. Business modules not implemented yet are labeled as coming later. See [Module 4 implementation](docs/15-MODULE-04-UI.md).
+
+## Module 5 approval workflows
+The `/app/approvals` screen provides submissions, a role-filtered decision queue and configuration of category policies. An administrator must create an active policy before anyone can submit requests. Approval outcomes do not post accounting or publish content until those feature modules are implemented. The reusable state machine prevents self-approval and concurrent duplicate decisions. See [Module 5 implementation](docs/16-MODULE-05-APPROVALS.md).

@@ -52,6 +52,11 @@ export default function ApprovalsPage() {
     }catch(e){setError(errorText(e));}finally{setLoading(false);}
   },[request,view,canRead,canDecide]);
   useEffect(()=>{void reload();},[reload]);
+  useEffect(()=>{
+    if(policies.length && !policies.some(p=>p.active && p.category===category)) {
+      setCategory(policies.find(p=>p.active)?.category??"GENERAL");
+    }
+  },[policies,category]);
 
   async function submit(e:FormEvent) {
     e.preventDefault();setError("");setSuccess("");setBusy(true);

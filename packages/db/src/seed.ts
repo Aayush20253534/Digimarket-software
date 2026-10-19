@@ -13,6 +13,21 @@ export async function seedPermissionCatalog() {
         update: { description },
       });
     }
+    // Module 5 upgrade: attach new approval grants to existing system roles,
+    // without touching custom roles or removing any previously assigned permissions.
+    const grants: Record<string, string[]> = {
+      SUPER_ADMIN: ["approvals.read","approvals.submit","approvals.decide","approvals.policy.manage"],
+      ADMIN: ["approvals.read","approvals.submit","approvals.decide","approvals.policy.manage"],
+      FOUNDER: ["approvals.read","approvals.submit","approvals.decide"],
+      EMPLOYEE: ["approvals.read","approvals.submit"],
+    };
+    const roles = await prisma.role.findMany({ where: { isSystem: true, key: { in: Object.keys(grants) } } });
+    for (const role of roles) {
+      await prisma.rolePermission.createMany({
+        data: grants[role.key].map(permissionKey => ({ roleId: role.id, permissionKey })),
+        skipDuplicates: true,
+      });
+    }
     return permissionCatalog.length;
   } finally {
     await prisma.$disconnect();
