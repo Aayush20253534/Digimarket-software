@@ -23,6 +23,8 @@ const endpoints: Record<string, string[]> = {
   "leads": ["GET","POST"],
   "clients": ["GET","POST"],
   "assets": ["GET"],
+  "projects": ["GET","POST"],
+  "projects/assignees": ["GET"],
   "assets/upload-intent": ["POST"],
   "assets/confirm": ["POST"],
   "leads/duplicates": ["GET"],
@@ -34,6 +36,12 @@ const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/st
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
+const projectDetailPattern = /^projects\\/[0-9a-fA-F-]{36}$/;
+const projectChildrenPattern = /^projects\\/[0-9a-fA-F-]{36}\\/(members|milestones|deliverables)$/;
+const projectMemberRemovePattern = /^projects\\/[0-9a-fA-F-]{36}\\/members\\/[0-9a-fA-F-]{36}\\/remove$/;
+const projectMilestonePattern = /^projects\\/[0-9a-fA-F-]{36}\\/milestones\\/[0-9a-fA-F-]{36}$/;
+const projectDeliverablePattern = /^projects\\/[0-9a-fA-F-]{36}\\/deliverables\\/[0-9a-fA-F-]{36}$/;
+const projectDeliverableSubmitPattern = /^projects\\/[0-9a-fA-F-]{36}\\/deliverables\\/[0-9a-fA-F-]{36}\\/submit$/;
 const clientDetailPattern = /^clients\/[0-9a-fA-F-]{36}$/;
 const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/(contacts|services)$/;
 const clientConvertPattern = /^leads\/[0-9a-fA-F-]{36}\/convert$/;
@@ -46,6 +54,12 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if (projectDetailPattern.test(path)) return ["GET","PUT"].includes(method);
+  if (projectChildrenPattern.test(path)) return method==="POST";
+  if (projectMemberRemovePattern.test(path)) return method==="POST";
+  if (projectMilestonePattern.test(path)) return method==="PUT";
+  if (projectDeliverablePattern.test(path)) return method==="PUT";
+  if (projectDeliverableSubmitPattern.test(path)) return method==="POST";
   if (assetIdPattern.test(path)) return method==="GET";
   if (assetActionPattern.test(path)) return method==="POST";
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
@@ -91,6 +105,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
   if (path === "assets") {
     for (const key of ["q","clientId","status","cursor","limit"]) {
+      const value=request.nextUrl.searchParams.get(key);
+      if(value!==null)url.searchParams.set(key,value);
+    }
+  }
+  if (path === "projects") {
+    for (const key of ["q","status","clientId","cursor","limit"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
