@@ -31,10 +31,17 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "Route not found" } }, { status: 404 });
   }
 
-  const origin = request.nextUrl.origin;
-  if (request.method !== "GET" && request.headers.get("origin") !== origin) {
+  // Next.js may normalize the incoming Host to localhost even when a browser
+  // connects via 127.0.0.1 or a reverse proxy. Trust only configured frontend
+  // origins, never an arbitrary Host value supplied with a request.
+  const allowedOrigins = (process.env.WEB_ALLOWED_ORIGINS ??
+    process.env.CORS_ALLOWED_ORIGINS ??
+    "http://localhost:3000,http://127.0.0.1:3000").split(",").map((value) => value.trim());
+  const incomingOrigin = request.headers.get("origin");
+  if (request.method !== "GET" && (!incomingOrigin || !allowedOrigins.includes(incomingOrigin))) {
     return NextResponse.json({ error: { code: "ORIGIN_DENIED", message: "Untrusted request origin" } }, { status: 403 });
   }
+  const origin = incomingOrigin && allowedOrigins.includes(incomingOrigin) ? incomingOrigin : allowedOrigins[0];
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
