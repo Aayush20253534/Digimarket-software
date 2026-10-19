@@ -69,7 +69,7 @@ export class LeadsService {
  async assignees(a:Principal){
    deny(a,"leads.assign");
    return this.db.user.findMany({where:{organizationId:a.organizationId,status:"ACTIVE"},
-     select:{id:true,displayName:true,loginId:true},orderBy:{displayName:"asc"},take:500});
+     select:{id:true,displayName:true,loginId:true,status:true},orderBy:{displayName:"asc"},take:500});
  }
  async create(a:Principal,input:LeadCreateInput){
    deny(a,"leads.create");
