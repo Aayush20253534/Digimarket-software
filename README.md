@@ -40,7 +40,7 @@ pnpm --filter @digimarket/web start
 # Then:
 pnpm smoke
 ~~~
-If the dependency lockfile has not landed yet, use `pnpm install --no-frozen-lockfile` once. Main-branch CI is configured to commit a verified lockfile after passing validation.
+The committed `pnpm-lock.yaml` is used with `--frozen-lockfile` in CI and local installations.
 
 ## Workspace
 ~~~text
