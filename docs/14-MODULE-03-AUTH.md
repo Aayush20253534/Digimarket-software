@@ -39,3 +39,16 @@ Bootstrap via cloud-only job using BOOTSTRAP_ORG_NAME, BOOTSTRAP_ADMIN_LOGIN and
 - Default role matrix grants are explicitly assigned during bootstrap. Founder labels do not themselves grant access.
 - Every new future domain route must enforce authenticated principal, organization filters and record-level access; a sidebar is not a security control.
 - Test flows and all actual validation evidence should be recorded after GitHub Actions finishes.
+
+## Verified remote acceptance
+- [x] Argon2id, JWT purpose isolation, encrypted TOTP and unit tests pass.
+- [x] First-admin bootstrap rejects repeat initialization.
+- [x] Initial password-change challenge enforced and verified.
+- [x] SUPER_ADMIN TOTP enrollment required before signed-in session.
+- [x] Employee provisioning, reset, disable and role change tested.
+- [x] Restricted role cannot list/provision staff.
+- [x] Refresh token rotation and replay revocation tested; cross-origin refresh rejected.
+- [x] Prisma migration and dependency lock committed.
+- [x] Complete build and PostgreSQL integration run: https://github.com/Aayush20253534/Digimarket-software/actions/runs/39230018523
+
+The tests use an ephemeral GitHub-hosted PostgreSQL database. No existing Neon project was modified.

@@ -69,7 +69,7 @@ No public signup or client credentials stored here. **Authentication is not yet 
 - [x] Module 0: product architecture and wireframes
 - [x] Module 1: monorepo scaffold, API/web foundation and CI configuration (see actual GitHub Actions status for runtime verification)
 - [x] Module 2: initial database models, migrations and isolated PostgreSQL validation
-- [ ] Module 3: authentication and RBAC
+- [x] Module 3: authentication, admin user provisioning, JWT sessions, MFA and RBAC
 - [ ] Module 4: dashboard UI and common components
 - [ ] Modules 5–17: workflows, finance, CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
 
@@ -77,3 +77,6 @@ No public signup or client credentials stored here. **Authentication is not yet 
 
 ## Module 2 database milestone
 Prisma 7 defines the initial organization, user, session, role/permission, team/founder, audit and outbox models. Migration SQL is versioned in `packages/db/prisma/migrations/` and is tested with a GitHub Actions PostgreSQL service. See [Module 2 implementation](docs/13-MODULE-02-IMPLEMENTATION.md). This milestone does **not** connect to a live agency Neon database or create employee credentials.
+
+## Module 3: authenticated API foundation
+Secure identity routes and server-side authorization are implemented in `apps/api/src/auth`. First administrator provisioning uses a **one-time cloud CLI task**, not public signup. Existing non-auth application routes remain limited to health checks. The [Module 3 specification](docs/14-MODULE-03-AUTH.md) documents the endpoints, secret configuration and verification. User-facing login and admin dashboards are scheduled for Module 4.
