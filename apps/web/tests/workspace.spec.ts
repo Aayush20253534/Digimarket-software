@@ -110,8 +110,9 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("button", { name: "Add contact" }).click();
   await expect(page.getByText("Client contact saved.")).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
-  await page.getByLabel("Business name", { exact: true }).fill("Cafe Demo Lead Other");
-  await page.getByLabel("Phone", { exact: true }).fill("98765 43210");
+  await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
+  await page.locator("#new-businessName").fill("Cafe Demo Lead Other");
+  await page.locator("#new-phone").fill("98765 43210");
   await page.getByRole("button", { name: "Create lead" }).click();
   await page.getByRole("button", { name: "Load suspected duplicates" }).click();
   await expect(page.getByText("PHONE_MATCH")).toBeVisible();
