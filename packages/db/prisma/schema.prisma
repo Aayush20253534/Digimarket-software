@@ -1,10 +1,192 @@
-// Module 1: Prisma foundation only.
-// Module 2 will add Organization, User, Role, Session and audit/outbox entities.
+// DigiMarket Module 2: organization, identity and reliable event storage.
+// No staff credentials are seeded. Auth/token business behavior begins in Module 3.
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated"
+  provider            = "prisma-client"
+  output              = "../src/generated"
+  moduleFormat        = "esm"
+  importFileExtension = "ts"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
+
+model Organization {
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String           @db.VarChar(160)
+  timezone        String           @default("Asia/Kolkata") @db.VarChar(80)
+  defaultCurrency String           @default("INR") @db.VarChar(3)
+  createdAt       DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamptz(6)
+  users           User[]
+  roles           Role[]
+  teams           Team[]
+  founderProfiles FounderProfile[]
+  auditLogs       AuditLog[]
+  outboxEvents    OutboxEvent[]
+}
+
+model User {
+  id                 String          @id @default(uuid()) @db.Uuid
+  organizationId     String          @db.Uuid
+  loginId            String          @db.VarChar(80)
+  displayName        String          @db.VarChar(160)
+  email              String?         @db.VarChar(255)
+  passwordHash       String?         @db.Text
+  status             UserStatus      @default(INVITED)
+  mustChangePassword Boolean         @default(true)
+  authVersion        Int             @default(1)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(6)
+  organization       Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  roles              UserRole[]
+  sessions           Session[]
+  teamMemberships    TeamMember[]
+  founderProfile     FounderProfile?
+  auditActions       AuditLog[]      @relation("AuditActor")
+
+  @@unique([organizationId, loginId])
+  @@index([organizationId, status])
+}
+
+model Role {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  key            String           @db.VarChar(80)
+  label          String           @db.VarChar(160)
+  isSystem       Boolean          @default(false)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  users          UserRole[]
+  permissions    RolePermission[]
+
+  @@unique([organizationId, key])
+}
+
+model Permission {
+  key         String           @id @db.VarChar(120)
+  description String           @db.VarChar(255)
+  roles       RolePermission[]
+}
+
+model UserRole {
+  userId     String @db.Uuid
+  roleId     String @db.Uuid
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId        String     @db.Uuid
+  permissionKey String     @db.VarChar(120)
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionKey], references: [key], onDelete: Restrict)
+
+  @@id([roleId, permissionKey])
+  @@index([permissionKey])
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String    @unique @db.VarChar(255)
+  expiresAt        DateTime  @db.Timestamptz(6)
+  revokedAt        DateTime? @db.Timestamptz(6)
+  lastUsedAt       DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  deviceLabel      String?   @db.VarChar(160)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Team {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  name           String        @db.VarChar(160)
+  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  members        TeamMember[]
+
+  @@unique([organizationId, name])
+}
+
+model TeamMember {
+  teamId String @db.Uuid
+  userId String @db.Uuid
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([userId])
+}
+
+model FounderProfile {
+  id               String        @id @default(uuid()) @db.Uuid
+  organizationId   String        @db.Uuid
+  userId           String?       @unique @db.Uuid
+  displayName      String        @db.VarChar(160)
+  title            String        @db.VarChar(160)
+  responsibilities String        @db.Text
+  sortOrder        Int           @default(0)
+  createdAt        DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(6)
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, sortOrder])
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  actorId        String?      @db.Uuid
+  action         String       @db.VarChar(120)
+  entityType     String       @db.VarChar(120)
+  entityId       String       @db.VarChar(160)
+  requestId      String?      @db.VarChar(160)
+  beforeRedacted Json?
+  afterRedacted  Json?
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor          User?        @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, entityType, entityId])
+}
+
+model OutboxEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  eventKey       String?      @db.VarChar(160)
+  kind           String       @db.VarChar(120)
+  aggregateType  String       @db.VarChar(120)
+  aggregateId    String       @db.VarChar(160)
+  payloadMinimal Json
+  status         OutboxStatus @default(PENDING)
+  attempts       Int          @default(0)
+  availableAt    DateTime     @default(now()) @db.Timestamptz(6)
+  publishedAt    DateTime?    @db.Timestamptz(6)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, eventKey])
+  @@index([status, availableAt])
+  @@index([organizationId, createdAt])
 }
