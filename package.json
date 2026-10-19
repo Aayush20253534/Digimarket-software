@@ -9,10 +9,10 @@
   },
   "scripts": {
     "dev": "pnpm --filter @digimarket/contracts build && dotenv -e .env -- pnpm --parallel --filter @digimarket/web --filter @digimarket/api dev",
-    "build": "pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api build && pnpm --filter @digimarket/worker build && pnpm --filter @digimarket/web build",
+    "build": "pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api build && pnpm --filter @digimarket/worker build && pnpm --filter @digimarket/web build",
     "lint": "eslint .",
-    "typecheck": "pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api typecheck && pnpm --filter @digimarket/worker typecheck && pnpm --filter @digimarket/web typecheck",
-    "test": "pnpm --filter @digimarket/contracts test && pnpm --filter @digimarket/api test",
+    "typecheck": "pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/db db:typecheck && pnpm --filter @digimarket/api typecheck && pnpm --filter @digimarket/worker typecheck && pnpm --filter @digimarket/web typecheck",
+    "test": "pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/contracts test && pnpm --filter @digimarket/api test",
     "smoke": "node scripts/smoke.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

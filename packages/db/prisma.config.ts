@@ -5,10 +5,8 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: { path: "prisma/migrations" },
   datasource: {
-    // Use direct Neon connections for migrations and pooled connections at runtime.
-    // Placeholder is only used by static validation/generation when no provider is configured.
-    url: process.env.DIRECT_DATABASE_URL ??
-      process.env.DATABASE_URL ??
-      "postgresql://postgres:postgres@127.0.0.1:5432/digimarket_unconfigured",
+    // Prisma CLI uses direct Neon connection for migrations; runtime pooled URL is DATABASE_URL.
+    // During Module 1 no database connection or migration is required.
+    url: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL ?? "",
   },
 });

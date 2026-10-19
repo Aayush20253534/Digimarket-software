@@ -1,14 +1,11 @@
 {
   "name": "@digimarket/db",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "db:validate": "prisma validate",
-    "db:generate": "prisma generate",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:migrate:status": "prisma migrate status",
-    "db:typecheck": "tsc --noEmit"
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^7.0.0",
@@ -21,9 +18,5 @@
     "dotenv": "^17.2.2",
     "prisma": "^7.0.0",
     "typescript": "^5.9.3"
-  },
-  "exports": {
-    ".": "./src/index.ts",
-    "./permissions": "./src/permissions.ts"
   }
 }

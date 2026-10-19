@@ -26,6 +26,8 @@ jobs:
           node-version-file: .node-version
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --filter @digimarket/db db:generate
       - name: Lint
         run: pnpm lint
       - name: Typecheck
