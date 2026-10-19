@@ -74,7 +74,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 5: approval policies, request queue, atomic decisions, role-aware UI and PostgreSQL integration
 - [x] Module 6: organization-wide finance categories, income/expense approval ledger, exact posted/pending sums, scoped CSV exports
 - [x] Module 7: leads CRM, ownership, stages, follow-ups, private activity, duplicate review, scoped bulk tools
-- [ ] Modules 8–17: clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
+- [x] Module 8: client profiles, contacts, services and atomic won-lead conversion
+- [ ] Modules 9–17: assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -95,3 +96,6 @@ The `/app/finance` screen creates user-scoped income/expense submissions with ad
 
 ## Module 7 leads CRM
 The `/app/leads` screen exposes the shared prospect pipeline with follow-up scheduling, role-scoped updates, duplicate review and permission-gated CSV import/export. WON does not create a client until Module 8. See [Module 7 documentation](docs/18-MODULE-07-LEADS-CRM.md). The CI workflow uses isolated PostgreSQL; live Neon and production deployment are unchanged.
+
+## Module 8 clients
+The `/app/clients` directory supports client records, contacts, service tracking and versioned updates. Authorized staff can convert `WON` leads to a single unique client record. See [Module 8 implementation](docs/19-MODULE-08-CLIENTS.md). A disposable PostgreSQL CI suite checks organization isolation and conversion atomicity; no production Neon migration or deployment has been performed.
