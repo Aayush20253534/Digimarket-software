@@ -228,7 +228,7 @@ export default function LeadsPage(){
            <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · {selected.source||"No source"}</p>
            {selected.canEdit?<form onSubmit={edit} className="space-y-3">
              {(["businessName","contactName","phone","businessType","location","source","websiteUrl","instagramUrl"] as const).map(k=>
-               <FormField key={k} id={"edit-"+k} label={k.replace(/([A-Z])/g," $1")}>
+               <FormField key={k} id={"edit-"+k} label={"Edit "+k.replace(/([A-Z])/g," $1")}>
                  <input id={"edit-"+k} className="field" value={updating[k]} onChange={e=>setUpdating(v=>({...v,[k]:e.target.value}))}/>
                </FormField>)}
              <FormField id="edit-stage" label="Stage"><select id="edit-stage" className="field" value={editStage}

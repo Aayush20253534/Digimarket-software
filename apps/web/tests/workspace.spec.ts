@@ -89,7 +89,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Phone", { exact: true }).fill("9876543210");
   await page.getByRole("button", { name: "Create lead" }).click();
   await expect(page.getByRole("heading", { name: "Lead: Cafe Demo Lead" })).toBeVisible();
-  await page.getByLabel("Stage").selectOption("CONTACTED");
+  await page.getByLabel("Stage", { exact: true }).selectOption("CONTACTED");
   await page.getByRole("button", { name: "Save details and stage" }).click();
   await expect(page.getByText("Lead updated and activity recorded.")).toBeVisible();
   await page.getByLabel("Activity note").fill("Followed up about digital campaigns.");
@@ -148,7 +148,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Business name", { exact: true }).fill("Employee Prospect");
   await page.getByRole("button", { name: "Create lead" }).click();
   await expect(page.getByRole("heading", { name: "Lead: Employee Prospect" })).toBeVisible();
-  await page.getByLabel("Stage").selectOption("QUALIFIED");
+  await page.getByLabel("Stage", { exact: true }).selectOption("QUALIFIED");
   await page.getByRole("button", { name: "Save details and stage" }).click();
   await expect(page.getByText("Lead updated and activity recorded.")).toBeVisible();
   await page.goto("/app/team/users");
