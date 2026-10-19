@@ -89,6 +89,14 @@ export class ApprovalService {
         decision:{select:{outcome:true,reason:true,createdAt:true,actor:{select:{displayName:true}}}}},
     });
     if(!result || (result.requesterId!==actor.userId && !canDecide(actor,result))) throw notFound();
+    if(result.referenceType==="PROJECT_DELIVERABLE" && result.requesterId!==actor.userId){
+      const p=await this.db.projectDeliverable.findFirst({where:{
+        id:result.referenceId??"",project:{organizationId:actor.organizationId,
+          ...(actor.permissions.has("projects.assign")?{}:{
+            members:{some:{userId:actor.userId,role:{in:["REVIEWER","MANAGER"]}}}})},
+      }});
+      if(!p || !actor.permissions.has("projects.review"))throw notFound();
+    }
     return result;
   }
 
@@ -105,6 +113,20 @@ export class ApprovalService {
     if(record.status!=="PENDING") throw conflict();
     if(record.referenceType==="FINANCE_ENTRY" && outcome!=="CANCELLED" && !actor.permissions.has("finance.approve")) throw forbidden();
     if(outcome==="REJECTED" && !reason?.trim()) throw invalid("Rejection reason is required");
+    if(record.referenceType==="PROJECT_DELIVERABLE"){
+      const item=await this.db.projectDeliverable.findFirst({where:{
+        id:record.referenceId??"",approvalRequestId:id,status:"IN_REVIEW",
+        project:{organizationId:actor.organizationId},
+      },include:{project:{select:{members:{where:{userId:actor.userId},select:{role:true}}}},
+        asset:{select:{status:true}}}});
+      if(!item)throw conflict();
+      if(outcome!=="CANCELLED"){
+        grant(actor,"projects.review");
+        if(!actor.permissions.has("projects.assign") &&
+          !item.project.members.some(m=>m.role==="MANAGER"||m.role==="REVIEWER"))throw forbidden();
+        if(outcome==="APPROVED"&&item.asset?.status==="ARCHIVED")throw invalid("Asset is archived");
+      }
+    }
     return this.db.$transaction(async tx=>{
       const now=new Date();
       const updated=await tx.approvalRequest.updateMany({
