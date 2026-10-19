@@ -1,0 +1,229 @@
+"use client";
+import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { ApiError } from "@/lib/api";
+import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
+
+type Status="TODO"|"IN_PROGRESS"|"BLOCKED"|"IN_REVIEW"|"DONE"|"CANCELLED";
+type Priority="LOW"|"MEDIUM"|"HIGH"|"URGENT";
+type User={id:string;displayName:string};
+type Member={userId:string;user:{displayName:string}};
+type Checklist={id:string;label:string;completed:boolean};
+type Comment={id:string;body:string;author:{displayName:string};createdAt:string};
+type Task={id:string;title:string;description:string|null;status:Status;priority:Priority;
+ dueAt:string|null;createdAt:string;projectId:string|null;version:number;recurrenceId:string|null;
+ assignees:Member[];project?:{id?:string;name:string}|null;checklist?:Checklist[];comments?:Comment[]};
+type Recurrence={id:string;title:string;frequency:"DAILY"|"WEEKLY"|"MONTHLY";interval:number;
+ nextRunAt:string;enabled:boolean;version:number;timezone:string;assigneeIds:string[]};
+type Project={id:string;name:string};
+type Result<T>={items:T[];nextCursor:string|null};
+const statuses:Status[]=["TODO","IN_PROGRESS","BLOCKED","IN_REVIEW","DONE","CANCELLED"];
+const priorities:Priority[]=["LOW","MEDIUM","HIGH","URGENT"];
+const err=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Request failed";
+const initial={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",dueAt:"",assigneeIds:[] as string[]};
+const initialSchedule={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",
+ assigneeIds:[] as string[],frequency:"DAILY" as "DAILY"|"WEEKLY"|"MONTHLY",interval:1,
+ startAt:"",dueOffsetDays:0};
+
+export default function TasksPage(){
+ const {session,request}=useAuth();
+ const grants=session?.identity.permissions??[];
+ const canRead=grants.includes("tasks.read"),canCreate=grants.includes("tasks.create");
+ const canManage=grants.includes("tasks.manage"),canRepeat=grants.includes("tasks.recurrence.manage");
+ const canWrite=grants.includes("tasks.update.own")||canManage;
+ const [view,setView]=useState<"mine"|"team">("mine");
+ const [tasks,setTasks]=useState<Task[]>([]);
+ const [selected,setSelected]=useState<Task|null>(null);
+ const [staff,setStaff]=useState<User[]>([]);
+ const [projects,setProjects]=useState<Project[]>([]);
+ const [recurrences,setRecurrences]=useState<Recurrence[]>([]);
+ const [create,setCreate]=useState(initial);
+ const [schedule,setSchedule]=useState(initialSchedule);
+ const [search,setSearch]=useState("");
+ const [statusFilter,setStatusFilter]=useState("");
+ const [cursor,setCursor]=useState<string|null>(null);
+ const [nextCursor,setNextCursor]=useState<string|null>(null);
+ const [checkLabel,setCheckLabel]=useState("");
+ const [comment,setComment]=useState("");
+ const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
+ const [error,setError]=useState(""),[message,setMessage]=useState("");
+ const browserTimezone=useMemo(()=>Intl.DateTimeFormat().resolvedOptions().timeZone||"Asia/Kolkata",[]);
+ const load=useCallback(async()=>{
+  if(!canRead){setLoading(false);return;}
+  setLoading(true);
+  try{
+   const params=new URLSearchParams({view:canManage?view:"mine",limit:"40"});
+   if(search.trim())params.set("q",search.trim());
+   if(statusFilter)params.set("status",statusFilter);
+   if(cursor)params.set("cursor",cursor);
+   const data=await request<Result<Task>>("/tasks?"+params);
+   setTasks(data.items);setNextCursor(data.nextCursor);setError("");
+  }catch(e){setError(err(e));}finally{setLoading(false);}
+ },[canRead,canManage,view,request,search,statusFilter,cursor]);
+ const open=useCallback(async(id:string)=>{
+  try{setSelected(await request<Task>("/tasks/"+id));}catch(e){setError(err(e));}
+ },[request]);
+ const loadRecurrences=useCallback(async()=>{
+  if(!canRepeat)return;
+  try{setRecurrences(await request<Recurrence[]>("/task-recurrences"));}
+  catch(e){setError(err(e));}
+ },[canRepeat,request]);
+ useEffect(()=>{void load();},[load]);
+ useEffect(()=>{
+  if(canCreate)void request<User[]>("/tasks/team").then(setStaff).catch(()=>{});
+  if(grants.includes("projects.read"))void request<Result<Project>>("/projects?limit=100").then(r=>setProjects(r.items)).catch(()=>{});
+  if(canRepeat)void loadRecurrences();
+ },[canCreate,canRepeat,request,loadRecurrences,session?.identity.userId]);
+ async function run(action:()=>Promise<unknown>,done:string,reopen=true){
+  setBusy(true);setError("");setMessage("");
+  try{
+   await action();if(reopen&&selected)await open(selected.id);
+   await Promise.all([load(),loadRecurrences()]);
+   setMessage(done);
+  }catch(e){setError(err(e));}finally{setBusy(false);}
+ }
+ const multi=(target:HTMLSelectElement)=>Array.from(target.selectedOptions).map(v=>v.value);
+ async function submitTask(e:FormEvent){
+  e.preventDefault();
+  await run(async()=>{
+   const task=await request<Task>("/tasks",{method:"POST",body:{
+    ...create,projectId:create.projectId||null,dueAt:create.dueAt?new Date(create.dueAt).toISOString():null}});
+   setCreate(initial);await open(task.id);
+  },"Task created.",false);
+ }
+ async function submitRecurring(e:FormEvent){
+  e.preventDefault();
+  if(!schedule.startAt)return;
+  await run(async()=>{
+   await request("/task-recurrences",{method:"POST",body:{
+    ...schedule,projectId:schedule.projectId||null,
+    timezone:browserTimezone,startAt:new Date(schedule.startAt).toISOString()}});
+   setSchedule(initialSchedule);
+  },"Recurring schedule created.",false);
+ }
+ if(!session)return <Spinner label="Checking task permissions…"/>;
+ if(!canRead)return <><PageHeader title="Task access denied"/><Notice kind="error">Task read permission required.</Notice></>;
+ return <div className="space-y-6">
+  <PageHeader eyebrow="Delivery operations" title="Tasks & recurring work"
+   description="Assign team work, maintain checklists, review progress and schedule automatic occurrences."/>
+  {error&&<Notice kind="error">{error}</Notice>}
+  {message&&<Notice kind="success">{message}</Notice>}
+  <Card title="Task register" description="Your tasks are private to participants. Team-wide access requires management permissions.">
+   <div className="mb-4 flex flex-wrap gap-2">
+    {canManage&&<select className="field" aria-label="Task view" value={view} onChange={e=>{setView(e.target.value as "mine"|"team");setCursor(null);}}>
+      <option value="mine">My tasks</option><option value="team">Team tasks</option></select>}
+    <input className="field min-w-[175px] flex-1" aria-label="Search tasks" placeholder="Search title" value={search}
+      onChange={e=>{setSearch(e.target.value);setCursor(null);}}/>
+    <select className="field" aria-label="Task status filter" value={statusFilter}
+      onChange={e=>{setStatusFilter(e.target.value);setCursor(null);}}>
+     <option value="">All statuses</option>{statuses.map(v=><option key={v}>{v}</option>)}
+    </select>
+   </div>
+   {loading?<Spinner label="Loading tasks…"/>:tasks.length? <div className="space-y-2">
+     {tasks.map(task=><button type="button" key={task.id} onClick={()=>void open(task.id)}
+       className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-indigo-400">
+       <div><p className="text-sm font-semibold">{task.title}</p>
+         <p className="mt-1 text-xs text-slate-500">{task.project?.name||"General"} · {task.priority}
+           {task.dueAt?" · Due "+new Date(task.dueAt).toLocaleString():""}</p></div>
+       <StatusBadge status={task.status}/>
+     </button>)}
+   </div>:<EmptyState title="No tasks found" description="Tasks assigned to you will appear here."/>}
+   <div className="mt-4 flex justify-between">
+    <button type="button" className="btn-secondary" disabled={!cursor||busy} onClick={()=>setCursor(null)}>First page</button>
+    <button type="button" className="btn-secondary" disabled={!nextCursor||busy} onClick={()=>setCursor(nextCursor)}>Next page</button>
+   </div>
+  </Card>
+  {canCreate&&<Card title="Create a task" description="Select one or more active employees. Project-linked tasks require project members.">
+    <form className="grid gap-3 md:grid-cols-2" onSubmit={submitTask}>
+     <label className="text-sm">Task title<input className="field mt-1 w-full" required minLength={2} maxLength={180}
+       value={create.title} onChange={e=>setCreate(p=>({...p,title:e.target.value}))}/></label>
+     <label className="text-sm">Priority<select className="field mt-1 w-full" value={create.priority}
+       onChange={e=>setCreate(p=>({...p,priority:e.target.value as Priority}))}>
+       {priorities.map(p=><option key={p}>{p}</option>)}</select></label>
+     <label className="text-sm">Project<select className="field mt-1 w-full" value={create.projectId}
+       onChange={e=>setCreate(p=>({...p,projectId:e.target.value}))}>
+       <option value="">General task</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+     <label className="text-sm">Due date/time<input type="datetime-local" className="field mt-1 w-full"
+       value={create.dueAt} onChange={e=>setCreate(p=>({...p,dueAt:e.target.value}))}/></label>
+     <label className="text-sm md:col-span-2">Assign employees (Ctrl/Cmd to select multiple)
+      <select multiple required size={Math.min(Math.max(staff.length,2),6)} className="field mt-1 w-full"
+       value={create.assigneeIds} onChange={e=>setCreate(p=>({...p,assigneeIds:multi(e.target)}))}>
+       {staff.map(p=><option key={p.id} value={p.id}>{p.displayName}</option>)}</select>
+     </label>
+     <label className="text-sm md:col-span-2">Description
+      <textarea className="field mt-1 w-full" maxLength={2000} rows={2} value={create.description}
+       onChange={e=>setCreate(p=>({...p,description:e.target.value}))}/></label>
+     <button className="btn-primary w-fit" disabled={busy}>Create task</button>
+    </form>
+   </Card>}
+  {selected&&<Card title={selected.title} description={selected.description||"Task details and activity"}>
+   <div className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+     <span className="text-sm text-slate-500">Assigned: {selected.assignees.map(a=>a.user.displayName).join(", ")}</span>
+     {canWrite&&<select aria-label="Update task status" className="field" value={selected.status} disabled={busy}
+       onChange={e=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",
+         body:{version:selected.version,status:e.target.value}}),"Task status updated.")}>
+       {statuses.map(v=><option key={v}>{v}</option>)}</select>}
+    </div>
+    <section><h3 className="text-sm font-bold">Checklist</h3>
+     <ul className="my-3 space-y-2">{selected.checklist?.map(c=><li key={c.id} className="flex items-center gap-2 text-sm">
+      <input type="checkbox" aria-label={c.label} checked={c.completed} disabled={!canWrite||busy||selected.status==="DONE"}
+       onChange={e=>void run(()=>request("/tasks/"+selected.id+"/checklist/"+c.id,{method:"PUT",
+         body:{completed:e.target.checked}}),"Checklist updated.")}/>{c.label}
+     </li>)}</ul>
+     {canWrite&&<form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();void run(async()=>{
+       await request("/tasks/"+selected.id+"/checklist",{method:"POST",body:{label:checkLabel}});setCheckLabel("");
+     },"Checklist item added.");}}>
+      <input className="field flex-1" aria-label="New checklist item" placeholder="New checklist item" minLength={2} maxLength={240}
+       required value={checkLabel} onChange={e=>setCheckLabel(e.target.value)}/>
+      <button className="btn-secondary" disabled={busy}>Add</button></form>}
+    </section>
+    <section><h3 className="text-sm font-bold">Comments</h3>
+     <ul className="my-3 space-y-3">{selected.comments?.map(c=><li key={c.id} className="rounded-lg bg-slate-50 p-3 text-sm">
+       <b>{c.author.displayName}</b><span className="ml-2 text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</span>
+       <p className="mt-1 whitespace-pre-wrap">{c.body}</p></li>)}</ul>
+     {grants.includes("tasks.comment")&&<form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();void run(async()=>{
+       await request("/tasks/"+selected.id+"/comments",{method:"POST",body:{body:comment}});setComment("");
+     },"Comment added.");}}>
+      <input className="field flex-1" required aria-label="New comment" maxLength={2000} value={comment}
+       onChange={e=>setComment(e.target.value)} placeholder="Update your team"/>
+      <button className="btn-secondary" disabled={busy}>Comment</button>
+     </form>}
+    </section>
+   </div>
+  </Card>}
+  {canRepeat&&<Card title="Recurring schedules" description="BullMQ generates task occurrences at the scheduled time. Scheduled work remains idempotent across retries.">
+    <ul className="mb-5 space-y-2">{recurrences.map(x=><li key={x.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm">
+     <div><b>{x.title}</b><p className="text-xs text-slate-500">{x.frequency} every {x.interval} · Next {new Date(x.nextRunAt).toLocaleString()} ({x.timezone})</p></div>
+     <button className="btn-secondary" type="button" disabled={busy} onClick={()=>void run(()=>
+       request("/task-recurrences/"+x.id,{method:"PUT",body:{version:x.version,enabled:!x.enabled}}),
+       x.enabled?"Schedule paused.":"Schedule resumed.",false)}>{x.enabled?"Pause":"Resume"}</button>
+    </li>)}</ul>
+    <form className="grid gap-3 md:grid-cols-2" onSubmit={submitRecurring}>
+     <label className="text-sm">Recurring task title<input className="field mt-1 w-full" required minLength={2}
+       value={schedule.title} onChange={e=>setSchedule(p=>({...p,title:e.target.value}))}/></label>
+     <label className="text-sm">Frequency<select className="field mt-1 w-full" value={schedule.frequency}
+       onChange={e=>setSchedule(p=>({...p,frequency:e.target.value as typeof schedule.frequency}))}>
+       <option value="DAILY">Daily</option><option value="WEEKLY">Weekly</option><option value="MONTHLY">Monthly</option>
+       </select></label>
+     <label className="text-sm">Repeat every (interval)<input type="number" min={1} max={12} className="field mt-1 w-full"
+       value={schedule.interval} onChange={e=>setSchedule(p=>({...p,interval:Number(e.target.value)}))}/></label>
+     <label className="text-sm">First occurrence (your local time)<input className="field mt-1 w-full" type="datetime-local"
+       required value={schedule.startAt} onChange={e=>setSchedule(p=>({...p,startAt:e.target.value}))}/></label>
+     <label className="text-sm">Project<select className="field mt-1 w-full" value={schedule.projectId}
+       onChange={e=>setSchedule(p=>({...p,projectId:e.target.value}))}>
+       <option value="">General work</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+     <label className="text-sm">Days until due<input className="field mt-1 w-full" type="number" min={0} max={30}
+       value={schedule.dueOffsetDays} onChange={e=>setSchedule(p=>({...p,dueOffsetDays:Number(e.target.value)}))}/></label>
+     <label className="text-sm md:col-span-2">Assign employees
+      <select className="field mt-1 w-full" multiple required size={Math.min(Math.max(staff.length,2),6)}
+       value={schedule.assigneeIds} onChange={e=>setSchedule(p=>({...p,assigneeIds:multi(e.target)}))}>
+       {staff.map(p=><option key={p.id} value={p.id}>{p.displayName}</option>)}</select></label>
+     <label className="text-sm md:col-span-2">Description<textarea className="field mt-1 w-full" maxLength={2000}
+       value={schedule.description} onChange={e=>setSchedule(p=>({...p,description:e.target.value}))}/></label>
+     <p className="text-xs text-slate-500 md:col-span-2">Timezone: {browserTimezone}. Schedules automatically pause if their staff or project becomes unavailable.</p>
+     <button className="btn-primary w-fit" disabled={busy}>Create recurring schedule</button>
+    </form>
+   </Card>}
+ </div>;
+}

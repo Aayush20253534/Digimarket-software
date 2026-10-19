@@ -1,0 +1,31 @@
+name: Update Module 11 Lockfile
+on:
+  push:
+    branches: [main]
+    paths: [apps/worker/package.json]
+permissions:
+  contents: write
+jobs:
+  update:
+    if: github.repository == 'Aayush20253534/Digimarket-software'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Generate dependency lock
+        run: pnpm install --no-frozen-lockfile
+      - name: Commit lockfile update
+        run: |
+          if ! git diff --quiet -- pnpm-lock.yaml; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add pnpm-lock.yaml
+            git commit -m "build(m11): lock BullMQ worker dependencies"
+            git push origin HEAD:main
+          fi

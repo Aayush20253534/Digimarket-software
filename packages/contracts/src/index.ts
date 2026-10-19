@@ -207,3 +207,49 @@ export const projectDeliverableUpdateSchema=projectDeliverableSchema.partial().e
 }).strict();
 export type ProjectDeliverableUpdateInput=z.infer<typeof projectDeliverableUpdateSchema>;
 export const projectDeliverableSubmitSchema=z.strictObject({version:z.number().int().positive()});
+
+// Module 11: tasks and recurring schedules.
+export const taskStatusSchema=z.enum(["TODO","IN_PROGRESS","BLOCKED","IN_REVIEW","DONE","CANCELLED"]);
+export const taskPrioritySchema=z.enum(["LOW","MEDIUM","HIGH","URGENT"]);
+export const taskFrequencySchema=z.enum(["DAILY","WEEKLY","MONTHLY"]);
+const taskOptionalText=z.string().trim().max(2000).optional();
+const taskOptionalTimestamp=z.iso.datetime({offset:true}).nullable().optional();
+export const taskCreateSchema=z.strictObject({
+ title:z.string().trim().min(2).max(180),description:taskOptionalText,
+ priority:taskPrioritySchema.default("MEDIUM"),dueAt:taskOptionalTimestamp,
+ projectId:z.uuid().nullable().optional(),
+ assigneeIds:z.array(z.uuid()).min(1).max(30).refine(x=>new Set(x).size===x.length,"Duplicate assignee"),
+});
+export type TaskCreateInput=z.infer<typeof taskCreateSchema>;
+export const taskUpdateSchema=z.strictObject({
+ version:z.number().int().positive(),
+ title:z.string().trim().min(2).max(180).optional(),
+ description:taskOptionalText,priority:taskPrioritySchema.optional(),
+ dueAt:taskOptionalTimestamp,status:taskStatusSchema.optional(),
+});
+export type TaskUpdateInput=z.infer<typeof taskUpdateSchema>;
+export const taskAssigneesSchema=z.strictObject({
+ version:z.number().int().positive(),
+ assigneeIds:z.array(z.uuid()).min(1).max(30).refine(x=>new Set(x).size===x.length,"Duplicate assignee"),
+});
+export const taskListSchema=z.strictObject({
+ view:z.enum(["mine","team"]).default("mine"),
+ status:taskStatusSchema.optional(),projectId:z.uuid().optional(),
+ q:z.string().trim().max(100).optional(),cursor:z.uuid().optional(),
+ limit:z.coerce.number().int().min(1).max(100).default(30),
+});
+export type TaskListInput=z.infer<typeof taskListSchema>;
+export const taskChecklistCreateSchema=z.strictObject({label:z.string().trim().min(2).max(240)});
+export const taskChecklistUpdateSchema=z.strictObject({completed:z.boolean()});
+export const taskCommentSchema=z.strictObject({body:z.string().trim().min(1).max(2000)});
+export const taskRecurrenceCreateSchema=z.strictObject({
+ title:z.string().trim().min(2).max(180),description:taskOptionalText,
+ priority:taskPrioritySchema.default("MEDIUM"),
+ projectId:z.uuid().nullable().optional(),
+ assigneeIds:z.array(z.uuid()).min(1).max(30).refine(x=>new Set(x).size===x.length,"Duplicate assignee"),
+ frequency:taskFrequencySchema,interval:z.number().int().min(1).max(12).default(1),
+ timezone:z.string().trim().min(3).max(80),
+ startAt:z.iso.datetime({offset:true}),dueOffsetDays:z.number().int().min(0).max(30).default(0),
+});
+export type TaskRecurrenceCreateInput=z.infer<typeof taskRecurrenceCreateSchema>;
+export const taskRecurrenceUpdateSchema=z.strictObject({version:z.number().int().positive(),enabled:z.boolean()});

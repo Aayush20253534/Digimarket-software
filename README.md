@@ -77,7 +77,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 8: client profiles, contacts, services and atomic won-lead conversion
 - [x] Module 9: private Cloudinary assets, signed upload intents, provider verification and secure downloads
 - [x] Module 10: client projects, membership, milestones, versioned deliverables and approval integration
-- [ ] Modules 11–17: tasks, calendar, billing, profit, reporting, settings, security and deployment
+- [x] Module 11: employee/team tasks, checklist/comments, recurrence cursor and BullMQ worker
+- [ ] Modules 12–17: content calendar, billing, profitability, settings, reporting and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -107,3 +108,6 @@ The `/app/assets` page supports Cloudinary-authenticated files, signed upload in
 
 ## Module 10 projects
 The `/app/projects` page provides a client-linked project status board, membership management, milestones and deliverable revisions with private asset links. Submission requires an active DELIVERABLE approval policy. Authorized reviewers resolve the original approval request, with atomic status updates, no self-approval and audit/outbox events. See [Module 10 documentation](docs/21-MODULE-10-PROJECTS.md). Production Neon and Cloudinary are not configured.
+
+## Module 11 tasks and recurrence
+`/app/tasks` supports personal/team task queues, assignments, status updates, checklists, comments and daily/weekly/monthly recurrence schedules. A separate BullMQ worker advances due recurrences with a PostgreSQL transactional cursor and uniqueness key, guaranteeing no duplicate task occurrence under retries. CI uses disposable PostgreSQL and Redis. See [Module 11 details](docs/22-MODULE-11-TASKS.md). Live managed Redis and deployment remain Module 17.

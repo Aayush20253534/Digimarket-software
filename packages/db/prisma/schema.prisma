@@ -91,6 +91,25 @@ enum ClientServiceStatus {
   PAUSED
   ENDED
 }
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
 enum ProjectStatus {
   PLANNED
   ACTIVE
@@ -150,6 +169,8 @@ model Organization {
   assets Asset[]
   assetUploadIntents AssetUploadIntent[]
   projects Project[]
+  tasks Task[]
+  taskRecurrences TaskRecurrence[]
 }
 
 model User {
@@ -186,6 +207,10 @@ model User {
   assetIntentsCreated AssetUploadIntent[] @relation("AssetIntentCreator")
   projectsCreated Project[] @relation("ProjectCreator")
   projectMemberships ProjectMember[]
+  tasksCreated Task[] @relation("TaskCreator")
+  assignedTasks TaskAssignment[]
+  taskComments TaskComment[]
+  taskRecurrencesCreated TaskRecurrence[]
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
@@ -602,6 +627,8 @@ model Project {
   members ProjectMember[]
   milestones ProjectMilestone[]
   deliverables ProjectDeliverable[]
+  tasks Task[]
+  taskRecurrences TaskRecurrence[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,clientId,createdAt])
 }
@@ -651,4 +678,94 @@ model ProjectDeliverable {
   @@index([projectId,status,updatedAt])
   @@index([milestoneId])
   @@index([assetId])
+}
+
+// Module 11: assignable tasks, checklists, comments and durable recurrence cursor.
+// BullMQ is a wakeup mechanism only; the database constraints provide exactly-once occurrence creation.
+model Task {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  projectId String? @db.Uuid
+  createdById String @db.Uuid
+  recurrenceId String? @db.Uuid
+  scheduledFor DateTime? @db.Timestamptz(6)
+  title String @db.VarChar(180)
+  description String? @db.VarChar(2000)
+  priority TaskPriority @default(MEDIUM)
+  status TaskStatus @default(TODO)
+  dueAt DateTime? @db.Timestamptz(6)
+  completedAt DateTime? @db.Timestamptz(6)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[projectId],references:[id],onDelete:Restrict)
+  creator User @relation("TaskCreator",fields:[createdById],references:[id],onDelete:Restrict)
+  recurrence TaskRecurrence? @relation(fields:[recurrenceId],references:[id],onDelete:Restrict)
+  assignees TaskAssignment[]
+  checklist TaskChecklistItem[]
+  comments TaskComment[]
+  @@unique([recurrenceId,scheduledFor])
+  @@index([organizationId,status,dueAt])
+  @@index([organizationId,createdAt,id])
+  @@index([projectId,status])
+}
+
+model TaskAssignment {
+  taskId String @db.Uuid
+  userId String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  task Task @relation(fields:[taskId],references:[id],onDelete:Cascade)
+  user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+  @@id([taskId,userId])
+  @@index([userId,taskId])
+}
+
+model TaskChecklistItem {
+  id String @id @default(uuid()) @db.Uuid
+  taskId String @db.Uuid
+  label String @db.VarChar(240)
+  completed Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  task Task @relation(fields:[taskId],references:[id],onDelete:Cascade)
+  @@index([taskId,createdAt])
+}
+
+model TaskComment {
+  id String @id @default(uuid()) @db.Uuid
+  taskId String @db.Uuid
+  authorId String @db.Uuid
+  body String @db.VarChar(2000)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  task Task @relation(fields:[taskId],references:[id],onDelete:Cascade)
+  author User @relation(fields:[authorId],references:[id],onDelete:Restrict)
+  @@index([taskId,createdAt])
+}
+
+model TaskRecurrence {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  projectId String? @db.Uuid
+  createdById String @db.Uuid
+  title String @db.VarChar(180)
+  description String? @db.VarChar(2000)
+  priority TaskPriority @default(MEDIUM)
+  assigneeIds String[] @db.Uuid
+  frequency RecurrenceFrequency
+  interval Int @default(1)
+  timezone String @db.VarChar(80)
+  anchorAt DateTime @db.Timestamptz(6)
+  nextRunAt DateTime @db.Timestamptz(6)
+  dueOffsetDays Int @default(0)
+  enabled Boolean @default(true)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[projectId],references:[id],onDelete:Restrict)
+  creator User @relation(fields:[createdById],references:[id],onDelete:Restrict)
+  occurrences Task[]
+  @@index([enabled,nextRunAt])
+  @@index([organizationId,createdAt])
 }

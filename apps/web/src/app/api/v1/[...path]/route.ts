@@ -25,6 +25,9 @@ const endpoints: Record<string, string[]> = {
   "assets": ["GET"],
   "projects": ["GET","POST"],
   "projects/assignees": ["GET"],
+  "tasks": ["GET","POST"],
+  "tasks/team": ["GET"],
+  "task-recurrences": ["GET","POST"],
   "assets/upload-intent": ["POST"],
   "assets/confirm": ["POST"],
   "leads/duplicates": ["GET"],
@@ -36,6 +39,10 @@ const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/st
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
+const taskDetailPattern=/^tasks\/[0-9a-fA-F-]{36}$/;
+const taskActionPattern=/^tasks\/[0-9a-fA-F-]{36}\/(assignees|checklist|comments)$/;
+const taskChecklistItemPattern=/^tasks\/[0-9a-fA-F-]{36}\/checklist\/[0-9a-fA-F-]{36}$/;
+const taskRecurrencePattern=/^task-recurrences\/[0-9a-fA-F-]{36}$/;
 const projectDetailPattern = /^projects\/[0-9a-fA-F-]{36}$/;
 const projectChildrenPattern = /^projects\/[0-9a-fA-F-]{36}\/(members|milestones|deliverables)$/;
 const projectMemberRemovePattern = /^projects\/[0-9a-fA-F-]{36}\/members\/[0-9a-fA-F-]{36}\/remove$/;
@@ -54,6 +61,10 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(taskDetailPattern.test(path))return ["GET","PUT"].includes(method);
+  if(taskActionPattern.test(path))return path.endsWith("/assignees")?method==="PUT":method==="POST";
+  if(taskChecklistItemPattern.test(path))return method==="PUT";
+  if(taskRecurrencePattern.test(path))return method==="PUT";
   if (projectDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (projectChildrenPattern.test(path)) return method==="POST";
   if (projectMemberRemovePattern.test(path)) return method==="POST";
@@ -107,6 +118,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     for (const key of ["q","clientId","status","cursor","limit"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
+    }
+  }
+  if (path === "tasks") {
+    for(const key of ["view","status","projectId","q","cursor","limit"]){
+      const v=request.nextUrl.searchParams.get(key);
+      if(v!==null)url.searchParams.set(key,v);
     }
   }
   if (path === "projects") {

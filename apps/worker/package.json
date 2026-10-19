@@ -1,11 +1,19 @@
 {
   "name": "@digimarket/worker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@digimarket/db": "workspace:*",
+    "bullmq": "^5.63.0",
+    "dotenv": "^17.2.2",
+    "tsx": "^4.20.6"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
