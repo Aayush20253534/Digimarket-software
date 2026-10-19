@@ -1,0 +1,93 @@
+name: Module 2 PostgreSQL Integration
+
+on:
+  push:
+    branches: [main, feature/module-02-database]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: digimarket_ci
+          POSTGRES_PASSWORD: ci-only-database-password
+          POSTGRES_DB: digimarket_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U digimarket_ci -d digimarket_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://digimarket_ci:ci-only-database-password@127.0.0.1:5432/digimarket_ci
+      DIRECT_DATABASE_URL: postgresql://digimarket_ci:ci-only-database-password@127.0.0.1:5432/digimarket_ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate Prisma schema
+        run: pnpm --filter @digimarket/db db:validate
+      - name: Generate Prisma client
+        run: pnpm --filter @digimarket/db db:generate
+      - name: Typecheck Prisma database client and integration helpers
+        run: pnpm --filter @digimarket/db exec tsc --noEmit
+      - name: Generate initial migration on Module 2 feature branch
+        if: github.ref == 'refs/heads/feature/module-02-database'
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=packages/db/prisma/migrations/20261019000000_init_core/migration.sql
+          if [ ! -f "$FILE" ]; then
+            mkdir -p "$(dirname "$FILE")"
+            pnpm --filter @digimarket/db exec prisma migrate diff \
+              --from-empty --to-schema prisma/schema.prisma --script \
+              --output prisma/migrations/20261019000000_init_core/migration.sql
+          fi
+          test -s "$FILE"
+      - name: Require versioned migration
+        run: test -s packages/db/prisma/migrations/20261019000000_init_core/migration.sql
+      - name: Apply Prisma migrations to isolated PostgreSQL
+        run: pnpm --filter @digimarket/db db:migrate:deploy
+      - name: Confirm migration reapply is safe
+        run: pnpm --filter @digimarket/db db:migrate:deploy
+      - name: Check migration status
+        run: pnpm --filter @digimarket/db db:migrate:status
+      - name: Check live database matches Prisma schema
+        run: pnpm --filter @digimarket/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Seed permission catalog twice
+        shell: bash
+        run: |
+          pnpm --filter @digimarket/api exec tsx ../../packages/db/src/seed.ts
+          pnpm --filter @digimarket/api exec tsx ../../packages/db/src/seed.ts
+      - name: Smoke-test real PostgreSQL schema and rollback
+        run: pnpm --filter @digimarket/api exec tsx ../../packages/db/src/integration-smoke.ts
+      - name: Commit checked migration on feature branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/module-02-database'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/db/prisma/migrations/20261019000000_init_core/migration.sql
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(m02): record verified PostgreSQL initial migration"
+            git push origin HEAD:feature/module-02-database
+          fi
