@@ -95,8 +95,19 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Activity note").fill("Followed up about digital campaigns.");
   await page.getByRole("button", { name: "Add note" }).click();
   await expect(page.getByText("Followed up about digital campaigns.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add note" })).toBeEnabled();
   await page.getByLabel("Stage", { exact: true }).selectOption("WON");
+  await expect(page.getByLabel("Stage", { exact: true })).toHaveValue("WON");
+  const wonUpdate = page.waitForResponse(response =>
+    response.url().includes("/api/v1/leads/") &&
+    response.request().method() === "PUT" &&
+    response.status() === 200,
+  );
   await page.getByRole("button", { name: "Save details and stage" }).click();
+  const wonResponse = await wonUpdate;
+  const wonPayload = await wonResponse.json() as { data: { status: string } };
+  expect(wonPayload.data.status).toBe("WON");
+  await expect(page.getByRole("button", { name: "Convert to client" })).toBeVisible();
   await page.getByRole("button", { name: "Convert to client" }).click();
   await expect(page.getByText("Won lead converted into a client.")).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Clients" }).click();
