@@ -1,0 +1,38 @@
+# Secrets and environment configuration
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.secret
+**/secrets/
+# Node / Next / build output
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+# Local caches and IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+pnpm-debug.log*
+# Runtime data and databases
+*.sqlite
+*.sqlite3
+*.db
+# Temporary uploads and media
+tmp/
+temp/
+uploads/
+# Env files for providers are never committed
