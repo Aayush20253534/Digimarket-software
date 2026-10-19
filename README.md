@@ -73,7 +73,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 4: secure login UI, protected dashboard, admin user management and app shell
 - [x] Module 5: approval policies, request queue, atomic decisions, role-aware UI and PostgreSQL integration
 - [x] Module 6: organization-wide finance categories, income/expense approval ledger, exact posted/pending sums, scoped CSV exports
-- [ ] Modules 7–17: CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
+- [x] Module 7: leads CRM, ownership, stages, follow-ups, private activity, duplicate review, scoped bulk tools
+- [ ] Modules 8–17: clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -91,3 +92,6 @@ The `/app/approvals` screen provides submissions, a role-filtered decision queue
 
 ## Module 6 income & expenses
 The `/app/finance` screen creates user-scoped income/expense submissions with administrator-managed categories, approval-gated posting and exact decimal sums. The FINANCE approval policy is required first; authorized reviewers resolve those entries from `/app/approvals`. CSV exports are permission-scoped. See [Module 6 finance details](docs/17-MODULE-06-FINANCE.md). No live banking, Cloudinary receipts or production Neon deployment is performed here.
+
+## Module 7 leads CRM
+The `/app/leads` screen exposes the shared prospect pipeline with follow-up scheduling, role-scoped updates, duplicate review and permission-gated CSV import/export. WON does not create a client until Module 8. See [Module 7 documentation](docs/18-MODULE-07-LEADS-CRM.md). The CI workflow uses isolated PostgreSQL; live Neon and production deployment are unchanged.

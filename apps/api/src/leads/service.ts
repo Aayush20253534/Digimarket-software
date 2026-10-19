@@ -1,0 +1,231 @@
+import { createHash } from "node:crypto";
+import type { PrismaClient, Prisma } from "@digimarket/db";
+import type { LeadCreateInput, LeadUpdateInput, LeadListQuery } from "@digimarket/contracts";
+import type { Principal } from "../auth/service";
+import { AuthError, forbidden, invalid } from "../auth/errors";
+
+const deny=(actor:Principal,key:string)=>{if(!actor.permissions.has(key))throw forbidden();};
+const missing=()=>new AuthError(404,"NOT_FOUND","Lead not found");
+const clash=()=>new AuthError(409,"VERSION_CONFLICT","Lead changed; refresh before editing");
+const clean=(s:string)=>s.trim().replace(/\s+/g," ").toLocaleLowerCase("en-US");
+function phone(value?:string){
+  if(!value?.trim())return null;
+  const digits=value.replace(/\D/g,"");
+  if(digits.length<7||digits.length>15)throw invalid("Phone number must contain 7 to 15 digits");
+  return digits;
+}
+const safeCSV=(s:string)=>'"'+(/^[\s]*[=+@\-\t\r]/.test(s)?"'":"")+s.replaceAll('"','""')+'"';
+const urlOrNull=(s?:string)=>s?.trim()||null;
+const follow=(s?:string)=>s?new Date(s):null;
+const keyFor=(batch:string,i:number)=>{
+  const h=createHash("sha256").update(batch+":"+i).digest("hex");
+  return [h.slice(0,8),h.slice(8,12),"4"+h.slice(13,16),"8"+h.slice(17,20),h.slice(20,32)].join("-");
+};
+type Tx=Prisma.TransactionClient;
+
+export class LeadsService {
+ constructor(private readonly db:PrismaClient){}
+ private canEdit(a:Principal,r:{assignedToId:string|null;createdById:string}){
+   return a.permissions.has("leads.edit") ||
+      (a.permissions.has("leads.edit.own")&&(r.assignedToId===a.userId||r.createdById===a.userId));
+ }
+ private async find(a:Principal,id:string){
+   deny(a,"leads.read");
+   const r=await this.db.lead.findFirst({where:{id,organizationId:a.organizationId}});
+   if(!r)throw missing();
+   return r;
+ }
+ private async addIn(tx:Tx,a:Principal,input:LeadCreateInput,importKey?:string){
+   const normalizedPhone=phone(input.phone);
+   const r=await tx.lead.create({data:{
+     organizationId:a.organizationId,businessName:input.businessName.trim(),
+     normalizedBusinessName:clean(input.businessName),contactName:urlOrNull(input.contactName),
+     phone:urlOrNull(input.phone),normalizedPhone,
+     businessType:urlOrNull(input.businessType),location:urlOrNull(input.location),
+     websiteUrl:urlOrNull(input.websiteUrl),instagramUrl:urlOrNull(input.instagramUrl),
+     source:urlOrNull(input.source),nextFollowUpAt:follow(input.nextFollowUpAt),
+     createdById:a.userId,importKey:importKey??null,
+   }});
+   await tx.leadActivity.create({data:{leadId:r.id,actorId:a.userId,kind:"CREATED",
+     note:input.note?.trim()||null}});
+   await this.flagDuplicates(tx,a.organizationId,r.id,r.normalizedPhone,r.normalizedBusinessName);
+   await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+     action:"leads.created",entityType:"Lead",entityId:r.id,
+     afterRedacted:{status:r.status}}});
+   return r;
+ }
+ private async flagDuplicates(tx:Tx,org:string,id:string,normalizedPhone:string|null,normalizedBusinessName:string){
+   const clauses:Prisma.LeadWhereInput[]=[{normalizedBusinessName}];
+   if(normalizedPhone)clauses.push({normalizedPhone});
+   const others=await tx.lead.findMany({where:{organizationId:org,id:{not:id},OR:clauses},
+     select:{id:true,normalizedPhone:true,normalizedBusinessName:true},take:100});
+   if(others.length){
+     await tx.leadDuplicateCandidate.createMany({data:others.map(o=>({
+       organizationId:org,leadId:id<o.id?id:o.id,candidateId:id<o.id?o.id:id,
+       reason:normalizedPhone&&o.normalizedPhone===normalizedPhone?"PHONE_MATCH":"BUSINESS_MATCH",
+     })),skipDuplicates:true});
+   }
+ }
+ async create(a:Principal,input:LeadCreateInput){
+   deny(a,"leads.create");
+   return this.db.$transaction(tx=>this.addIn(tx,a,input));
+ }
+ async list(a:Principal,input:LeadListQuery){
+   deny(a,"leads.read");
+   const where:Prisma.LeadWhereInput={
+     organizationId:a.organizationId,
+     ...(input.stage?{status:input.stage}:{}),
+     ...(input.assignedToId?{assignedToId:input.assignedToId}:{}),
+     ...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},
+       {contactName:{contains:input.q,mode:"insensitive"}},
+       {location:{contains:input.q,mode:"insensitive"}},
+       {phone:{contains:input.q}}]}:{}),
+   };
+   const rows=await this.db.lead.findMany({where,take:input.limit+1,
+     ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
+     orderBy:[{createdAt:"desc"},{id:"desc"}],
+     select:{id:true,businessName:true,contactName:true,phone:true,businessType:true,location:true,
+       websiteUrl:true,instagramUrl:true,source:true,status:true,assignedToId:true,createdById:true,
+       nextFollowUpAt:true,version:true,createdAt:true,updatedAt:true,
+       assignee:{select:{displayName:true}},_count:{select:{duplicateMatches:true,duplicateCandidates:true}}}});
+   const hasMore=rows.length>input.limit;
+   const page=rows.slice(0,input.limit);
+   return {items:page,nextCursor:hasMore?page.at(-1)?.id??null:null};
+ }
+ async detail(a:Principal,id:string){
+   const lead=await this.find(a,id);
+   const editable=this.canEdit(a,lead);
+   const basic={...lead,canEdit:editable};
+   if(!editable)return {...basic,activities:[],duplicates:[]};
+   const [activities,duplicates]=await Promise.all([
+     this.db.leadActivity.findMany({where:{leadId:id},
+       orderBy:{createdAt:"desc"},take:100,
+       include:{actor:{select:{displayName:true}}}}),
+     this.db.leadDuplicateCandidate.findMany({where:{organizationId:a.organizationId,
+       OR:[{leadId:id},{candidateId:id}]},take:50,
+       include:{lead:{select:{id:true,businessName:true,phone:true}},
+         candidate:{select:{id:true,businessName:true,phone:true}}}}),
+   ]);
+   return {...basic,activities,duplicates};
+ }
+ async update(a:Principal,id:string,input:LeadUpdateInput){
+   const current=await this.find(a,id);
+   if(!this.canEdit(a,current))throw forbidden();
+   const {version,...changes}=input;
+   const data:Prisma.LeadUpdateManyMutationInput={version:{increment:1}};
+   if(changes.businessName!==undefined){
+     data.businessName=changes.businessName;
+     data.normalizedBusinessName=clean(changes.businessName);
+   }
+   if(changes.contactName!==undefined)data.contactName=urlOrNull(changes.contactName);
+   if(changes.phone!==undefined){data.phone=urlOrNull(changes.phone);data.normalizedPhone=phone(changes.phone);}
+   if(changes.businessType!==undefined)data.businessType=urlOrNull(changes.businessType);
+   if(changes.location!==undefined)data.location=urlOrNull(changes.location);
+   if(changes.source!==undefined)data.source=urlOrNull(changes.source);
+   if(changes.websiteUrl!==undefined)data.websiteUrl=urlOrNull(changes.websiteUrl);
+   if(changes.instagramUrl!==undefined)data.instagramUrl=urlOrNull(changes.instagramUrl);
+   if(changes.nextFollowUpAt!==undefined)data.nextFollowUpAt=follow(changes.nextFollowUpAt);
+   if(changes.status!==undefined)data.status=changes.status;
+   if(Object.keys(changes).length===0)throw invalid("At least one change is required");
+   return this.db.$transaction(async tx=>{
+     const ok=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,version},data});
+     if(ok.count!==1)throw clash();
+     const changed=await tx.lead.findUniqueOrThrow({where:{id}});
+     const kind=changes.status!==undefined?"STAGE_CHANGED":
+       changes.nextFollowUpAt!==undefined?"FOLLOW_UP_SET":"DETAILS_UPDATED";
+     await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,kind,
+       metadata:{fromStatus:current.status,toStatus:changed.status,version:changed.version}}});
+     await this.flagDuplicates(tx,a.organizationId,id,changed.normalizedPhone,changed.normalizedBusinessName);
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.updated",entityType:"Lead",entityId:id,
+       afterRedacted:{stage:changed.status,version:changed.version}}});
+     return changed;
+   });
+ }
+ async assign(a:Principal,id:string,version:number,assignedToId:string|null){
+   deny(a,"leads.assign");
+   await this.find(a,id);
+   if(assignedToId){
+     const owner=await this.db.user.findFirst({where:{id:assignedToId,
+       organizationId:a.organizationId,status:"ACTIVE"},select:{id:true}});
+     if(!owner)throw invalid("Assignee must be an active staff member in this workspace");
+   }
+   return this.db.$transaction(async tx=>{
+     const changed=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,version},
+       data:{assignedToId,version:{increment:1}}});
+     if(changed.count!==1)throw clash();
+     await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,kind:"OWNER_ASSIGNED",
+       metadata:{assignedToId}}});
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.assigned",entityType:"Lead",entityId:id,afterRedacted:{assignedToId}}});
+     return tx.lead.findUniqueOrThrow({where:{id}});
+   });
+ }
+ async note(a:Principal,id:string,note:string){
+   const r=await this.find(a,id);
+   if(!this.canEdit(a,r))throw forbidden();
+   return this.db.$transaction(async tx=>{
+     const activity=await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,kind:"NOTE",note}});
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.note_added",entityType:"Lead",entityId:id}});
+     return activity;
+   });
+ }
+ async duplicates(a:Principal){
+   deny(a,"leads.duplicates.review");
+   return this.db.leadDuplicateCandidate.findMany({where:{organizationId:a.organizationId},
+     orderBy:{createdAt:"desc"},take:100,
+     include:{lead:{select:{id:true,businessName:true,phone:true}},
+       candidate:{select:{id:true,businessName:true,phone:true}}}});
+ }
+ async resolveDuplicate(a:Principal,id:string,resolution:"CONFIRMED"|"DISMISSED"){
+   deny(a,"leads.duplicates.review");
+   return this.db.$transaction(async tx=>{
+     const changed=await tx.leadDuplicateCandidate.updateMany({where:{id,organizationId:a.organizationId,resolution:"OPEN"},
+       data:{resolution,resolvedById:a.userId,resolvedAt:new Date()}});
+     if(changed.count!==1)throw new AuthError(409,"NOT_OPEN","Duplicate signal not found or already reviewed");
+     const r=await tx.leadDuplicateCandidate.findUniqueOrThrow({where:{id}});
+     await tx.leadActivity.create({data:{leadId:r.leadId,actorId:a.userId,kind:"DUPLICATE_REVIEWED",
+       metadata:{otherLeadId:r.candidateId,resolution}}});
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.duplicate_reviewed",entityType:"LeadDuplicateCandidate",entityId:id,
+       afterRedacted:{resolution}}});
+     return r;
+   });
+ }
+ async import(a:Principal,batchId:string,rows:LeadCreateInput[]){
+   deny(a,"leads.bulk");
+   deny(a,"leads.create");
+   const keys=rows.map((_,i)=>keyFor(batchId,i));
+   const existing=await this.db.lead.count({where:{organizationId:a.organizationId,importKey:{in:keys}}});
+   if(existing)throw new AuthError(409,"BATCH_ALREADY_USED","Import batch already exists");
+   try{return await this.db.$transaction(async tx=>{
+     const created=[];
+     for(let i=0;i<rows.length;i++)created.push(await this.addIn(tx,a,rows[i],keys[i]));
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.bulk_import",entityType:"LeadImport",entityId:batchId,
+       afterRedacted:{count:created.length}}});
+     return {count:created.length,ids:created.map(r=>r.id)};
+   },{timeout:20000});}
+   catch(e){if((e as {code?:string}).code==="P2002")throw new AuthError(409,"BATCH_ALREADY_USED","Import batch already exists");throw e;}
+ }
+ async export(a:Principal){
+   deny(a,"leads.bulk");
+   deny(a,"leads.read");
+   const rows=await this.db.lead.findMany({where:{organizationId:a.organizationId},
+     orderBy:{createdAt:"desc"},take:5001,
+     include:{assignee:{select:{loginId:true}}}});
+   if(rows.length>5000)throw invalid("Export limit is 5,000 rows");
+   const head=["id","business_name","contact_name","phone","business_type","location","website_url","instagram_url",
+     "source","stage","assigned_login","next_follow_up","created_at"];
+   const csv=[head.join(","),...rows.map(r=>[
+     r.id,r.businessName,r.contactName??"",r.phone??"",r.businessType??"",r.location??"",r.websiteUrl??"",
+     r.instagramUrl??"",r.source??"",r.status,r.assignee?.loginId??"",r.nextFollowUpAt?.toISOString()??"",
+     r.createdAt.toISOString(),
+   ].map(safeCSV).join(","))].join("\r\n")+"\r\n";
+   await this.db.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+     action:"leads.exported",entityType:"LeadExport",entityId:a.userId,
+     afterRedacted:{count:rows.length}}});
+   return {filename:"digimarket-leads.csv",csv};
+ }
+}

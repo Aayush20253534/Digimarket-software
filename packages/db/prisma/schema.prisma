@@ -59,6 +59,29 @@ enum FinanceMethod {
   OTHER
 }
 
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  WON
+  LOST
+}
+enum LeadActivityKind {
+  CREATED
+  NOTE
+  STAGE_CHANGED
+  OWNER_ASSIGNED
+  FOLLOW_UP_SET
+  DETAILS_UPDATED
+  DUPLICATE_REVIEWED
+}
+enum LeadDuplicateResolution {
+  OPEN
+  CONFIRMED
+  DISMISSED
+}
+
 model Organization {
   id              String           @id @default(uuid()) @db.Uuid
   name            String           @db.VarChar(160)
@@ -76,6 +99,8 @@ model Organization {
   approvalRequests ApprovalRequest[]
   financialCategories FinancialCategory[]
   financialEntries FinancialTransaction[]
+  leads Lead[]
+  leadDuplicateCandidates LeadDuplicateCandidate[]
 }
 
 model User {
@@ -103,6 +128,10 @@ model User {
   approvalSubmissions ApprovalRequest[] @relation("ApprovalRequester")
   approvalActions ApprovalDecision[] @relation("ApprovalActor")
   financialEntries FinancialTransaction[] @relation("FinancialSubmitter")
+  leadsCreated Lead[] @relation("LeadCreator")
+  leadsAssigned Lead[] @relation("LeadAssignee")
+  leadActivities LeadActivity[] @relation("LeadActivityActor")
+  reviewedLeadDuplicates LeadDuplicateCandidate[] @relation("LeadDuplicateReviewer")
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
@@ -327,4 +356,69 @@ model FinancialTransaction {
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, status, kind, occurredOn])
   @@index([organizationId, enteredById, createdAt])
+}
+
+model Lead {
+  id                String      @id @default(uuid()) @db.Uuid
+  organizationId    String      @db.Uuid
+  businessName      String      @db.VarChar(180)
+  normalizedBusinessName String @db.VarChar(180)
+  contactName       String?     @db.VarChar(160)
+  phone             String?     @db.VarChar(40)
+  normalizedPhone   String?     @db.VarChar(20)
+  businessType      String?     @db.VarChar(120)
+  location          String?     @db.VarChar(240)
+  websiteUrl        String?     @db.VarChar(500)
+  instagramUrl      String?     @db.VarChar(500)
+  source            String?     @db.VarChar(120)
+  status            LeadStage   @default(NEW)
+  assignedToId      String?     @db.Uuid
+  createdById       String      @db.Uuid
+  nextFollowUpAt    DateTime?   @db.Timestamptz(6)
+  importKey         String?     @db.Uuid
+  version           Int         @default(1)
+  createdAt         DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime    @updatedAt @db.Timestamptz(6)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  creator           User        @relation("LeadCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignee          User?       @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: Restrict)
+  activities        LeadActivity[]
+  duplicateMatches  LeadDuplicateCandidate[] @relation("LeadDuplicateSource")
+  duplicateCandidates LeadDuplicateCandidate[] @relation("LeadDuplicateMatch")
+  @@unique([organizationId, importKey])
+  @@index([organizationId, status, updatedAt])
+  @@index([organizationId, assignedToId, nextFollowUpAt])
+  @@index([organizationId, normalizedPhone])
+  @@index([organizationId, normalizedBusinessName])
+}
+
+model LeadActivity {
+  id        String  @id @default(uuid()) @db.Uuid
+  leadId    String  @db.Uuid
+  actorId   String  @db.Uuid
+  kind      LeadActivityKind
+  note      String? @db.VarChar(2000)
+  metadata  Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  lead      Lead @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  actor     User @relation("LeadActivityActor", fields: [actorId], references: [id], onDelete: Restrict)
+  @@index([leadId, createdAt])
+}
+
+model LeadDuplicateCandidate {
+  id            String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  leadId        String @db.Uuid
+  candidateId   String @db.Uuid
+  reason        String @db.VarChar(80)
+  resolution    LeadDuplicateResolution @default(OPEN)
+  resolvedById  String? @db.Uuid
+  resolvedAt    DateTime? @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  lead          Lead @relation("LeadDuplicateSource", fields: [leadId], references: [id], onDelete: Restrict)
+  candidate     Lead @relation("LeadDuplicateMatch", fields: [candidateId], references: [id], onDelete: Restrict)
+  reviewer      User? @relation("LeadDuplicateReviewer", fields: [resolvedById], references: [id], onDelete: Restrict)
+  @@unique([organizationId, leadId, candidateId])
+  @@index([organizationId, resolution, createdAt])
 }

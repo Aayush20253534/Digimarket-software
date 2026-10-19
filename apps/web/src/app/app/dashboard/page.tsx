@@ -9,7 +9,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 
 const planned = [
-  { title: "Leads & clients", detail: "Prospects, follow-up history and client records.", icon: Users, module: "Modules 7–8" },
+  { title: "Clients", detail: "Convert won leads into active client records.", icon: Users, module: "Module 8" },
   { title: "Projects, tasks & assets", detail: "Production workflows, Cloudinary files and recurring work.", icon: FolderOpen, module: "Modules 9–11" },
   { title: "Calendar, invoices & reporting", detail: "Content planning, billing, profitability and insights.", icon: CalendarClock, module: "Modules 12–16" },
 ];
@@ -17,6 +17,7 @@ const planned = [
 export default function Dashboard() {
   const { session } = useAuth();
   if (!session) return null;
+  const canSeeLeads = session.identity.permissions.includes("leads.read");
   const canSeeFinance = session.identity.permissions.includes("finance.entry.read.own") || session.identity.permissions.includes("finance.read.all");
   const canSeeApprovals = session.identity.permissions.includes("approvals.read");
   const canManage = session.identity.permissions.includes("users.read");
@@ -45,6 +46,9 @@ export default function Dashboard() {
           <Link href="/app/profile" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
             <span className="flex items-center gap-3 text-sm font-semibold"><ShieldCheck className="h-5 w-5 text-indigo-600" aria-hidden="true" />View account and permissions</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </Link>
+          {canSeeLeads && <Link href="/app/leads" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
+            <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Leads and follow-ups</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          </Link>}
           {canSeeFinance && <Link href="/app/finance" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
             <span className="flex items-center gap-3 text-sm font-semibold"><Workflow className="h-5 w-5 text-indigo-600" aria-hidden="true" />Income & expenses</span><ArrowUpRight className="h-4 w-4" aria-hidden="true"/>
           </Link>}

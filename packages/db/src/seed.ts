@@ -13,13 +13,13 @@ export async function seedPermissionCatalog() {
         update: { description },
       });
     }
-    // Module 5/6 upgrade: attach new approval and finance grants to existing system roles,
+    // Module 5/6/7 upgrade: attach new approval and finance grants to existing system roles,
     // without touching custom roles or removing any previously assigned permissions.
     const grants: Record<string, string[]> = {
-      SUPER_ADMIN: ["approvals.read","approvals.submit","approvals.decide","approvals.policy.manage", "finance.read.all", "finance.category.manage", "finance.approve"],
-      ADMIN: ["approvals.read","approvals.submit","approvals.decide","approvals.policy.manage","finance.read.all","finance.category.manage","finance.approve"],
-      FOUNDER: ["approvals.read","approvals.submit","approvals.decide","finance.read.all","finance.approve"],
-      EMPLOYEE: ["approvals.read","approvals.submit"],
+      SUPER_ADMIN: ["approvals.read","approvals.submit","approvals.decide","approvals.policy.manage", "finance.read.all", "finance.category.manage", "finance.approve","leads.bulk","leads.duplicates.review"],
+      ADMIN: ["approvals.read","approvals.submit","approvals.decide","approvals.policy.manage","finance.read.all","finance.category.manage","finance.approve","leads.bulk","leads.duplicates.review"],
+      FOUNDER: ["approvals.read","approvals.submit","approvals.decide","finance.read.all","finance.approve","leads.bulk","leads.duplicates.review"],
+      EMPLOYEE: ["approvals.read","approvals.submit","leads.edit.own"],
     };
     const roles = await prisma.role.findMany({ where: { isSystem: true, key: { in: Object.keys(grants) } } });
     for (const role of roles) {
