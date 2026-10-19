@@ -6,7 +6,8 @@
     ],
     "types": [
       "node"
-    ]
+    ],
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src/**/*.ts"
