@@ -50,7 +50,7 @@ apps/
   worker/    reserved for future BullMQ queue consumers
 packages/
   contracts/ Zod shared DTOs and tests
-  db/        Prisma v7 datasource/generator foundation (no tables yet)
+  db/        Prisma v7 organization and identity models with committed migrations
   ui/        reserved for shared UI components
 scripts/
   smoke.mjs  real HTTP web + API integration probe
@@ -63,14 +63,14 @@ docs/        full product, architecture, DB, permissions and UI specifications
 - [Module 1 setup, boundaries and verification](docs/12-MODULE-01-IMPLEMENTATION.md)
 
 ## Security
-No public signup or client credentials stored here. **Authentication is not yet implemented**. All runtime provider credentials must be in untracked environment files or hosting secret stores; never commit real secrets to this public repository. Sensitive Cloudinary files must use authenticated delivery when the asset module is built.
+No public signup or client credentials stored here. **Authentication is implemented at the API level, but no production organization or user has been bootstrapped.**. All runtime provider credentials must be in untracked environment files or hosting secret stores; never commit real secrets to this public repository. Sensitive Cloudinary files must use authenticated delivery when the asset module is built.
 
 ## Roadmap
 - [x] Module 0: product architecture and wireframes
 - [x] Module 1: monorepo scaffold, API/web foundation and CI configuration (see actual GitHub Actions status for runtime verification)
 - [x] Module 2: initial database models, migrations and isolated PostgreSQL validation
 - [x] Module 3: authentication, admin user provisioning, JWT sessions, MFA and RBAC
-- [ ] Module 4: dashboard UI and common components
+- [x] Module 4: secure login UI, protected dashboard, admin user management and app shell
 - [ ] Modules 5–17: workflows, finance, CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
 
 **Design and scaffolding are not a production release.**
@@ -80,3 +80,6 @@ Prisma 7 defines the initial organization, user, session, role/permission, team/
 
 ## Module 3: authenticated API foundation
 Secure identity routes and server-side authorization are implemented in `apps/api/src/auth`. First administrator provisioning uses a **one-time cloud CLI task**, not public signup. Existing non-auth application routes remain limited to health checks. The [Module 3 specification](docs/14-MODULE-03-AUTH.md) documents the endpoints, secret configuration and verification. User-facing login and admin dashboards are scheduled for Module 4.
+
+## Module 4 interface
+The actual browser application exposes `/login`, `/app/dashboard`, `/app/profile` and `/app/team/users`. It uses same-origin `/api/v1/*` for an allowlisted set of backend API routes and keeps bearer access tokens only in memory. Business modules not implemented yet are labeled as coming later. See [Module 4 implementation](docs/15-MODULE-04-UI.md).

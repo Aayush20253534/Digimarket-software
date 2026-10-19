@@ -1,0 +1,92 @@
+name: Module 4 Browser Integration
+
+on:
+  push:
+    branches: [main, feature/module-04-ui]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: digimarket_ci
+          POSTGRES_PASSWORD: ephemeral-ci-only
+          POSTGRES_DB: digimarket_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U digimarket_ci -d digimarket_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      CI: "true"
+      DATABASE_URL: postgresql://digimarket_ci:ephemeral-ci-only@127.0.0.1:5432/digimarket_ci
+      DIRECT_DATABASE_URL: postgresql://digimarket_ci:ephemeral-ci-only@127.0.0.1:5432/digimarket_ci
+      API_INTERNAL_URL: http://127.0.0.1:4000
+      CORS_ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+      E2E_ADMIN_INITIAL_PASSWORD: "E2E-Temporary-CI-Only-2026!"
+      E2E_ADMIN_UPDATED_PASSWORD: "E2E-Permanent-CI-Only-2026!"
+      BOOTSTRAP_ORG_NAME: "DigiMarket Isolated Browser CI"
+      BOOTSTRAP_ADMIN_LOGIN: admin-e2e
+      BOOTSTRAP_ADMIN_PASSWORD: "E2E-Temporary-CI-Only-2026!"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install dependencies and resolve lockfile on feature branch
+        if: github.ref == 'refs/heads/feature/module-04-ui'
+        run: pnpm install --no-frozen-lockfile
+      - name: Install frozen dependencies
+        if: github.ref != 'refs/heads/feature/module-04-ui'
+        run: pnpm install --frozen-lockfile
+      - name: Generate temporary identity test secrets
+        run: |
+          echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "JWT_CHALLENGE_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "MFA_ENCRYPTION_KEY_BASE64=$(openssl rand -base64 32 | tr -d '\n')" >> "$GITHUB_ENV"
+      - name: Generate DB client and run existing migrations
+        run: |
+          pnpm --filter @digimarket/db db:generate
+          pnpm --filter @digimarket/db db:migrate:deploy
+      - name: Lint, typecheck, unit test and build
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: Bootstrap ephemeral administrator
+        run: pnpm --filter @digimarket/api exec tsx src/auth/bootstrap.ts
+      - name: Install Chromium browser for UI integration
+        run: pnpm --filter @digimarket/web exec playwright install chromium --with-deps
+      - name: Run real Next.js / Express login browser tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          NODE_ENV=test pnpm --filter @digimarket/api start > /tmp/module4-api.log 2>&1 &
+          API_PID=$!
+          pnpm --filter @digimarket/web start --hostname 127.0.0.1 > /tmp/module4-web.log 2>&1 &
+          WEB_PID=$!
+          trap 'kill "$API_PID" "$WEB_PID" 2>/dev/null || true; tail -n 120 /tmp/module4-api.log; tail -n 120 /tmp/module4-web.log' EXIT
+          pnpm --filter @digimarket/web test:e2e
+      - name: Commit tested dependency lockfile
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/module-04-ui'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(m04): lock browser-test dependencies after successful CI"
+            git push origin HEAD:feature/module-04-ui
+          fi

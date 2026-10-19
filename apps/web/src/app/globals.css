@@ -1,10 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: Arial, Helvetica, sans-serif;
 }
 
+html { scroll-behavior: smooth; }
 html, body { min-height: 100%; }
-body { margin: 0; background: #0a1020; color: #e8eefc; }
-::selection { background: #4b73e4; color: white; }
+body { margin: 0; background: #f8fafc; color: #0f172a; }
+::selection { background: #c7d2fe; color: #1e1b4b; }
+button, input, select, textarea { font: inherit; }
+a, button, input, select { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 3px solid #818cf8; outline-offset: 2px; }
+.field { width: 100%; min-height: 44px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; padding: 10px 12px; color: #0f172a; font-size: 14px; outline: none; transition: border-color .15s, box-shadow .15s; }
+.field:focus { border-color: #6366f1; box-shadow: 0 0 0 3px #e0e7ff; }
+.field::placeholder { color: #94a3b8; }
+.btn-primary, .btn-secondary, .btn-danger { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background-color .15s; }
+.btn-primary { background: #4f46e5; color: white; }
+.btn-primary:hover { background: #4338ca; }
+.btn-secondary { background: white; color: #334155; border: 1px solid #cbd5e1; }
+.btn-secondary:hover { background: #f1f5f9; }
+.btn-danger { background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; }
+.btn-danger:hover { background: #ffe4e6; }
+button:disabled { opacity: .6; cursor: not-allowed; }
+.sidebar-link { display: flex; align-items: center; gap: 12px; border-radius: 12px; padding: 10px 12px; color: #475569; font-size: 13px; font-weight: 600; transition: background-color .15s; }
+.sidebar-link:hover { background: #f1f5f9; color: #0f172a; }
+.sidebar-active, .sidebar-active:hover { background: #eef2ff; color: #4338ca; }
