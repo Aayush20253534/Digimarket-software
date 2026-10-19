@@ -9,7 +9,6 @@ import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 
 const planned = [
-  { title: "Clients", detail: "Convert won leads into active client records.", icon: Users, module: "Module 8" },
   { title: "Projects, tasks & assets", detail: "Production workflows, Cloudinary files and recurring work.", icon: FolderOpen, module: "Modules 9–11" },
   { title: "Calendar, invoices & reporting", detail: "Content planning, billing, profitability and insights.", icon: CalendarClock, module: "Modules 12–16" },
 ];
@@ -17,6 +16,7 @@ const planned = [
 export default function Dashboard() {
   const { session } = useAuth();
   if (!session) return null;
+  const canSeeClients = session.identity.permissions.includes("clients.read");
   const canSeeLeads = session.identity.permissions.includes("leads.read");
   const canSeeFinance = session.identity.permissions.includes("finance.entry.read.own") || session.identity.permissions.includes("finance.read.all");
   const canSeeApprovals = session.identity.permissions.includes("approvals.read");
@@ -49,6 +49,9 @@ export default function Dashboard() {
           {canSeeLeads && <Link href="/app/leads" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
             <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Leads and follow-ups</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </Link>}
+          {canSeeClients && <Link href="/app/clients" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
+            <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Client directory</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          </Link>}
           {canSeeFinance && <Link href="/app/finance" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
             <span className="flex items-center gap-3 text-sm font-semibold"><Workflow className="h-5 w-5 text-indigo-600" aria-hidden="true" />Income & expenses</span><ArrowUpRight className="h-4 w-4" aria-hidden="true"/>
           </Link>}
@@ -58,7 +61,7 @@ export default function Dashboard() {
           {canManage && <Link href="/app/team/users" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
             <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Team account management</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </Link>}
-          <EmptyState title="No business data yet" description="Tasks, leads, clients and finance entries will appear here after their database-backed modules ship." icon={CheckCircle2} />
+          <EmptyState title="No business data yet" description="Newly created clients, projects and other business records appear in their respective modules." icon={CheckCircle2} />
         </div>
       </Card>
     </div>

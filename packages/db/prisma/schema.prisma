@@ -81,6 +81,16 @@ enum LeadDuplicateResolution {
   CONFIRMED
   DISMISSED
 }
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+enum ClientServiceStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
 
 model Organization {
   id              String           @id @default(uuid()) @db.Uuid
@@ -101,6 +111,7 @@ model Organization {
   financialEntries FinancialTransaction[]
   leads Lead[]
   leadDuplicateCandidates LeadDuplicateCandidate[]
+  clients Client[]
 }
 
 model User {
@@ -132,6 +143,7 @@ model User {
   leadsAssigned Lead[] @relation("LeadAssignee")
   leadActivities LeadActivity[] @relation("LeadActivityActor")
   reviewedLeadDuplicates LeadDuplicateCandidate[] @relation("LeadDuplicateReviewer")
+  clientsCreated Client[] @relation("ClientCreator")
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
@@ -385,6 +397,7 @@ model Lead {
   activities        LeadActivity[]
   duplicateMatches  LeadDuplicateCandidate[] @relation("LeadDuplicateSource")
   duplicateCandidates LeadDuplicateCandidate[] @relation("LeadDuplicateMatch")
+  convertedClient Client? @relation("ClientSourceLead")
   @@unique([organizationId, importKey])
   @@index([organizationId, status, updatedAt])
   @@index([organizationId, assignedToId, nextFollowUpAt])
@@ -421,4 +434,56 @@ model LeadDuplicateCandidate {
   reviewer      User? @relation("LeadDuplicateReviewer", fields: [resolvedById], references: [id], onDelete: Restrict)
   @@unique([organizationId, leadId, candidateId])
   @@index([organizationId, resolution, createdAt])
+}
+
+model Client {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  sourceLeadId String? @unique @db.Uuid
+  createdById String @db.Uuid
+  businessName String @db.VarChar(180)
+  businessType String? @db.VarChar(120)
+  phone String? @db.VarChar(40)
+  email String? @db.VarChar(255)
+  location String? @db.VarChar(240)
+  websiteUrl String? @db.VarChar(500)
+  instagramUrl String? @db.VarChar(500)
+  facebookUrl String? @db.VarChar(500)
+  notes String? @db.VarChar(2000)
+  status ClientStatus @default(ACTIVE)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  creator User @relation("ClientCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  sourceLead Lead? @relation("ClientSourceLead", fields: [sourceLeadId], references: [id], onDelete: Restrict)
+  contacts ClientContact[]
+  services ClientService[]
+  @@index([organizationId,status,updatedAt])
+  @@index([organizationId,businessName])
+}
+
+model ClientContact {
+  id String @id @default(uuid()) @db.Uuid
+  clientId String @db.Uuid
+  name String @db.VarChar(160)
+  role String? @db.VarChar(120)
+  phone String? @db.VarChar(40)
+  email String? @db.VarChar(255)
+  isPrimary Boolean @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  @@index([clientId,createdAt])
+}
+
+model ClientService {
+  id String @id @default(uuid()) @db.Uuid
+  clientId String @db.Uuid
+  name String @db.VarChar(120)
+  description String? @db.VarChar(1000)
+  status ClientServiceStatus @default(ACTIVE)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  @@index([clientId,status])
 }

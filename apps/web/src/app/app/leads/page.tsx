@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { BriefcaseBusiness, Download, RefreshCw, Upload, Users } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
@@ -41,6 +42,7 @@ const headers:Record<string,string>={business_name:"businessName",contact_name:"
 export default function LeadsPage(){
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("leads.read");
+ const canConvert=!!session?.identity.permissions.includes("leads.convert")&&!!session?.identity.permissions.includes("clients.create");
  const canCreate=!!session?.identity.permissions.includes("leads.create");
  const canAssign=!!session?.identity.permissions.includes("leads.assign");
  const canBulk=!!session?.identity.permissions.includes("leads.bulk");
@@ -90,6 +92,15 @@ export default function LeadsPage(){
        websiteUrl:detail.websiteUrl??"",instagramUrl:detail.instagramUrl??""});
    }catch(e){setError(errText(e));}
  };
+ async function convert(){
+   if(!selected)return;setBusy(true);setError("");setMessage("");
+   try{
+     const client=await request<{id:string}>("/leads/"+selected.id+"/convert",{method:"POST",body:{version:selected.version}});
+     setMessage("Won lead converted into a client. The record is now linked in Clients.");
+     await open(selected.id);await load();
+     if(!client.id)throw new Error("Client conversion did not return an ID");
+   }catch(e){setError(errText(e));}finally{setBusy(false);}
+ }
  async function create(e:FormEvent){
    e.preventDefault();setBusy(true);setError("");setMessage("");
    try{
@@ -176,7 +187,7 @@ export default function LeadsPage(){
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div className="space-y-7">
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
-     description="Shared agency prospects, ownership, pipeline stages and follow-ups. Marking a lead Won does not create a client until Module 8."
+     description="Shared agency prospects, ownership, pipeline stages and follow-ups. Won leads can be converted to client records by authorized staff."
      actions={<div className="flex gap-2">
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
@@ -226,6 +237,11 @@ export default function LeadsPage(){
        {selected?<Card title={"Lead: "+selected.businessName} description={"Version "+selected.version+" · "+selected.status}>
          <div className="space-y-5">
            <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · {selected.source||"No source"}</p>
+           {canConvert&&selected.status==="WON"&&<div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+             <p className="mb-2 text-xs text-indigo-800">Create one linked client profile from this won lead. Repeat conversions are rejected.</p>
+             <button className="btn-primary" type="button" disabled={busy} onClick={()=>void convert()}>Convert to client</button>
+             <Link href="/app/clients" className="ml-3 text-sm text-indigo-700 underline">View clients</Link>
+           </div>}
            {selected.canEdit?<form onSubmit={edit} className="space-y-3">
              {(["businessName","contactName","phone","businessType","location","source","websiteUrl","instagramUrl"] as const).map(k=>
                <FormField key={k} id={"edit-"+k} label={"Edit "+k.replace(/([A-Z])/g," $1")}>

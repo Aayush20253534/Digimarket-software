@@ -100,3 +100,38 @@ export const leadImportSchema = z.strictObject({
   rows:z.array(leadCreateSchema).min(1).max(50),
 });
 export type LeadListQuery = z.infer<typeof leadListQuerySchema>;
+
+// Module 8 client profile, relationship and conversion contracts.
+export const clientStatusSchema=z.enum(["ACTIVE","PAUSED","ARCHIVED"]);
+export const clientServiceStatusSchema=z.enum(["ACTIVE","PAUSED","ENDED"]);
+const optionalClientUrl=z.union([z.url({protocol:/^https?$/}).max(500),z.literal("")]).optional();
+const optionalClientEmail=z.union([z.email().max(255),z.literal("")]).optional();
+export const clientCreateSchema=z.strictObject({
+ businessName:z.string().trim().min(2).max(180),
+ businessType:z.string().trim().max(120).optional(),phone:z.string().trim().max(40).optional(),
+ email:optionalClientEmail,location:z.string().trim().max(240).optional(),
+ websiteUrl:optionalClientUrl,instagramUrl:optionalClientUrl,facebookUrl:optionalClientUrl,
+ notes:z.string().trim().max(2000).optional(),
+});
+export type ClientCreateInput=z.infer<typeof clientCreateSchema>;
+export const clientUpdateSchema=clientCreateSchema.partial().extend({
+ version:z.number().int().min(1),status:clientStatusSchema.optional(),
+}).strict();
+export type ClientUpdateInput=z.infer<typeof clientUpdateSchema>;
+export const clientListQuerySchema=z.strictObject({
+ q:z.string().trim().max(100).optional(),status:clientStatusSchema.optional(),
+ cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(30),
+});
+export type ClientListQuery=z.infer<typeof clientListQuerySchema>;
+export const clientContactSchema=z.strictObject({
+ name:z.string().trim().min(2).max(160),role:z.string().trim().max(120).optional(),
+ phone:z.string().trim().max(40).optional(),email:optionalClientEmail,
+ isPrimary:z.boolean().default(false),
+});
+export type ClientContactInput=z.infer<typeof clientContactSchema>;
+export const clientServiceSchema=z.strictObject({
+ name:z.string().trim().min(2).max(120),description:z.string().trim().max(1000).optional(),
+ status:clientServiceStatusSchema.default("ACTIVE"),
+});
+export type ClientServiceInput=z.infer<typeof clientServiceSchema>;
+export const clientConvertSchema=z.strictObject({version:z.number().int().min(1)});

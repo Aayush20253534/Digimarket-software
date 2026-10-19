@@ -21,6 +21,7 @@ const endpoints: Record<string, string[]> = {
   "finance/summary": ["GET"],
   "finance/export": ["GET"],
   "leads": ["GET","POST"],
+  "clients": ["GET","POST"],
   "leads/duplicates": ["GET"],
   "leads/assignees": ["GET"],
   "leads/import": ["POST"],
@@ -30,6 +31,9 @@ const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/st
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
+const clientDetailPattern = /^clients\/[0-9a-fA-F-]{36}$/;
+const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/(contacts|services)$/;
+const clientConvertPattern = /^leads\/[0-9a-fA-F-]{36}\/convert$/;
 const leadDetailPattern = /^leads\/[0-9a-fA-F-]{36}$/;
 const leadAssignPattern = /^leads\/[0-9a-fA-F-]{36}\/assign$/;
 const leadNotesPattern = /^leads\/[0-9a-fA-F-]{36}\/notes$/;
@@ -37,6 +41,9 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
+  if (clientChildrenPattern.test(path)) return method === "POST";
+  if (clientConvertPattern.test(path)) return method === "POST";
   if (leadDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (leadAssignPattern.test(path)) return method === "PUT";
   if (leadNotesPattern.test(path)||leadDuplicateReviewPattern.test(path)) return method === "POST";
@@ -74,6 +81,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (path === "approvals" || ["finance/entries","finance/summary","finance/export"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");
     if (view === "mine" || view === "queue") url.searchParams.set("view", view);
+  }
+  if (path === "clients") {
+    for (const key of ["status","q","cursor","limit"]) {
+      const value=request.nextUrl.searchParams.get(key);
+      if(value!==null)url.searchParams.set(key,value);
+    }
   }
   if (path === "leads") {
     for (const key of ["stage","assignedToId","q","cursor","limit"]) {

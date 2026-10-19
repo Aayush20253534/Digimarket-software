@@ -12,7 +12,6 @@ import { useAuth } from "@/components/auth-provider";
 import { Notice, Spinner } from "@/components/ui";
 
 const futureModules = [
-  { label: "Clients", icon: Users },
   { label: "Projects", icon: FolderKanban },
   { label: "Tasks", icon: CheckSquare2 },
   { label: "Content calendar", icon: CalendarDays },
@@ -53,6 +52,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSeeClients = session.identity.permissions.includes("clients.read");
   const canSeeLeads = session.identity.permissions.includes("leads.read");
   const canSeeFinance = session.identity.permissions.includes("finance.entry.read.own") || session.identity.permissions.includes("finance.read.all");
   const canSeeApprovals = session.identity.permissions.includes("approvals.read");
@@ -72,6 +72,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Link>
         {canSeeLeads && <Link href="/app/leads" aria-current={pathname.startsWith("/app/leads") ? "page" : undefined} className={"sidebar-link " + (pathname.startsWith("/app/leads") ? "sidebar-active" : "")}>
           <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />Leads CRM
+        </Link>}
+        {canSeeClients && <Link href="/app/clients" aria-current={pathname.startsWith("/app/clients") ? "page" : undefined} className={"sidebar-link " + (pathname.startsWith("/app/clients") ? "sidebar-active" : "")}>
+          <Users className="h-4 w-4" aria-hidden="true" />Clients
         </Link>}
         {canSeeFinance && <Link href="/app/finance" aria-current={pathname === "/app/finance" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/finance" ? "sidebar-active" : "")}>
           <Wallet className="h-4 w-4" aria-hidden="true" />Income & expenses
