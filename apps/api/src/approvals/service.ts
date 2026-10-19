@@ -153,6 +153,21 @@ export class ApprovalService {
           payloadMinimal:{transactionId:record.referenceId,outcome},
         }});
       }
+      if(record.referenceType==="PROJECT_DELIVERABLE"){
+        const changed=await tx.projectDeliverable.updateMany({where:{
+          id:record.referenceId??"",approvalRequestId:id,status:"IN_REVIEW",
+          project:{organizationId:actor.organizationId},
+        },data:{status:outcome==="APPROVED"?"APPROVED":
+          outcome==="REJECTED"?"CHANGES_REQUESTED":"DRAFT",version:{increment:1}}});
+        if(changed.count!==1)throw conflict();
+        await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
+          action:"projects.deliverable_"+outcome.toLowerCase(),entityType:"ProjectDeliverable",
+          entityId:record.referenceId??"",afterRedacted:{outcome}}});
+        await tx.outboxEvent.create({data:{organizationId:actor.organizationId,
+          eventKey:"project.deliverable.resolved."+id,kind:"projects.deliverable_resolved",
+          aggregateType:"ProjectDeliverable",aggregateId:record.referenceId??"",
+          payloadMinimal:{deliverableId:record.referenceId,approvalId:id,outcome}}});
+      }
       await tx.approvalDecision.create({data:{
         requestId:id,actorId:actor.userId,outcome,reason:reason?.trim() || null,
       }});
