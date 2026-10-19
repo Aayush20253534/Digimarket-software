@@ -76,7 +76,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 7: leads CRM, ownership, stages, follow-ups, private activity, duplicate review, scoped bulk tools
 - [x] Module 8: client profiles, contacts, services and atomic won-lead conversion
 - [x] Module 9: private Cloudinary assets, signed upload intents, provider verification and secure downloads
-- [ ] Modules 10–17: projects, tasks, calendar, billing, profit, reporting, security and deployment
+- [x] Module 10: client projects, membership, milestones, versioned deliverables and approval integration
+- [ ] Modules 11–17: tasks, calendar, billing, profit, reporting, settings, security and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -103,3 +104,6 @@ The `/app/clients` directory supports client records, contacts, service tracking
 
 ## Module 9 assets
 The `/app/assets` page supports Cloudinary-authenticated files, signed upload intents, verification, client links and protected downloads. See [Module 9 details](docs/20-MODULE-09-ASSETS.md). Live Cloudinary requires server-side Cloudinary credentials. No production deployment has been performed.
+
+## Module 10 projects
+The `/app/projects` page provides a client-linked project status board, membership management, milestones and deliverable revisions with private asset links. Submission requires an active DELIVERABLE approval policy. Authorized reviewers resolve the original approval request, with atomic status updates, no self-approval and audit/outbox events. See [Module 10 documentation](docs/21-MODULE-10-PROJECTS.md). Production Neon and Cloudinary are not configured.
