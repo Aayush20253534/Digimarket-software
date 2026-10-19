@@ -32,7 +32,7 @@ try{
   const approver=principal(reviewer.id,org.id,[
     "projects.read","projects.review","approvals.read","approvals.decide"]);
   const contributorActor=principal(contributor.id,org.id,[
-    "projects.read","projects.deliverables.write","approvals.read","approvals.submit"],["EMPLOYEE"]);
+    "projects.read","projects.deliverables.write","assets.read","approvals.read","approvals.submit"],["EMPLOYEE"]);
   const readonly=principal(unknown.id,org.id,["projects.read"],["EMPLOYEE"]);
   const outside=principal(external.id,other.id,permissions);
   const client=await db.client.create({data:{organizationId:org.id,createdById:owner.id,businessName:"Agency Client"}});

@@ -66,7 +66,7 @@ export class ProjectsService {
         deliverables:{orderBy:{createdAt:"asc"},
           select:{id:true,title:true,description:true,status:true,version:true,revision:true,
             milestoneId:true,assetId:true,approvalRequestId:true,createdAt:true,
-            asset:{select:{id:true,filename:true,status:true}},
+            asset:a.permissions.has("assets.read")?{select:{id:true,filename:true,status:true}}:false,
             approvalRequest:{select:{id:true,status:true,requesterId:true,decidedAt:true}}}}}});
   }
   async create(a:Principal,input:ProjectCreateInput){
@@ -203,6 +203,10 @@ export class ProjectsService {
     const original=await this.db.projectDeliverable.findFirst({where:{id:deliverableId,projectId:id}});
     if(!original)throw missing();
     if(original.status==="IN_REVIEW")throw invalid("Cancel current review before editing");
+    if(original.milestoneId){
+      const milestone=await this.db.projectMilestone.findUniqueOrThrow({where:{id:original.milestoneId}});
+      if(milestone.status==="DONE")throw invalid("Reopen the milestone before revising linked deliverables");
+    }
     await this.refs(p,input);
     return this.db.$transaction(async tx=>{
       const result=await tx.projectDeliverable.updateMany({where:{id:deliverableId,projectId:id,version:input.version,status:{not:"IN_REVIEW"}},
@@ -237,7 +241,7 @@ export class ProjectsService {
       if(changed.count!==1)throw conflict();
       const approval=await tx.approvalRequest.create({data:{
         organizationId:a.organizationId,policyId:policy.id,requesterId:a.userId,
-        title:"Deliverable: "+item.title,description:item.description||"Review project deliverable",
+        title:("Deliverable: "+item.title).slice(0,180),description:item.description||"Review project deliverable",
         approverRoleKeys:policy.approverRoleKeys,referenceType:"PROJECT_DELIVERABLE",referenceId:deliverableId,
       }});
       await tx.projectDeliverable.update({where:{id:deliverableId},data:{approvalRequestId:approval.id}});
