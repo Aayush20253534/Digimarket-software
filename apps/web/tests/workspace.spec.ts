@@ -27,12 +27,20 @@ function otp(secret: string, now = Date.now()) {
 }
 
 test("login, first password change, MFA, admin user management and employee permission boundary", async ({ page }) => {
+  page.on("pageerror", (error) => console.log("PAGE ERROR:", error.name, error.message.slice(0, 300)));
+  page.on("response", (response) => {
+    if (response.url().includes("/api/v1/")) console.log("API RESULT", new URL(response.url()).pathname, response.status());
+  });
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Sign in to your workspace" })).toBeVisible();
   await page.getByLabel("Login ID").fill("admin-e2e");
   await page.getByLabel("Password", { exact: true }).fill(INITIAL);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Set your new password" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Set your new password" })).toBeVisible().catch(async (error) => {
+    console.log("LOGIN SCREEN HEADINGS:", await page.locator("h2").allTextContents());
+    console.log("LOGIN ALERTS:", await page.locator('[role="alert"]').allTextContents());
+    throw error;
+  });
   await page.getByLabel("New password").fill(UPDATED);
   await page.getByRole("button", { name: "Change password" }).click();
   await expect(page.getByText("Password changed. Sign in using your new password.")).toBeVisible();
@@ -80,7 +88,12 @@ test("login, first password change, MFA, admin user management and employee perm
 test("signed-out visitors cannot read the dashboard", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
+  page.on("pageerror", (error) => console.log("UNAUTH PAGE ERROR:", error.name, error.message.slice(0, 300)));
+  page.on("response", (response) => { if (response.url().includes("/api/v1/")) console.log("UNAUTH API", new URL(response.url()).pathname, response.status()); });
   await page.goto("/app/dashboard");
-  await expect(page).toHaveURL(/\/login/);
+  await expect(page).toHaveURL(/\/login/).catch(async (error) => {
+    console.log("UNAUTH PAGE BODY:", (await page.locator("body").innerText()).slice(0, 480));
+    throw error;
+  });
   await context.close();
 });
