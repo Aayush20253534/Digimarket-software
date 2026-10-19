@@ -1,48 +1,76 @@
 # DigiMarket Software
 
-Internal agency operations platform for a digital marketing team. This repository is currently in **Module 0: product and technical specification**; application code has not been implemented.
+An internal digital marketing agency workspace, built as a pnpm TypeScript monorepo. Module 0 specifications are maintained under [docs/](docs/). Module 1 introduces the executable foundation: Next.js web, Express API, shared contracts, Prisma workspace, local Redis, CI and smoke testing.
 
-## Planned stack
-- **Web:** Next.js, TypeScript, Tailwind CSS, shadcn/ui, Recharts
-- **API:** Node.js, Express, TypeScript, Zod
-- **Database:** Neon PostgreSQL, Prisma
-- **Authentication:** Argon2id, JWT access tokens and rotating refresh sessions
-- **Authorization:** Deny-by-default RBAC with record-level access checks
-- **Cache / queues:** Redis, BullMQ, Server-Sent Events
-- **Assets:** Cloudinary, private/authenticated delivery
-- **Deployment:** Vercel (web), Render (API), managed Neon/Redis/Cloudinary
+## Stack
+- **Web:** Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
+- **API:** Node.js 22, Express 5, TypeScript, Helmet, CORS
+- **Contracts:** shared Zod v4 schemas and TypeScript types
+- **Database foundation:** Prisma v7 for planned Neon PostgreSQL (actual schema/migrations start in Module 2)
+- **Infra:** pnpm 10, Docker Compose Redis for later queues/caches, Cloudinary environment placeholders
+- **Quality:** ESLint 9, Prettier, Vitest, Supertest, GitHub Actions, integrated web/API smoke
 
-## Module 0 deliverables
-| Document | Purpose |
-| --- | --- |
-| [Product charter](docs/00-PROJECT-CHARTER.md) | Goals, boundaries, assumptions |
-| [Product requirements](docs/01-PRD.md) | Actors, modules, business rules |
-| [System architecture](docs/02-ARCHITECTURE.md) | Runtime design, data flows, integrations |
-| [Database design](docs/03-DATABASE-DESIGN.md) | Entities, keys, invariants, indexes |
-| [Authorization matrix](docs/04-PERMISSIONS.md) | Permissions and record visibility |
-| [Sitemap and UI](docs/05-SITEMAP-AND-UI.md) | Routes, layouts, forms, navigation |
-| [API standards](docs/06-API-CONTRACTS.md) | Endpoints, errors, validation, versioning |
-| [Workflows](docs/07-WORKFLOWS.md) | Leads, finances, invoices, content and tasks |
-| [Security & operations](docs/08-SECURITY-AND-OPERATIONS.md) | Security controls, deployment and backups |
-| [Execution roadmap](docs/09-MODULE-ROADMAP.md) | Modules 0–17, dependencies, acceptance gates |
-| [Acceptance criteria](docs/10-ACCEPTANCE-CRITERIA.md) | Testable requirements and release criteria |
-| [Decision log](docs/11-DECISIONS.md) | Locked decisions and items to confirm |
-| [Wireframes](docs/wireframes/README.md) | Low-fidelity application screens |
+## Setup
+Prerequisites: Node 22, pnpm 10.34.5 (Corepack or standalone), internet access for dependency installation.
 
-## Development policy
-1. One implementation module at a time; backend, frontend, authorization, tests and documentation must agree.
-2. All financial balances come from PostgreSQL. Redis is a cache and job-queue transport, never the ledger.
-3. No unrestricted public registration. Privileged actions are enforced in the API and audited.
-4. Company-wide shared records are permission-filtered. Sensitive client credentials are never stored as plaintext.
-5. Cloudinary handles files; Neon holds metadata and access policy. Sensitive files require authorized delivery.
-6. No production secrets in Git. `.env.example` will only document variable names.
+~~~bash
+corepack enable
+corepack prepare pnpm@10.34.5 --activate
+pnpm install --frozen-lockfile
+cp .env.example .env
+pnpm dev
+~~~
 
-## Status
-- [x] Module 0: specification and wireframes
-- [ ] Module 1: monorepo and infrastructure
-- [ ] Module 2: initial data layer
-- [ ] Module 3: authentication and permissions
-- [ ] Module 4: application shell
-- [ ] Modules 5–17: feature delivery and production hardening
+- Web: http://localhost:3000
+- API: http://localhost:4000/api/v1/health
 
-**Note:** Checkmarks in documentation represent planning work, not implementation, runtime verification or deployment.
+The web homepage performs a real server-side health request to Express and displays **Connected** or **Unavailable**. No mock business records are served.
+
+For optional local Redis: `docker compose up -d redis`. This is not required to run Module 1.
+
+## Validation
+~~~bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+# Start production API and web in separate terminals:
+pnpm --filter @digimarket/api start
+pnpm --filter @digimarket/web start
+# Then:
+pnpm smoke
+~~~
+If the dependency lockfile has not landed yet, use `pnpm install --no-frozen-lockfile` once. Main-branch CI is configured to commit a verified lockfile after passing validation.
+
+## Workspace
+~~~text
+apps/
+  api/       Express API: versioned health route + integration tests
+  web/       Next.js App Router + server-side API connectivity screen
+  worker/    reserved for future BullMQ queue consumers
+packages/
+  contracts/ Zod shared DTOs and tests
+  db/        Prisma v7 datasource/generator foundation (no tables yet)
+  ui/        reserved for shared UI components
+scripts/
+  smoke.mjs  real HTTP web + API integration probe
+docs/        full product, architecture, DB, permissions and UI specifications
+~~~
+
+## Documentation
+- [PRD](docs/01-PRD.md), [architecture](docs/02-ARCHITECTURE.md), [data model](docs/03-DATABASE-DESIGN.md), [permissions](docs/04-PERMISSIONS.md)
+- [Module roadmap](docs/09-MODULE-ROADMAP.md) and [UI wireframes](docs/wireframes/README.md)
+- [Module 1 setup, boundaries and verification](docs/12-MODULE-01-IMPLEMENTATION.md)
+
+## Security
+No public signup or client credentials stored here. **Authentication is not yet implemented**. All runtime provider credentials must be in untracked environment files or hosting secret stores; never commit real secrets to this public repository. Sensitive Cloudinary files must use authenticated delivery when the asset module is built.
+
+## Roadmap
+- [x] Module 0: product architecture and wireframes
+- [x] Module 1: monorepo scaffold, API/web foundation and CI configuration (see actual GitHub Actions status for runtime verification)
+- [ ] Module 2: initial database models and migrations
+- [ ] Module 3: authentication and RBAC
+- [ ] Module 4: dashboard UI and common components
+- [ ] Modules 5–17: workflows, finance, CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
+
+**Design and scaffolding are not a production release.**

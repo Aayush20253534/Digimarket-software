@@ -1,0 +1,57 @@
+name: Validate workspace
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit and API integration tests
+        run: pnpm test
+      - name: Build all runnable applications
+        run: pnpm build
+      - name: API and web integration smoke
+        shell: bash
+        run: |
+          set -e
+          pnpm --filter @digimarket/api start > /tmp/digimarket-api.log 2>&1 &
+          API_PID=$!
+          pnpm --filter @digimarket/web start > /tmp/digimarket-web.log 2>&1 &
+          WEB_PID=$!
+          trap 'kill "$API_PID" "$WEB_PID" 2>/dev/null || true; cat /tmp/digimarket-api.log; cat /tmp/digimarket-web.log' EXIT
+          pnpm smoke
+      - name: Commit generated dependency lockfile to main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(m01): lock verified workspace dependencies"
+            git push origin HEAD:main
+          fi

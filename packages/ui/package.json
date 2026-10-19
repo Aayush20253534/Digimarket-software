@@ -1,0 +1,8 @@
+{
+  "name": "@digimarket/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {},
+  "description": "Reserved workspace for shared UI components beginning in Module 4"
+}

@@ -1,0 +1,31 @@
+{
+  "name": "digimarket-software",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @digimarket/contracts build && dotenv -e .env -- pnpm --parallel --filter @digimarket/web --filter @digimarket/api dev",
+    "build": "pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api build && pnpm --filter @digimarket/worker build && pnpm --filter @digimarket/web build",
+    "lint": "eslint .",
+    "typecheck": "pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api typecheck && pnpm --filter @digimarket/worker typecheck && pnpm --filter @digimarket/web typecheck",
+    "test": "pnpm --filter @digimarket/contracts test && pnpm --filter @digimarket/api test",
+    "smoke": "node scripts/smoke.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:validate": "pnpm --filter @digimarket/db db:validate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.38.0",
+    "@types/node": "^22.18.0",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^9.38.0",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}

@@ -1,0 +1,10 @@
+// Module 1: Prisma foundation only.
+// Module 2 will add Organization, User, Role, Session and audit/outbox entities.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
