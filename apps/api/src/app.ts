@@ -3,8 +3,10 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { apiHealthSchema } from "@digimarket/contracts";
+import { registerAuthRoutes } from "./auth/routes";
+import type { AuthService } from "./auth/service";
 
-export function createApp(allowedOrigins: string[] = ["http://localhost:3000"]) {
+export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], authService?: AuthService) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
@@ -19,6 +21,8 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"]) 
       meta: { version: "v1" },
     }));
   });
+
+  if (authService) registerAuthRoutes(app, authService, allowedOrigins);
 
   app.use((_request, response) => {
     response.status(404).json({

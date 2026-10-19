@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@digimarket/db";
 import {
   decryptSecret, encryptSecret, generateTotpSecret, hashPassword, hashToken,
@@ -8,7 +7,6 @@ import { AuthError, forbidden, invalid, unauthorized } from "./errors";
 import { privilegedRole, SYSTEM_ROLES, type SystemRole } from "./policies";
 
 type Database = PrismaClient;
-type UserWithRoles = NonNullable<Awaited<ReturnType<Database["user"]["findUnique"]>>>;
 export interface Principal {
   userId: string;
   organizationId: string;

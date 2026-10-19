@@ -51,6 +51,7 @@ model User {
   mfaSecretEncrypted String?         @db.Text
   mfaPendingEncrypted String?        @db.Text
   mfaPendingExpiresAt DateTime?      @db.Timestamptz(6)
+  lastMfaStep        Int?
   createdAt          DateTime        @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime        @updatedAt @db.Timestamptz(6)
   organization       Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)

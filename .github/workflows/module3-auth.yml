@@ -1,0 +1,92 @@
+name: Module 3 Authentication Integration
+on:
+  push:
+    branches: [main, feature/module-03-auth]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  authentication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: digimarket_ci
+          POSTGRES_PASSWORD: ci-local-only
+          POSTGRES_DB: digimarket_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U digimarket_ci -d digimarket_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://digimarket_ci:ci-local-only@127.0.0.1:5432/digimarket_ci
+      DIRECT_DATABASE_URL: postgresql://digimarket_ci:ci-local-only@127.0.0.1:5432/digimarket_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install dependencies on feature branch
+        if: github.ref == 'refs/heads/feature/module-03-auth'
+        run: pnpm install --no-frozen-lockfile
+      - name: Install verified lockfile
+        if: github.ref != 'refs/heads/feature/module-03-auth'
+        run: pnpm install --frozen-lockfile
+      - name: Generate ephemeral test-only auth secrets
+        run: |
+          echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "JWT_CHALLENGE_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "MFA_ENCRYPTION_KEY_BASE64=$(openssl rand -base64 32 | tr -d '\n')" >> "$GITHUB_ENV"
+      - name: Generate Prisma client and validate schema
+        run: |
+          pnpm --filter @digimarket/db db:validate
+          pnpm --filter @digimarket/db db:generate
+      - name: Apply module 2 baseline migration
+        run: pnpm --filter @digimarket/db db:migrate:deploy
+      - name: Generate module 3 migration on feature branch
+        if: github.ref == 'refs/heads/feature/module-03-auth'
+        run: |
+          set -euo pipefail
+          FILE=packages/db/prisma/migrations/20261019010000_auth_mfa/migration.sql
+          if [ ! -f "$FILE" ]; then
+            mkdir -p "$(dirname "$FILE")"
+            pnpm --filter @digimarket/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script --output prisma/migrations/20261019010000_auth_mfa/migration.sql
+          fi
+          test -s "$FILE"
+      - name: Require versioned MFA migration
+        run: test -s packages/db/prisma/migrations/20261019010000_auth_mfa/migration.sql
+      - name: Deploy migrations and verify schema
+        run: |
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db db:migrate:status
+          pnpm --filter @digimarket/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Lint, typecheck, unit tests, and build
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: End-to-end API authentication test
+        run: pnpm --filter @digimarket/api exec tsx src/auth/integration-smoke.ts
+      - name: Commit validated migration and lockfile
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feature/module-03-auth'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml packages/db/prisma/migrations/20261019010000_auth_mfa/migration.sql
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(m03): record tested auth migration and dependency lockfile"
+            git push origin HEAD:feature/module-03-auth
+          fi
