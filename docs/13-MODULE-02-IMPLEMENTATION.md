@@ -22,15 +22,20 @@
 - No production DB connection, public signup, employee login or deployment created in Module 2.
 
 ## Acceptance criteria
-- [ ] Prisma schema validates and Prisma client generates.
-- [ ] Generated SQL migration committed.
-- [ ] Fresh migration deployment on PostgreSQL CI succeeds.
-- [ ] Reapplying migration is idempotent.
-- [ ] Role, user, team, session, founder, audit/outbox relations work.
-- [ ] Tenant-scoped uniqueness and transaction rollback tested.
-- [ ] Permission seed rerun does not duplicate grants/rows.
+- [x] Prisma schema validates and Prisma client generates.
+- [x] Generated SQL migration committed.
+- [x] Fresh migration deployment on PostgreSQL CI succeeds.
+- [x] Reapplying migration is idempotent.
+- [x] Role, user, team, session, founder, audit/outbox relations work.
+- [x] Tenant-scoped uniqueness and transaction rollback tested.
+- [x] Permission seed rerun does not duplicate grants/rows.
 - [ ] Main branch CI green.
 These gates are marked only after actual remote verification.
 
 ## Next
 Module 3: securely bootstrap Super Admin, implement Argon2id credentials, user provisioning, JWT/refresh sessions, MFA and request-scoped RBAC.
+
+## Verified cloud evidence
+- Isolated PostgreSQL run: https://github.com/Aayush20253534/Digimarket-software/actions/runs/39226954918
+- Generated SQL migration is versioned and reproducible from Prisma schema.
+- No external Neon project was changed or connected. Live database provisioning and deployment remain subsequent cloud milestones.

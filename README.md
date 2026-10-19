@@ -68,9 +68,12 @@ No public signup or client credentials stored here. **Authentication is not yet 
 ## Roadmap
 - [x] Module 0: product architecture and wireframes
 - [x] Module 1: monorepo scaffold, API/web foundation and CI configuration (see actual GitHub Actions status for runtime verification)
-- [ ] Module 2: initial database models and migrations
+- [x] Module 2: initial database models, migrations and isolated PostgreSQL validation
 - [ ] Module 3: authentication and RBAC
 - [ ] Module 4: dashboard UI and common components
 - [ ] Modules 5–17: workflows, finance, CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
 
 **Design and scaffolding are not a production release.**
+
+## Module 2 database milestone
+Prisma 7 defines the initial organization, user, session, role/permission, team/founder, audit and outbox models. Migration SQL is versioned in `packages/db/prisma/migrations/` and is tested with a GitHub Actions PostgreSQL service. See [Module 2 implementation](docs/13-MODULE-02-IMPLEMENTATION.md). This milestone does **not** connect to a live agency Neon database or create employee credentials.

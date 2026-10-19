@@ -48,6 +48,8 @@ jobs:
         run: pnpm --filter @digimarket/db db:validate
       - name: Generate Prisma client
         run: pnpm --filter @digimarket/db db:generate
+      - name: Typecheck Prisma database client and integration helpers
+        run: pnpm --filter @digimarket/db exec tsc --noEmit
       - name: Generate initial migration on Module 2 feature branch
         if: github.ref == 'refs/heads/feature/module-02-database'
         shell: bash
