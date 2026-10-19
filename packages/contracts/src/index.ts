@@ -45,3 +45,24 @@ export const approvalDecisionSchema = z.strictObject({
   message: "Reason required for rejection",
 });
 export type ApprovalDecisionInput = z.infer<typeof approvalDecisionSchema>;
+
+export const financeKindSchema = z.enum(["INCOME","EXPENSE"]);
+export type FinanceKind = z.infer<typeof financeKindSchema>;
+export const financeCategoryInputSchema = z.strictObject({
+  kind: financeKindSchema,
+  name: z.string().trim().min(2).max(120),
+});
+export type FinanceCategoryInput = z.infer<typeof financeCategoryInputSchema>;
+export const financeEntryInputSchema = z.strictObject({
+  kind: financeKindSchema,
+  categoryId: z.uuid(),
+  amount: z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),
+  occurredOn: z.iso.date(),
+  method: z.enum(["CASH","UPI","BANK_TRANSFER","CARD","OTHER"]),
+  merchantOrSource: z.string().trim().max(160).optional(),
+  description: z.string().trim().max(2000).optional(),
+  idempotencyKey: z.uuid(),
+});
+export type FinanceEntryInput = z.infer<typeof financeEntryInputSchema>;
+export const financeCategoryStatusSchema = z.strictObject({active:z.boolean()});
+export const financeViewSchema = z.enum(["mine","all"]);

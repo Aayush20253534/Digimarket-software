@@ -16,13 +16,19 @@ const endpoints: Record<string, string[]> = {
   "users": ["GET", "POST"],
   "approval-policies": ["GET"],
   "approvals": ["GET", "POST"],
+  "finance/categories": ["GET", "POST"],
+  "finance/entries": ["GET", "POST"],
+  "finance/summary": ["GET"],
+  "finance/export": ["GET"],
 };
+const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/status$/;
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if (financeCategoryStatusPattern.test(path)) return method === "PUT";
   if (policyPattern.test(path)) return method === "PUT";
   if (approvalPattern.test(path)) return method === "GET";
   if (decisionPattern.test(path)) return method === "POST";
@@ -53,7 +59,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
-  if (path === "approvals") {
+  if (path === "approvals" || ["finance/entries","finance/summary","finance/export"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");
     if (view === "mine" || view === "queue") url.searchParams.set("view", view);
   }

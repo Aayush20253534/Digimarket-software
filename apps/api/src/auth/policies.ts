@@ -9,7 +9,7 @@ const admin = [
   "users.read", "users.create", "users.update", "users.reset", "teams.read", "teams.manage",
   "leads.read", "leads.create", "leads.edit", "leads.assign", "leads.convert",
   "clients.read", "clients.create", "clients.edit", "finance.entry.create",
-  "finance.entry.read.own", "projects.create", "projects.assign", "projects.read",
+  "finance.entry.read.own", "finance.read.all", "finance.category.manage", "finance.approve", "projects.create", "projects.assign", "projects.read",
   "projects.update", "tasks.create", "tasks.update.own", "content.create",
   "content.edit", "assets.upload", "assets.read",
 ] as const;
@@ -17,7 +17,7 @@ const founder = [
   "approvals.read", "approvals.submit", "approvals.decide",
   "teams.read", "leads.read", "leads.create", "leads.edit", "leads.assign",
   "clients.read", "clients.create", "clients.edit", "finance.entry.create",
-  "finance.entry.read.own", "projects.create", "projects.read", "projects.update",
+  "finance.entry.read.own", "finance.read.all", "finance.approve", "projects.create", "projects.read", "projects.update",
   "tasks.create", "tasks.update.own", "content.create", "content.edit",
   "assets.upload", "assets.read",
 ] as const;

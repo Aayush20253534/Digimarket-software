@@ -12,7 +12,6 @@ import { useAuth } from "@/components/auth-provider";
 import { Notice, Spinner } from "@/components/ui";
 
 const futureModules = [
-  { label: "Finance", icon: Wallet },
   { label: "Leads", icon: BriefcaseBusiness },
   { label: "Clients", icon: Users },
   { label: "Projects", icon: FolderKanban },
@@ -55,6 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSeeFinance = session.identity.permissions.includes("finance.entry.read.own") || session.identity.permissions.includes("finance.read.all");
   const canSeeApprovals = session.identity.permissions.includes("approvals.read");
   const canSeeTeam = session.identity.permissions.includes("users.read");
   const name = session.user.displayName;
@@ -70,6 +70,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Link href="/app/dashboard" aria-current={pathname === "/app/dashboard" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/dashboard" ? "sidebar-active" : "")}>
           <LayoutDashboard className="h-4 w-4" aria-hidden="true" />Overview
         </Link>
+        {canSeeFinance && <Link href="/app/finance" aria-current={pathname === "/app/finance" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/finance" ? "sidebar-active" : "")}>
+          <Wallet className="h-4 w-4" aria-hidden="true" />Income & expenses
+        </Link>}
         {canSeeApprovals && <Link href="/app/approvals" aria-current={pathname === "/app/approvals" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/approvals" ? "sidebar-active" : "")}>
           <CheckSquare2 className="h-4 w-4" aria-hidden="true" />Approvals
         </Link>}

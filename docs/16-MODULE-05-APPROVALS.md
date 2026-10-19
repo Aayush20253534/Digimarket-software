@@ -43,3 +43,6 @@ The GitHub workflow `.github/workflows/module5-approvals.yml` migrates an isolat
 - No emails, chat notifications, Redis worker processing or SLA escalation are connected yet.
 - No invoice, finance or client assets exist in this module.
 - Production deployment, database initialization, backups, and monitoring are Module 17 concerns.
+
+## Module 6 integration update
+Module 6 links a FINANCE approval request with each income/expense submission. Approving, rejecting, or cancelling such a request changes the financial transaction in the **same database transaction** as the decision, with additional `finance.approve` enforcement for reviewers. Generic approval requests remain independent. See [finance implementation](17-MODULE-06-FINANCE.md).

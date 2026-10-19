@@ -86,7 +86,7 @@ export class ApprovalService {
   private async resolve(actor: Principal,id:string,outcome:"APPROVED"|"REJECTED"|"CANCELLED",reason?:string) {
     const record=await this.db.approvalRequest.findFirst({
       where:{id,organizationId:actor.organizationId},
-      select:{id:true,requesterId:true,status:true,approverRoleKeys:true},
+      select:{id:true,requesterId:true,status:true,approverRoleKeys:true,referenceType:true,referenceId:true},
     });
     if(!record) throw notFound();
     if(outcome==="CANCELLED") {
@@ -94,6 +94,7 @@ export class ApprovalService {
       if(record.requesterId!==actor.userId) throw forbidden();
     } else if(!canDecide(actor,record)) throw forbidden();
     if(record.status!=="PENDING") throw conflict();
+    if(record.referenceType==="FINANCE_ENTRY" && outcome!=="CANCELLED" && !actor.permissions.has("finance.approve")) throw forbidden();
     if(outcome==="REJECTED" && !reason?.trim()) throw invalid("Rejection reason is required");
     return this.db.$transaction(async tx=>{
       const now=new Date();
@@ -102,6 +103,25 @@ export class ApprovalService {
         data:{status:outcome,decidedAt:now},
       });
       if(updated.count!==1) throw conflict();
+      if(record.referenceType==="FINANCE_ENTRY"){
+        if(!record.referenceId) throw conflict();
+        const changed=await tx.financialTransaction.updateMany({
+          where:{id:record.referenceId,approvalRequestId:id,organizationId:actor.organizationId,status:"PENDING"},
+          data:{status:outcome==="APPROVED"?"POSTED":outcome,
+            postedAt:outcome==="APPROVED"?now:null},
+        });
+        if(changed.count!==1)throw conflict();
+        await tx.auditLog.create({data:{
+          organizationId:actor.organizationId,actorId:actor.userId,
+          action:"finance."+outcome.toLowerCase(),entityType:"FinancialTransaction",entityId:record.referenceId,
+          afterRedacted:{status:outcome==="APPROVED"?"POSTED":outcome},
+        }});
+        await tx.outboxEvent.create({data:{
+          organizationId:actor.organizationId,eventKey:"finance.resolved."+record.referenceId,
+          kind:"finance.resolved",aggregateType:"FinancialTransaction",aggregateId:record.referenceId,
+          payloadMinimal:{transactionId:record.referenceId,outcome},
+        }});
+      }
       await tx.approvalDecision.create({data:{
         requestId:id,actorId:actor.userId,outcome,reason:reason?.trim() || null,
       }});

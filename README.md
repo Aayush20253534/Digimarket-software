@@ -72,7 +72,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 3: authentication, admin user provisioning, JWT sessions, MFA and RBAC
 - [x] Module 4: secure login UI, protected dashboard, admin user management and app shell
 - [x] Module 5: approval policies, request queue, atomic decisions, role-aware UI and PostgreSQL integration
-- [ ] Modules 6–17: finance, CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
+- [x] Module 6: organization-wide finance categories, income/expense approval ledger, exact posted/pending sums, scoped CSV exports
+- [ ] Modules 7–17: CRM, clients, assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -87,3 +88,6 @@ The actual browser application exposes `/login`, `/app/dashboard`, `/app/profile
 
 ## Module 5 approval workflows
 The `/app/approvals` screen provides submissions, a role-filtered decision queue and configuration of category policies. An administrator must create an active policy before anyone can submit requests. Approval outcomes do not post accounting or publish content until those feature modules are implemented. The reusable state machine prevents self-approval and concurrent duplicate decisions. See [Module 5 implementation](docs/16-MODULE-05-APPROVALS.md).
+
+## Module 6 income & expenses
+The `/app/finance` screen creates user-scoped income/expense submissions with administrator-managed categories, approval-gated posting and exact decimal sums. The FINANCE approval policy is required first; authorized reviewers resolve those entries from `/app/approvals`. CSV exports are permission-scoped. See [Module 6 finance details](docs/17-MODULE-06-FINANCE.md). No live banking, Cloudinary receipts or production Neon deployment is performed here.

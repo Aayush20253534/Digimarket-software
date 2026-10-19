@@ -41,6 +41,24 @@ enum ApprovalOutcome {
   CANCELLED
 }
 
+enum FinanceKind {
+  INCOME
+  EXPENSE
+}
+enum FinanceStatus {
+  PENDING
+  POSTED
+  REJECTED
+  CANCELLED
+}
+enum FinanceMethod {
+  CASH
+  UPI
+  BANK_TRANSFER
+  CARD
+  OTHER
+}
+
 model Organization {
   id              String           @id @default(uuid()) @db.Uuid
   name            String           @db.VarChar(160)
@@ -56,6 +74,8 @@ model Organization {
   outboxEvents    OutboxEvent[]
   approvalPolicies ApprovalPolicy[]
   approvalRequests ApprovalRequest[]
+  financialCategories FinancialCategory[]
+  financialEntries FinancialTransaction[]
 }
 
 model User {
@@ -82,6 +102,7 @@ model User {
   auditActions       AuditLog[]      @relation("AuditActor")
   approvalSubmissions ApprovalRequest[] @relation("ApprovalRequester")
   approvalActions ApprovalDecision[] @relation("ApprovalActor")
+  financialEntries FinancialTransaction[] @relation("FinancialSubmitter")
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
@@ -250,6 +271,7 @@ model ApprovalRequest {
   policy           ApprovalPolicy   @relation(fields: [policyId], references: [id], onDelete: Restrict)
   requester        User             @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   decision         ApprovalDecision?
+  financeEntry     FinancialTransaction?
   @@index([organizationId, status, createdAt])
   @@index([organizationId, requesterId, createdAt])
 }
@@ -264,4 +286,45 @@ model ApprovalDecision {
   request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
   actor     User            @relation("ApprovalActor", fields: [actorId], references: [id], onDelete: Restrict)
   @@index([actorId, createdAt])
+}
+
+model FinancialCategory {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  kind           FinanceKind
+  name           String @db.VarChar(120)
+  normalizedName String @db.VarChar(120)
+  active         Boolean @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entries        FinancialTransaction[]
+  @@unique([organizationId, kind, normalizedName])
+  @@index([organizationId, kind, active])
+}
+
+model FinancialTransaction {
+  id                String @id @default(uuid()) @db.Uuid
+  organizationId    String @db.Uuid
+  enteredById       String @db.Uuid
+  categoryId        String @db.Uuid
+  approvalRequestId String @unique @db.Uuid
+  idempotencyKey    String @db.Uuid
+  kind              FinanceKind
+  amount            Decimal @db.Decimal(19,4)
+  currencyCode      String @db.VarChar(3)
+  occurredOn        DateTime @db.Date
+  merchantOrSource  String? @db.VarChar(160)
+  method            FinanceMethod
+  description       String? @db.VarChar(2000)
+  status            FinanceStatus @default(PENDING)
+  postedAt          DateTime? @db.Timestamptz(6)
+  createdAt         DateTime @default(now()) @db.Timestamptz(6)
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  enteredBy         User @relation("FinancialSubmitter", fields: [enteredById], references: [id], onDelete: Restrict)
+  category          FinancialCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  approvalRequest   ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, status, kind, occurredOn])
+  @@index([organizationId, enteredById, createdAt])
 }
