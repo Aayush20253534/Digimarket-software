@@ -50,6 +50,8 @@ try{
  const privateView=await crm.detail(employee,initial.id);
  assert.ok(privateView.activities.some(a=>a.note?.includes("Called the manager")));
  const match=await crm.create(employee,{businessName:"BIG MO'S CAFÉ",phone:"98765-43210",location:"Prayagraj"});
+ assert.notEqual(match.id,initial.id);
+ assert.equal(match.organizationId,org.id);
  const signals=await crm.duplicates(admin);
  assert.equal(signals.length,1);
  assert.equal(signals[0].reason,"PHONE_MATCH");
