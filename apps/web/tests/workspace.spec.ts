@@ -95,7 +95,9 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Activity note").fill("Followed up about digital campaigns.");
   await page.getByRole("button", { name: "Add note" }).click();
   await expect(page.getByText("Followed up about digital campaigns.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add note" })).toBeEnabled();
+  // Note input is cleared after saving, so its submit button stays disabled by design.
+  // Wait for the shared in-flight operation to finish before editing the lead stage.
+  await expect(page.getByRole("button", { name: "Save details and stage" })).toBeEnabled();
   await page.getByLabel("Stage", { exact: true }).selectOption("WON");
   await expect(page.getByLabel("Stage", { exact: true })).toHaveValue("WON");
   const wonUpdate = page.waitForResponse(response =>
