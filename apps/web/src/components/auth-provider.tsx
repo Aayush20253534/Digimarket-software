@@ -77,12 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const logout = useCallback(async () => {
-    // Clear in-memory identity even if API is unavailable. Server cookie is cleared on successful logout.
-    try {
-      await apiRequest<void>("/auth/logout", { method: "POST" });
-    } finally {
-      saveSession(null);
-    }
+    // Do not claim logout when server failed to revoke its HttpOnly refresh cookie.
+    await apiRequest<void>("/auth/logout", { method: "POST" });
+    saveSession(null);
   }, [saveSession]);
 
   return <AuthContext.Provider value={{ status, session, completeLogin, request, refresh, logout }}>
