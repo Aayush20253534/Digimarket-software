@@ -159,3 +159,51 @@ export const assetLinkSchema=z.strictObject({
  version:z.number().int().positive(),clientId:z.uuid().nullable(),
 });
 export const assetArchiveSchema=z.strictObject({version:z.number().int().positive()});
+
+// Module 10: projects, project membership, milestones, deliverables and approval submissions.
+export const projectStatusSchema=z.enum(["PLANNED","ACTIVE","ON_HOLD","COMPLETED","ARCHIVED"]);
+export const projectMemberRoleSchema=z.enum(["MANAGER","CONTRIBUTOR","REVIEWER"]);
+export const milestoneStatusSchema=z.enum(["OPEN","DONE"]);
+export const deliverableStatusSchema=z.enum(["DRAFT","IN_REVIEW","CHANGES_REQUESTED","APPROVED"]);
+const optionalProjectDate=z.union([z.iso.date(),z.literal("")]).optional();
+export const projectCreateSchema=z.strictObject({
+  clientId:z.uuid(),name:z.string().trim().min(2).max(180),
+  description:z.string().trim().max(2000).optional(),
+  startOn:optionalProjectDate,dueOn:optionalProjectDate,
+}).refine(x=>!x.startOn||!x.dueOn||x.startOn<=x.dueOn,{message:"Start date must be on or before due date"});
+export type ProjectCreateInput=z.infer<typeof projectCreateSchema>;
+export const projectUpdateSchema=z.strictObject({
+  version:z.number().int().positive(),name:z.string().trim().min(2).max(180).optional(),
+  description:z.string().trim().max(2000).optional(),status:projectStatusSchema.optional(),
+  startOn:optionalProjectDate,dueOn:optionalProjectDate,
+});
+export type ProjectUpdateInput=z.infer<typeof projectUpdateSchema>;
+export const projectListSchema=z.strictObject({
+  q:z.string().trim().max(100).optional(),status:projectStatusSchema.optional(),
+  clientId:z.uuid().optional(),cursor:z.uuid().optional(),
+  limit:z.coerce.number().int().min(1).max(100).default(30),
+});
+export type ProjectListInput=z.infer<typeof projectListSchema>;
+export const projectMemberSchema=z.strictObject({
+  userId:z.uuid(),role:projectMemberRoleSchema,
+});
+export type ProjectMemberInput=z.infer<typeof projectMemberSchema>;
+export const projectMilestoneSchema=z.strictObject({
+  title:z.string().trim().min(2).max(180),dueOn:optionalProjectDate,
+});
+export type ProjectMilestoneInput=z.infer<typeof projectMilestoneSchema>;
+export const projectMilestoneUpdateSchema=z.strictObject({
+  version:z.number().int().positive(),status:milestoneStatusSchema,
+});
+export const projectDeliverableSchema=z.strictObject({
+  title:z.string().trim().min(2).max(180),
+  description:z.string().trim().max(2000).optional(),
+  milestoneId:z.uuid().nullable().optional(),
+  assetId:z.uuid().nullable().optional(),
+});
+export type ProjectDeliverableInput=z.infer<typeof projectDeliverableSchema>;
+export const projectDeliverableUpdateSchema=projectDeliverableSchema.partial().extend({
+  version:z.number().int().positive(),
+}).strict();
+export type ProjectDeliverableUpdateInput=z.infer<typeof projectDeliverableUpdateSchema>;
+export const projectDeliverableSubmitSchema=z.strictObject({version:z.number().int().positive()});

@@ -41,6 +41,8 @@ export const permissionCatalog = [
   ["projects.assign", "Assign project collaborators"],
   ["projects.read", "Read permitted projects"],
   ["projects.update", "Edit permitted projects"],
+  ["projects.deliverables.write", "Author and revise assigned project deliverables"],
+  ["projects.review", "Decide deliverables in permitted project review queues"],
   ["tasks.create", "Create and assign tasks"],
   ["tasks.update.own", "Update assigned tasks"],
   ["tasks.recurrence.manage", "Manage recurring schedules"],

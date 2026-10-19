@@ -91,6 +91,28 @@ enum ClientServiceStatus {
   PAUSED
   ENDED
 }
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+enum ProjectMemberRole {
+  MANAGER
+  CONTRIBUTOR
+  REVIEWER
+}
+enum MilestoneStatus {
+  OPEN
+  DONE
+}
+enum DeliverableStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+}
 enum AssetStatus {
   ACTIVE
   ARCHIVED
@@ -127,6 +149,7 @@ model Organization {
   clients Client[]
   assets Asset[]
   assetUploadIntents AssetUploadIntent[]
+  projects Project[]
 }
 
 model User {
@@ -330,6 +353,7 @@ model ApprovalRequest {
   requester        User             @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   decision         ApprovalDecision?
   financeEntry     FinancialTransaction?
+  projectDeliverable ProjectDeliverable? @relation("DeliverableCurrentApproval")
   @@index([organizationId, status, createdAt])
   @@index([organizationId, requesterId, createdAt])
 }
@@ -478,6 +502,7 @@ model Client {
   services ClientService[]
   assets Asset[]
   assetUploadIntents AssetUploadIntent[]
+  projects Project[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
 }
@@ -548,7 +573,80 @@ model Asset {
   uploader User @relation("AssetCreator", fields: [uploadedById], references: [id], onDelete: Restrict)
   client Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
   uploadIntent AssetUploadIntent @relation(fields: [uploadIntentId], references: [id], onDelete: Restrict)
+  projectDeliverables ProjectDeliverable[]
   @@index([organizationId,status,createdAt])
   @@index([organizationId,clientId,createdAt])
   @@index([organizationId,filename])
+}
+
+ 
+// Module 10: client-linked delivery management with membership-scoped reads.
+model Project {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  createdById String @db.Uuid
+  name String @db.VarChar(180)
+  description String? @db.VarChar(2000)
+  status ProjectStatus @default(PLANNED)
+  startOn DateTime? @db.Date
+  dueOn DateTime? @db.Date
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId], references:[id], onDelete:Restrict)
+  client Client @relation(fields:[clientId], references:[id], onDelete:Restrict)
+  creator User @relation("ProjectCreator", fields:[createdById], references:[id], onDelete:Restrict)
+  members ProjectMember[]
+  milestones ProjectMilestone[]
+  deliverables ProjectDeliverable[]
+  @@index([organizationId,status,updatedAt])
+  @@index([organizationId,clientId,createdAt])
+}
+
+model ProjectMember {
+  projectId String @db.Uuid
+  userId String @db.Uuid
+  role ProjectMemberRole @default(CONTRIBUTOR)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  project Project @relation(fields:[projectId], references:[id], onDelete:Restrict)
+  user User @relation(fields:[userId], references:[id], onDelete:Restrict)
+  @@id([projectId,userId])
+  @@index([userId])
+}
+
+model ProjectMilestone {
+  id String @id @default(uuid()) @db.Uuid
+  projectId String @db.Uuid
+  title String @db.VarChar(180)
+  dueOn DateTime? @db.Date
+  status MilestoneStatus @default(OPEN)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  project Project @relation(fields:[projectId], references:[id], onDelete:Restrict)
+  deliverables ProjectDeliverable[]
+  @@index([projectId,status,dueOn])
+}
+
+model ProjectDeliverable {
+  id String @id @default(uuid()) @db.Uuid
+  projectId String @db.Uuid
+  milestoneId String? @db.Uuid
+  assetId String? @db.Uuid
+  approvalRequestId String? @unique @db.Uuid
+  title String @db.VarChar(180)
+  description String? @db.VarChar(2000)
+  status DeliverableStatus @default(DRAFT)
+  version Int @default(1)
+  revision Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  project Project @relation(fields:[projectId], references:[id], onDelete:Restrict)
+  milestone ProjectMilestone? @relation(fields:[milestoneId], references:[id], onDelete:Restrict)
+  asset Asset? @relation(fields:[assetId], references:[id], onDelete:Restrict)
+  approvalRequest ApprovalRequest? @relation("DeliverableCurrentApproval", fields:[approvalRequestId], references:[id], onDelete:Restrict)
+  @@index([projectId,status,updatedAt])
+  @@index([milestoneId])
+  @@index([assetId])
 }
