@@ -135,3 +135,27 @@ export const clientServiceSchema=z.strictObject({
 });
 export type ClientServiceInput=z.infer<typeof clientServiceSchema>;
 export const clientConvertSchema=z.strictObject({version:z.number().int().min(1)});
+
+export const assetContentTypeSchema=z.enum(["image/jpeg","image/png","image/webp","video/mp4","video/quicktime","video/webm","application/pdf"]);
+export const assetIntentSchema=z.strictObject({
+ filename:z.string().trim().min(1).max(180).refine(name=>!/[/\\\x00-\x1f]/.test(name),"Invalid filename"),
+ contentType:assetContentTypeSchema,
+ bytes:z.number().int().positive().max(100_000_000),
+ clientId:z.uuid().nullable().optional(),
+});
+export type AssetIntentInput=z.infer<typeof assetIntentSchema>;
+export const assetConfirmSchema=z.strictObject({
+ intentId:z.uuid(),assetId:z.string().trim().min(6).max(120),
+});
+export const assetListSchema=z.strictObject({
+ q:z.string().trim().max(100).optional(),
+ clientId:z.uuid().optional(),
+ status:z.enum(["ACTIVE","ARCHIVED"]).default("ACTIVE"),
+ cursor:z.uuid().optional(),
+ limit:z.coerce.number().int().min(1).max(100).default(30),
+});
+export type AssetListQuery=z.infer<typeof assetListSchema>;
+export const assetLinkSchema=z.strictObject({
+ version:z.number().int().positive(),clientId:z.uuid().nullable(),
+});
+export const assetArchiveSchema=z.strictObject({version:z.number().int().positive()});

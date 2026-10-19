@@ -122,6 +122,9 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Contact name").fill("Agency Contact");
   await page.getByRole("button", { name: "Add contact" }).click();
   await expect(page.getByText("Client contact saved.")).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Files & assets" }).click();
+  await expect(page.getByRole("heading", { name: "Files & assets" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Secure upload" })).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
   await page.locator("#new-businessName").fill("Cafe Demo Lead Other");
@@ -154,6 +157,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("link", { name: "Team & accounts" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Files & assets" })).toHaveCount(0);
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income & expenses" }).click();
   await expect(page.getByRole("heading", { name: "Income & expenses" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Agency totals" })).toHaveCount(0);

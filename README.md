@@ -75,7 +75,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 6: organization-wide finance categories, income/expense approval ledger, exact posted/pending sums, scoped CSV exports
 - [x] Module 7: leads CRM, ownership, stages, follow-ups, private activity, duplicate review, scoped bulk tools
 - [x] Module 8: client profiles, contacts, services and atomic won-lead conversion
-- [ ] Modules 9–17: assets, projects, tasks, calendar, billing, profit, reporting, security and deployment
+- [x] Module 9: private Cloudinary assets, signed upload intents, provider verification and secure downloads
+- [ ] Modules 10–17: projects, tasks, calendar, billing, profit, reporting, security and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -99,3 +100,6 @@ The `/app/leads` screen exposes the shared prospect pipeline with follow-up sche
 
 ## Module 8 clients
 The `/app/clients` directory supports client records, contacts, service tracking and versioned updates. Authorized staff can convert `WON` leads to a single unique client record. See [Module 8 implementation](docs/19-MODULE-08-CLIENTS.md). A disposable PostgreSQL CI suite checks organization isolation and conversion atomicity; no production Neon migration or deployment has been performed.
+
+## Module 9 assets
+The `/app/assets` page supports Cloudinary-authenticated files, signed upload intents, verification, client links and protected downloads. See [Module 9 details](docs/20-MODULE-09-ASSETS.md). Live Cloudinary requires server-side Cloudinary credentials. No production deployment has been performed.

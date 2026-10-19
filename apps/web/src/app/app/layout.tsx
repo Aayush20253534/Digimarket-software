@@ -15,7 +15,6 @@ const futureModules = [
   { label: "Projects", icon: FolderKanban },
   { label: "Tasks", icon: CheckSquare2 },
   { label: "Content calendar", icon: CalendarDays },
-  { label: "Assets", icon: FileStack },
   { label: "Invoices & payments", icon: CreditCard },
   { label: "Reports", icon: ChartNoAxesCombined },
   { label: "Company settings", icon: Settings2 },
@@ -52,6 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSeeAssets = session.identity.permissions.includes("assets.read");
   const canSeeClients = session.identity.permissions.includes("clients.read");
   const canSeeLeads = session.identity.permissions.includes("leads.read");
   const canSeeFinance = session.identity.permissions.includes("finance.entry.read.own") || session.identity.permissions.includes("finance.read.all");
@@ -75,6 +75,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Link>}
         {canSeeClients && <Link href="/app/clients" aria-current={pathname.startsWith("/app/clients") ? "page" : undefined} className={"sidebar-link " + (pathname.startsWith("/app/clients") ? "sidebar-active" : "")}>
           <Users className="h-4 w-4" aria-hidden="true" />Clients
+        </Link>}
+        {canSeeAssets && <Link href="/app/assets" aria-current={pathname.startsWith("/app/assets") ? "page" : undefined} className={"sidebar-link " + (pathname.startsWith("/app/assets") ? "sidebar-active" : "")}>
+          <FileStack className="h-4 w-4" aria-hidden="true" />Files & assets
         </Link>}
         {canSeeFinance && <Link href="/app/finance" aria-current={pathname === "/app/finance" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/finance" ? "sidebar-active" : "")}>
           <Wallet className="h-4 w-4" aria-hidden="true" />Income & expenses

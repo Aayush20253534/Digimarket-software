@@ -11,7 +11,7 @@ const admin = [
   "clients.read", "clients.create", "clients.edit", "finance.entry.create",
   "finance.entry.read.own", "finance.read.all", "finance.category.manage", "finance.approve", "projects.create", "projects.assign", "projects.read",
   "projects.update", "tasks.create", "tasks.update.own", "content.create",
-  "content.edit", "assets.upload", "assets.read",
+  "content.edit", "assets.upload", "assets.read", "assets.delete",
 ] as const;
 const founder = [
   "approvals.read", "approvals.submit", "approvals.decide",

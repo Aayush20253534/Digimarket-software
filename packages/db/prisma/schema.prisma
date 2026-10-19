@@ -91,6 +91,19 @@ enum ClientServiceStatus {
   PAUSED
   ENDED
 }
+enum AssetStatus {
+  ACTIVE
+  ARCHIVED
+}
+enum AssetUploadState {
+  PENDING
+  CONFIRMED
+}
+enum AssetResourceType {
+  IMAGE
+  VIDEO
+  RAW
+}
 
 model Organization {
   id              String           @id @default(uuid()) @db.Uuid
@@ -112,6 +125,8 @@ model Organization {
   leads Lead[]
   leadDuplicateCandidates LeadDuplicateCandidate[]
   clients Client[]
+  assets Asset[]
+  assetUploadIntents AssetUploadIntent[]
 }
 
 model User {
@@ -144,6 +159,8 @@ model User {
   leadActivities LeadActivity[] @relation("LeadActivityActor")
   reviewedLeadDuplicates LeadDuplicateCandidate[] @relation("LeadDuplicateReviewer")
   clientsCreated Client[] @relation("ClientCreator")
+  assetsCreated Asset[] @relation("AssetCreator")
+  assetIntentsCreated AssetUploadIntent[] @relation("AssetIntentCreator")
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
@@ -459,6 +476,8 @@ model Client {
   sourceLead Lead? @relation("ClientSourceLead", fields: [sourceLeadId], references: [id], onDelete: Restrict)
   contacts ClientContact[]
   services ClientService[]
+  assets Asset[]
+  assetUploadIntents AssetUploadIntent[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
 }
@@ -486,4 +505,50 @@ model ClientService {
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
   @@index([clientId,status])
+}
+
+model AssetUploadIntent {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  createdById String @db.Uuid
+  clientId String? @db.Uuid
+  publicId String @unique @db.VarChar(255)
+  filename String @db.VarChar(180)
+  contentType String @db.VarChar(100)
+  resourceType AssetResourceType
+  expectedBytes Int
+  status AssetUploadState @default(PENDING)
+  expiresAt DateTime @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  creator User @relation("AssetIntentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  asset Asset?
+  @@index([organizationId,expiresAt,status])
+}
+
+model Asset {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  uploadedById String @db.Uuid
+  clientId String? @db.Uuid
+  uploadIntentId String @unique @db.Uuid
+  providerAssetId String @unique @db.VarChar(120)
+  publicId String @unique @db.VarChar(255)
+  filename String @db.VarChar(180)
+  contentType String @db.VarChar(100)
+  resourceType AssetResourceType
+  format String @db.VarChar(16)
+  bytes Int
+  status AssetStatus @default(ACTIVE)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  uploader User @relation("AssetCreator", fields: [uploadedById], references: [id], onDelete: Restrict)
+  client Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  uploadIntent AssetUploadIntent @relation(fields: [uploadIntentId], references: [id], onDelete: Restrict)
+  @@index([organizationId,status,createdAt])
+  @@index([organizationId,clientId,createdAt])
+  @@index([organizationId,filename])
 }

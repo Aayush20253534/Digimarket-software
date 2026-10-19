@@ -9,13 +9,14 @@ import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
 
 const planned = [
-  { title: "Projects, tasks & assets", detail: "Production workflows, Cloudinary files and recurring work.", icon: FolderOpen, module: "Modules 9–11" },
+  { title: "Projects and tasks", detail: "Production workflows and recurring work.", icon: FolderOpen, module: "Modules 10–11" },
   { title: "Calendar, invoices & reporting", detail: "Content planning, billing, profitability and insights.", icon: CalendarClock, module: "Modules 12–16" },
 ];
 
 export default function Dashboard() {
   const { session } = useAuth();
   if (!session) return null;
+  const canSeeAssets = session.identity.permissions.includes("assets.read");
   const canSeeClients = session.identity.permissions.includes("clients.read");
   const canSeeLeads = session.identity.permissions.includes("leads.read");
   const canSeeFinance = session.identity.permissions.includes("finance.entry.read.own") || session.identity.permissions.includes("finance.read.all");
@@ -51,6 +52,9 @@ export default function Dashboard() {
           </Link>}
           {canSeeClients && <Link href="/app/clients" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
             <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Client directory</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          </Link>}
+          {canSeeAssets && <Link href="/app/assets" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
+            <span className="flex items-center gap-3 text-sm font-semibold"><FolderOpen className="h-5 w-5 text-indigo-600" aria-hidden="true" />Private files & assets</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </Link>}
           {canSeeFinance && <Link href="/app/finance" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
             <span className="flex items-center gap-3 text-sm font-semibold"><Workflow className="h-5 w-5 text-indigo-600" aria-hidden="true" />Income & expenses</span><ArrowUpRight className="h-4 w-4" aria-hidden="true"/>

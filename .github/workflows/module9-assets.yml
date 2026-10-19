@@ -1,0 +1,57 @@
+name: Module 9 Private Assets Integration
+on:
+  push:
+    branches: [main, feature/module-09-assets]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: digimarket_ci
+          POSTGRES_PASSWORD: ephemeral-assets-only
+          POSTGRES_DB: digimarket_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U digimarket_ci -d digimarket_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://digimarket_ci:ephemeral-assets-only@127.0.0.1:5432/digimarket_ci
+      DIRECT_DATABASE_URL: postgresql://digimarket_ci:ephemeral-assets-only@127.0.0.1:5432/digimarket_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify migration
+        run: |
+          test -s packages/db/prisma/migrations/20261019060000_cloudinary_assets/migration.sql
+          pnpm --filter @digimarket/db db:validate
+          pnpm --filter @digimarket/db db:generate
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Lint, typecheck, unit tests, builds
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: Integration test with isolated PostgreSQL and mocked Cloudinary network
+        run: pnpm --filter @digimarket/api exec tsx src/assets/integration-smoke.ts
+      - name: Module 8 regression
+        run: pnpm --filter @digimarket/api exec tsx src/clients/integration-smoke.ts
