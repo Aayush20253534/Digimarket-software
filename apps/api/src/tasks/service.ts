@@ -140,7 +140,8 @@ export class TasksService {
     });
   }
   async addChecklist(a:Principal,id:string,label:string){
-    await this.editable(a,id);
+    const task=await this.editable(a,id);
+    if(task.status==="DONE"||task.status==="CANCELLED")throw invalid("Reopen task before adding checklist items");
     return this.db.$transaction(async tx=>{
       const item=await tx.taskChecklistItem.create({data:{taskId:id,label}});
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,

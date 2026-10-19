@@ -68,7 +68,7 @@ try{
  const first=await sweepRecurrences(db,new Date(),100);
  assert.equal(first.created,1);
  assert.equal((await sweepRecurrences(db,new Date(),100)).created,0);
- let generated=await db.task.findMany({where:{recurrenceId:repeat.id}});
+ const generated=await db.task.findMany({where:{recurrenceId:repeat.id}});
  assert.equal(generated.length,1);
  assert.equal(generated[0].scheduledFor?.toISOString(),new Date(start).toISOString());
  const anchor=new Date("2026-01-31T10:00:00.000Z");
