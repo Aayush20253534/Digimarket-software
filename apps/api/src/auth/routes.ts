@@ -35,10 +35,11 @@ function bearer(request: Request) {
 
 export function registerAuthRoutes(app: Express, service: AuthService, allowedOrigins: string[]) {
   const authLimit = rateLimit({
-    windowMs: 15 * 60 * 1000, limit: 12,
+    windowMs: 15 * 60 * 1000, limit: 120,
     standardHeaders: "draft-8", legacyHeaders: false,
     message: { error: { code: "RATE_LIMITED", message: "Too many authentication requests" } },
   });
+  const credentialLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: "draft-8", legacyHeaders: false });
   app.use(cookieParser());
   app.use("/api/v1/auth", authLimit);
 
@@ -77,7 +78,7 @@ export function registerAuthRoutes(app: Express, service: AuthService, allowedOr
     }
   }
 
-  app.post("/api/v1/auth/login", async (request, response) => {
+  app.post("/api/v1/auth/login", credentialLimit, async (request, response) => {
     const input = body(loginSchema, request.body);
     const result = await service.login(input.loginId, input.password);
     finishLogin(response, result);
@@ -95,7 +96,7 @@ export function registerAuthRoutes(app: Express, service: AuthService, allowedOr
     const input = body(verifySchema, request.body);
     finishLogin(response, await service.confirmMfa(input.challengeToken, input.code));
   });
-  app.post("/api/v1/auth/mfa/verify", async (request, response) => {
+  app.post("/api/v1/auth/mfa/verify", credentialLimit, async (request, response) => {
     const input = body(verifySchema, request.body);
     finishLogin(response, await service.verifyMfa(input.challengeToken, input.code));
   });
