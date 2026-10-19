@@ -81,7 +81,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("link", { name: "Team & accounts" })).toHaveCount(0);
   await page.goto("/app/team/users");
   await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
-  await page.getByRole("link", { name: "My account" }).click();
+  await page.getByRole("link", { name: "My account", exact: true }).click();
   await expect(page.getByRole("heading", { name: "My profile" })).toBeVisible();
 });
 
