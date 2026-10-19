@@ -62,8 +62,17 @@ export class ApprovalService {
   async list(actor: Principal, view: "mine" | "queue") {
     grant(actor,"approvals.read");
     if(view==="queue") grant(actor,"approvals.decide");
+    const reviewers = actor.permissions.has("projects.review") ?
+      await this.db.projectDeliverable.findMany({
+        where:{project:{organizationId:actor.organizationId,
+          ...(actor.permissions.has("projects.assign")?{}:{members:{some:{userId:actor.userId,role:{in:["MANAGER","REVIEWER"]}}}})}},
+        select:{id:true},take:10000,
+      }) : [];
     return this.db.approvalRequest.findMany({
-      where:{organizationId:actor.organizationId,...(view==="mine"
+      where:{organizationId:actor.organizationId,
+        ...(view==="queue"?{OR:[{referenceType:null},{referenceType:{not:"PROJECT_DELIVERABLE"}},
+          {referenceType:"PROJECT_DELIVERABLE",referenceId:{in:reviewers.map(row=>row.id)}}]}:{}),
+        ...(view==="mine"
         ? {requesterId:actor.userId}
         : {status:"PENDING" as const,requesterId:{not:actor.userId},approverRoleKeys:{hasSome:actor.roles}})},
       include:{policy:{select:{category:true,name:true}},requester:{select:{displayName:true}},
