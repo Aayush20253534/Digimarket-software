@@ -138,7 +138,7 @@ export const clientConvertSchema=z.strictObject({version:z.number().int().min(1)
 
 export const assetContentTypeSchema=z.enum(["image/jpeg","image/png","image/webp","video/mp4","video/quicktime","video/webm","application/pdf"]);
 export const assetIntentSchema=z.strictObject({
- filename:z.string().trim().min(1).max(180).refine(name=>!/[/\\\x00-\x1f]/.test(name),"Invalid filename"),
+ filename:z.string().trim().min(1).max(180).refine(name=>!name.includes("/")&&!name.includes("\\")&&[...name].every(ch=>ch.charCodeAt(0)>=32),"Invalid filename"),
  contentType:assetContentTypeSchema,
  bytes:z.number().int().positive().max(100_000_000),
  clientId:z.uuid().nullable().optional(),

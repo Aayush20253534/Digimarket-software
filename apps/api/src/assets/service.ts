@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient, Prisma } from "@digimarket/db";
 import type { AssetIntentInput, AssetListQuery } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
-import { AuthError, forbidden, invalid } from "../auth/errors";
+import { AuthError, forbidden } from "../auth/errors";
 import { type AssetProvider, CloudinaryAssetProvider, validateMedia } from "./provider";
 
 const deny=(a:Principal,key:string)=>{if(!a.permissions.has(key))throw forbidden();};
