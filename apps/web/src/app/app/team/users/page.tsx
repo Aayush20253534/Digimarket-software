@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { KeyRound, LockKeyhole, Plus, RefreshCw, Search, Shield, UserRoundX, Users } from "lucide-react";
+import { KeyRound, Plus, RefreshCw, Search, Shield, UserRoundX, Users } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 import { ApiError, type StaffUser } from "@/lib/api";
