@@ -40,8 +40,12 @@ export default function ProfilePage() {
         <div className="flex items-center gap-2 text-sm text-slate-600"><LockKeyhole className="h-4 w-4 text-indigo-600" aria-hidden="true" />JWT access with revocable refresh session</div>
         <button type="button" className="btn-secondary ml-auto" onClick={async () => {
           setError("");
-          try { await logout(); } catch { setError("Server did not confirm logout. Close other open sessions and reconnect before trusting this device."); }
-          router.replace("/login");
+          try {
+            await logout();
+            router.replace("/login");
+          } catch {
+            setError("Server did not confirm logout. The session may still be active.");
+          }
         }}><LogOut className="h-4 w-4" aria-hidden="true" />Sign out</button>
       </div>
       {error && <div className="mt-4"><Notice kind="error">{error}</Notice></div>}
