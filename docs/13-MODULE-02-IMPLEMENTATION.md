@@ -29,7 +29,7 @@
 - [x] Role, user, team, session, founder, audit/outbox relations work.
 - [x] Tenant-scoped uniqueness and transaction rollback tested.
 - [x] Permission seed rerun does not duplicate grants/rows.
-- [ ] Main branch CI green.
+- [x] Main branch CI green.
 These gates are marked only after actual remote verification.
 
 ## Next
@@ -39,3 +39,7 @@ Module 3: securely bootstrap Super Admin, implement Argon2id credentials, user p
 - Isolated PostgreSQL run: https://github.com/Aayush20253534/Digimarket-software/actions/runs/39226954918
 - Generated SQL migration is versioned and reproducible from Prisma schema.
 - No external Neon project was changed or connected. Live database provisioning and deployment remain subsequent cloud milestones.
+
+## Final main-branch validation
+- Workspace CI passed: https://github.com/Aayush20253534/Digimarket-software/actions/runs/39227295504
+- PostgreSQL integration CI passed: https://github.com/Aayush20253534/Digimarket-software/actions/runs/39227295484
