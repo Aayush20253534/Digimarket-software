@@ -56,7 +56,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading", { name: /Welcome,/ })).toBeVisible();
   await expect(page.getByText("Authenticated", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Approvals" }).click();
+  await page.getByRole("link", { name: "Approvals" }).first().click();
   await expect(page.getByRole("heading", { name: "Approval workflows" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Approval policy configuration" })).toBeVisible();
   await page.getByRole("button", { name: "Save policy" }).click();
@@ -114,7 +114,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Amount (INR)").fill("1000.00");
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByText("Entry submitted for finance approval.")).toBeVisible();
-  await page.getByRole("link", { name: "Approvals" }).click();
+  await page.getByRole("link", { name: "Approvals" }).first().click();
   await expect(page.getByRole("heading", { name: "Approval workflows" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Approval policy configuration" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Decision queue" })).toHaveCount(0);
