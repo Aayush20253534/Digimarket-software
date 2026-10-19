@@ -142,7 +142,7 @@ export function registerAuthRoutes(app: Express, service: AuthService, allowedOr
 
   // Only install error handler on auth-enabled app; avoid leaking stack traces.
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
-    if (response.headersSent) return;
+    if (response.headersSent) return _next(error);
     if (error instanceof AuthError) {
       response.status(error.status).json({ error: { code: error.code, message: error.message } });
       return;
