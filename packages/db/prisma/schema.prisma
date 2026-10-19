@@ -184,6 +184,8 @@ model User {
   clientsCreated Client[] @relation("ClientCreator")
   assetsCreated Asset[] @relation("AssetCreator")
   assetIntentsCreated AssetUploadIntent[] @relation("AssetIntentCreator")
+  projectsCreated Project[] @relation("ProjectCreator")
+  projectMemberships ProjectMember[]
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
