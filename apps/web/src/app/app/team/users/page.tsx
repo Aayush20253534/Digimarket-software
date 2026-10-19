@@ -58,9 +58,9 @@ export default function TeamAccounts() {
         loginId: loginId.trim(), displayName: displayName.trim(),
         ...(email.trim() ? { email: email.trim() } : {}), temporaryPassword: password, role,
       } });
-      setSuccess("Account created. Provide the temporary password through a secure, separate channel. It cannot be retrieved later.");
+      setSuccess("Account created. Login: " + loginId.trim() + ". One-time temporary password: " + password + ". Copy and share it securely; it cannot be retrieved later.");
       setLoginId(""); setDisplayName(""); setEmail(""); setRole("EMPLOYEE"); setShowForm(false);
-      // Keep password visible in the form state temporarily until the admin has copied it.
+      setPassword("");
       await reload();
     } catch (failure) {
       setError(failure instanceof ApiError ? failure.message : "Unable to create account.");
@@ -74,7 +74,6 @@ export default function TeamAccounts() {
     setError(""); setSuccess(""); setBusy(true);
     try {
       await request("/users/" + user.id + "/reset-password", { method: "POST", body: { temporaryPassword: next } });
-      setPassword(next);
       setSuccess("Password reset for " + user.loginId + ". New temporary password: " + next + ". Share it securely. This notice disappears on navigation.");
       await reload();
     } catch (failure) {

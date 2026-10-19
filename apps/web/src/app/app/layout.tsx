@@ -30,6 +30,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { status, session, refresh, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -39,9 +40,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     setSigningOut(true);
-    try { await logout(); } catch { /* local state still cleared on failure */ }
-    router.replace("/login");
-    setSigningOut(false);
+    setSignOutError("");
+    try {
+      await logout();
+      router.replace("/login");
+    } catch {
+      setSignOutError("Sign out could not be confirmed by the server. Your session may still be active.");
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   if (status === "loading") return <div className="min-h-screen bg-slate-50"><Spinner label="Verifying workspace access…" /></div>;
@@ -106,6 +113,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Link href="/app/profile" aria-label="Open my account" className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">{initials}</Link>
       </div>
     </header>
-    <div className="mx-auto w-full max-w-[1500px] px-5 py-8 sm:px-8 sm:py-10">{children}</div>
+    <div className="mx-auto w-full max-w-[1500px] px-5 py-8 sm:px-8 sm:py-10">
+      {signOutError && <div className="mb-5"><Notice kind="error">{signOutError}</Notice></div>}
+      {children}
+    </div>
   </div>;
 }
