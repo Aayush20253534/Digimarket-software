@@ -27,6 +27,8 @@ const normalizeLogin = (value: string) => value.trim().toLowerCase();
 export class AuthService {
   constructor(private readonly db: Database, readonly config: AuthConfig) {}
 
+  get database(): Database { return this.db; }
+
   private async fullUser(id: string) {
     return this.db.user.findUnique({
       where: { id },

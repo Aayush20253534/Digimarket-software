@@ -14,10 +14,18 @@ const endpoints: Record<string, string[]> = {
   "auth/logout": ["POST"],
   "me": ["GET"],
   "users": ["GET", "POST"],
+  "approval-policies": ["GET"],
+  "approvals": ["GET", "POST"],
 };
+const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
+const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
+const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if (policyPattern.test(path)) return method === "PUT";
+  if (approvalPattern.test(path)) return method === "GET";
+  if (decisionPattern.test(path)) return method === "POST";
   if (userActionPattern.test(path)) {
     return (path.endsWith("/role") ? method === "PUT" : method === "POST");
   }
@@ -45,6 +53,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
+  if (path === "approvals") {
+    const view = request.nextUrl.searchParams.get("view");
+    if (view === "mine" || view === "queue") url.searchParams.set("view", view);
+  }
   const headers = new Headers({ "accept": "application/json", "origin": origin });
   const authorization = request.headers.get("authorization");
   const cookie = request.headers.get("cookie");

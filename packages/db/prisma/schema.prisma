@@ -23,6 +23,24 @@ enum OutboxStatus {
   FAILED
 }
 
+enum ApprovalCategory {
+  GENERAL
+  FINANCE
+  CONTENT
+  DELIVERABLE
+}
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+enum ApprovalOutcome {
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 model Organization {
   id              String           @id @default(uuid()) @db.Uuid
   name            String           @db.VarChar(160)
@@ -36,6 +54,8 @@ model Organization {
   founderProfiles FounderProfile[]
   auditLogs       AuditLog[]
   outboxEvents    OutboxEvent[]
+  approvalPolicies ApprovalPolicy[]
+  approvalRequests ApprovalRequest[]
 }
 
 model User {
@@ -60,6 +80,8 @@ model User {
   teamMemberships    TeamMember[]
   founderProfile     FounderProfile?
   auditActions       AuditLog[]      @relation("AuditActor")
+  approvalSubmissions ApprovalRequest[] @relation("ApprovalRequester")
+  approvalActions ApprovalDecision[] @relation("ApprovalActor")
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
@@ -194,4 +216,52 @@ model OutboxEvent {
   @@unique([organizationId, eventKey])
   @@index([status, availableAt])
   @@index([organizationId, createdAt])
+}
+
+model ApprovalPolicy {
+  id               String           @id @default(uuid()) @db.Uuid
+  organizationId   String           @db.Uuid
+  category         ApprovalCategory
+  name             String           @db.VarChar(160)
+  approverRoleKeys String[]         @default([])
+  active           Boolean          @default(true)
+  createdAt        DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  requests         ApprovalRequest[]
+  @@unique([organizationId, category])
+  @@index([organizationId, active])
+}
+
+model ApprovalRequest {
+  id               String           @id @default(uuid()) @db.Uuid
+  organizationId   String           @db.Uuid
+  policyId         String           @db.Uuid
+  requesterId      String           @db.Uuid
+  title            String           @db.VarChar(180)
+  description      String           @db.Text
+  referenceType    String?          @db.VarChar(80)
+  referenceId      String?          @db.VarChar(160)
+  status           ApprovalStatus   @default(PENDING)
+  approverRoleKeys String[]         @default([])
+  createdAt        DateTime         @default(now()) @db.Timestamptz(6)
+  decidedAt        DateTime?        @db.Timestamptz(6)
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  policy           ApprovalPolicy   @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  requester        User             @relation("ApprovalRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  decision         ApprovalDecision?
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, requesterId, createdAt])
+}
+
+model ApprovalDecision {
+  id        String          @id @default(uuid()) @db.Uuid
+  requestId String          @unique @db.Uuid
+  actorId   String          @db.Uuid
+  outcome   ApprovalOutcome
+  reason    String?         @db.VarChar(1000)
+  createdAt DateTime        @default(now()) @db.Timestamptz(6)
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  actor     User            @relation("ApprovalActor", fields: [actorId], references: [id], onDelete: Restrict)
+  @@index([actorId, createdAt])
 }

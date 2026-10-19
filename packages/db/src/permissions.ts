@@ -3,6 +3,10 @@
  * from seeding these keys; grants require explicit organization roles (Module 3).
  */
 export const permissionCatalog = [
+  ["approvals.read", "Read authorized approval requests"],
+  ["approvals.submit", "Submit and cancel own approval requests"],
+  ["approvals.decide", "Decide eligible approval requests"],
+  ["approvals.policy.manage", "Configure approval policies"],
   ["users.read", "View organization staff"],
   ["users.create", "Provision employee accounts"],
   ["users.update", "Edit employee accounts"],

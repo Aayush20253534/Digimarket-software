@@ -23,3 +23,25 @@ export const apiErrorSchema = z.object({
 });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const approvalCategorySchema = z.enum(["GENERAL","FINANCE","CONTENT","DELIVERABLE"]);
+export type ApprovalCategory = z.infer<typeof approvalCategorySchema>;
+export const approvalPolicyInputSchema = z.strictObject({
+  name: z.string().trim().min(2).max(160),
+  active: z.boolean(),
+  approverRoleKeys: z.array(z.enum(["SUPER_ADMIN","ADMIN","FOUNDER"])).min(1).max(3),
+});
+export type ApprovalPolicyInput = z.infer<typeof approvalPolicyInputSchema>;
+export const approvalSubmissionSchema = z.strictObject({
+  category: approvalCategorySchema,
+  title: z.string().trim().min(4).max(180),
+  description: z.string().trim().min(5).max(4000),
+});
+export type ApprovalSubmission = z.infer<typeof approvalSubmissionSchema>;
+export const approvalDecisionSchema = z.strictObject({
+  outcome: z.enum(["APPROVED","REJECTED"]),
+  reason: z.string().trim().max(1000).optional(),
+}).refine((data) => data.outcome !== "REJECTED" || Boolean(data.reason?.trim()), {
+  message: "Reason required for rejection",
+});
+export type ApprovalDecisionInput = z.infer<typeof approvalDecisionSchema>;

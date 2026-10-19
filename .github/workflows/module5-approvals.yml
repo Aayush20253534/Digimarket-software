@@ -1,0 +1,57 @@
+name: Module 5 Approval Integration
+on:
+  push:
+    branches: [main, feature/module-05-approvals]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  approvals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: digimarket_ci
+          POSTGRES_PASSWORD: ephemeral-approvals-only
+          POSTGRES_DB: digimarket_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U digimarket_ci -d digimarket_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://digimarket_ci:ephemeral-approvals-only@127.0.0.1:5432/digimarket_ci
+      DIRECT_DATABASE_URL: postgresql://digimarket_ci:ephemeral-approvals-only@127.0.0.1:5432/digimarket_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify migration and generated client
+        run: |
+          test -s packages/db/prisma/migrations/20261019020000_approval_engine/migration.sql
+          pnpm --filter @digimarket/db db:validate
+          pnpm --filter @digimarket/db db:generate
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Check quality and build
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: Test approval state machine against PostgreSQL
+        run: pnpm --filter @digimarket/api exec tsx src/approvals/integration-smoke.ts

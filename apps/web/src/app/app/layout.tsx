@@ -55,6 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSeeApprovals = session.identity.permissions.includes("approvals.read");
   const canSeeTeam = session.identity.permissions.includes("users.read");
   const name = session.user.displayName;
   const initials = name.split(/\s+/).map((word) => word.charAt(0)).slice(0,2).join("").toUpperCase();
@@ -69,6 +70,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Link href="/app/dashboard" aria-current={pathname === "/app/dashboard" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/dashboard" ? "sidebar-active" : "")}>
           <LayoutDashboard className="h-4 w-4" aria-hidden="true" />Overview
         </Link>
+        {canSeeApprovals && <Link href="/app/approvals" aria-current={pathname === "/app/approvals" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/approvals" ? "sidebar-active" : "")}>
+          <CheckSquare2 className="h-4 w-4" aria-hidden="true" />Approvals
+        </Link>}
         {canSeeTeam && <Link href="/app/team/users" aria-current={pathname === "/app/team/users" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/team/users" ? "sidebar-active" : "")}>
           <Users className="h-4 w-4" aria-hidden="true" />Team & accounts
         </Link>}
