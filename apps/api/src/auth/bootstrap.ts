@@ -16,7 +16,7 @@ export async function bootstrapFirstAdmin() {
     const passwordHash = await hashPassword(password);
     return await db.$transaction(async (tx) => {
       // Serializes concurrent bootstrap attempts within one database.
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(336197, 3)`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(336197, 3)::text AS locked`;
       if (await tx.organization.count() !== 0) throw new Error("Bootstrap refused: organization already exists");
       for (const [key, description] of permissionCatalog) {
         await tx.permission.upsert({ where: { key }, create: { key, description }, update: { description } });
