@@ -2,11 +2,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronRight, LogOut, Menu, NotebookPen, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
+import { ChevronRight, LogOut, Menu, NotebookPen, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { AWButton, AWNotice } from "@/components/aw-ui";
 import { currentSection, permittedGroups, WorkspaceNav } from "@/components/workspace-navigation";
+import { AWNotificationBell } from "@/components/aw-notification-bell";
 
 function Avatar({ name }: { name: string }) {
  const initials=name.trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0)).join("").toUpperCase();
@@ -80,12 +81,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const groups=permittedGroups(session.identity.permissions);
  const current=currentSection(groups,pathname);
  const canSearch=session.identity.permissions.includes("search.read");
- const canAlerts=session.identity.permissions.includes("notifications.read");
  const name=session.user.displayName;
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
- return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/finance","/app/billing","/app/profitability","/app/reports","/app/settings","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notifications","/app/notes"].includes(pathname)?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
+ return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/finance","/app/billing","/app/reports","/app/settings","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes"].includes(pathname)?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
   <a href="#workspace-content" className="aw-skip-link">Skip to workspace content</a>
   <aside aria-label="Workspace sidebar" className="aw-work-sidebar">
    <div className="aw-work-sidehead">{brand}
@@ -131,9 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      {canSearch&&<Link href="/app/search" aria-label="Search workspace" className="aw-work-search">
       <Search size={17} aria-hidden="true"/><span>Search workspace</span>
      </Link>}
-     {canAlerts&&<Link href="/app/notifications" aria-label="Notifications" title="Notifications" className="aw-work-icon">
-      <Bell size={19} aria-hidden="true"/>
-     </Link>}
+     <AWNotificationBell/>
      <Link href="/app/profile" aria-label="Open my account" className="aw-work-header-avatar"><Avatar name={name}/></Link>
     </div>
    </header>
