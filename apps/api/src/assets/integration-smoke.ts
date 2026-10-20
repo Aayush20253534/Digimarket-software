@@ -103,6 +103,28 @@ try{
  uploadMock(expiredIntent.params.public_id,"raw","pdf",250,"expired-provider-id");
  await assert.rejects(()=>svc.confirm(admin,expiredIntent.intentId,"expired-provider-id"),
    (e:{status?:number})=>e.status===409);
+ // A successful upload must be visible in the destination folder immediately.
+ // Confirming an upload and assigning its folder must be ONE transaction.
+ const localFolder=await db.assetFolder.create({data:{
+   organizationId:a.id,createdById:owner.id,name:"Client campaign",parentId:null,
+ }});
+ const outsideFolder=await db.assetFolder.create({data:{
+   organizationId:b.id,createdById:outsider.id,name:"Outside organization",parentId:null,
+ }});
+ const nestedIntent=await svc.intent(admin,{filename:"banner.png",contentType:"image/png",bytes:133});
+ uploadMock(nestedIntent.params.public_id,"image","png",133,"nested-asset-id");
+ await assert.rejects(
+   ()=>svc.confirm(admin,nestedIntent.intentId,"nested-asset-id",false,outsideFolder.id),
+   (e:{status?:number})=>e.status===404,
+ );
+ assert.equal(await db.asset.count({where:{uploadIntentId:nestedIntent.intentId}}),0);
+ const nestedSaved=await svc.confirm(admin,nestedIntent.intentId,"nested-asset-id",false,localFolder.id);
+ assert.equal(nestedSaved.folderId,localFolder.id);
+ const folderListing=await svc.list(admin,{limit:30,status:"ACTIVE",folderId:localFolder.id});
+ assert.equal(folderListing.items.length,1);
+ assert.equal(folderListing.items[0]?.id,nestedSaved.id);
+ const rootListing=await svc.list(admin,{limit:30,status:"ACTIVE",folderId:null});
+ assert.ok(rootListing.items.every(row=>row.id!==nestedSaved.id));
  assert.ok((await db.auditLog.count({where:{organizationId:a.id,entityType:"Asset"}}))>=4);
  console.info("Module 9 PASS: authenticated uploads, provider verification, organization/client isolation, unauthorized and forged intent, expiry, browsing, download, link, archive.");
 }finally{await db.$disconnect();}

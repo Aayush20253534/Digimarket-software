@@ -40,7 +40,7 @@ const blank:Draft={title:"Untitled",body:"",strokes:"[]",pages:"[]"};
 const parsePages=(value:string):NotePage[]=>{try{const result=JSON.parse(value);return Array.isArray(result)?result:[];}catch{return[];}};
 const W=900,H=520;
 const parseStrokes=(s:string):Stroke[]=>{try{const x=JSON.parse(s);return Array.isArray(x)?x:[];}catch{return[];}};
-const explanation=(e:unknown)=>e instanceof ApiError?e.message:"Unable to save notes. Check the connection.";
+const explanation=(e:unknown)=>e instanceof Error?e.message:"Unable to save notes. Check the connection.";
 function MarkdownPreview({value}:{value:string}){
  const lines=value.split("\n");
  return <div className="aw-notes-preview" aria-label="Text preview">
@@ -103,6 +103,10 @@ export default function NotesPage(){
  const [selected,setSelected]=useState<string|null>(null);
  const [draft,setDraft]=useState<Draft>(blank);
  const draftRef=useRef<Draft>(blank),versionRef=useRef(1);
+ // An older deployed API understands strokes but not persisted pages. Do not send
+ // fields that its strict validator rejects, or silently drop a multi-page note.
+ const pagesSupported=useRef(false);
+ const [modernNotesApi,setModernNotesApi]=useState(true);
  const [loadState,setLoadState]=useState<"loading"|"ready">("loading");
  const [saveState,setSaveState]=useState<"saved"|"unsaved"|"saving"|"conflict">("saved");
  const [error,setError]=useState("");
@@ -141,7 +145,15 @@ export default function NotesPage(){
   inFlight.current=true;setSaveState("saving");setError("");
   const snapshot=draftRef.current;
   try{
-   const saved=await request<Note>("/notes/"+id,{method:"PUT",body:{...snapshot,version:versionRef.current}});
+   const pages=parsePages(snapshot.pages);
+   if(!pagesSupported.current&&pages.length>1)throw new Error(
+     "This backend does not support multi-page notes yet. Deploy the latest GitHub main branch to Render before saving more than one page. Your work is still in this tab."
+   );
+   const {title,body,strokes}=snapshot;
+   const saved=await request<Note>("/notes/"+id,{method:"PUT",body:{
+     title,body,strokes,...(pagesSupported.current?{pages:snapshot.pages}:{}),
+     version:versionRef.current,
+   }});
    if(selectedRef.current===id){
     versionRef.current=saved.version;
     dirty.current=snapshot!==draftRef.current;
@@ -160,6 +172,8 @@ export default function NotesPage(){
   setActionBusy(true);setError("");
   try{
    const note=await request<Note>("/notes/"+id);
+   pagesSupported.current=typeof note.pages==="string";
+   setModernNotesApi(pagesSupported.current);
    selectedRef.current=id;setSelected(id);versionRef.current=note.version;
    redoStack.current=[];history.current=[];setErasing(null);
    const pages=parsePages(note.pages??"[]");
@@ -179,7 +193,8 @@ export default function NotesPage(){
  },[session,request,open]);
  useEffect(()=>{
   if(!session)return;
-  void request<{items:Notebook[]}>("/notes/notebooks").then(data=>setNotebooks(data.items)).catch(e=>setError(explanation(e)));
+  void request<{items:Notebook[]}>("/notes/notebooks").then(data=>setNotebooks(data.items))
+   .catch(e=>{if(e instanceof ApiError&&e.status===404){setModernNotesApi(false);return;}setError(explanation(e));});
  },[session,request]);
  useEffect(()=>{
   if(!initialized.current)return;
@@ -199,7 +214,12 @@ export default function NotesPage(){
   if(dirty.current&&!await flush())return;
   setActionBusy(true);setError("");
   try{
-   const note=await request<Note>("/notes",{method:"POST",body:blank});
+   // Old Notes APIs validate fields strictly and reject the modern 'pages' key.
+   const note=await request<Note>("/notes",{method:"POST",body:{
+     title:blank.title,body:blank.body,strokes:blank.strokes,
+   }});
+   pagesSupported.current=typeof note.pages==="string";
+   setModernNotesApi(pagesSupported.current);
    await listNotes();
    selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
    draftRef.current=blank;setDraft(blank);setActivePage(0);setPaper("dotted");dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];history.current=[];
@@ -209,8 +229,13 @@ export default function NotesPage(){
   if(inFlight.current||actionBusy)return;
   setActionBusy(true);setError("");
   try{
-   const note=await request<Note>("/notes",{method:"POST",body:{...draftRef.current,
-     title:draftRef.current.title.slice(0,167)+" (recovered)"}});
+   if(!pagesSupported.current&&parsePages(draftRef.current.pages).length>1)
+     throw new Error("The deployed Notes API cannot save multiple pages. Keep this tab open until the Render backend is updated.");
+   const snapshot=draftRef.current;
+   const note=await request<Note>("/notes",{method:"POST",body:{
+     title:snapshot.title.slice(0,167)+" (recovered)",body:snapshot.body,strokes:snapshot.strokes,
+     ...(pagesSupported.current?{pages:snapshot.pages}:{}),
+   }});
    await listNotes();selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
    const pages=parsePages(note.pages??"[]");
    setActivePage(0);setPaper(pages[0]?.paper??"dotted");
@@ -474,6 +499,7 @@ export default function NotesPage(){
      <button type="button" aria-label="Toggle tool settings" onClick={()=>setInspectorOpen(x=>!x)}><Settings2 size={19}/></button>
     </div>
    </header>
+   {!modernNotesApi&&<AWNotice tone="error">The Notes API on Render is outdated. Single-page notes can still be saved, but notebooks and multi-page persistence require deploying the latest backend.</AWNotice>}
    {error&&<AWNotice tone="error">{error} {saveState==="conflict"&&"Unsaved work remains here."}</AWNotice>}
    {!selected?<div className="aw-notes-empty"><NotebookPen size={36}/><p>Choose a saved note or create a new one.</p></div>:<>
     <div className="aw-studio-modebar">

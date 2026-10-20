@@ -30,7 +30,10 @@ const content=z.strictObject({
 const update=content.extend({version:z.number().int().min(1)});
 function checked<T>(schema:z.ZodType<T>,value:unknown):T{
  const result=schema.safeParse(value);
- if(!result.success)throw new AuthError(422,"VALIDATION_ERROR","Invalid note fields");
+ if(!result.success){
+   const fields=[...new Set(result.error.issues.map(issue=>issue.path.join(".")||"request"))].slice(0,5);
+   throw new AuthError(422,"VALIDATION_ERROR","Invalid note fields: "+fields.join(", "));
+ }
  return result.data;
 }
 export function registerNotesRoutes(app:Express,auth:AuthService){

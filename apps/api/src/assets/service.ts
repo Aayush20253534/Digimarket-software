@@ -48,8 +48,11 @@ export class AssetService {
    }});
    return {intentId:id,expiresAt,resourceType:type.kind,...options};
  }
- async confirm(a:Principal,intentId:string,providerAssetId:string,financeProof=false){
-   if(financeProof)deny(a,"finance.entry.create");
+ async confirm(a:Principal,intentId:string,providerAssetId:string,financeProof=false,folderId:string|null=null){
+   if(financeProof){
+     deny(a,"finance.entry.create");
+     if(folderId)throw new AuthError(422,"VALIDATION_ERROR","Finance proof uploads cannot be placed in Drive folders");
+   }
    else {deny(a,"assets.upload");deny(a,"assets.read");}
    const intent=await this.db.assetUploadIntent.findFirst({where:{
      id:intentId,organizationId:a.organizationId,createdById:a.userId,
@@ -57,6 +60,13 @@ export class AssetService {
    if(!intent)throw new AuthError(404,"NOT_FOUND","Upload intent not found");
    if(intent.status!=="PENDING"||intent.expiresAt<=new Date())throw expired();
    if(intent.clientId)await this.client(a,intent.clientId);
+   // Check ownership before calling Cloudinary or consuming the one-time intent.
+   if(folderId){
+     const folder=await this.db.assetFolder.findFirst({
+       where:{id:folderId,organizationId:a.organizationId},select:{id:true},
+     });
+     if(!folder)throw new AuthError(404,"NOT_FOUND","Destination folder no longer exists");
+   }
    const info=validateMedia(intent.contentType,intent.expectedBytes);
    if(financeProof&&(intent.clientId||info.kind==="video"
      ||!intent.publicId.startsWith(financeProofPrefix(a.organizationId))))
@@ -79,7 +89,7 @@ export class AssetService {
      },data:{status:"CONFIRMED"}});
      if(acquired.count!==1)throw expired();
      const asset=await tx.asset.create({data:{
-       organizationId:a.organizationId,uploadedById:a.userId,clientId:intent.clientId,
+       organizationId:a.organizationId,uploadedById:a.userId,clientId:intent.clientId,folderId,
        uploadIntentId:intent.id,providerAssetId:verified.asset_id,publicId:intent.publicId,
        filename:intent.filename,contentType:intent.contentType,resourceType:intent.resourceType,
        format:verified.format,bytes:verified.bytes,

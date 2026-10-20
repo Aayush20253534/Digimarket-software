@@ -30,7 +30,7 @@ export function registerAssetRoutes(app:Express,auth:AuthService) {
  });
  app.post(root+"/confirm",authenticated,async(req,res)=>{
    const data=parse(assetConfirmSchema,req.body);
-   res.status(201).json({data:await service.confirm(actor(res),data.intentId,data.assetId)});
+   res.status(201).json({data:await service.confirm(actor(res),data.intentId,data.assetId,false,data.folderId??null)});
  });
  app.get(root,authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");

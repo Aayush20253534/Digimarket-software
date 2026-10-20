@@ -72,6 +72,22 @@ describe("private notes API isolation and version protection",()=>{
   expect(good.status).toBe(201);
   expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,organizationId,ownerId:userId}});
  });
+ it("accepts a persisted handwritten page and identifies invalid fields",async()=>{
+  const pages=JSON.stringify([{id:"page-1",paper:"dotted",strokes:JSON.stringify([
+    {color:"#3366CC",width:3,tool:"pen",points:[[0.2,0.3,0.5]]}
+  ])}]);
+  db.personalNote.create.mockResolvedValue({id:noteId,...valid,pages,version:1});
+  const created=await request(app()).post("/api/v1/notes")
+    .set("Authorization","Bearer token").send({...valid,pages});
+  expect(created.status).toBe(201);
+  expect(db.personalNote.create).toHaveBeenCalledWith({
+    data:{...valid,pages,organizationId,ownerId:userId}
+  });
+  const broken=await request(app()).post("/api/v1/notes")
+    .set("Authorization","Bearer token").send({...valid,pages:"broken-json"});
+  expect(broken.status).toBe(422);
+  expect(broken.body.error.message).toContain("pages");
+ });
  it("accepts modern pen pressure and highlighter strokes while preserving legacy points",async()=>{
   const ink=JSON.stringify([
    {color:"#123ABC",width:3,points:[[.1,.2],[.2,.4]]},

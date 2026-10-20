@@ -151,6 +151,8 @@ export const assetIntentSchema=z.strictObject({
 export type AssetIntentInput=z.infer<typeof assetIntentSchema>;
 export const assetConfirmSchema=z.strictObject({
  intentId:z.uuid(),assetId:z.string().trim().min(6).max(120),
+ // The selected folder is verified and written atomically with the confirmed asset.
+ folderId:z.uuid().nullable().optional(),
 });
 export const assetListSchema=z.strictObject({
  q:z.string().trim().max(100).optional(),

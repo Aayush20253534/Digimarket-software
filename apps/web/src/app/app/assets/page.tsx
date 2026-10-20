@@ -211,7 +211,15 @@ export default function AssetsPage(){
     xhr.onerror=()=>reject(new Error("Network error while uploading "+file.name));
     xhr.onabort=()=>reject(new Error("Upload cancelled for "+file.name));
     xhr.onload=()=>{
-     if(xhr.status<200||xhr.status>=300){reject(new Error("Cloudinary rejected "+file.name+" ("+xhr.status+")"));return;}
+     if(xhr.status<200||xhr.status>=300){
+       let detail="";
+       try{
+         const body=JSON.parse(xhr.responseText) as {error?:{message?:string}};
+         detail=body.error?.message?.slice(0,250)??"";
+       }catch{/* An HTML or empty response still includes its HTTP status. */}
+       reject(new Error("Storage rejected "+file.name+" (HTTP "+xhr.status+")"+(detail?": "+detail:"")));
+       return;
+     }
      try{resolve(JSON.parse(xhr.responseText) as {asset_id?:string});}
      catch{reject(new Error("Invalid Cloudinary response for "+file.name));}
     };
@@ -219,16 +227,46 @@ export default function AssetsPage(){
    });
    if(!payload.asset_id)throw new Error("Cloudinary did not confirm "+file.name);
    setUploadProgress("Verifying "+index+" of "+total+": "+file.name);
-   const saved=await request<Asset>("/assets/confirm",{method:"POST",body:{intentId:intent.intentId,assetId:payload.asset_id}});
-   if(folderId)await request("/assets/"+saved.id+"/organize",{method:"POST",body:{filename:file.name,folderId,version:saved.version}});
+   let saved:Asset;
+   try{
+     // Current API: confirm and persist the destination atomically.
+     saved=await request<Asset>("/assets/confirm",{method:"POST",body:{
+       intentId:intent.intentId,assetId:payload.asset_id,folderId,
+     }});
+   }catch(e){
+     // The still-deployed legacy API rejects the optional folderId on confirm.
+     // Never retry the Cloudinary upload: it has already succeeded.
+     if(!(e instanceof ApiError&&e.status===422&&e.code==="VALIDATION_ERROR"))throw e;
+     saved=await request<Asset>("/assets/confirm",{method:"POST",body:{
+       intentId:intent.intentId,assetId:payload.asset_id,
+     }});
+     if(folderId){
+       try{
+         saved=await request<Asset>("/assets/"+saved.id+"/organize",{method:"POST",body:{
+           filename:saved.filename,folderId,version:saved.version,
+         }});
+       }catch(reason){
+         return file.name+" was saved in My Drive root, but moving it to the selected folder failed ("+errText(reason)+"). Refresh the root folder before trying again.";
+       }
+     }
+   }
+   if((saved.folderId??null)!==folderId)
+     return file.name+" was saved, but its folder could not be confirmed. Refresh My Drive before retrying.";
+   return null;
  }
  async function upload(e:FormEvent){
    e.preventDefault();if(!files.length)return;
    setBusy(true);setError("");setMessage("");
    let uploaded=0;
    try{
-    for(const file of files){await uploadOne(file,uploaded+1,files.length);uploaded++;}
+    const placementWarnings:string[]=[];
+    for(const file of files){
+      const warning=await uploadOne(file,uploaded+1,files.length);
+      uploaded++;
+      if(warning)placementWarnings.push(warning);
+    }
     setMessage(uploaded+" file(s) uploaded and verified.");setFiles([]);setUploadDialog(false);setCursor(null);
+    if(placementWarnings.length)setError(placementWarnings.join(" "));
    }catch(e){setError((uploaded?uploaded+" file(s) uploaded before failure. ":"")+errText(e));setFiles(files.slice(uploaded));}
    finally{setBusy(false);setUploadProgress("");await load();}
  }
