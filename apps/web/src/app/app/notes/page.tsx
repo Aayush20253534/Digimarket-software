@@ -270,6 +270,18 @@ export default function NotesPage(){
    if(data.items.length)await open(data.items[0].id);
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
+ const moveListedNote=async(note:NoteSummary)=>{
+  if(!window.confirm("Move "+note.title+" to Trash?"))return;
+  if(inFlight.current)return;
+  setActionBusy(true);setError("");
+  try{
+   if(dirty.current&&!await flush())return;
+   const version=selectedRef.current===note.id?versionRef.current:note.version;
+   await request("/notes/"+note.id+"?version="+version,{method:"DELETE"});
+   if(selectedRef.current===note.id){selectedRef.current=null;setSelected(null);dirty.current=false;draftRef.current=blank;setDraft(blank);}
+   await listNotes();
+  }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
+ };
  const mark=(e:PointerEvent<HTMLCanvasElement>)=>{
   const rect=e.currentTarget.getBoundingClientRect();
   return [Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),
@@ -500,7 +512,10 @@ export default function NotesPage(){
         <button type="button" disabled={actionBusy} onClick={()=>void restoreNote(n.id)} aria-label={"Restore "+n.title}>Restore</button>
         <button type="button" disabled={actionBusy} className="danger" onClick={()=>void permanentlyDeleteNote(n.id)} aria-label={"Permanently delete "+n.title}><Trash2 size={15}/></button>
        </div>:
-       <button type="button" aria-label={(n.starred?"Unstar ":"Star ")+n.title} onClick={()=>void toggleStar(n)}><Star size={15} fill={n.starred?"#b26cfa":"none"}/></button>}
+       <div className="aw-notes-trash-actions">
+        <button type="button" disabled={actionBusy} aria-label={(n.starred?"Unstar ":"Star ")+n.title} onClick={()=>void toggleStar(n)}><Star size={15} fill={n.starred?"#b26cfa":"none"}/></button>
+        <button type="button" disabled={actionBusy} className="danger" aria-label={"Move "+n.title+" to Trash"} onClick={()=>void moveListedNote(n)}><Trash2 size={15}/></button>
+       </div>}
      </div>)}
    </div>
   </aside>
