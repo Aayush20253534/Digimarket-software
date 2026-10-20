@@ -56,6 +56,18 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading", { name: /Welcome,/ })).toBeVisible();
   await expect(page.getByText("Authenticated", { exact: true })).toBeVisible();
+
+  // Phase 4: the overview is driven by the signed-in user's real permissions.
+  await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
+  await expect(page.getByTestId("dashboard-kpis")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent workspace records" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Search recent records" }).fill("does-not-exist-in-ci");
+  await expect(page.getByText("No matching records")).toBeVisible();
+  await page.getByRole("textbox", { name: "Search recent records" }).fill("");
+  await page.getByRole("combobox", { name: "Filter by type" }).selectOption("Clients");
+  await page.getByRole("combobox", { name: "Filter by type" }).selectOption("all");
+  await expect(page.getByRole("button", { name: "Refresh overview" })).toBeVisible();
+
   // Phase 3: shell controls must remain usable without altering any API state.
   await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
   await page.getByRole("button", { name: "Collapse sidebar" }).click();
