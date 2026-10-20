@@ -5,6 +5,7 @@ import { AuthService } from "./auth/service";
 import { loadAuthConfig } from "./auth/crypto";
 import { validateProductionApiConfig } from "./runtime/production";
 import { bootstrapIfConfigured } from "./auth/bootstrap";
+import { describeStartupError } from "./runtime/startup-error";
 
 validateProductionApiConfig(process.env);
 if(process.env.NODE_ENV==="production"&&!process.env.DATABASE_URL)
@@ -57,7 +58,7 @@ async function startServer() {
 
 void startServer().catch(async (error: unknown) => {
   // Provider error descriptions can carry DSNs, so print only the error class.
-  console.error("API startup failed:", error instanceof Error ? error.name : "UNKNOWN");
+  console.error("API startup failed:", describeStartupError(error,"bootstrap"));
   process.exitCode = 1;
   if (database) await database.$disconnect();
 });

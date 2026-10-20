@@ -23,8 +23,9 @@ export function validateProductionApiConfig(env:NodeJS.ProcessEnv){
  for(const key of ["DATABASE_URL","DIRECT_DATABASE_URL"]){
   const uri=new URL(required(env,key));
   if(!["postgres:","postgresql:"].includes(uri.protocol)||!uri.hostname||!uri.pathname.slice(1)
-    ||uri.searchParams.get("sslmode")!=="require")
-   throw new Error("Production PostgreSQL URL requires sslmode=require: "+key);
+    ||!["require","verify-full"].includes(uri.searchParams.get("sslmode")??"")
+    ||(uri.searchParams.get("sslmode")==="require"&&uri.searchParams.get("uselibpqcompat")==="true"))
+   throw new Error("Production PostgreSQL URL requires verified TLS (sslmode=verify-full or legacy require): "+key);
  }
  const bytes=Buffer.from(required(env,"MFA_ENCRYPTION_KEY_BASE64"),"base64");
  if(bytes.length!==32)throw new Error("MFA encryption key must be 32 bytes");

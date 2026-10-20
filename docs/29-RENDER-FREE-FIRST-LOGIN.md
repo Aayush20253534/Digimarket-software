@@ -56,3 +56,25 @@ The standard **Render API** does not require a `REDIS_URL` to start and authenti
 - Render Free can sleep when idle; wakeups may exceed the frontend's short API proxy timeout and initially show 503. Retry after Render reports healthy.
 
 See [Module 17 production runbook](28-MODULE-17-PRODUCTION.md) for migration, backup, and incident handling.
+
+## Prisma startup failure on Render Free
+
+A Node PostgreSQL warning about `sslmode=require` is not a database exception. Use a verified TLS URL with `sslmode=verify-full` in both Neon `DATABASE_URL` and `DIRECT_DATABASE_URL` (preserve all other Neon parameters). The API production validator accepts `verify-full` and legacy `require`, but blocks libpq-compatibility `require`, which would weaken certificate verification.
+
+If Render prints `API startup failed: PrismaClientKnownRequestError`, the current code logs a **safe Prisma error code** (such as `P2021`) and a suggested fix without exposing database passwords. Read the new `code` entry, not just the class name. Most commonly during first-admin initialization:
+
+- `P2021`: table missing. Make sure the Render **Start Command** includes `pnpm --filter @digimarket/db db:migrate:deploy` before starting the API. Check Render logs for `All migrations have been successfully applied` or the corresponding completion message.
+- `P2022`: column missing. The database schema doesn't match the generated Prisma client; verify migrations target the exact same Neon database.
+- `P1000`: database login rejected; verify Neon credentials.
+- `P1001` / `P1002`: Neon endpoint unreachable or timed out; verify Neon endpoint/network.
+- `P1011`: TLS handshake problem; confirm strict SSL and trusted CA.
+- `P2010`: raw SQL failure; verify migration status, privileges and Neon pooler settings.
+- Other Prisma codes: use the sanitized startup code together with the official Prisma error reference, without sharing raw connection strings.
+
+Render Free doesn't run the Blueprint's paid pre-deploy hook, so migrations and permissions must be included in the **Start Command**:
+
+```bash
+pnpm --filter @digimarket/db db:migrate:deploy && pnpm --filter @digimarket/api exec tsx ../../packages/db/src/seed.ts && pnpm --filter @digimarket/api start
+```
+
+The migration process must finish successfully **before** the account bootstrap queries organization tables. Do not run `prisma db push --force-reset`, drop production tables, or remove the first administrator as a workaround.

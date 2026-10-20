@@ -29,6 +29,14 @@ describe("module17 production safeguards",()=>{
  it("accepts complete production configuration with independent secrets",()=>{
   expect(()=>validateProductionApiConfig(live)).not.toThrow();
  });
+ it("accepts explicit certificate and hostname verification for Neon URLs",()=>{
+  const url="postgresql://dev:secret@db.example.net/agency?sslmode=verify-full";
+  expect(()=>validateProductionApiConfig({...live,DATABASE_URL:url,DIRECT_DATABASE_URL:url})).not.toThrow();
+ });
+ it("disallows weakened libpq compatibility for legacy require URLs",()=>{
+  expect(()=>validateProductionApiConfig({...live,
+    DATABASE_URL:"postgresql://dev:secret@db.example.net/agency?sslmode=require&uselibpqcompat=true"})).toThrow("verified TLS");
+ });
  it("does not force production settings on a local test app",()=>{
   expect(()=>validateProductionApiConfig({NODE_ENV:"test"})).not.toThrow();
  });
