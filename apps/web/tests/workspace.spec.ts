@@ -193,6 +193,16 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("heading", { name: "My profile" })).toBeVisible();
 });
 
+test("login proxy rejects requests from an unrelated browser origin", async ({ request }) => {
+  const response = await request.post("/api/v1/auth/login", {
+    headers: { origin: "https://untrusted-origin.invalid" },
+    data: { loginId: "not-a-user", password: "not-a-real-password" },
+  });
+  expect(response.status()).toBe(403);
+  const payload = await response.json() as { error: { code: string } };
+  expect(payload.error.code).toBe("ORIGIN_DENIED");
+});
+
 test("signed-out visitors cannot read the dashboard", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();

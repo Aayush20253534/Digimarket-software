@@ -130,6 +130,25 @@ function permitted(path: string, method: string): boolean {
   return endpoints[path]?.includes(method) ?? false;
 }
 
+// Vercel gives each production/preview deployment a distinct verified host.
+// Only trust platform-assigned *.vercel.app hosts and explicit frontend origins;
+// never trust arbitrary Host or X-Forwarded-Host headers for CSRF validation.
+function normalizeOrigin(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    if (url.username || url.password || url.search || url.hash || url.pathname !== "/") return null;
+    const localHttp = url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname);
+    return url.protocol === "https:" || localHttp ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function platformVercelOrigin(host: string | undefined): string | null {
+  if (!host || !/^[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.vercel\\.app$/.test(host)) return null;
+  return "https://" + host;
+}
+
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await context.params;
   const path = parts.join("/");
@@ -137,17 +156,29 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "Route not found" } }, { status: 404 });
   }
 
-  // Next.js may normalize the incoming Host to localhost even when a browser
-  // connects via 127.0.0.1 or a reverse proxy. Trust only configured frontend
-  // origins, never an arbitrary Host value supplied with a request.
-  const allowedOrigins = (process.env.WEB_ALLOWED_ORIGINS ??
+  const configuredOrigins = (process.env.WEB_ALLOWED_ORIGINS ??
     process.env.CORS_ALLOWED_ORIGINS ??
-    "http://localhost:3000,http://127.0.0.1:3000").split(",").map((value) => value.trim());
+    "http://localhost:3000,http://127.0.0.1:3000")
+    .split(",").map(normalizeOrigin).filter((value): value is string => value !== null);
+  const allowedOrigins = new Set(configuredOrigins);
+  if (process.env.VERCEL === "1") {
+    for (const host of [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL,
+      process.env.VERCEL_PROJECT_PRODUCTION_URL]) {
+      const vercelOrigin = platformVercelOrigin(host);
+      if (vercelOrigin) allowedOrigins.add(vercelOrigin);
+    }
+  }
   const incomingOrigin = request.headers.get("origin");
-  if (request.method !== "GET" && (!incomingOrigin || !allowedOrigins.includes(incomingOrigin))) {
+  if (request.method !== "GET" && (!incomingOrigin || !allowedOrigins.has(incomingOrigin))) {
     return NextResponse.json({ error: { code: "ORIGIN_DENIED", message: "Untrusted request origin" } }, { status: 403 });
   }
-  const origin = incomingOrigin && allowedOrigins.includes(incomingOrigin) ? incomingOrigin : allowedOrigins[0];
+  // The backend validates cookie-authenticated POSTs against its own CORS list.
+  // Forward one configured canonical origin, not an alternate deployment alias.
+  const upstreamOrigin = (process.env.CORS_ALLOWED_ORIGINS ?? "")
+    .split(",").map(normalizeOrigin).find((value) => value !== null) ?? configuredOrigins[0];
+  if (!upstreamOrigin) {
+    return NextResponse.json({ error: { code: "ORIGIN_CONFIG_ERROR", message: "Frontend origin configuration is missing" } }, { status: 503 });
+  }
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
@@ -227,7 +258,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       if(value!==null)url.searchParams.set(key,value);
     }
   }
-  const headers = new Headers({ "accept": "application/json", "origin": origin });
+  const headers = new Headers({ "accept": "application/json", "origin": upstreamOrigin });
   const authorization = request.headers.get("authorization");
   const cookie = request.headers.get("cookie");
   if (authorization) headers.set("authorization", authorization);
