@@ -309,7 +309,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("button", { name: "Add contact" }).click();
   await expect(page.getByText("Client contact saved.")).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Files & assets" }).click();
-  await expect(page.getByRole("heading", { name: "Files & assets" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My Drive" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Secure upload" })).toBeVisible();
   // Persistent folders, private ZIP downloads and empty-folder deletion.
   await page.getByRole("textbox", { name: "New folder name" }).fill("CI Campaign Artwork");
