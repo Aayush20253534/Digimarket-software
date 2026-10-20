@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { BriefcaseBusiness, Download, RefreshCw, Upload, Users } from "lucide-react";
+import { BriefcaseBusiness, Download, Plus, RefreshCw, Upload, Users } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError, type StaffUser } from "@/lib/api";
@@ -57,6 +57,7 @@ export default function LeadsPage(){
  const [error,setError]=useState("");
  const [message,setMessage]=useState("");
  const [created,setCreated]=useState<NewLead>(blank);
+ const [creating,setCreating]=useState(false);
  const [selected,setSelected]=useState<Detail|null>(null);
  const [editStage,setEditStage]=useState<Stage>("NEW");
  const [followup,setFollowup]=useState("");
@@ -188,14 +189,16 @@ export default function LeadsPage(){
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
      description="Shared agency prospects, ownership, pipeline stages and follow-ups. Won leads can be converted to client records by authorized staff."
-     actions={<div className="flex gap-2">
+     actions={<div className="flex flex-wrap gap-2">
+       {canCreate&&<button className="btn-primary" type="button" onClick={()=>setCreating(x=>!x)} aria-expanded={creating}>
+        <Plus className="h-4 w-4"/>{creating?"Hide lead form":"Add lead"}</button>}
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage||"All stages"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
-   <div className="aw-two-col">
+   <div className="aw-directory-layout">
      <div className="space-y-5">
        <Card title="Lead register" description="Latest leads first. Search and filter are scoped to your organization.">
          <div className="flex flex-wrap gap-2">
@@ -207,18 +210,20 @@ export default function LeadsPage(){
          </div>
          {loading?<Spinner label="Loading leads…"/>:items.length===0?
            <EmptyState icon={BriefcaseBusiness} title="No leads found" description="Add the agency's first prospect, or adjust your search."/>:
-           <div className="mt-4 space-y-2">{items.map(l=><button key={l.id} type="button" onClick={()=>void open(l.id)}
-             className={"w-full rounded-xl border p-3 text-left hover:border-indigo-400 "+(selected?.id===l.id?"border-indigo-500 bg-indigo-50":"border-slate-200")}>
-             <div className="flex flex-wrap items-start justify-between gap-2"><p className="font-semibold text-slate-900">{l.businessName}</p><StatusBadge status={l.status}/></div>
-             <p className="mt-1 text-xs text-slate-600">{l.contactName||"No contact"} · {l.phone||"No phone"} · {l.location||"No location"}</p>
-             <p className="mt-1 text-xs text-slate-500">Assigned: {l.assignee?.displayName||"Unassigned"} · Follow-up: {fmt(l.nextFollowUpAt)}</p>
-           </button>)}</div>}
+           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
+            <thead><tr><th>Business / contact</th><th>Phone</th><th>Location</th><th>Stage</th><th>Assigned to</th><th>Follow-up</th><th>Details</th></tr></thead>
+            <tbody>{items.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
+             <td><strong>{l.businessName}</strong><span>{l.contactName||"No contact"}</span></td>
+             <td>{l.phone||"—"}</td><td>{l.location||"—"}</td><td><StatusBadge status={l.status}/></td>
+             <td>{l.assignee?.displayName||"Unassigned"}</td><td>{fmt(l.nextFollowUpAt)}</td>
+             <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
+            </tr>)}</tbody></table></div>}
          <div className="mt-4 flex items-center justify-between gap-3">
            <button className="btn-secondary" disabled={!cursor||loading} onClick={()=>setCursor(null)}>First page</button>
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>setCursor(nextCursor)}>Next page</button>
          </div>
        </Card>
-       {canCreate&&<Card title="Create a lead" description="Lead notes are preserved in the private activity timeline.">
+       {canCreate&&creating&&<Card title="Create a lead" description="Lead notes are preserved in the private activity timeline.">
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {([
              ["businessName","Business name",true],["contactName","Contact name",false],

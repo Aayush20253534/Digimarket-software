@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { BriefcaseBusiness, RefreshCw, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, Plus, RefreshCw, UsersRound } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
@@ -37,6 +37,7 @@ export default function ClientsPage(){
  const [selected,setSelected]=useState<Detail|null>(null);
  const [draft,setDraft]=useState<Editable>(clean);
  const [createDraft,setCreateDraft]=useState<Editable>(clean);
+ const [creating,setCreating]=useState(false);
  const [status,setStatus]=useState<Status>("ACTIVE");
  const [filter,setFilter]=useState("");
  const [search,setSearch]=useState("");
@@ -108,12 +109,12 @@ export default function ClientsPage(){
  return <div data-aw-module="clients" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Agency relationships" title="Clients"
      description="Organization-wide client profiles, contacts and active services. Won leads may be converted from Leads CRM."
-     actions={<button type="button" className="btn-secondary" onClick={()=>void load()}>
-       <RefreshCw className="h-4 w-4" aria-hidden="true"/>Refresh</button>}/>
+     actions={<div className="flex flex-wrap gap-2">{canCreate&&<button className="btn-primary" type="button" aria-expanded={creating} onClick={()=>setCreating(v=>!v)}><Plus size={16}/>{creating?"Hide client form":"Add client"}</button>}<button type="button" className="btn-secondary" onClick={()=>void load()}>
+       <RefreshCw className="h-4 w-4" aria-hidden="true"/>Refresh</button></div>}/>
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Client relationships</span><span className="aw-module-count">{rows.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{filter||"All statuses"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
-   <div className="aw-two-col">
+   <div className="aw-directory-layout">
      <div className="space-y-5">
        <Card title="Client directory" description="Records are scoped to the signed-in agency.">
          <div className="flex flex-wrap gap-2">
@@ -125,20 +126,20 @@ export default function ClientsPage(){
          </div>
          {loading?<Spinner label="Loading clients…"/>:rows.length===0?
            <EmptyState icon={BriefcaseBusiness} title="No matching clients" description="Add a client or convert a won lead."/>:
-           <div className="mt-4 space-y-2">
-             {rows.map(c=><button key={c.id} type="button" onClick={()=>void open(c.id)}
-               className={"w-full rounded-xl border p-3 text-left hover:border-indigo-400 "+(selected?.id===c.id?"border-indigo-500 bg-indigo-50":"border-slate-200")}>
-               <div className="flex justify-between gap-2"><span className="font-semibold">{c.businessName}</span><StatusBadge status={c.status}/></div>
-               <p className="mt-1 text-xs text-slate-500">{c.businessType||"Unspecified"} · {c.location||"No location"} · {c.phone||"No phone"}</p>
-               {c.sourceLeadId&&<p className="mt-1 text-xs text-indigo-700">Converted from a lead</p>}
-             </button>)}
-           </div>}
+           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Clients directory">
+            <thead><tr><th>Business</th><th>Type</th><th>Phone</th><th>Email</th><th>Location</th><th>Status</th><th>Details</th></tr></thead>
+            <tbody>{rows.map(c=><tr key={c.id} className={selected?.id===c.id?"aw-register-selected":""}>
+             <td><strong>{c.businessName}</strong>{c.sourceLeadId&&<span>Converted from lead</span>}</td>
+             <td>{c.businessType||"—"}</td><td>{c.phone||"—"}</td><td>{c.email||"—"}</td>
+             <td>{c.location||"—"}</td><td><StatusBadge status={c.status}/></td>
+             <td><button type="button" className="aw-register-open" onClick={()=>void open(c.id)}>Open</button></td>
+            </tr>)}</tbody></table></div>}
          <div className="mt-4 flex justify-between">
            <button className="btn-secondary" disabled={!cursor||loading} onClick={()=>setCursor(null)}>First page</button>
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>setCursor(nextCursor)}>Next page</button>
          </div>
        </Card>
-       {canCreate&&<Card title="Add client" description="Create a client directly when there is no lead to convert.">
+       {canCreate&&creating&&<Card title="Add client" description="Create a client directly when there is no lead to convert.">
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {editableFields.map(([key,label])=><FormField key={key} id={"new-client-"+key} label={label}>
              <input id={"new-client-"+key} className="field" required={key==="businessName"}
