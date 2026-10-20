@@ -205,6 +205,32 @@ export default function AssetsPage(){
   if(!next.length){setError("Choose JPEG, PNG, WebP, MP4, MOV, WebM or PDF files.");return;}
   setFiles(next);setUploadDialog(true);setNewMenu(false);setError("");
  }
+ async function moveAssets(ids:string[],destinationId:string|null){
+  if(!canUpload||!ids.length)return;
+  let moved=0;setError("");setBusy(true);setContext(null);
+  try{
+   for(const id of [...new Set(ids)]){
+    const asset=items.find(a=>a.id===id);
+    if(!asset||asset.status!=="ACTIVE")continue;
+    await request("/assets/"+asset.id+"/organize",{method:"POST",
+     body:{filename:asset.filename,folderId:destinationId,version:asset.version}});
+    moved++;
+   }
+   setSelected(null);setSelectedIds([]);
+   setMessage("Moved "+moved+" file(s) to the selected folder.");
+  }catch(e){setError("Moved "+moved+" file(s) before an error: "+errText(e));}
+  finally{setBusy(false);await load();}
+ }
+ async function moveFolderTo(folder:FolderItem,destinationId:string|null){
+  if(!canUpload||folder.id===destinationId)return;
+  setBusy(true);setContext(null);setError("");
+  try{
+   await request("/asset-folders/"+folder.id,{method:"PUT",
+    body:{name:folder.name,color:folder.color,parentId:destinationId,version:folder.version}});
+   setMessage("Moved folder "+folder.name+".");
+  }catch(e){setError(errText(e));}
+  finally{setBusy(false);await load();}
+ }
  async function previewAsset(asset:Asset){
   setBusy(true);setError("");
   try{
@@ -309,7 +335,17 @@ export default function AssetsPage(){
   {selectedIds.length>0&&<div className="aw-drive-selection"><strong>{selectedIds.length} selected</strong><button type="button" onClick={()=>setSelectedIds([])}>Clear selection</button>{canArchive&&<button type="button" disabled={busy} onClick={()=>void bulkArchive()}><Archive size={15}/> Archive selected</button>}</div>}
   {loading?<div className="aw-drive-loading"><Spinner label="Loading Drive…"/></div>:<>
    {visibleFolders.length>0&&<section aria-label="Folders" className="aw-drive-section"><h2>Folders <span>{visibleFolders.length}</span></h2>
-     <div className="aw-drive-tile-grid">{visibleFolders.map(folder=><div key={folder.id} className="aw-drive-folder-tile"
+     <div className="aw-drive-tile-grid">{visibleFolders.map(folder=><div key={folder.id} className="aw-drive-folder-tile" draggable={canUpload}
+       onDragStart={e=>{if(!canUpload)return;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("application/x-aw-folder",folder.id);}}
+       onDragOver={e=>{if(e.dataTransfer.types.includes("application/x-aw-asset")||e.dataTransfer.types.includes("application/x-aw-folder")){e.preventDefault();e.dataTransfer.dropEffect="move";}}}
+       onDrop={e=>{
+        const ids=e.dataTransfer.getData("application/x-aw-asset");
+        const source=e.dataTransfer.getData("application/x-aw-folder");
+        if(!ids&&!source)return;
+        e.preventDefault();e.stopPropagation();
+        if(ids){try{void moveAssets(JSON.parse(ids) as string[],folder.id);}catch{setError("Invalid file selection");}}
+        else if(source){const target=folders.find(f=>f.id===source);if(target)void moveFolderTo(target,folder.id);}
+       }}
        onContextMenu={e=>{e.preventDefault();setContext("folder:"+folder.id);}}>
        <button type="button" className="aw-drive-folder-primary" onClick={()=>enter(folder)} aria-label={"Open folder "+folder.name}>
         <Folder size={23} fill={folder.color} color={folder.color} strokeWidth={1.6}/><strong>{folder.name}</strong>
@@ -325,7 +361,10 @@ export default function AssetsPage(){
    </section>}
    <section className="aw-drive-section" aria-label="Files in current directory"><h2>Files <span>{items.length}{nextCursor?"+":""}</span></h2>
     {!items.length?<div className="aw-drive-empty"><File size={28}/><strong>{folders.length||search?"No matching files":"This folder is empty"}</strong><p>Files uploaded here will appear in this list.</p></div>:
-    <div className={"aw-drive-items aw-drive-"+view} role="list">{displayed.map(asset=><div key={asset.id} className={"aw-drive-file"+(selected?.id===asset.id?" is-selected":"")} role="listitem" onContextMenu={e=>{e.preventDefault();open(asset);setContext("file:"+asset.id);}}>
+    <div className={"aw-drive-items aw-drive-"+view} role="list">{displayed.map(asset=><div key={asset.id} className={"aw-drive-file"+(selected?.id===asset.id?" is-selected":"")} role="listitem"
+       draggable={canUpload&&asset.status==="ACTIVE"}
+       onDragStart={e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("application/x-aw-asset",JSON.stringify(selectedIds.includes(asset.id)?selectedIds:[asset.id]));}}
+       onContextMenu={e=>{e.preventDefault();open(asset);setContext("file:"+asset.id);}}>
       <label className="aw-drive-check"><input type="checkbox" aria-label={"Select "+asset.filename} checked={selectedIds.includes(asset.id)}
        onChange={e=>setSelectedIds(v=>e.target.checked?[...v,asset.id]:v.filter(id=>id!==asset.id))}/></label>
       <button type="button" className="aw-drive-file-primary" onClick={()=>open(asset)} onDoubleClick={()=>void previewAsset(asset)}>
