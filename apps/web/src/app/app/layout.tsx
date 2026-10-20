@@ -11,9 +11,7 @@ import {
 import { useAuth } from "@/components/auth-provider";
 import { Notice, Spinner } from "@/components/ui";
 
-const futureModules = [
-  { label: "Reports", icon: ChartNoAxesCombined },
-];
+
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -46,6 +44,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSearch = session.identity.permissions.includes("search.read");
+  const canSeeReports = session.identity.permissions.includes("reports.business.read");
+  const canSeeAlerts = session.identity.permissions.includes("notifications.read");
   const canSeeFounders = session.identity.permissions.includes("founders.read");
   const canSeeSettings = session.identity.permissions.includes("organization.settings.manage");
   const canSeeProfitability = session.identity.permissions.includes("profitability.read");
@@ -72,6 +73,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Link href="/app/dashboard" aria-current={pathname === "/app/dashboard" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/dashboard" ? "sidebar-active" : "")}>
           <LayoutDashboard className="h-4 w-4" aria-hidden="true" />Overview
         </Link>
+        {canSearch && <Link href="/app/search" aria-current={pathname.startsWith("/app/search")?"page":undefined}
+          className={"sidebar-link "+(pathname.startsWith("/app/search")?"sidebar-active":"")}>
+          <Search className="h-4 w-4" aria-hidden="true" />Global search
+        </Link>}
+        {canSeeReports && <Link href="/app/reports" aria-current={pathname.startsWith("/app/reports")?"page":undefined}
+          className={"sidebar-link "+(pathname.startsWith("/app/reports")?"sidebar-active":"")}>
+          <ChartNoAxesCombined className="h-4 w-4" aria-hidden="true" />Reports
+        </Link>}
+        {canSeeAlerts && <Link href="/app/notifications"
+          aria-current={pathname.startsWith("/app/notifications")?"page":undefined}
+          className={"sidebar-link "+(pathname.startsWith("/app/notifications")?"sidebar-active":"")}>
+          <Bell className="h-4 w-4" aria-hidden="true" />Notifications
+        </Link>}
         {canSeeLeads && <Link href="/app/leads" aria-current={pathname.startsWith("/app/leads") ? "page" : undefined} className={"sidebar-link " + (pathname.startsWith("/app/leads") ? "sidebar-active" : "")}>
           <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />Leads CRM
         </Link>}
@@ -124,13 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <ShieldCheck className="h-4 w-4" aria-hidden="true" />My account
         </Link>
       </div>
-      <div>
-        <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Coming in later modules</p>
-        {futureModules.map(({ label, icon: Icon }) => <div key={label} className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-400" title="Scheduled for a later module">
-          <Icon className="h-4 w-4" aria-hidden="true" /><span>{label}</span>
-          <span className="ml-auto text-[10px]">Soon</span>
-        </div>)}
-      </div>
+
     </nav>
     <div className="mt-5 border-t border-slate-200 pt-5">
       <Link href="/app/profile" className="flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-slate-50">

@@ -63,6 +63,8 @@ export const permissionCatalog = [
   ["assets.delete", "Delete authorized assets"],
   ["profitability.read", "View privileged client-level financial performance"],
   ["profitability.manage", "Assign direct costs and record or reverse recognized revenue"],
+  ["notifications.read", "View and acknowledge only personal alerts"],
+  ["search.read", "Search only individually authorized resources"],
   ["reports.business.read", "View authorized company analytics"],
   ["founders.read", "View founder roles and team responsibilities"],
   ["founders.edit", "Edit founder responsibilities"],

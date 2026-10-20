@@ -3,6 +3,7 @@ import { Queue, Worker, type ConnectionOptions } from "bullmq";
 import { createDatabaseClient } from "@digimarket/db";
 import { sweepRecurrences } from "./recurrence";
 import { sweepBillingSchedules } from "./billing-recurrence";
+import { sweepAlerts, reconcileInvoices } from "./alerts";
 
 function redisOptions():ConnectionOptions {
  const value=process.env.REDIS_URL;
@@ -25,6 +26,12 @@ const worker=new Worker("digimarket-task-recurrence",async job=>{
   if(result.created||result.paused)console.info("Billing draft sweep",result);
   return result;
  }
+ if(job.name==="scan-business-alerts"){
+  return sweepAlerts(db,new Date());
+ }
+ if(job.name==="reconcile-invoice-balances"){
+  return reconcileInvoices(db,new Date());
+ }
  if(job.name!=="scan-recurring-tasks")throw new Error("Unknown worker job");
  const outcome=await sweepRecurrences(db,new Date(),100);
  if(outcome.created||outcome.disabled)console.info("Task recurrence sweep",outcome);
@@ -40,7 +47,15 @@ await queue.upsertJobScheduler("billing-minute-sweep",{every:60_000},{
  name:"scan-billing-schedules",data:{},
  opts:{attempts:4,backoff:{type:"exponential",delay:1500},removeOnComplete:100,removeOnFail:1000},
 });
-console.info("Task and recurring billing BullMQ worker ready");
+await queue.upsertJobScheduler("alerts-every-15-minutes",{every:900_000},{
+ name:"scan-business-alerts",data:{},opts:{attempts:3,backoff:{type:"exponential",delay:2000},
+ removeOnComplete:100,removeOnFail:1000},
+});
+await queue.upsertJobScheduler("invoice-reconciliation-hourly",{every:3_600_000},{
+ name:"reconcile-invoice-balances",data:{},opts:{attempts:3,backoff:{type:"exponential",delay:2000},
+ removeOnComplete:100,removeOnFail:1000},
+});
+console.info("Task, billing, alerts and reconciliation BullMQ worker ready");
 let shuttingDown=false;
 async function shutdown(){
  if(shuttingDown)return;shuttingDown=true;

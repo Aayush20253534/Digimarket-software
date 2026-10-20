@@ -82,7 +82,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 13: invoices, payment verification and allocation, receivables, private PDF generation and recurring draft templates
 - [x] Module 14: client profitability, cost attribution, earned-revenue recognition and corrections
 - [x] Module 15: founder responsibilities, organization profile, versioned billing defaults and configuration governance
-- [ ] Modules 16–17: reporting/search/notifications and production readiness
+- [x] Module 16: permission-filtered global search, operational reports, private SSE notifications and reconciliation alerts
+- [ ] Module 17: production readiness and deployment
 
 **Design and scaffolding are not a production release.**
 
@@ -127,3 +128,6 @@ The `/app/profitability` dashboard separates issued invoices, verified collectio
 
 ## Module 15 founders and settings
 `/app/founders` displays responsibility profiles separately from permission grants. `/app/settings` manages organization identity/timezone, invoice prefixes, payment terms and instructions, with existing finance/approval/billing setting links. Issued invoices remain immutable; company currency stays INR. See [Module 15 documentation](docs/26-MODULE-15-FOUNDERS-SETTINGS.md). The next work is search/reports/notifications (Module 16) and deployment (Module 17).
+
+## Module 16: search, reports and notifications
+`/app/search` respects the same source and record permissions as each module. `/app/reports` provides authorized operational KPIs, while `/app/notifications` delivers private task, lead, approval and overdue invoice notices via authenticated SSE (with polling fallback). Redis worker runs idempotent scheduled alert and read-only invoice reconciliation jobs. See [Module 16 guide](docs/27-MODULE-16-INSIGHTS.md). Live deployment remains Module 17.

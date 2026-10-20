@@ -375,3 +375,15 @@ export const billingSettingsSchema=z.strictObject({
  paymentInstructions:z.string().trim().max(1000).nullable(),
 });
 export type BillingSettingsUpdate=z.infer<typeof billingSettingsSchema>;
+
+// Module 16 search, reporting and notifications.
+export const searchQuerySchema=z.strictObject({
+ q:z.string().trim().min(2).max(100),
+});
+export const reportsPeriodSchema=z.strictObject({
+ from:z.iso.date(),to:z.iso.date(),
+}).refine(x=>x.from<=x.to,{message:"Invalid report period"});
+export const notificationListSchema=z.strictObject({
+ unread:z.enum(["true","false"]).optional(),
+ limit:z.coerce.number().int().min(1).max(100).default(30),
+});

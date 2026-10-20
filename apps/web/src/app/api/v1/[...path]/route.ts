@@ -5,6 +5,10 @@ export const dynamic = "force-dynamic";
 
 const endpoints: Record<string, string[]> = {
   "health": ["GET"],
+  "search": ["GET"],
+  "reports/overview": ["GET"],
+  "notifications": ["GET"],
+  "notifications/read-all": ["POST"],
   "founders": ["GET","POST"],
   "founders/eligible-staff": ["GET"],
   "company-settings": ["GET","PUT"],
@@ -50,6 +54,7 @@ const endpoints: Record<string, string[]> = {
   "leads/import": ["POST"],
   "leads/export": ["GET"],
 };
+const notificationReadPattern=/^notifications\/[0-9a-fA-F-]{36}\/read$/;
 const founderDetailPattern=/^founders\/[0-9a-fA-F-]{36}$/;
 const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/status$/;
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
@@ -86,6 +91,7 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(notificationReadPattern.test(path))return method==="POST";
   if(founderDetailPattern.test(path))return method==="PUT";
   if(profitExpensePattern.test(path))return method==="PUT";
   if(profitReversePattern.test(path))return method==="POST";
@@ -148,6 +154,22 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (path === "approvals" || ["finance/entries","finance/summary","finance/export"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");
     if (view === "mine" || view === "queue") url.searchParams.set("view", view);
+  }
+  if(path==="search"){
+    const q=request.nextUrl.searchParams.get("q");
+    if(q!==null)url.searchParams.set("q",q);
+  }
+  if(path==="reports/overview"){
+    for(const key of ["from","to"]){
+      const v=request.nextUrl.searchParams.get(key);
+      if(v!==null)url.searchParams.set(key,v);
+    }
+  }
+  if(path==="notifications"){
+    for(const key of ["unread","limit"]){
+      const v=request.nextUrl.searchParams.get(key);
+      if(v!==null)url.searchParams.set(key,v);
+    }
   }
   if (path === "assets") {
     for (const key of ["q","clientId","status","cursor","limit"]) {

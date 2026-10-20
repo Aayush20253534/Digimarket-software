@@ -5,7 +5,7 @@ export const SYSTEM_ROLES: SystemRole[] = ["SUPER_ADMIN", "ADMIN", "FOUNDER", "E
 export const privilegedRole = (roles: string[]) => roles.some((role) => role === "SUPER_ADMIN" || role === "ADMIN" || role === "FOUNDER");
 
 const admin = [
-  "approvals.read", "approvals.submit", "approvals.decide", "approvals.policy.manage",
+  "notifications.read", "search.read", "reports.business.read", "approvals.read", "approvals.submit", "approvals.decide", "approvals.policy.manage",
   "users.read", "users.create", "users.update", "users.reset", "teams.read", "teams.manage",
   "leads.read", "leads.create", "leads.edit", "leads.assign", "leads.convert", "leads.bulk", "leads.duplicates.review",
   "clients.read", "clients.create", "clients.edit", "finance.entry.create",
@@ -21,7 +21,7 @@ const founder = [
   "tasks.create", "tasks.update.own", "content.read", "content.manage", "content.publish", "content.create", "content.edit", "content.approve",
   "invoices.read", "invoices.draft", "invoices.manage", "invoices.issue", "payments.read", "payments.record", "payments.verify", "profitability.read", "profitability.manage", "founders.read", "founders.edit", "assets.upload", "assets.read",
 ] as const;
-const employee = ["founders.read", "approvals.read", "approvals.submit", "leads.read", "leads.create", "leads.edit.own", "clients.read", "finance.entry.create", "finance.entry.read.own", "projects.read", "projects.deliverables.write", "tasks.read", "tasks.comment", "tasks.update.own"] as const;
+const employee = ["notifications.read","search.read","founders.read", "approvals.read", "approvals.submit", "leads.read", "leads.create", "leads.edit.own", "clients.read", "finance.entry.create", "finance.entry.read.own", "projects.read", "projects.deliverables.write", "tasks.read", "tasks.comment", "tasks.update.own"] as const;
 export const systemRoleGrants: Record<SystemRole, readonly string[]> = {
   SUPER_ADMIN: permissionCatalog.map(([key]) => key),
   ADMIN: admin,

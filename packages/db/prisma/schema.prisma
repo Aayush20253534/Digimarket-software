@@ -204,6 +204,7 @@ model Organization {
   founderProfiles FounderProfile[]
   auditLogs       AuditLog[]
   outboxEvents    OutboxEvent[]
+  notifications Notification[]
   approvalPolicies ApprovalPolicy[]
   approvalRequests ApprovalRequest[]
   financialCategories FinancialCategory[]
@@ -272,6 +273,7 @@ model User {
   tasksCreated Task[] @relation("TaskCreator")
   assignedTasks TaskAssignment[]
   taskComments TaskComment[]
+  notifications Notification[]
   taskRecurrencesCreated TaskRecurrence[]
 
   @@unique([organizationId, loginId])
@@ -1091,4 +1093,23 @@ model OrganizationBillingSettings {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+}
+
+// Module 16: private per-recipient alerts; dedupe keys make BullMQ retries idempotent.
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  recipientId String @db.Uuid
+  dedupeKey String @db.VarChar(180)
+  kind String @db.VarChar(40)
+  title String @db.VarChar(160)
+  body String @db.VarChar(300)
+  href String @db.VarChar(160)
+  readAt DateTime? @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  recipient User @relation(fields:[recipientId],references:[id],onDelete:Restrict)
+  @@unique([organizationId,recipientId,dedupeKey])
+  @@index([organizationId,recipientId,createdAt,id])
+  @@index([organizationId,recipientId,readAt])
 }

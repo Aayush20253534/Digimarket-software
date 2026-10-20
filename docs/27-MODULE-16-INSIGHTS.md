@@ -1,0 +1,21 @@
+# Module 16: Global Search, Reports, Notifications and Reconciliation
+
+## Architecture and scope
+- Search is an authenticated, query-bounded aggregator across Leads, Clients, Projects, Tasks, Content and issued Invoices. Each subquery is guarded by the **exact source read permission**, applies tenant isolation and preserves record-level access rules for projects (manager or membership/creator), tasks (manager or assigned/creator) and content (manager or owner/creator). No finance notes, file metadata, client contact details or full-text secret indexing. A hidden task/project cannot be recovered by an arbitrary title.
+- `GET /api/v1/search?q=...`: 2–100 characters, at most eight results per source and forty total. Results link to their authorized module, not an unguarded record-fetch route.
+- `GET /api/v1/reports/overview?from=YYYY-MM-DD&to=YYYY-MM-DD`: requires `reports.business.read` as the umbrella permission; each metric group also requires the relevant resource read permission. Project/task/content counts observe record-level scoping; invoice and cash summaries require invoice / full-finance grants respectively. Dates are inclusive UTC; overdue balances and live statuses are **current snapshots**, not reconstructed historical snapshots.
+- `/app/reports` shows real permission-scoped operational counts and posted income/expense. It never sums issued invoice totals as cash or invents conversion percentages.
+- Notification rows are per user, private to recipient, with bounded generic text and permitted internal link targets. The worker generates task deadline, lead follow-up, pending approval and overdue invoice notices; future sources can reuse the table.
+- Worker loads actual **active users and role permissions** for recipient selection; merely being a founder or another tenant's user is not enough. Pending content reviews also require `content.approve`, deliverable review requires `projects.review`. Sensitive financial amounts and task details do not appear in notification bodies.
+- `sweepAlerts` scheduled every 15 minutes via BullMQ; `reconcileInvoices` hourly verifies `Invoice.paidTotal` against VERIFIED `PaymentAllocation` sums. A mismatch creates only an internal, finance-privileged alert. It **never auto-edits ledger or balances**.
+- Notification duplicate avoidance uses a unique `(organizationId, recipientId, dedupeKey)` constraint and `createMany(skipDuplicates:true)` to tolerate at-least-once delivery. One alert per qualifying record/day/recipient. Sweeps are bounded (first 100 per source), with due date indexes used where possible.
+- `GET /api/v1/notifications` returns only personal records and unread count, with `unread=true` filter. POST `/api/v1/notifications/:id/read`, POST `/api/v1/notifications/read-all` are scope-locked.
+- Live updates use `GET /api/v1/notifications/stream` over authenticated SSE. Next.js has a dedicated streaming gateway that forwards an access token **in Authorization**, not in the URL. Express reauthenticates periodically. Stream emits only cursor/unread-count change hints; the UI refetches authoritative results. When SSE is down, the UI polls every minute.
+- The existing BullMQ worker continues task and billing sweeps and adds alerts/reconciliation schedules. Recurring worker depends on live Redis + database being deployed in Module 17.
+
+## Security and implementation notes
+- New RBAC keys: `search.read`, `notifications.read`. Existing `reports.business.read` is now granted to privileged system roles. Employees can read only their own notification rows. New permissions require running the **idempotent** organization seed on deployment.
+- Notifications are not emails or push notifications; live delivery requires an open browser tab and working SSE gateway. Keep-alive, abort cleanup and fallback polling are included.
+- No new package dependencies. New migration `20261020050000_reporting_notifications`.
+- Dedicated CI workflow `.github/workflows/module16-insights.yml` tests cross-tenant leakage, task/project/content scoping, confidential invoice/finance filtering, notification recipient isolation, retry idempotency, and read-only reconciliation, plus existing project/tasks/billing regressions.
+- Module 17 covers production backup, deploy, observability, security review and live services.
