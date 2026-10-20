@@ -58,6 +58,38 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("heading", { name: /Welcome,/ })).toBeVisible();
   await expect(page.getByText("Authenticated", { exact: true })).toBeVisible();
 
+  // Dashboard action-center regression uses scoped, read-only API fixtures.
+  await expect(page.getByTestId("dashboard-action-center")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pending tasks" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Past deadline" })).toBeVisible();
+  const mockTasks = "**/api/v1/tasks?*";
+  const mockProjects = "**/api/v1/projects?*";
+  await page.route(mockTasks, route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ data: { items: [
+      { id: "00000000-0000-4000-8000-000000000041", title: "Urgent overdue design", status: "IN_PROGRESS", priority: "URGENT",
+        dueAt: "2001-01-01T08:00:00.000Z", project: {name:"Example project"} },
+      { id: "00000000-0000-4000-8000-000000000042", title: "Upcoming marketing plan", status: "TODO", priority: "MEDIUM",
+        dueAt: "2099-01-01T08:00:00.000Z", project: null },
+      { id: "00000000-0000-4000-8000-000000000043", title: "Finished old task", status: "DONE", priority: "LOW",
+        dueAt: "2000-01-01T08:00:00.000Z", project: null }
+    ], nextCursor: null } }) }));
+  await page.route(mockProjects, route => route.fulfill({ status: 200, contentType: "application/json",
+    body: JSON.stringify({ data: { items: [
+      { id: "00000000-0000-4000-8000-000000000044", name: "Delayed example project", status: "ACTIVE",
+        dueOn: "2000-02-02T00:00:00.000Z", client: {businessName:"Test client"} }
+    ], nextCursor: null } }) }));
+  await expect(page.getByRole("button", { name: "Refresh priorities" })).toBeEnabled();
+  await page.getByRole("button", { name: "Refresh priorities" }).click();
+  await expect(page.getByTestId("pending-task-count")).toHaveText("2");
+  await expect(page.getByTestId("overdue-item-count")).toHaveText("2");
+  await expect(page.getByText("Urgent overdue design").first()).toBeVisible();
+  await expect(page.getByText("Delayed example project")).toBeVisible();
+  await expect(page.getByLabel("Task number 1")).toBeVisible();
+  await expect(page.locator(".aw-action-number").first()).toHaveCSS("color", "rgb(255, 192, 138)");
+  await page.unroute(mockTasks);
+  await page.unroute(mockProjects);
+
+
   // Phase 4: the overview is driven by the signed-in user's real permissions.
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
   await expect(page.getByTestId("dashboard-kpis")).toBeVisible();
