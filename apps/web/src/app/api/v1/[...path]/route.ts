@@ -145,7 +145,7 @@ function normalizeOrigin(value: string): string | null {
 }
 
 function platformVercelOrigin(host: string | undefined): string | null {
-  if (!host || !/^[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.vercel\\.app$/.test(host)) return null;
+  if (!host || !/^[a-z0-9-]+(?:[.][a-z0-9-]+)*[.]vercel[.]app$/.test(host)) return null;
   return "https://" + host;
 }
 
