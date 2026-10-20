@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 112" role="img" aria-labelledby="title">
+<title id="title">AmplifyWorld brand mark</title>
+<defs>
+  <linearGradient id="amplify" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#6516FF"/><stop offset=".48" stop-color="#A020FF"/><stop offset="1" stop-color="#F037DB"/></linearGradient>
+  <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#D8D3E8"/></linearGradient>
+</defs>
+<path d="M4 102 49 21a11 11 0 0 1 19 0l28 48H73L58 42 25 102Z" fill="url(#metal)"/>
+<path d="m41 76 12-18h31l11 18z" fill="url(#metal)"/>
+<path d="m79 73 17 24a10 10 0 0 0 17-1l17-30-12-16-15 26-14-19Z" fill="url(#amplify)"/>
+<path d="M110 73 137 13l-5 30-18-9-29 54-12-18L109 39Z" fill="url(#amplify)"/>
+<path d="m104 23 36-17-5 40Z" fill="#E72EEA"/>
+</svg>
