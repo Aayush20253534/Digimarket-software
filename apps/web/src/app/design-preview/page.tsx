@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Activity, ArrowRight, Bell, CheckCircle2, ChevronRight, CircleDollarSign,
-  FolderKanban, LayoutDashboard, Search, ShieldCheck, Sparkles, Users,
+  FolderKanban, LayoutDashboard, Search, ShieldCheck, Users,
 } from "lucide-react";
 import { AWDialog } from "@/components/aw-dialog";
 import { AWBadge, AWButton, AWCard, AWEmptyState, AWFormField, AWInput, AWNotice,

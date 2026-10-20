@@ -1,6 +1,6 @@
 import type {
   ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode,
-  SelectHTMLAttributes, TableHTMLAttributes, TextareaHTMLAttributes
+  SelectHTMLAttributes, TextareaHTMLAttributes
 } from "react";
 
 function join(...values: Array<string | undefined | false>) {
