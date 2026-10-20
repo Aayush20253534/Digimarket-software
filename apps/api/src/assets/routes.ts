@@ -51,6 +51,13 @@ export function registerAssetRoutes(app:Express,auth:AuthService) {
  app.post("/api/v1/asset-folders",authenticated,async(req,res)=>{
    res.status(201).json({data:await folders.create(actor(res),req.body)});
  });
+ app.post("/api/v1/asset-folders/:id/download",authenticated,async(req,res)=>{
+   const zip=await folders.downloadFolder(actor(res),parse(uuid,req.params.id));
+   res.set("Cache-Control","no-store");
+   res.set("Content-Type","application/zip");
+   res.set("Content-Disposition",'attachment; filename="'+zip.filename+'"');
+   res.send(zip.data);
+ });
  app.put("/api/v1/asset-folders/:id",authenticated,async(req,res)=>{
    res.json({data:await folders.update(actor(res),parse(uuid,req.params.id),req.body)});
  });

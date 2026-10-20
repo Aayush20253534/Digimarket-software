@@ -71,6 +71,25 @@ export default function AssetsPage(){
  const open=(asset:Asset)=>{setSelected(asset);setEditedName(asset.filename);setDestination(asset.folderId??"");setLinkClient(asset.clientId??"");};
  const enter=(folder:FolderItem)=>{setTrail(v=>[...v,folder]);setCursor(null);setSelected(null);};
  const goTo=(depth:number)=>{setTrail(v=>v.slice(0,depth));setCursor(null);setSelected(null);};
+ async function downloadFolder(folder:FolderItem){
+  if(!session)return;
+  setBusy(true);setError("");
+  try{
+   const response=await fetch("/api/v1/asset-folders/"+folder.id+"/download",{
+    method:"POST",credentials:"same-origin",
+    headers:{authorization:"Bearer "+session.accessToken,"content-type":"application/json"},
+    body:"{}",
+   });
+   if(!response.ok){
+    const result=await response.json().catch(()=>null) as {error?:{message?:string}}|null;
+    throw new Error(result?.error?.message||"Folder download failed");
+   }
+   const url=URL.createObjectURL(await response.blob());
+   const anchor=document.createElement("a");anchor.href=url;anchor.download=folder.name+".zip";anchor.click();
+   window.setTimeout(()=>URL.revokeObjectURL(url),30000);
+   setMessage("Folder ZIP downloaded.");
+  }catch(e){setError(errText(e));}finally{setBusy(false);}
+ }
  async function addFolder(e:FormEvent){
    e.preventDefault();if(!newFolderName.trim())return;
    setBusy(true);setError("");
@@ -175,11 +194,15 @@ export default function AssetsPage(){
              <Folder size={28} fill={folder.color} color={folder.color} strokeWidth={1.6}/>
              <span>{folder.name}</span><ChevronRight size={16}/>
             </button>
-            {canUpload&&<div className="aw-drive-folder-tools">
+            <div className="aw-drive-folder-tools">
+             <button type="button" aria-label={"Download "+folder.name+" as ZIP"} title="Download folder ZIP"
+               disabled={busy} onClick={()=>void downloadFolder(folder)}><Download size={15}/></button>
+             {canUpload&&<>
              <button type="button" aria-label={"Rename "+folder.name} title="Rename folder"
                onClick={()=>setRenaming(renaming===folder.id?null:folder.id)}><Pencil size={15}/></button>
              <input type="color" aria-label={"Change "+folder.name+" color"} title="Change folder color" value={folder.color}
                onChange={e=>void renameFolder(folder,{color:e.target.value})}/>
+              </>}
             </div>}
             {renaming===folder.id&&<form className="aw-drive-rename" onSubmit={e=>{e.preventDefault();
               const input=e.currentTarget.elements.namedItem("folder-name") as HTMLInputElement|null;

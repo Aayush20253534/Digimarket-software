@@ -2,6 +2,8 @@ import {z} from "zod";
 import type {PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
+import {buildZip} from "./zip";
+import {CloudinaryAssetProvider} from "./provider";
 
 const uuid=z.uuid(),folderLabel=z.string().trim().min(1).max(120);
 const color=z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -61,6 +63,45 @@ export class AssetFolderService{
     data:{name:nextName,parentId:nextParent,...(v.color?{color:v.color}:{}),version:{increment:1}}});
   if(!result.count)throw new AuthError(409,"VERSION_CONFLICT","Folder changed; refresh to retry");
   return this.get(p,id);
+ }
+ async downloadFolder(p:Principal,id:string){
+  need(p,"assets.read");const root=await this.get(p,id);
+  const stack:[string,string,number][]=[[root.id,"",0]];
+  const visited=new Set<string>();
+  const files:{name:string;data:Buffer}[]=[];
+  let bytes=0;
+  const cloudinary=new CloudinaryAssetProvider();
+  while(stack.length){
+   const [folderId,path,depth]=stack.pop()!;
+   if(visited.has(folderId)||depth>6)throw new AuthError(422,"FOLDER_TOO_DEEP","Folder nesting exceeds download limit");
+   visited.add(folderId);
+   const [sub,assets]=await Promise.all([
+    this.db.assetFolder.findMany({where:{organizationId:p.organizationId,parentId:folderId},take:100}),
+    this.db.asset.findMany({where:{organizationId:p.organizationId,folderId,status:"ACTIVE",
+      ...(p.permissions.has("clients.read")?{}:{clientId:null})},
+      select:{filename:true,bytes:true,publicId:true,format:true,resourceType:true},take:31}),
+   ]);
+   if(sub.length>=100||assets.length>30||files.length+assets.length>30)
+    throw new AuthError(422,"ARCHIVE_LIMIT","Download one folder with 30 files or fewer.");
+   for(const child of sub)stack.push([child.id,path+child.name.replace(/[\\/:*?"<>|\x00-\x1f]/g,"_")+"/",depth+1]);
+   for(const asset of assets){
+    if(bytes+asset.bytes>25_000_000)throw new AuthError(422,"ARCHIVE_LIMIT","Folder exceeds 25 MB ZIP limit");
+    const link=cloudinary.download(asset.publicId,asset.resourceType.toLowerCase() as "image"|"video"|"raw",asset.format);
+    const url=new URL(link);
+    if(url.protocol!=="https:"||url.hostname!=="res.cloudinary.com")
+      throw new AuthError(503,"STORAGE_URL_INVALID","Secure download host is unavailable");
+    const response=await fetch(link,{signal:AbortSignal.timeout(8000)});
+    if(!response.ok)throw new AuthError(503,"DOWNLOAD_FAILED","Storage could not return a file");
+    const raw=Buffer.from(await response.arrayBuffer());
+    if(raw.length>asset.bytes+65536||bytes+raw.length>25_000_000)
+      throw new AuthError(422,"ARCHIVE_LIMIT","Folder ZIP would exceed size limits");
+    bytes+=raw.length;
+    files.push({name:path+asset.filename.replace(/[\\/:*?"<>|\x00-\x1f]/g,"_"),data:raw});
+   }
+  }
+  await this.db.auditLog.create({data:{organizationId:p.organizationId,actorId:p.userId,
+    action:"assets.folder_downloaded",entityType:"AssetFolder",entityId:id,afterRedacted:{files:files.length}}});
+  return {filename:root.name.replace(/[^a-zA-Z0-9 _-]/g,"_")+".zip",data:buildZip(files)};
  }
  async remove(p:Principal,id:string){
   need(p,"assets.delete");await this.get(p,id);

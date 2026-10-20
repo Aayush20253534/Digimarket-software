@@ -58,6 +58,7 @@ const endpoints: Record<string, string[]> = {
   "leads/import": ["POST"],
   "leads/export": ["GET"],
 };
+const folderArchivePattern=/^asset-folders\/[0-9a-fA-F-]{36}\/download$/;
 const folderDetailPattern=/^asset-folders\/[0-9a-fA-F-]{36}$/;
 const financeProofPattern=/^finance\/entries\/[0-9a-fA-F-]{36}\/proof$/;
 const assetOrganizePattern=/^assets\/[0-9a-fA-F-]{36}\/organize$/;
@@ -100,6 +101,7 @@ const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|rol
 
 function permitted(path: string, method: string): boolean {
   if(financeProofPattern.test(path))return method==="GET";
+  if(folderArchivePattern.test(path))return method==="POST";
   if(folderDetailPattern.test(path))return ["PUT","DELETE"].includes(method);
   if(assetOrganizePattern.test(path))return method==="POST";
   if(noteDetailPattern.test(path))return ["GET","PUT","DELETE"].includes(method);
@@ -317,6 +319,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const responseHeaders = new Headers({ "Cache-Control": "no-store" });
     const contentType = response.headers.get("content-type");
     if (contentType?.startsWith("application/json")) responseHeaders.set("content-type", "application/json");
+    if (folderArchivePattern.test(path) && contentType?.startsWith("application/zip")){
+      responseHeaders.set("content-type","application/zip");
+      const disposition=response.headers.get("content-disposition");
+      if(disposition)responseHeaders.set("content-disposition",disposition);
+    }
     for (const value of response.headers.getSetCookie()) responseHeaders.append("set-cookie", value);
     return new NextResponse(response.status === 204 ? null : await response.arrayBuffer(), {
       status: response.status, headers: responseHeaders,
