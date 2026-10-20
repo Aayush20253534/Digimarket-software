@@ -2,9 +2,9 @@ name: AmplifyWorld Notes and Responsive Workspace Regression
 
 on:
   push:
-    branches: [feat/amplifyworld-phase6-9-completion]
+    branches: [main]
   pull_request:
-    branches: [feat/amplifyworld-overview-action-center, main]
+    branches: [main]
 
 permissions:
   contents: read
