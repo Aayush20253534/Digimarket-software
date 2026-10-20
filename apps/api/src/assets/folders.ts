@@ -95,7 +95,7 @@ export class AssetFolderService{
     if(bytes+asset.bytes>25_000_000)throw new AuthError(422,"ARCHIVE_LIMIT","Folder exceeds 25 MB ZIP limit");
     const link=cloudinary.download(asset.publicId,asset.resourceType.toLowerCase() as "image"|"video"|"raw",asset.format);
     const url=new URL(link);
-    if(url.protocol!=="https:"||url.hostname!=="res.cloudinary.com")
+    if(url.protocol!=="https:"||url.hostname!=="api.cloudinary.com"||!url.pathname.startsWith("/v1_1/"))
       throw new AuthError(503,"STORAGE_URL_INVALID","Secure download host is unavailable");
     const response=await fetch(link,{signal:AbortSignal.timeout(8000)});
     if(!response.ok)throw new AuthError(503,"DOWNLOAD_FAILED","Storage could not return a file");
