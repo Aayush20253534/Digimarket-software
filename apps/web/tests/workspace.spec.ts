@@ -27,6 +27,7 @@ function otp(secret: string, now = Date.now()) {
 }
 
 test("login, first password change, MFA, admin user management and employee permission boundary", async ({ page }) => {
+  test.setTimeout(180_000); // Long, sequential multi-module browser workflow in isolated CI.
   page.on("pageerror", (error) => console.log("PAGE ERROR:", error.name, error.message.slice(0, 300)));
   page.on("response", (response) => {
     if (response.url().includes("/api/v1/")) console.log("API RESULT", new URL(response.url()).pathname, response.status());
@@ -93,6 +94,29 @@ test("login, first password change, MFA, admin user management and employee perm
     viewport: document.documentElement.clientWidth
   }));
   expect(mobileWidth.full).toBeLessThanOrEqual(mobileWidth.viewport + 1);
+
+  // Phase 5 mobile check: retain every live module and route while changing only presentation.
+  for (const route of ["leads", "clients", "projects", "tasks", "content", "approvals"]) {
+    await page.goto("/app/" + route);
+    await expect(page.locator('[data-aw-module="' + route + '"]')).toBeVisible();
+    await expect(page.locator(".aw-workspace")).toHaveAttribute("data-workstream", "true");
+    const dimensions = await page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: document.documentElement.clientWidth
+    }));
+    expect(dimensions.documentWidth, "No horizontal overflow in " + route + " at 375px").toBeLessThanOrEqual(dimensions.viewportWidth + 1);
+    if (route === "content") {
+      await expect(page.locator(".aw-mobile-agenda")).toBeVisible();
+      await expect(page.locator(".aw-calendar-grid")).toBeHidden();
+      await page.getByRole("button", { name: "List", exact: true }).click();
+      await expect(page.locator(".aw-mobile-agenda")).toBeHidden();
+      await page.getByRole("button", { name: "Month", exact: true }).click();
+      await expect(page.locator(".aw-mobile-agenda")).toBeVisible();
+    }
+  }
+  await page.goto("/app/dashboard");
+  await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
+
   await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.getByRole("link", { name: "Approvals" }).first().click();

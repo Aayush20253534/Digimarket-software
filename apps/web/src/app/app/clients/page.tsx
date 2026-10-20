@@ -105,14 +105,15 @@ export default function ClientsPage(){
  }
  if(!session)return <Spinner label="Checking client access…"/>;
  if(!canRead)return <><PageHeader title="Clients access denied"/><Notice kind="error">Your account cannot view client records.</Notice></>;
- return <div className="space-y-7">
+ return <div data-aw-module="clients" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Agency relationships" title="Clients"
      description="Organization-wide client profiles, contacts and active services. Won leads may be converted from Leads CRM."
      actions={<button type="button" className="btn-secondary" onClick={()=>void load()}>
        <RefreshCw className="h-4 w-4" aria-hidden="true"/>Refresh</button>}/>
+   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Client relationships</span><span className="aw-module-count">{rows.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{filter||"All statuses"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
-   <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+   <div className="aw-two-col">
      <div className="space-y-5">
        <Card title="Client directory" description="Records are scoped to the signed-in agency.">
          <div className="flex flex-wrap gap-2">

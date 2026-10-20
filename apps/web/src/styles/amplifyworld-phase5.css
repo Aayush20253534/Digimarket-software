@@ -1,0 +1,130 @@
+/* AmplifyWorld Workspace Phase 5: CRM, delivery, editorial and approvals.
+   Explicitly route-scoped; finance, admin and other unmigrated screens remain light. */
+.aw-workspace[data-workstream="true"] .aw-work-content {
+  background:radial-gradient(ellipse 60% 21% at 100% 0%,rgba(122,46,172,.13),transparent 85%),#0C0814;
+  color:#F7F0FF;color-scheme:dark;
+}
+.aw-workspace[data-workstream="true"] .aw-work-content-width{max-width:1610px}
+.aw-module-root{min-width:0;color:#EEE6F8;isolation:isolate}
+.aw-module-root :where(h1,h2,h3,h4,legend){color:#F7EFFC;overflow-wrap:anywhere}
+.aw-module-root :where(p,li,span,small){overflow-wrap:break-word}
+.aw-module-root :where(form,fieldset,label){min-width:0}
+.aw-module-root .aw-module-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:-10px;margin-bottom:22px;color:#BAA8CE;font-size:.74rem}
+.aw-module-root .aw-module-pill{display:inline-flex;align-items:center;gap:7px;border:1px solid #533469;background:#271838;border-radius:100px;padding:6px 12px;color:#DAB5F4;font-size:.72rem;font-weight:650}
+.aw-module-root .aw-module-pill-muted{color:#BCAFCB;background:#191020;border-color:#3B2A4D}
+.aw-module-root header{gap:13px}
+.aw-module-root header .text-indigo-600,.aw-module-root header p.text-indigo-600{color:#D392FF}
+.aw-module-root header :is(.text-slate-900,.text-slate-950){color:#F7EFFC}
+.aw-module-root header .text-slate-500{color:#B0A2C3}
+.aw-module-root :is(section.rounded-2xl.bg-white,section.rounded-2xl.border-slate-200,section.bg-white){
+ background:linear-gradient(155deg,#1A1225,#140D1C)!important;
+ border-color:#3E2952!important;
+ box-shadow:0 12px 32px #0004!important;
+ color:#F4EAFB;
+}
+.aw-module-root :is(section.rounded-2xl.bg-white,section.rounded-2xl.border-slate-200)>h2{color:#F5E7FE}
+.aw-module-root :is(section.rounded-2xl.bg-white,section.rounded-2xl.border-slate-200)>p{color:#B8A7CC}
+.aw-module-root :where(.bg-white,.bg-slate-50,.bg-indigo-50){background-color:#21162E!important}
+.aw-module-root :where(.bg-slate-100,.bg-indigo-100){background-color:#30203D!important}
+.aw-module-root :where(.border-slate-200,.border-slate-100,.border-indigo-200){border-color:#4A335B!important}
+.aw-module-root :where(.border-t,.border-b){border-color:#42304D!important}
+.aw-module-root :where(.text-slate-900,.text-slate-950,.text-slate-800,.text-slate-700){color:#F1E5FC!important}
+.aw-module-root :where(.text-slate-600,.text-slate-500,.text-slate-400){color:#B6A8C8!important}
+.aw-module-root :where(.text-indigo-600,.text-indigo-700,.text-indigo-800){color:#D999FF!important}
+.aw-module-root :where(.text-amber-700,.text-amber-800){color:#F6D393!important}
+.aw-module-root :where(.text-emerald-700){color:#A4EDC9!important}
+.aw-module-root :where(.text-red-700,.text-red-800){color:#FFC0CC!important}
+.aw-module-root :where(.bg-amber-50){background:#3B2A1B!important}
+.aw-module-root :where(.bg-emerald-50){background:#173529!important}
+.aw-module-root :where(.bg-red-50){background:#3B1D2A!important}
+.aw-module-root :where(.hover\:border-indigo-400:hover){border-color:#B16ADD!important}
+.aw-module-root :where(.hover\:bg-indigo-50:hover){background:#332046!important}
+.aw-module-root :where(.hover\:bg-slate-50:hover){background:#2B1D3A!important}
+.aw-module-root :is(.field,input.field,select.field,textarea.field) {
+ color:#F6EFFF!important;background:#120D1C!important;border:1px solid #614477!important;
+ border-radius:11px;min-height:44px;max-width:100%;
+}
+.aw-module-root :is(.field,input.field,select.field,textarea.field):focus {
+ border-color:#D18DFF!important;box-shadow:0 0 0 3px #AB38DD2E!important;
+ outline:2px solid transparent;
+}
+.aw-module-root .field::placeholder{color:#9385A8!important}
+.aw-module-root :is(input,select,textarea):disabled{opacity:.6}
+.aw-module-root select[multiple].field{min-height:115px;height:auto}
+.aw-module-root textarea.field{min-height:100px;resize:vertical}
+.aw-module-root input[type="checkbox"],.aw-module-root input[type="radio"]{accent-color:#B64AEB;width:17px;height:17px}
+.aw-module-root :is(.btn-primary,.btn-secondary,.btn-danger){
+ min-height:43px;max-width:100%;white-space:normal;line-height:1.4;text-align:center;flex:none;
+ border-radius:11px;transition:background-color .12s,border-color .12s;color:#F6E9FF;
+}
+.aw-module-root .btn-primary{background:linear-gradient(115deg,#7434D5,#B735D9)!important;color:white!important;border:1px solid #B466EB}
+.aw-module-root .btn-primary:hover:not(:disabled){background:linear-gradient(115deg,#8852E1,#C44CE5)!important}
+.aw-module-root .btn-secondary{background:#2A1A38!important;color:#EAD6FA!important;border:1px solid #63467A!important}
+.aw-module-root .btn-secondary:hover:not(:disabled){background:#3A2650!important}
+.aw-module-root .btn-danger{background:#482036!important;color:#FFD0DC!important;border:1px solid #814056!important}
+.aw-module-root button:disabled{opacity:.5;cursor:not-allowed}
+.aw-module-root :where(button,a,input,select,textarea):focus-visible{outline:2px solid #DD9EFF!important;outline-offset:3px}
+.aw-module-root :where(.rounded-xl.border,.rounded-lg.border){
+ border-color:#49335C;
+}
+.aw-module-root :where(.rounded-xl.border.bg-white,.rounded-lg.border.bg-white){background:#24162F}
+.aw-module-root button.rounded-xl.border:hover,.aw-module-root button.rounded-lg.border:hover {
+ border-color:#9B5FBB!important;background:#322040!important;
+}
+.aw-module-root button.border-indigo-500{background:#342047!important;border-color:#B872E3!important}
+.aw-module-root .rounded-full.bg-slate-100{background:#332043!important;color:#DABDF1!important}
+.aw-module-root .rounded-full.bg-amber-50{color:#FAD798!important}
+.aw-module-root .rounded-full.bg-emerald-50{color:#B3F0D6!important}
+.aw-module-root .rounded-full.bg-red-50{color:#FFBBC9!important}
+.aw-module-root .rounded-xl.border-dashed{background:#191124;border-color:#61447B}
+.aw-module-root .rounded-xl.border-dashed p{color:#B2A0C5}
+.aw-module-root .aw-module-register{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:15px}
+.aw-module-root .aw-module-count{border:1px solid #503768;background:#2B1B3B;border-radius:999px;padding:5px 10px;color:#E7BFFF;font-size:.72rem;font-weight:700}
+.aw-module-root .aw-module-register-info{color:#A795BA;font-size:.76rem}
+.aw-module-root .aw-project-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,195px),1fr));gap:12px}
+.aw-module-root .aw-project-board>section{min-width:0;background:#1A1126!important;border:1px solid #4C335E!important}
+.aw-module-root .aw-project-board>section>h2{color:#DDB9F5!important}
+.aw-module-root .aw-project-board button{background:#291B36!important;border:1px solid #554067!important}
+.aw-module-root .aw-project-board button:hover{background:#392249!important;border-color:#A46AC8!important}
+.aw-module-root .aw-editorial-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.aw-module-root .aw-editorial-controls>.field{width:auto;min-width:120px;max-width:100%;flex:1 1 150px}
+.aw-module-root .aw-editorial-controls>input[type="date"]{flex:0 1 190px;min-width:145px}
+.aw-module-root .aw-editorial-controls .aw-view-switch{display:inline-flex;flex:none;overflow:hidden;border:1px solid #65427B;border-radius:11px;background:#24162E}
+.aw-module-root .aw-view-switch button{color:#CDBADC;min-height:43px}
+.aw-module-root .aw-view-switch button.bg-indigo-600{background:linear-gradient(120deg,#7141C1,#AC3ACC)!important;color:#FFF!important}
+.aw-module-root .aw-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.aw-module-root .aw-calendar-day{min-width:0;min-height:132px;border:1px solid #453357!important;border-radius:11px;background:#1C1428!important;padding:7px}
+.aw-module-root .aw-calendar-day:has(button){border-color:#634478!important}
+.aw-module-root .aw-calendar-grid .aw-calendar-weekday{padding:8px 1px;text-align:center;font-size:.7rem;font-weight:700;color:#AE9BC0}
+.aw-module-root .aw-calendar-day>span{color:#D7C5E8!important}
+.aw-module-root .aw-calendar-item{display:block;width:100%;min-width:0;background:#30203F!important;border:1px solid #64477B!important;color:#F7EFFD;border-radius:9px;padding:8px;text-align:left;overflow-wrap:anywhere}
+.aw-module-root .aw-calendar-item:hover{background:#462C58!important;border-color:#AE71CA!important}
+.aw-module-root .aw-calendar-item b,.aw-module-root .aw-calendar-item span{white-space:normal;overflow-wrap:anywhere}
+.aw-module-root .aw-mobile-agenda{display:none}
+.aw-module-root .aw-agenda-group{border:1px solid #49355A;border-radius:12px;background:#1C1429;padding:13px;margin-bottom:10px}
+.aw-module-root .aw-agenda-heading{color:#DCC5F0;font-size:.8rem;font-weight:740;margin-bottom:10px}
+.aw-module-root .aw-approval-row{background:#21162D;border-color:#4C3761!important;border-radius:14px}
+.aw-module-root .aw-approval-row>div{min-width:0}
+.aw-module-root form.grid>*,.aw-module-root .grid>*{min-width:0}
+.aw-module-root .aw-two-col{display:grid;gap:20px;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)}
+.aw-module-root [role="status"],.aw-module-root [role="alert"]{border-radius:12px}
+@media(max-width:899px){
+ .aw-module-root .aw-calendar-grid{display:none!important}
+ .aw-module-root .aw-mobile-agenda{display:block}
+}
+@media(max-width:767px){
+ .aw-module-root .aw-two-col{grid-template-columns:minmax(0,1fr)}
+ .aw-module-root .aw-editorial-controls>.field{flex:1 1 100%}
+}
+@media(max-width:639px){
+ .aw-module-root{overflow-x:clip}
+ .aw-module-root :is(.grid,form.grid)>*{min-width:0}
+ .aw-module-root .btn-primary,.aw-module-root .btn-secondary,.aw-module-root .btn-danger{max-width:100%}
+ .aw-module-root .aw-module-meta{margin-top:-3px}
+ .aw-module-root :where(.rounded-2xl.bg-white){padding:16px}
+ .aw-module-root .aw-project-board{grid-template-columns:minmax(0,1fr)}
+ .aw-module-root .aw-editorial-controls>input[type="date"]{flex:1 1 100%}
+ .aw-module-root .aw-editorial-controls>.aw-view-switch{max-width:100%}
+ .aw-module-root .aw-calendar-item b{font-size:.83rem}
+}
+@media(prefers-reduced-motion:reduce){.aw-module-root *, .aw-module-root *::before,.aw-module-root *::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

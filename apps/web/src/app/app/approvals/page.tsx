@@ -97,10 +97,11 @@ export default function ApprovalsPage() {
   if(!session)return <Spinner label="Loading your permissions…" />;
   if(!canRead)return <div className="space-y-4"><PageHeader title="Access denied" description="Approval requests are restricted."/><Notice kind="error">Your role cannot view approvals.</Notice></div>;
   const activePolicies=policies.filter(p=>p.active);
-  return <div className="space-y-7">
+  return <div data-aw-module="approvals" className="aw-module-root space-y-7">
     <PageHeader eyebrow="Operations" title="Approval workflows"
       description="Submit requests, review your decision queue and inspect recorded outcomes. Approving does not post financial transactions."
       actions={<button className="btn-secondary" onClick={()=>void reload()} disabled={loading||busy}><RefreshCw className="h-4 w-4"/>Refresh</button>}/>
+    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Review workflows</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="mine"?"My requests":"Decision queue"}</span></div>}
     {error&&<Notice kind="error">{error}</Notice>}
     {success&&<Notice kind="success">{success}</Notice>}
     {canSubmit&&<Card title="New approval request" description="An active category policy is required before requests can be submitted.">
@@ -127,7 +128,7 @@ export default function ApprovalsPage() {
     <Card title={view==="mine"?"My approval requests":"Requests awaiting my decision"}>
       {loading?<Spinner label="Loading approval records…"/>:items.length===0?
         <EmptyState icon={Clock3} title="No requests here" description={view==="mine"?"Your submitted requests will appear here.":"No pending requests match your approver roles."}/>:
-        <div className="space-y-4">{items.map(item=><article key={item.id} className="rounded-xl border border-slate-200 p-4">
+        <div className="space-y-4">{items.map(item=><article key={item.id} className="aw-approval-row rounded-xl border border-slate-200 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-slate-500">{item.policy.name} · {item.requester.displayName} · {new Date(item.createdAt).toLocaleString()}</p>
             <h3 className="mt-1 font-semibold">{item.title}</h3></div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{item.status}</span></div>

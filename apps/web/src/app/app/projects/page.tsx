@@ -128,10 +128,11 @@ export default function ProjectsPage(){
   }
   if(!session)return <Spinner label="Loading projects…"/>;
   if(!canRead)return <><PageHeader title="Projects access denied"/><Notice kind="error">You do not have project read permission.</Notice></>;
-  return <div className="space-y-7">
+  return <div data-aw-module="projects" className="aw-module-root space-y-7">
     <PageHeader eyebrow="Client delivery" title="Projects & deliverables"
       description="Client-linked projects, milestones, collaborators and revision-aware deliverable approvals."
       actions={<button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/> Refresh</button>}/>
+    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Project delivery</span><span className="aw-module-count">{projects.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{filter||"All statuses"}</span></div>}
     {error&&<Notice kind="error">{error}</Notice>}
     {notice&&<Notice kind="success">{notice}</Notice>}
     {canCreate&&<Card title="Create project" description="Projects must be attached to an active client.">
@@ -173,7 +174,7 @@ export default function ProjectsPage(){
         </select>
       </div>
       {loading?<Spinner label="Loading project board…"/>:
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="aw-project-board">
           {grouped.map(({stage,items})=><section key={stage} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <h2 className="mb-3 text-xs font-bold tracking-wide text-slate-600">{stage.replaceAll("_"," ")} ({items.length})</h2>
             <div className="space-y-2">{items.map(project=><button type="button" key={project.id}
