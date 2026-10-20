@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Plus, RefreshCw, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
@@ -49,6 +49,7 @@ export default function LeadsPage(){
  const canReview=!!session?.identity.permissions.includes("leads.duplicates.review");
  const [items,setItems]=useState<Lead[]>([]);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
+ const [legacySort,setLegacySort]=useState(false);
  const [cursor,setCursor]=useState<string|null>(null);
  const [stage,setStage]=useState("");
  const [search,setSearch]=useState("");
@@ -78,7 +79,13 @@ export default function LeadsPage(){
      const q=new URLSearchParams({limit:"30",sort:sortBy,direction:descending?"desc":"asc"});
      if(stage)q.set("stage",stage);if(search.trim())q.set("q",search.trim());
      if(cursor)q.set("cursor",cursor);
-     const result=await request<Page>("/leads?"+q);
+     let result:Page;
+     try{result=await request<Page>("/leads?"+q);setLegacySort(false);}
+     catch(e){
+      if(!(e instanceof ApiError)||e.status!==422)throw e;
+      q.delete("sort");q.delete("direction");
+      result=await request<Page>("/leads?"+q);setLegacySort(true);
+     }
      setItems(result.items);setNextCursor(result.nextCursor);setError("");
    }catch(e){setError(errText(e));}finally{setLoading(false);}
  },[canRead,request,stage,search,cursor,sortBy,descending]);
@@ -186,7 +193,10 @@ export default function LeadsPage(){
      setMessage("Organization CSV exported and recorded in audit history.");
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
- const sorted=items;
+ const sorted=useMemo(()=>legacySort?[...items].sort((a,b)=>{
+  const delta=String(a[sortBy]??"").localeCompare(String(b[sortBy]??""),undefined,{numeric:true,sensitivity:"base"});
+  return descending?-delta:delta;
+ }):items,[items,sortBy,descending,legacySort]);
  if(!session)return <Spinner label="Checking CRM access…"/>;
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
