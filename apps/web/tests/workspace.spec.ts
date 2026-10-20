@@ -82,7 +82,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("button", { name: "Refresh priorities" }).click();
   await expect(page.getByTestId("pending-task-count")).toHaveText("2");
   await expect(page.getByTestId("overdue-item-count")).toHaveText("2");
-  await expect(page.getByText("Urgent overdue design")).toBeVisible();
+  await expect(page.getByText("Urgent overdue design").first()).toBeVisible();
   await expect(page.getByText("Delayed example project")).toBeVisible();
   await expect(page.getByLabel("Task number 1")).toBeVisible();
   await expect(page.locator(".aw-action-number").first()).toHaveCSS("color", "rgb(255, 192, 138)");
