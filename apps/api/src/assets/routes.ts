@@ -4,6 +4,7 @@ import { assetIntentSchema,assetConfirmSchema,assetListSchema,assetLinkSchema,as
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { AssetService } from "./service";
+import { AssetFolderService } from "./folders";
 const uuid=z.uuid();
 function parse<T>(schema:z.ZodType<T>,data:unknown):T {
  const value=schema.safeParse(data);
@@ -12,6 +13,7 @@ function parse<T>(schema:z.ZodType<T>,data:unknown):T {
 }
 export function registerAssetRoutes(app:Express,auth:AuthService) {
  const service=new AssetService(auth.database);
+ const folders=new AssetFolderService(auth.database);
  const authenticated=async(req:Request,res:Response,next:NextFunction)=>{
    try{
      const header=req.get("authorization");
@@ -32,7 +34,28 @@ export function registerAssetRoutes(app:Express,auth:AuthService) {
  });
  app.get(root,authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
-   res.json({data:await service.list(actor(res),parse(assetListSchema,req.query))});
+   const folderId=req.query.folderId;
+   if(folderId!==undefined && folderId!=="root" && !uuid.safeParse(folderId).success)
+    throw new AuthError(422,"VALIDATION_ERROR","Invalid folder");
+   const input=parse(assetListSchema,req.query);
+   res.json({data:await service.list(actor(res),{...input,
+     ...(folderId!==undefined?{folderId:folderId==="root"?null:String(folderId)}:{})})});
+ });
+ app.get("/api/v1/asset-folders",authenticated,async(req,res)=>{
+   const parentId=req.query.parentId;
+   if(parentId!==undefined && parentId!=="root" && !uuid.safeParse(parentId).success)
+     throw new AuthError(422,"VALIDATION_ERROR","Invalid folder");
+   res.set("Cache-Control","no-store").json({data:await folders.list(actor(res),
+     parentId===undefined||parentId==="root"?null:String(parentId))});
+ });
+ app.post("/api/v1/asset-folders",authenticated,async(req,res)=>{
+   res.status(201).json({data:await folders.create(actor(res),req.body)});
+ });
+ app.put("/api/v1/asset-folders/:id",authenticated,async(req,res)=>{
+   res.json({data:await folders.update(actor(res),parse(uuid,req.params.id),req.body)});
+ });
+ app.delete("/api/v1/asset-folders/:id",authenticated,async(req,res)=>{
+   await folders.remove(actor(res),parse(uuid,req.params.id));res.status(204).end();
  });
  app.get(root+"/:id",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
@@ -45,6 +68,9 @@ export function registerAssetRoutes(app:Express,auth:AuthService) {
  app.post(root+"/:id/link",authenticated,async(req,res)=>{
    const data=parse(assetLinkSchema,req.body);
    res.json({data:await service.link(actor(res),parse(uuid,req.params.id),data.version,data.clientId)});
+ });
+ app.post(root+"/:id/organize",authenticated,async(req,res)=>{
+   res.json({data:await folders.organize(actor(res),parse(uuid,req.params.id),req.body)});
  });
  app.post(root+"/:id/archive",authenticated,async(req,res)=>{
    res.json({data:await service.archive(actor(res),parse(uuid,req.params.id),

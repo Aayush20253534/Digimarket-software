@@ -1,0 +1,87 @@
+import {z} from "zod";
+import type {PrismaClient} from "@digimarket/db";
+import type {Principal} from "../auth/service";
+import {AuthError,forbidden} from "../auth/errors";
+
+const uuid=z.uuid(),folderLabel=z.string().trim().min(1).max(120);
+const color=z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const createInput=z.strictObject({name:folderLabel,parentId:uuid.nullable().default(null),color:color.default("#A56CE4")});
+const editInput=z.strictObject({name:folderLabel.optional(),color:color.optional(),parentId:uuid.nullable().optional(),version:z.number().int().min(1)});
+const fileInput=z.strictObject({filename:z.string().trim().min(1).max(180),folderId:uuid.nullable(),version:z.number().int().min(1)});
+const validate=<T>(schema:z.ZodType<T>,input:unknown):T=>{
+ const v=schema.safeParse(input);if(!v.success)throw new AuthError(422,"VALIDATION_ERROR","Invalid folder or filename");
+ return v.data;
+};
+const need=(p:Principal,permission:string)=>{if(!p.permissions.has(permission))throw forbidden();};
+const missing=()=>new AuthError(404,"NOT_FOUND","Folder not found");
+export class AssetFolderService{
+ constructor(private db:PrismaClient){}
+ private async get(p:Principal,id:string){
+  const folder=await this.db.assetFolder.findFirst({where:{id,organizationId:p.organizationId}});
+  if(!folder)throw missing();return folder;
+ }
+ private async parent(p:Principal,id:string|null){
+  if(id)await this.get(p,id);
+ }
+ async list(p:Principal,parentId:string|null){
+  need(p,"assets.read");
+  await this.parent(p,parentId);
+  const [folders,count]=await Promise.all([
+    this.db.assetFolder.findMany({where:{organizationId:p.organizationId,parentId},
+      orderBy:[{name:"asc"},{id:"asc"}],take:200}),
+    this.db.asset.count({where:{organizationId:p.organizationId,folderId:parentId,status:"ACTIVE",
+      ...(p.permissions.has("clients.read")?{}:{clientId:null})}}),
+  ]);
+  return {folders,fileCount:count,limited:folders.length===200};
+ }
+ async create(p:Principal,raw:unknown){
+  need(p,"assets.upload");const v=validate(createInput,raw);await this.parent(p,v.parentId);
+  const duplicate=await this.db.assetFolder.findFirst({where:{organizationId:p.organizationId,parentId:v.parentId,name:{equals:v.name,mode:"insensitive"}}});
+  if(duplicate)throw new AuthError(409,"ALREADY_EXISTS","A folder with this name already exists");
+  return this.db.assetFolder.create({data:{organizationId:p.organizationId,createdById:p.userId,...v}});
+ }
+ async update(p:Principal,id:string,raw:unknown){
+  need(p,"assets.upload");const v=validate(editInput,raw);const current=await this.get(p,id);
+  if(v.parentId!==undefined){
+   if(v.parentId===id)throw new AuthError(422,"VALIDATION_ERROR","A folder cannot contain itself");
+   await this.parent(p,v.parentId);
+   let step=v.parentId;const seen=new Set<string>();
+   while(step){
+    if(step===id||seen.has(step))throw new AuthError(422,"VALIDATION_ERROR","Folder cycle is not allowed");
+    seen.add(step);step=(await this.get(p,step)).parentId;
+   }
+  }
+  const nextName=v.name??current.name,nextParent=v.parentId===undefined?current.parentId:v.parentId;
+  if(nextName!==current.name||nextParent!==current.parentId){
+   const duplicate=await this.db.assetFolder.findFirst({where:{organizationId:p.organizationId,
+     parentId:nextParent,name:{equals:nextName,mode:"insensitive"},id:{not:id}}});
+   if(duplicate)throw new AuthError(409,"ALREADY_EXISTS","A folder with this name already exists");
+  }
+  const result=await this.db.assetFolder.updateMany({where:{id,organizationId:p.organizationId,version:v.version},
+    data:{name:nextName,parentId:nextParent,...(v.color?{color:v.color}:{}),version:{increment:1}}});
+  if(!result.count)throw new AuthError(409,"VERSION_CONFLICT","Folder changed; refresh to retry");
+  return this.get(p,id);
+ }
+ async remove(p:Principal,id:string){
+  need(p,"assets.delete");await this.get(p,id);
+  const [sub,files]=await Promise.all([
+    this.db.assetFolder.count({where:{organizationId:p.organizationId,parentId:id}}),
+    this.db.asset.count({where:{organizationId:p.organizationId,folderId:id}}),
+  ]);
+  if(sub||files)throw new AuthError(409,"FOLDER_NOT_EMPTY","Move or remove the contents first");
+  await this.db.assetFolder.deleteMany({where:{id,organizationId:p.organizationId}});
+ }
+ async organize(p:Principal,id:string,raw:unknown){
+  need(p,"assets.upload");need(p,"assets.read");
+  const v=validate(fileInput,raw);await this.parent(p,v.folderId);
+  const file=await this.db.asset.findFirst({where:{id,organizationId:p.organizationId,status:"ACTIVE"}});
+  if(!file||file.clientId&&!p.permissions.has("clients.read"))throw new AuthError(404,"NOT_FOUND","Asset not found");
+  const updated=await this.db.asset.updateMany({where:{id,organizationId:p.organizationId,status:"ACTIVE",version:v.version},
+    data:{filename:v.filename,folderId:v.folderId,version:{increment:1}}});
+  if(!updated.count)throw new AuthError(409,"VERSION_CONFLICT","File changed. Refresh and retry.");
+  await this.db.auditLog.create({data:{organizationId:p.organizationId,actorId:p.userId,
+    action:"assets.organized",entityType:"Asset",entityId:id,
+    afterRedacted:{folderId:v.folderId,filenameChanged:file.filename!==v.filename}}});
+  return this.db.asset.findFirstOrThrow({where:{id,organizationId:p.organizationId}});
+ }
+}

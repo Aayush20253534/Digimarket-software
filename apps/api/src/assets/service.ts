@@ -80,11 +80,12 @@ export class AssetService {
      return asset;
    });
  }
- async list(a:Principal,input:AssetListQuery){
+ async list(a:Principal,input:AssetListQuery & {folderId?:string|null}){
    deny(a,"assets.read");
    if(input.clientId)await this.client(a,input.clientId);
    const where:Prisma.AssetWhereInput={
      organizationId:a.organizationId,status:input.status,
+     ...(input.folderId!==undefined?{folderId:input.folderId}:{}),
      ...(!a.permissions.has("clients.read")?{clientId:null}:{}),
      ...(input.clientId?{clientId:input.clientId}:{}),
      ...(input.q?{OR:[{filename:{contains:input.q,mode:"insensitive"}},
@@ -94,7 +95,7 @@ export class AssetService {
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
      orderBy:[{createdAt:"desc"},{id:"desc"}],
      select:{id:true,filename:true,contentType:true,resourceType:true,bytes:true,
-       status:true,version:true,clientId:true,createdAt:true,
+       status:true,version:true,clientId:true,folderId:true,createdAt:true,
        client:{select:{businessName:true}},uploader:{select:{displayName:true}}}});
    const more=rows.length>input.limit;
    const items=rows.slice(0,input.limit);
