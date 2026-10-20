@@ -50,16 +50,28 @@ export default function ReportsPage(){
     <span><ShieldCheck size={15}/> Live, role-protected metrics</span></div>
    <div className="aw-report-grid">
     {cards.map(([name,values],i)=>{
-     const Icon=icons[i%icons.length],entries=Object.entries(values),spot=entries.find(([,v])=>!Array.isArray(v)&&
+     const Icon=icons[i%icons.length],entries=Object.entries(values),ledger=name==="cashLedger"&&Array.isArray(values.posted)?values.posted:null,spot=entries.find(([,v])=>!Array.isArray(v)&&
        (typeof v==="number"||(/^-?\d+(\.\d+)?$/.test(v)&&v.length<20)))??entries[0];
      return <article className={"aw-report-card aw-report-"+themes[i%themes.length]} key={name}>
       <div className="aw-report-card-top"><span className="aw-report-icon"><Icon size={22}/></span>
        <ArrowUpRight size={18} aria-hidden="true"/></div>
       <p className="aw-report-card-label">{label(name)}</p>
-      {spot&&<><div className="aw-report-hero-value">{format(spot[1])}</div>
-       <p className="aw-report-hero-label">{label(spot[0])}</p></>}
-      <dl className="aw-report-details">{entries.filter(([key])=>key!==spot?.[0]).map(([key,value])=>
-       <div key={key}><dt>{label(key)}</dt><dd>{format(value)}</dd></div>)}</dl>
+      {ledger?<div className="aw-cash-ledger" aria-label="Posted income and expenses">
+       <p className="aw-cash-ledger-currency">Currency · INR</p>
+       {(["INCOME","EXPENSE"] as const).map(kind=>{
+        const row=ledger.find(item=>item.kind===kind);
+        const amount=Number(row?.amount??0);
+        return <div key={kind} className={"aw-cash-ledger-line aw-cash-"+kind.toLowerCase()}>
+         <span>{kind==="INCOME"?"Income":"Expense"}</span>
+         <strong>{new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)}</strong>
+        </div>;
+       })}
+      </div>:<>
+       {spot&&<><div className="aw-report-hero-value">{format(spot[1])}</div>
+        <p className="aw-report-hero-label">{label(spot[0])}</p></>}
+       <dl className="aw-report-details">{entries.filter(([key])=>key!==spot?.[0]).map(([key,value])=>
+        <div key={key}><dt>{label(key)}</dt><dd>{format(value)}</dd></div>)}</dl>
+      </>}
      </article>;
     })}
    </div>

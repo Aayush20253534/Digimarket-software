@@ -24,9 +24,10 @@ const modes=["CASH","UPI","BANK_TRANSFER","CARD","OTHER"] as const;
 function money(value:string){
   const negative=value.startsWith("-"),raw=negative?value.slice(1):value;
   const [whole,fraction=""]=raw.split(".");
-  const grouped=whole.replace(/\B(?=(\d{3})+(?!\d))/g,",");
-  const shown=fraction.padEnd(2,"0").replace(/0{1,2}$/,"") || "00";
-  return (negative?"−":"")+"₹"+grouped+"."+shown;
+  const digits=fraction.padEnd(3,"0");
+  const cents=BigInt(whole||"0")*100n+BigInt(digits.slice(0,2))+(digits.charCodeAt(2)>=53?1n:0n);
+  const integer=(cents/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  return (negative?"−":"")+"₹"+integer+"."+(cents%100n).toString().padStart(2,"0");
 }
 function readable(error:unknown){return error instanceof ApiError?error.message:"Could not complete the finance operation.";}
 export default function FinancePage(){
@@ -285,24 +286,24 @@ export default function FinancePage(){
         </div>):<EmptyState title="No categories yet" description="An administrator can add expense and income categories." icon={Wallet}/>}</div>
       </Card>
     </div>
-    <Card title={view==="all"?"Agency financial register":"My financial register"} description="Latest 200 entries, including pending and rejected requests. The CSV export includes up to 5,000 entries.">
+    <Card title={view==="all"?"Agency financial register":"My financial register"} description="Saved records, including pending, posted, rejected and cancelled entries. Latest 200 shown; CSV export includes up to 5,000.">
       {loading?<Spinner label="Loading financial entries…"/>:!entries.length?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
-        <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm">
+        <div className="aw-finance-register-scroll" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
             {["Date","Type","Category","Source","Amount","Status","Entered by","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
-          </tr></thead><tbody>{entries.map(row=><tr key={row.id} className="border-b border-slate-100">
+          </tr></thead><tbody>{entries.map(row=><tr key={row.id} id={"finance-"+row.id}>
             <td className="py-3 pr-4">{row.occurredOn}</td>
-            <td className="py-3 pr-4">{row.kind==="INCOME"?<ArrowDownLeft className="h-4 w-4 text-emerald-600"/>:<ArrowUpRight className="h-4 w-4 text-amber-600"/>}</td>
+            <td><span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>{row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>} {row.kind==="INCOME"?"Income":"Expense"}</span></td>
             <td className="py-3 pr-4">{row.category.name}</td>
             <td className="py-3 pr-4">{row.merchantOrSource||"—"}</td>
-            <td className="py-3 pr-4 font-semibold">{money(row.amount)}</td>
-            <td className="py-3 pr-4">{row.status}</td>
+            <td className={"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>{money(row.amount)}</td>
+            <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
             <td className="py-3 pr-4">{row.enteredBy.displayName}</td>
             <td className="py-3">{row.receiptAssetId?
               <button type="button" className="btn-secondary" disabled={busy} aria-label={"View receipt for "+row.occurredOn}
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
-              <Link href="/app/approvals" className="underline">Approvals</Link>
+              <Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>
               {adminFinance&&row.kind==="EXPENSE"&&row.status!=="CANCELLED"&&<>
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
                   onClick={()=>beginExpenseEdit(row)} aria-label={"Edit expense "+row.id}>Edit</button>
