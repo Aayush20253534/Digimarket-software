@@ -2,13 +2,19 @@
 
 **Implementation status:** production readiness code and CI rehearsals are provided. **No live deployment has been performed or verified.** Deploying production still requires provider provisioning, protected environment secrets, an incident owner, and a rehearsal against dedicated staging infrastructure.
 
+## Free-tier deployment profile (October 2026)
+
+The checked-in `render.yaml` provisions **one Render Free web service only**. It contains no paid worker and no unsupported pre-deploy hook. The web service Start Command runs Prisma migration deployment and idempotent permission seeding before it starts the API. Temporary `BOOTSTRAP_*` variables enable a one-time administrator bootstrap on initial startup; remove them after the successful first login (see [Render Free first login](29-RENDER-FREE-FIRST-LOGIN.md)).
+
+The API can handle login and ordinary CRUD without Redis. **Recurring tasks, recurring invoice generation and worker-driven notifications/alerts do not execute** until an independently hosted worker and Redis are provisioned. Do not claim these features are live in the free-tier setup. The full-production roadmap below remains aspirational, not a description of the current free deployment.
+
 ## Production architecture
 
 | Component | Hosting and operational role |
 | --- | --- |
 | Next.js website / server BFF | Vercel project from this GitHub repo, Root Directory `apps/web` |
 | Express API | Render Web Service `digimarket-api` using root `render.yaml` |
-| BullMQ worker | Render background worker `digimarket-worker` using root `render.yaml` |
+| BullMQ worker | Not deployed on Render Free; future separately hosted worker requires Redis and a revised deployment configuration |
 | PostgreSQL | **New dedicated** Neon PostgreSQL project, pooled `DATABASE_URL` and direct `DIRECT_DATABASE_URL` |
 | Redis | Dedicated managed Redis with TLS (`rediss://`) for task/billing/notifications/reconciliation jobs |
 | Files | Cloudinary authenticated assets, dedicated production credentials; never publish signed URLs or originals |
@@ -19,14 +25,12 @@
 
 ### Pre-release gates
 1. Confirm code on `main` and all GitHub Actions, including Module 17, pass on the same exact commit. Protect `main` using required reviews and CI checks. Check `pnpm audit --prod`, Next.js security advisories, threat inventory and dependency updates. Do not blindly auto-fix dependencies on the live branch.
-2. Provision separate **staging and production** Neon projects and managed Redis. Enable PITR/backup retention and record provider restore limits. Confirm live connection pool limits and use `DIRECT_DATABASE_URL` only for release-time migration.
-3. Configure Render Blueprint from `render.yaml`. Deployment is intentionally **manual** (`autoDeployTrigger: off`); attach `DATABASE_URL`, `DIRECT_DATABASE_URL`, `CORS_ALLOWED_ORIGINS`, independent JWT secrets, 32-byte base64 MFA key, Cloudinary credentials and `OPS_MONITOR_TOKEN` in protected Render secret settings. Run the API deploy first. Render's `preDeployCommand` applies schema migrations and idempotently seeds permissions. Watch health checks and ensure `/api/v1/ready` returns 200 (database reachable).
-4. Start worker after migrations. Configure `DATABASE_URL` and TLS `REDIS_URL`. Worker reports a heartbeat every 30 seconds. Monitor `/api/v1/ops/health` (header `X-Ops-Token`) and verify `workerAlive=true`. The endpoint is 404 without the independent token and 503 for stale/unreachable worker.
+2. Provision a dedicated Neon database. On the **free profile**, Redis and the worker are intentionally absent. For a future full-production profile, provision separate staging/production Neon resources and managed Redis. Record the available backup/restore limits, and use `DIRECT_DATABASE_URL` for migrations.
+3. Configure the API-only Render Free Blueprint from `render.yaml`. Deployment is intentionally **manual** (`autoDeployTrigger: off`); attach `DATABASE_URL`, `DIRECT_DATABASE_URL`, `CORS_ALLOWED_ORIGINS`, independent JWT secrets, 32-byte base64 MFA key, Cloudinary credentials and `OPS_MONITOR_TOKEN` in protected Render secret settings. The **Start Command** applies Prisma migrations and idempotently seeds permissions before starting the API. Watch health checks and ensure `/api/v1/ready` returns 200 (database reachable).
+4. **Skip the worker on the free tier.** When a future worker+Redis hosting arrangement is available, deploy it separately after migrations, configure TLS `REDIS_URL`, and monitor `/api/v1/ops/health` (header `X-Ops-Token`) for `workerAlive=true`. Until then, an absent worker heartbeat is expected.
 5. Connect Vercel to **this** GitHub repo with Root Directory `apps/web`, framework Next.js and the checked-in `apps/web/vercel.json`. Set server-only `API_INTERNAL_URL=https://<api-host>`, `WEB_ALLOWED_ORIGINS=https://<frontend-host>`, `CORS_ALLOWED_ORIGINS=https://<frontend-host>`. Never expose JWT, database credentials, Cloudinary secrets or monitoring tokens as `NEXT_PUBLIC_*`. Vercel and Render must use identical allowed **frontend** origin strings, including scheme and any explicitly specified port.
 6. Configure custom frontend domain/TLS, and update both providers' allowed origins before final traffic switch. Confirm refresh-token cookie is Secure/HttpOnly/SameSite=Strict and delivered from the Next.js BFF; token values must never appear in logs or URLs.
-7. Only after API + worker + website pass smoke, perform **one-time** bootstrap. From a protected API host administrative command environment with ephemeral `BOOTSTRAP_ORG_NAME`, `BOOTSTRAP_ADMIN_LOGIN` and `BOOTSTRAP_ADMIN_PASSWORD` (no logs), run:
-   `pnpm --filter @digimarket/api exec tsx src/auth/bootstrap.ts`.
-   Bootstrap aborts if the DB already has an organization, hashes the password, and enforces password change and privileged MFA. Remove bootstrap secrets immediately. Verify login, role restriction, logout and session revocation.
+7. On Render Free, perform the **one-time** bootstrap by setting temporary `BOOTSTRAP_ORG_NAME`, `BOOTSTRAP_ADMIN_LOGIN` and `BOOTSTRAP_ADMIN_PASSWORD` in the API service environment **before its first successful startup**. The startup guard creates the admin only if the database has no organization, hashes the password and enforces password change and privileged MFA. Remove bootstrap secrets after successful login. Verify login, role restriction, logout and session revocation. No paid shell or worker is required.
 8. Run `PROD_API_ORIGIN=https://... PROD_WEB_ORIGIN=https://... node scripts/postdeploy-smoke.mjs` **from a trusted runner**. This checks health, readiness, public home and rejection of anonymous protected API/BFF requests without creating data. Then do staging authenticated journeys: bootstrap/refresh/MFA, clients, project assignments, finance approvals, invoice PDF download and webhook-free Cloudinary authenticated access. Do not automate financial writes against live customer records.
 9. Exercise a live production backup and **disposable** restore rehearsal before approving real client data. Document time, operator, restored table counts, checksum, retained encryption key and RPO/RTO measured from the test. CI's disposable PostgreSQL recovery is only a structural rehearsal, not proof of Neon PITR availability.
 10. Enable uptime monitoring of `/api/v1/ready`, privileged operations monitoring, worker heartbeat freshness, Redis/BullMQ failures, Neon resource limits, outbox backlog, Cloudinary storage/egress, invoice reconciliation mismatch and error rates. Set incident ownership and a response/escalation channel before onboarding clients.
