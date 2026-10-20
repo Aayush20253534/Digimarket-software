@@ -86,8 +86,8 @@ export default function AssetsPage(){
    void request<{items:Client[]}>("/clients?limit=100&status=ACTIVE").then(data=>setClients(data.items)).catch(()=>{});
  },[canClients,request]);
  const open=(asset:Asset)=>{setSelected(asset);setEditedName(asset.filename);setDestination(asset.folderId??"");setLinkClient(asset.clientId??"");};
- const enter=(folder:FolderItem)=>{setTrail(v=>[...v,folder]);setCursor(null);setSelected(null);};
- const goTo=(depth:number)=>{setTrail(v=>v.slice(0,depth));setCursor(null);setSelected(null);};
+ const enter=(folder:FolderItem)=>{setTrail(v=>[...v,folder]);setCursor(null);setSelected(null);setSelectedIds([]);setContext(null);};
+ const goTo=(depth:number)=>{setTrail(v=>v.slice(0,depth));setCursor(null);setSelected(null);setSelectedIds([]);setContext(null);};
  async function downloadFolder(folder:FolderItem){
   if(!session)return;
   setBusy(true);setError("");
@@ -107,11 +107,11 @@ export default function AssetsPage(){
    setMessage("Folder ZIP downloaded.");
   }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
- async function addFolder(e:FormEvent){
+ async function addFolder(e:FormEvent):Promise<void>{
    e.preventDefault();if(!newFolderName.trim())return;
    setBusy(true);setError("");
    try{await request("/asset-folders",{method:"POST",body:{name:newFolderName.trim(),color:newFolderColor,parentId:folderId}});
-    setNewFolderName("");await load();setMessage("Folder created.");}catch(e){setError(errText(e));}finally{setBusy(false);}
+    setNewFolderName("");await load();setMessage("Folder created.");setFolderDialog(false);}catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function deleteFolder(folder:FolderItem){
    if(!window.confirm("Delete empty folder '"+folder.name+"'? Files are never deleted by this action."))return;
@@ -121,10 +121,10 @@ export default function AssetsPage(){
     setMessage("Empty folder deleted.");await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
- async function renameFolder(folder:FolderItem,updates:{name?:string;color?:string;parentId?:string|null}){
+ async function renameFolder(folder:FolderItem,updates:{name?:string;color?:string;parentId?:string|null}):Promise<boolean>{
    setBusy(true);setError("");
    try{await request("/asset-folders/"+folder.id,{method:"PUT",body:{...updates,version:folder.version}});
-    await load();setMessage("Folder updated.");}catch(e){setError(errText(e));}finally{setBusy(false);}
+    await load();setMessage("Folder updated.");return true;}catch(e){setError(errText(e));return false;}finally{setBusy(false);}
  }
  async function organizeFile(e:FormEvent){
    e.preventDefault();if(!selected)return;
@@ -217,8 +217,8 @@ export default function AssetsPage(){
  }
  async function saveFolderEdit(e:FormEvent){
   e.preventDefault();if(!folderEdit)return;
-  await renameFolder(folderEdit,{name:folderEditName,color:folderEditColor,parentId:folderMove||null});
-  setFolderEdit(null);
+  const ok=await renameFolder(folderEdit,{name:folderEditName,color:folderEditColor,parentId:folderMove||null});
+  if(ok)setFolderEdit(null);
  }
  async function download(){
    if(!selected)return;setBusy(true);setError("");setMessage("");
@@ -268,11 +268,11 @@ export default function AssetsPage(){
   {error&&<Notice kind="error">{error}</Notice>}
   {message&&<Notice kind="success">{message}</Notice>}
   <div className="aw-drive-toolbar">
-   <div className="aw-drive-search"><Search size={17}/><input aria-label="Search assets" value={search} placeholder="Search this folder…" onChange={e=>{setSearch(e.target.value);setCursor(null);}}/></div>
-   <select aria-label="Asset status" className="aw-drive-select" value={filter} onChange={e=>{setFilter(e.target.value as "ACTIVE"|"ARCHIVED");setCursor(null);}}><option value="ACTIVE">Active files</option><option value="ARCHIVED">Archived files</option></select>
-   {canClients&&<select aria-label="Filter assets by client" className="aw-drive-select" value={filterClient} onChange={e=>{setFilterClient(e.target.value);setCursor(null);}}><option value="">All clients</option>{clients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}</select>}
-   <select className="aw-drive-select" aria-label="Sort assets" value={sort} onChange={e=>{setSort(e.target.value as typeof sort);setCursor(null);}}><option value="name">Name</option><option value="date">Date</option><option value="type">Type</option><option value="size">Size</option></select>
-   <button type="button" className="aw-drive-icon-button" aria-label="Reverse sort" title="Reverse sort" onClick={()=>{setReverse(x=>!x);setCursor(null);}}><ArrowUpDown size={17}/></button>
+   <div className="aw-drive-search"><Search size={17}/><input aria-label="Search assets" value={search} placeholder="Search this folder…" onChange={e=>{setSearch(e.target.value);setCursor(null);setSelectedIds([]);}}/></div>
+   <select aria-label="Asset status" className="aw-drive-select" value={filter} onChange={e=>{setFilter(e.target.value as "ACTIVE"|"ARCHIVED");setCursor(null);setSelectedIds([]);}}><option value="ACTIVE">Active files</option><option value="ARCHIVED">Archived files</option></select>
+   {canClients&&<select aria-label="Filter assets by client" className="aw-drive-select" value={filterClient} onChange={e=>{setFilterClient(e.target.value);setCursor(null);setSelectedIds([]);}}><option value="">All clients</option>{clients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}</select>}
+   <select className="aw-drive-select" aria-label="Sort assets" value={sort} onChange={e=>{setSort(e.target.value as typeof sort);setCursor(null);setSelectedIds([]);}}><option value="name">Name</option><option value="date">Date</option><option value="type">Type</option><option value="size">Size</option></select>
+   <button type="button" className="aw-drive-icon-button" aria-label="Reverse sort" title="Reverse sort" onClick={()=>{setReverse(x=>!x);setCursor(null);setSelectedIds([]);}}><ArrowUpDown size={17}/></button>
    <div className="aw-drive-view-switch"><button type="button" aria-label="Grid view" aria-pressed={view==="grid"} onClick={()=>setView("grid")}><Grid2X2 size={18}/></button><button type="button" aria-label="List view" aria-pressed={view==="list"} onClick={()=>setView("list")}><List size={18}/></button></div>
   </div>
   <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files.</p>
@@ -281,6 +281,7 @@ export default function AssetsPage(){
    <button type="button" onClick={()=>goTo(0)}><Home size={17}/> My Drive</button>
    {trail.map((f,i)=><span key={f.id} className="aw-drive-crumb"><ChevronRight size={14}/><button type="button" onClick={()=>goTo(i+1)}>{f.name}</button></span>)}
   </nav>
+  {selected&&!detailsOpen&&<div className="aw-drive-selection"><span>Selected: <strong>{selected.filename}</strong></span><button type="button" onClick={()=>{setDetailsOpen(true);void loadFolderCatalog();}}><Eye size={15}/> View details</button><button type="button" onClick={()=>void previewAsset(selected)}><FileImage size={15}/> Preview</button></div>}
   {selectedIds.length>0&&<div className="aw-drive-selection"><strong>{selectedIds.length} selected</strong><button type="button" onClick={()=>setSelectedIds([])}>Clear selection</button>{canArchive&&<button type="button" disabled={busy} onClick={()=>void bulkArchive()}><Archive size={15}/> Archive selected</button>}</div>}
   {loading?<div className="aw-drive-loading"><Spinner label="Loading Drive…"/></div>:<>
    {visibleFolders.length>0&&<section aria-label="Folders" className="aw-drive-section"><h2>Folders <span>{visibleFolders.length}</span></h2>
@@ -322,7 +323,7 @@ export default function AssetsPage(){
   {dropActive&&<div className="aw-drive-drop-mask"><Upload size={38}/><strong>Drop files to upload</strong></div>}
   {folderDialog&&<div className="aw-drive-modal-shade" role="dialog" aria-modal="true" aria-label="Create folder"><div className="aw-drive-modal">
    <div className="aw-drive-modal-head"><h2>New folder</h2><button type="button" aria-label="Close folder dialog" onClick={()=>setFolderDialog(false)}><X size={18}/></button></div>
-   <form className="aw-drive-modal-form" onSubmit={async e=>{await addFolder(e);setFolderDialog(false);}}>
+   <form className="aw-drive-modal-form" onSubmit={e=>void addFolder(e)}>
     <FormField id="new-drive-folder-name" label="Folder name"><input id="new-drive-folder-name" className="field" aria-label="New folder name" value={newFolderName} maxLength={120} required onChange={e=>setNewFolderName(e.target.value)}/></FormField>
     <FormField id="new-drive-folder-color" label="Folder color"><input id="new-drive-folder-color" type="color" aria-label="New folder color" value={newFolderColor} onChange={e=>setNewFolderColor(e.target.value)}/></FormField>
     <div className="aw-drive-modal-actions"><button type="button" onClick={()=>setFolderDialog(false)}>Cancel</button><button className="btn-primary" type="submit" disabled={busy}>Create folder</button></div>
