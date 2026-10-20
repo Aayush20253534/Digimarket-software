@@ -18,9 +18,13 @@ export async function bootstrapFirstAdmin(env: NodeJS.ProcessEnv = process.env, 
       // Serializes concurrent bootstrap attempts within one database.
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(336197, 3)::text AS locked`;
       if (await tx.organization.count() !== 0) throw new Error("Bootstrap refused: organization already exists");
-      for (const [key, description] of permissionCatalog) {
-        await tx.permission.upsert({ where: { key }, create: { key, description }, update: { description } });
-      }
+      // This database is empty during its one-time bootstrap, and the permission
+      // seeder may already have inserted these keys. Avoid ~66 serial round trips
+      // inside a short-lived transaction over a remote Neon connection.
+      await tx.permission.createMany({
+        data: permissionCatalog.map(([key, description]) => ({ key, description })),
+        skipDuplicates: true,
+      });
       const organization = await tx.organization.create({ data: { name: orgName } });
       const user = await tx.user.create({ data: {
         organizationId: organization.id, loginId, displayName: "Platform Administrator",
@@ -38,7 +42,7 @@ export async function bootstrapFirstAdmin(env: NodeJS.ProcessEnv = process.env, 
         action: "organization.bootstrapped", entityType: "Organization", entityId: organization.id,
       } });
       return { organizationId: organization.id, adminLoginId: loginId };
-    });
+    }, { maxWait: 20_000, timeout: 60_000 });
   } finally {
     if (!existingDatabase) await db.$disconnect();
   }

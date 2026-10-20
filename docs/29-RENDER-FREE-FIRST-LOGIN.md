@@ -69,6 +69,7 @@ If Render prints `API startup failed: PrismaClientKnownRequestError`, the curren
 - `P1001` / `P1002`: Neon endpoint unreachable or timed out; verify Neon endpoint/network.
 - `P1011`: TLS handshake problem; confirm strict SSL and trusted CA.
 - `P2010`: raw SQL failure; verify migration status, privileges and Neon pooler settings.
+- `P2028`: bootstrap transaction timeout. The bootstrap now bulk-inserts permissions instead of issuing 66 sequential remote writes, and permits a 60-second initial transaction. Confirm the deployed commit includes this fix.
 - Other Prisma codes: use the sanitized startup code together with the official Prisma error reference, without sharing raw connection strings.
 
 Render Free doesn't run the Blueprint's paid pre-deploy hook, so migrations and permissions must be included in the **Start Command**:
