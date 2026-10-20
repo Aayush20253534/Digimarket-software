@@ -145,10 +145,22 @@ export default function AssetsPage(){
    const form=new FormData();
    for(const [key,value] of Object.entries(intent.params))form.append(key,value);
    form.append("file",file,file.name);
-   setUploadProgress("Uploading "+index+" of "+total+": "+file.name);
-   const uploaded=await fetch(intent.uploadUrl,{method:"POST",body:form});
-   if(!uploaded.ok)throw new Error("Cloudinary rejected "+file.name+" ("+uploaded.status+")");
-   const payload=await uploaded.json() as {asset_id?:string};
+   setUploadProgress("Uploading "+index+" of "+total+": "+file.name+" (0%)");
+   const payload=await new Promise<{asset_id?:string}>((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open("POST",intent.uploadUrl);
+    xhr.upload.onprogress=event=>{
+     if(event.lengthComputable)setUploadProgress("Uploading "+index+" of "+total+": "+file.name+" ("+Math.round(event.loaded/event.total*100)+"%)");
+    };
+    xhr.onerror=()=>reject(new Error("Network error while uploading "+file.name));
+    xhr.onabort=()=>reject(new Error("Upload cancelled for "+file.name));
+    xhr.onload=()=>{
+     if(xhr.status<200||xhr.status>=300){reject(new Error("Cloudinary rejected "+file.name+" ("+xhr.status+")"));return;}
+     try{resolve(JSON.parse(xhr.responseText) as {asset_id?:string});}
+     catch{reject(new Error("Invalid Cloudinary response for "+file.name));}
+    };
+    xhr.send(form);
+   });
    if(!payload.asset_id)throw new Error("Cloudinary did not confirm "+file.name);
    setUploadProgress("Verifying "+index+" of "+total+": "+file.name);
    const saved=await request<Asset>("/assets/confirm",{method:"POST",body:{intentId:intent.intentId,assetId:payload.asset_id}});
