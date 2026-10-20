@@ -85,7 +85,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
- return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"}>
+ return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"}>
   <a href="#workspace-content" className="aw-skip-link">Skip to workspace content</a>
   <aside aria-label="Workspace sidebar" className="aw-work-sidebar">
    <div className="aw-work-sidehead">{brand}

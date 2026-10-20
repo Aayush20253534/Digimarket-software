@@ -1,73 +1,221 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowUpRight, BadgeCheck, CalendarClock, CheckCircle2, FolderOpen,
-  Shield, ShieldCheck, Users, Workflow,
+  Activity, ArrowRight, ArrowUpRight, BadgeCheck, BriefcaseBusiness, CheckCircle2,
+  CircleHelp, FileStack, FolderKanban, KeyRound, Layers, RefreshCw, ShieldCheck,
+  Sparkles, Users, Wallet, Workflow
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
-import { Card, EmptyState, PageHeader, StatusBadge } from "@/components/ui";
+import { AWBadge, AWEmptyState, AWNotice, AWStatusBadge } from "@/components/aw-ui";
+import { AWDataToolbar, AWLocalPagination, AWPanel, AWSortButton, AWStat } from "@/components/aw-data-patterns";
+import { permittedGroups } from "@/components/workspace-navigation";
 
-const available = [
-  { title: "Project delivery", detail: "Projects, tasks, approvals and recurring work.", icon: FolderOpen, module: "Operations" },
-  { title: "Content, billing & reports", detail: "Editorial calendar, invoices, payments and analytics.", icon: CalendarClock, module: "Business" },
+type Source = "Clients" | "Leads" | "Projects";
+type Entry = { id: string; name: string; status: string; source: Source; href: string; };
+type ResponsePage<T> = { items: T[]; nextCursor: string | null };
+type Client = { id: string; businessName: string; status: string };
+type Lead = { id: string; businessName: string; status: string };
+type Project = { id: string; name: string; status: string };
+type Overview = { records: Entry[]; sources: Source[]; more: Source[]; errors: Source[] };
+
+const paths: Record<Source,string> = { Clients:"/app/clients",Leads:"/app/leads",Projects:"/app/projects" };
+const choices = [
+  {label:"All record types",value:"all"},
+  {label:"Clients",value:"Clients"},
+  {label:"Leads",value:"Leads"},
+  {label:"Projects",value:"Projects"},
+];
+const topics = [
+  {label:"Leads CRM",permits:["leads.read"],href:"/app/leads",icon:BriefcaseBusiness,detail:"Pipeline, follow-ups, and conversions"},
+  {label:"Clients",permits:["clients.read"],href:"/app/clients",icon:Users,detail:"Client contacts and service delivery"},
+  {label:"Projects",permits:["projects.read"],href:"/app/projects",icon:FolderKanban,detail:"Milestones and deliverables"},
+  {label:"Tasks",permits:["tasks.read"],href:"/app/tasks",icon:CheckCircle2,detail:"Assignments and recurring work"},
+  {label:"Content calendar",permits:["content.read"],href:"/app/content",icon:Layers,detail:"Editorial planning and approvals"},
+  {label:"Income & expenses",permits:["finance.entry.read.own","finance.read.all"],href:"/app/finance",icon:Wallet,detail:"Your permitted financial records"},
+  {label:"Approval workflows",permits:["approvals.read"],href:"/app/approvals",icon:Workflow,detail:"Reviews and decisions"},
+  {label:"Files & assets",permits:["assets.read"],href:"/app/assets",icon:FileStack,detail:"Protected brand resources"},
 ];
 
 export default function Dashboard() {
-  const { session } = useAuth();
-  if (!session) return null;
-  const canSeeAssets = session.identity.permissions.includes("assets.read");
-  const canSeeClients = session.identity.permissions.includes("clients.read");
-  const canSeeLeads = session.identity.permissions.includes("leads.read");
-  const canSeeFinance = session.identity.permissions.includes("finance.entry.read.own") || session.identity.permissions.includes("finance.read.all");
-  const canSeeApprovals = session.identity.permissions.includes("approvals.read");
-  const canManage = session.identity.permissions.includes("users.read");
+  const {session,request}=useAuth();
+  const [overview,setOverview]=useState<Overview | null>(null);
+  const [busy,setBusy]=useState(false);
+  const [query,setQuery]=useState("");
+  const [source,setSource]=useState("all");
+  const [descending,setDescending]=useState(false);
+  const [page,setPage]=useState(1);
+  const grants=session?.identity.permissions ?? [];
+  const permitted=useMemo(()=>new Set(grants),[grants]);
+  const available=useMemo(()=>topics.filter(x=>x.permits.some(p=>permitted.has(p))),[permitted]);
+  const nav=useMemo(()=>permittedGroups(grants).flatMap(group=>group.items),[grants]);
 
-  return <div className="space-y-8">
-    <PageHeader eyebrow="Overview" title={"Welcome, " + session.user.displayName.split(" ")[0]}
-      description="Your private operations workspace is ready. Use only the modules your role permits."
-      actions={<StatusBadge status={session.user.status} />} />
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-emerald-50 p-3 text-emerald-700"><BadgeCheck className="h-6 w-6" aria-hidden="true" /></div><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your session</p><p className="mt-1 text-xl font-bold text-slate-900">Authenticated</p></div></div><p className="mt-4 text-xs text-slate-500">Verified against the API and current session record.</p></Card>
-      <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-indigo-50 p-3 text-indigo-700"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></div><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assigned role</p><p className="mt-1 text-xl font-bold text-slate-900">{session.identity.roles.join(", ") || "None"}</p></div></div><p className="mt-4 text-xs text-slate-500">Role grants are checked by the backend.</p></Card>
-      <Card><div className="flex items-center gap-3"><div className="rounded-xl bg-violet-50 p-3 text-violet-700"><Shield className="h-6 w-6" aria-hidden="true" /></div><div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Access grants</p><p className="mt-1 text-xl font-bold text-slate-900">{session.identity.permissions.length}</p></div></div><p className="mt-4 text-xs text-slate-500">Current permissions attached to your account.</p></Card>
+  const load=useCallback(async()=>{
+    if(!session)return;
+    const toLoad: Source[]=[];
+    if(session.identity.permissions.includes("clients.read"))toLoad.push("Clients");
+    if(session.identity.permissions.includes("leads.read"))toLoad.push("Leads");
+    if(session.identity.permissions.includes("projects.read"))toLoad.push("Projects");
+    if(!toLoad.length){setOverview({records:[],sources:[],more:[],errors:[]});return;}
+    setBusy(true);
+    const settled=await Promise.allSettled(toLoad.map(async(name)=>{
+      if(name==="Clients"){
+        const data=await request<ResponsePage<Client>>("/clients?limit=10");
+        return {name,items:data.items.map(x=>({id:x.id,name:x.businessName,status:x.status,source:name,href:paths[name]})),hasMore:!!data.nextCursor};
+      }
+      if(name==="Leads"){
+        const data=await request<ResponsePage<Lead>>("/leads?limit=10");
+        return {name,items:data.items.map(x=>({id:x.id,name:x.businessName,status:x.status,source:name,href:paths[name]})),hasMore:!!data.nextCursor};
+      }
+      const data=await request<ResponsePage<Project>>("/projects?limit=10");
+      return {name,items:data.items.map(x=>({id:x.id,name:x.name,status:x.status,source:name,href:paths[name]})),hasMore:!!data.nextCursor};
+    }));
+    const records:Entry[]=[];
+    const sources:Source[]=[];
+    const more:Source[]=[];
+    const errors:Source[]=[];
+    settled.forEach((result,index)=>{
+      if(result.status==="fulfilled"){
+        sources.push(result.value.name);
+        if(result.value.hasMore)more.push(result.value.name);
+        records.push(...result.value.items);
+      }else{
+        errors.push(toLoad[index]);
+      }
+    });
+    setOverview({records,sources,more,errors});
+    setBusy(false);
+  },[request,session]);
+  useEffect(()=>{void load();},[load]);
+  useEffect(()=>{setPage(1);},[query,source,descending]);
+
+  const filtered=useMemo(()=>{
+    const q=query.toLowerCase().trim();
+    const selected=overview?.records.filter(item=>(source==="all"||item.source===source)
+      &&(!q||[item.name,item.source,item.status].some(part=>part.toLowerCase().includes(q))))??[];
+    return selected.sort((a,b)=>descending?b.name.localeCompare(a.name):a.name.localeCompare(b.name));
+  },[overview,query,source,descending]);
+  const pages=Math.max(1,Math.ceil(filtered.length/7));
+  const visible=filtered.slice((Math.min(page,pages)-1)*7,Math.min(page,pages)*7);
+  const firstName=session?.user.displayName.split(" ")[0]??"there";
+  if(!session)return null;
+  const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
+  overview?.records.forEach(x=>{groupCounts[x.source]++;});
+  return <div className="aw-dashboard space-y-7" data-testid="amplifyworld-dashboard">
+    <header className="aw-dashboard-hero">
+      <div className="min-w-0">
+        <p className="aw-eyebrow"><Sparkles size={14} className="mr-2 inline" aria-hidden="true"/>Agency command center</p>
+        <h1 className="aw-dashboard-title">Welcome, <span className="aw-gradient-text">{firstName}</span></h1>
+        <p className="aw-dashboard-subtitle">
+          Your permissions, current workspace records and everyday tools in one place.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <AWStatusBadge status={session.user.status}/>
+        <button type="button" className="aw-dashboard-refresh" onClick={()=>void load()} disabled={busy}
+          aria-label="Refresh overview"><RefreshCw size={16} className={busy?"animate-spin":""} aria-hidden="true"/>
+          {busy?"Updating…":"Refresh overview"}
+        </button>
+      </div>
+    </header>
+
+    <div className="aw-stat-grid" data-testid="dashboard-kpis">
+      <AWStat label="Your session" value="Authenticated" description="Verified against the active API session"
+        icon={<BadgeCheck size={21}/>} accent/>
+      <AWStat label="Assigned roles" value={session.identity.roles.length} description={session.identity.roles.join(", ")||"No roles"}
+        icon={<KeyRound size={21}/>}/>
+      <AWStat label="Access grants" value={session.identity.permissions.length} description="Rights enforced by the backend"
+        icon={<ShieldCheck size={21}/>}/>
+      <AWStat label="Available modules" value={nav.length} description="Navigation destinations your role can open"
+        icon={<Layers size={21}/>}/>
     </div>
-    <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-      <Card title="Agency modules" description="Available operational capabilities; no invented client or revenue statistics.">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {available.map(({ title, detail, icon: Icon, module }) => <div key={title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-center justify-between"><Icon className="h-5 w-5 text-indigo-600" aria-hidden="true" /><span className="text-[11px] font-semibold text-slate-400">{module}</span></div>
-            <h3 className="mt-3 text-sm font-bold text-slate-900">{title}</h3>
-            <p className="mt-2 text-xs leading-5 text-slate-500">{detail}</p>
-          </div>)}
-        </div>
-      </Card>
-      <Card title="Quick access" description="Tools available in this module.">
-        <div className="space-y-3">
-          <Link href="/app/profile" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
-            <span className="flex items-center gap-3 text-sm font-semibold"><ShieldCheck className="h-5 w-5 text-indigo-600" aria-hidden="true" />View account and permissions</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-          {canSeeLeads && <Link href="/app/leads" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
-            <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Leads and follow-ups</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-          </Link>}
-          {canSeeClients && <Link href="/app/clients" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
-            <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Client directory</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-          </Link>}
-          {canSeeAssets && <Link href="/app/assets" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
-            <span className="flex items-center gap-3 text-sm font-semibold"><FolderOpen className="h-5 w-5 text-indigo-600" aria-hidden="true" />Private files & assets</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-          </Link>}
-          {canSeeFinance && <Link href="/app/finance" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
-            <span className="flex items-center gap-3 text-sm font-semibold"><Workflow className="h-5 w-5 text-indigo-600" aria-hidden="true" />Income & expenses</span><ArrowUpRight className="h-4 w-4" aria-hidden="true"/>
-          </Link>}
-          {canSeeApprovals && <Link href="/app/approvals" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
-            <span className="flex items-center gap-3 text-sm font-semibold"><Workflow className="h-5 w-5 text-indigo-600" aria-hidden="true" />Approval queue</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-          </Link>}
-          {canManage && <Link href="/app/team/users" className="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50">
-            <span className="flex items-center gap-3 text-sm font-semibold"><Users className="h-5 w-5 text-indigo-600" aria-hidden="true" />Team account management</span><ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-          </Link>}
-          <EmptyState title="No business data yet" description="Newly created clients, projects and other business records appear in their respective modules." icon={CheckCircle2} />
-        </div>
-      </Card>
+
+    <div className="aw-records-summary" aria-label="Loaded record summary">
+      {(["Clients","Leads","Projects"] as const).filter(label=>{
+        const permission=label==="Clients"?"clients.read":label==="Leads"?"leads.read":"projects.read";
+        return permitted.has(permission);
+      }).map(label=><Link key={label} href={paths[label]} className="aw-summary-item">
+        <span className="aw-summary-number">{overview ? groupCounts[label] : "…"}</span>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-[#EDE2FA]">{label}</span>
+          <span className="block text-xs leading-5 text-[#A69ABD]">Recent page loaded · open module for full list</span>
+        </span>
+        <ArrowUpRight size={17} className="ml-auto shrink-0 text-[#BA80E8]" aria-hidden="true"/>
+      </Link>)}
     </div>
+
+    {overview?.errors.length ? <AWNotice tone="error">
+      Could not load recent {overview.errors.join(", ").toLowerCase()} records. Other workspace functions remain available.
+    </AWNotice> : null}
+    {overview?.more.length ? <AWNotice tone="info">
+      These counts and rows show the first 10 records returned from each permitted module, not agency-wide totals.
+      More records are available in: {overview.more.join(", ")}.
+    </AWNotice> : null}
+
+    <div className="aw-dashboard-main-grid">
+      <AWPanel title="Recent workspace records" description="Live data from modules your account can access. Results are limited to the first API page.">
+        <AWDataToolbar query={query} onQuery={setQuery} placeholder="Search recent records"
+          filter={source} onFilter={setSource} choices={choices} count={filtered.length}/>
+        {busy && !overview ? <div className="aw-dashboard-wait" role="status">
+          <RefreshCw size={17} className="animate-spin" aria-hidden="true"/> Loading your records…
+        </div> : filtered.length ? <>
+          <div className="aw-dashboard-table-wrap">
+            <table className="aw-dashboard-table" aria-label="Recent workspace records">
+              <thead><tr>
+                <th scope="col"><AWSortButton label="Name" descending={descending} onClick={()=>setDescending(v=>!v)}/></th>
+                <th scope="col">Module</th>
+                <th scope="col">Status</th>
+                <th scope="col"><span className="sr-only">Open</span></th>
+              </tr></thead>
+              <tbody>{visible.map(entry=><tr key={entry.source+entry.id}>
+                <td><span className="aw-row-name">{entry.name}</span></td>
+                <td><AWBadge tone="neutral">{entry.source}</AWBadge></td>
+                <td><AWStatusBadge status={entry.status}/></td>
+                <td className="text-right"><Link href={entry.href} className="aw-row-open" aria-label={"Open "+entry.source+" module"}>
+                  <ArrowUpRight size={17} aria-hidden="true"/></Link></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <AWLocalPagination page={Math.min(page,pages)} pages={pages} onPage={setPage}/>
+        </> : <AWEmptyState title={overview?"No matching records":"No records loaded yet"}
+          description={overview?"Try another filter or open the module to view its complete dataset.":"The data appears here once your allowed modules are loaded."}
+          action={<Link className="aw-button aw-button-secondary aw-button-sm" href="/app/profile">View my access <ArrowRight size={15}/></Link>}/>}
+      </AWPanel>
+
+      <div className="space-y-5">
+        <AWPanel title="Quick access" description="Only destinations your current role can use.">
+          <div className="aw-quick-grid">
+            <Link href="/app/profile" className="aw-quick-link">
+              <span className="aw-quick-icon"><ShieldCheck size={18}/></span>
+              <span className="min-w-0"><strong>View account and permissions</strong><small>Personal access and security</small></span>
+              <ArrowUpRight size={17} className="ml-auto shrink-0"/>
+            </Link>
+            {available.map(({label,href,icon:Icon,detail})=><Link key={href} href={href} className="aw-quick-link">
+              <span className="aw-quick-icon"><Icon size={18}/></span>
+              <span className="min-w-0"><strong>{label}</strong><small>{detail}</small></span>
+              <ArrowUpRight size={17} className="ml-auto shrink-0"/>
+            </Link>)}
+            {permitted.has("users.read")&&<Link href="/app/team/users" className="aw-quick-link">
+              <span className="aw-quick-icon"><Users size={18}/></span>
+              <span className="min-w-0"><strong>Team account management</strong><small>Accounts and assigned roles</small></span>
+              <ArrowUpRight size={17} className="ml-auto shrink-0"/>
+            </Link>}
+          </div>
+        </AWPanel>
+        <AWPanel title="Access & scope" description="A concise view of the security context for this account.">
+          <div className="aw-access-line"><span>Account status</span><AWStatusBadge status={session.user.status}/></div>
+          <div className="aw-access-line"><span>Roles</span><span className="max-w-[58%] text-right text-sm text-[#E8D7FB]">{session.identity.roles.join(", ")||"None"}</span></div>
+          <div className="aw-access-line"><span>Security</span><span className="inline-flex items-center gap-2 text-sm text-[#B9EDCF]"><CheckCircle2 size={15}/> Session active</span></div>
+          <p className="mt-4 flex items-start gap-2 text-xs leading-6 text-[#9F91B1]">
+            <CircleHelp size={16} className="mt-1 shrink-0" aria-hidden="true"/>
+            Access and record visibility are enforced by the API. No business totals are inferred from partial list pages.
+          </p>
+        </AWPanel>
+      </div>
+    </div>
+    <footer className="aw-dashboard-footer">
+      <Activity size={15} aria-hidden="true"/> AmplifyWorld Workspace · Live account context
+    </footer>
   </div>;
 }
