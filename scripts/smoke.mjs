@@ -29,7 +29,7 @@ try {
       body?.meta?.version === "v1";
   }, "API health contract");
 
-  await poll(webUrl, (text) => text.includes("DigiMarket") &&
+  await poll(webUrl, (text) => text.includes("AmplifyWorld Workspace") &&
     text.includes("Connected") &&
     text.includes("api-health-status"), "Next.js render and server-to-API fetch");
 

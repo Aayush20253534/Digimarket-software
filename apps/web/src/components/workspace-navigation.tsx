@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
  Bell, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CheckSquare2,
- CreditCard, FileStack, FolderKanban, LayoutDashboard, Search, Settings2,
+ CreditCard, FileStack, FolderKanban, LayoutDashboard, NotebookPen, Search, Settings2,
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
 
@@ -11,6 +11,7 @@ type Group={title:string;items:readonly Item[]};
 const sections:readonly Group[]=[
  {title:"Workspace",items:[
   {label:"Overview",href:"/app/dashboard",icon:LayoutDashboard},
+  {label:"My notes",href:"/app/notes",icon:NotebookPen},
   {label:"Global search",href:"/app/search",icon:Search,permits:["search.read"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]},
   {label:"Notifications",href:"/app/notifications",icon:Bell,permits:["notifications.read"]}

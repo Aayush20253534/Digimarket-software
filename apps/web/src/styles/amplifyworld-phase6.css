@@ -1,0 +1,46 @@
+/* Phase 6: continue the Obsidian/Violet/Magenta treatment across pre-existing
+   finance, assets, reports, profile and administration modules without altering
+   original forms, API contracts or mutation handlers. */
+.aw-workspace[data-restyled="true"] .aw-work-content{
+ background:radial-gradient(ellipse 50% 18% at 90% 0%,rgba(124,42,167,.13),transparent 85%),#0C0814;
+ color:#F1E7FC;color-scheme:dark;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content-width{max-width:1610px;min-width:0}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(h1,h2,h3,h4){color:#F4E9FC;overflow-wrap:anywhere}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.text-slate-900,.text-slate-950,.text-slate-800,.text-slate-700){color:#EEE1F8!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.text-slate-600,.text-slate-500,.text-slate-400){color:#B6A7C8!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.text-indigo-600,.text-indigo-700,.text-indigo-800){color:#DD9FFF!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.bg-white,.bg-slate-50,.bg-indigo-50){background:#21162E!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.bg-slate-100,.bg-indigo-100){background:#32213E!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.border-slate-200,.border-slate-100,.border-indigo-200){border-color:#4C335C!important}
+.aw-workspace[data-restyled="true"] .aw-work-content section.rounded-2xl.bg-white{
+ background:linear-gradient(155deg,#1D1428,#140E1E)!important;
+ border-color:#452C58!important;
+ color:#F0E6FB;box-shadow:0 14px 38px #0004!important
+}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.border-b,.border-t){border-color:#4A315A!important}
+.aw-workspace[data-restyled="true"] .aw-work-content .field{
+ background:#261A33;color:#F5ECFC;border:1px solid #57406A;
+ min-height:44px;color-scheme:dark;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content .field:focus{border-color:#D18BF1;box-shadow:0 0 0 3px #7D419155}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.field,textarea,select) ::placeholder{color:#AB95C3}
+.aw-workspace[data-restyled="true"] .aw-work-content .btn-primary{background:#A34BD2;color:white}
+.aw-workspace[data-restyled="true"] .aw-work-content .btn-primary:hover{background:#BF60E4}
+.aw-workspace[data-restyled="true"] .aw-work-content .btn-secondary{background:#2A1C39;color:#E9D8FA;border-color:#624276}
+.aw-workspace[data-restyled="true"] .aw-work-content .btn-secondary:hover{background:#3B284E}
+.aw-workspace[data-restyled="true"] .aw-work-content .btn-danger{background:#422134;color:#FFD6E0;border-color:#78425D}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.bg-emerald-50,.bg-red-50,.bg-amber-50){background:#312138!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.text-emerald-700,.text-emerald-800){color:#AEF2C7!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.text-red-700,.text-red-800){color:#FFB9CD!important}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.text-amber-700,.text-amber-800){color:#FFE29E!important}
+.aw-workspace[data-restyled="true"] .aw-work-content table{color:#EBE0F6}
+.aw-workspace[data-restyled="true"] .aw-work-content thead{background:#291D37}
+.aw-workspace[data-restyled="true"] .aw-work-content tr{border-color:#483357}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(button,a,input,select,textarea):focus-visible{outline:2px solid #D68BFC;outline-offset:3px}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(button,a){overflow-wrap:anywhere}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.overflow-x-auto){scrollbar-color:#6D4A7B #1A1226}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(.rounded-xl,.rounded-lg){max-width:100%}
+@media(max-width:640px){.aw-workspace[data-restyled="true"] .aw-work-content .field{font-size:16px}
+.aw-workspace[data-restyled="true"] .aw-work-content section.rounded-2xl.bg-white{padding:16px!important}
+.aw-workspace[data-restyled="true"] .aw-work-content table{font-size:.79rem}}

@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { apiHealthSchema } from "@digimarket/contracts";
+import { registerNotesRoutes } from "./notes/routes";
 import { registerInsightsRoutes } from "./insights/routes";
 import { registerCompanyRoutes } from "./company/routes";
 import { registerProfitabilityRoutes } from "./profitability/routes";
@@ -101,6 +102,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
   });
 
   if (authService) {
+    registerNotesRoutes(app, authService);
     registerInsightsRoutes(app, authService);
     registerCompanyRoutes(app, authService);
     registerProfitabilityRoutes(app, authService);

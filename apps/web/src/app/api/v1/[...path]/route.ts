@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 const endpoints: Record<string, string[]> = {
   "health": ["GET"],
+  "notes": ["GET","POST"],
   "search": ["GET"],
   "reports/overview": ["GET"],
   "notifications": ["GET"],
@@ -54,6 +55,7 @@ const endpoints: Record<string, string[]> = {
   "leads/import": ["POST"],
   "leads/export": ["GET"],
 };
+const noteDetailPattern=/^notes\/[0-9a-fA-F-]{36}$/;
 const notificationReadPattern=/^notifications\/[0-9a-fA-F-]{36}\/read$/;
 const founderDetailPattern=/^founders\/[0-9a-fA-F-]{36}$/;
 const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/status$/;
@@ -91,6 +93,7 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(noteDetailPattern.test(path))return ["GET","PUT","DELETE"].includes(method);
   if(notificationReadPattern.test(path))return method==="POST";
   if(founderDetailPattern.test(path))return method==="PUT";
   if(profitExpensePattern.test(path))return method==="PUT";
@@ -186,6 +189,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const view = request.nextUrl.searchParams.get("view");
     if (view === "mine" || view === "queue") url.searchParams.set("view", view);
   }
+  if(noteDetailPattern.test(path)&&request.method==="DELETE"){
+    const version=request.nextUrl.searchParams.get("version");
+    if(version!==null)url.searchParams.set("version",version);
+  }
   if(path==="search"){
     const q=request.nextUrl.searchParams.get("q");
     if(q!==null)url.searchParams.set("q",q);
@@ -266,7 +273,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   let body: ArrayBuffer | undefined;
   if (request.method !== "GET") {
-    if (!request.headers.get("content-type")?.startsWith("application/json") && path !== "auth/logout" && path !== "auth/refresh" && !path.endsWith("/cancel")) {
+    if (!request.headers.get("content-type")?.startsWith("application/json") && path !== "auth/logout" && path !== "auth/refresh" && request.method !== "DELETE" && !path.endsWith("/cancel")) {
       return NextResponse.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "JSON required" } }, { status: 415 });
     }
     body = await request.arrayBuffer();
@@ -296,3 +303,4 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 export const GET = proxy;
 export const POST = proxy;
 export const PUT = proxy;
+export const DELETE = proxy;
