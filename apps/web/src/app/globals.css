@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../styles/amplifyworld-tokens.css";
+@import "../styles/amplifyworld-phase2.css";
 
 :root {
   color-scheme: light;
