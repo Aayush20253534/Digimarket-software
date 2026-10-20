@@ -17,7 +17,7 @@ type Asset={id:string;filename:string};
 type Summary={id:string;title:string;clientId:string;projectId:string|null;ownerId:string;platform:Platform;format:Format;
  status:Stage;publishAt:string|null;version:number;revision:number;approvalRequestId:string|null;
  client:{businessName:string};owner:{displayName:string};assets:{assetId:string}[]};
-type Detail=Summary&{caption:string;hashtags:string[];createdById:string;publishedAt:string|null;publishedUrl:string|null;
+type Detail=Omit<Summary,"assets">&{caption:string;hashtags:string[];createdById:string;publishedAt:string|null;publishedUrl:string|null;
  assets:{assetId:string;asset:{filename:string;status:string}}[];
  approvalRequest:{status:string;decision:{outcome:string;reason:string|null}|null}|null;
  revisions:{revision:number;createdAt:string;actorId:string}[]};
