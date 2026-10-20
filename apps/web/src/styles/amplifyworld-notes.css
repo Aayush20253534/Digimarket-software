@@ -50,3 +50,16 @@
 .aw-notes-editor-expanded .aw-notes-canvas{display:block;width:min(100%,calc((100dvh - 235px) * 900 / 520));height:auto;max-height:none;align-self:center;flex:0 0 auto;box-shadow:0 20px 70px #0007}
 .aw-notes-editor-expanded .aw-notes-draw-head{margin-top:0}.aw-notes-editor-expanded .aw-notes-title{min-height:42px;font-size:1rem}
 @media(max-width:650px){.aw-notes-editor-expanded .aw-notes-canvas{width:100%}.aw-notes-editor-expanded{padding:10px}.aw-notes-toolbar{align-items:flex-start}}
+
+/* Compact precision drawing palette and viewport notebook. */
+.aw-notes-tool-choices{display:flex;gap:5px;flex-wrap:wrap;width:100%;padding-bottom:5px;border-bottom:1px solid #52345f}
+.aw-notes-pen .aw-notes-tool-choices button{min-height:34px;padding:6px 9px;font-size:.76rem}
+.aw-notes-pen .aw-notes-swatch{width:26px;height:26px;min-height:26px;padding:3px;border-radius:50%;display:grid;place-items:center}
+.aw-notes-swatch span{width:17px;height:17px;display:block;border-radius:50%;border:1px solid #e5d5ef40}
+.aw-notes-pen .aw-notes-swatch[aria-pressed=true]{border-color:#db97ff;background:#5f3770}
+.aw-notes-tool-size{font-size:.71rem;color:#bb9bcd;font-variant-numeric:tabular-nums}
+.aw-notes-pen{gap:8px}.aw-notes-draw-head{display:grid;gap:13px}
+.aw-notes-editor-expanded{padding:12px 20px!important;overflow-y:auto!important}
+.aw-notes-editor-expanded .aw-notes-toolbar{flex-shrink:0}.aw-notes-editor-expanded .aw-notes-draw-head{flex-shrink:0}
+.aw-notes-editor-expanded .aw-notes-canvas{max-height:calc(100dvh - 290px)!important;width:min(100%,calc((100dvh - 290px) * 900 / 520))!important}
+@media(max-width:630px){.aw-notes-editor-expanded{padding:8px!important}.aw-notes-editor-expanded .aw-notes-canvas{width:100%!important;max-height:calc(100dvh - 375px)!important}.aw-notes-tool-choices{gap:3px}.aw-notes-pen .aw-notes-tool-choices button{padding:6px}}
