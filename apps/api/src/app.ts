@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { apiHealthSchema } from "@digimarket/contracts";
+import { registerContentRoutes } from "./content/routes";
 import { registerTaskRoutes } from "./tasks/routes";
 import { registerProjectRoutes } from "./projects/routes";
 import { registerAssetRoutes } from "./assets/routes";
@@ -30,6 +31,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
   });
 
   if (authService) {
+    registerContentRoutes(app, authService);
     registerTaskRoutes(app, authService);
     registerProjectRoutes(app, authService);
     registerLeadRoutes(app, authService);

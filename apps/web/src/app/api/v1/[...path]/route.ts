@@ -26,6 +26,8 @@ const endpoints: Record<string, string[]> = {
   "projects": ["GET","POST"],
   "projects/assignees": ["GET"],
   "tasks": ["GET","POST"],
+  "content": ["GET","POST"],
+  "content/staff": ["GET"],
   "tasks/team": ["GET"],
   "task-recurrences": ["GET","POST"],
   "assets/upload-intent": ["POST"],
@@ -39,6 +41,8 @@ const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/st
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
+const contentDetailPattern=/^content\/[0-9a-fA-F-]{36}$/;
+const contentActionPattern=/^content\/[0-9a-fA-F-]{36}\/(submit|schedule|publish|cancel)$/;
 const taskDetailPattern=/^tasks\/[0-9a-fA-F-]{36}$/;
 const taskActionPattern=/^tasks\/[0-9a-fA-F-]{36}\/(assignees|checklist|comments)$/;
 const taskChecklistItemPattern=/^tasks\/[0-9a-fA-F-]{36}\/checklist\/[0-9a-fA-F-]{36}$/;
@@ -61,6 +65,8 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(contentDetailPattern.test(path))return ["GET","PUT"].includes(method);
+  if(contentActionPattern.test(path))return method==="POST";
   if(taskDetailPattern.test(path))return ["GET","PUT"].includes(method);
   if(taskActionPattern.test(path))return path.endsWith("/assignees")?method==="PUT":method==="POST";
   if(taskChecklistItemPattern.test(path))return method==="PUT";
@@ -116,6 +122,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
   if (path === "assets") {
     for (const key of ["q","clientId","status","cursor","limit"]) {
+      const value=request.nextUrl.searchParams.get(key);
+      if(value!==null)url.searchParams.set(key,value);
+    }
+  }
+  if (path === "content") {
+    for (const key of ["clientId","ownerId","status","platform","start","end","q","limit","cursor"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }

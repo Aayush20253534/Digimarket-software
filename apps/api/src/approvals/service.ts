@@ -70,8 +70,11 @@ export class ApprovalService {
       }) : [];
     return this.db.approvalRequest.findMany({
       where:{organizationId:actor.organizationId,
-        ...(view==="queue"?{OR:[{referenceType:null},{referenceType:{not:"PROJECT_DELIVERABLE"}},
-          {referenceType:"PROJECT_DELIVERABLE",referenceId:{in:reviewers.map(row=>row.id)}}]}:{}),
+        ...(view==="queue"?{OR:[
+          {referenceType:null},{referenceType:{notIn:["PROJECT_DELIVERABLE","CONTENT_POST"]}},
+          {referenceType:"PROJECT_DELIVERABLE",referenceId:{in:reviewers.map(row=>row.id)}},
+          ...(actor.permissions.has("content.approve")?[{referenceType:"CONTENT_POST"}]:[]),
+        ]}:{}),
         ...(view==="mine"
         ? {requesterId:actor.userId}
         : {status:"PENDING" as const,requesterId:{not:actor.userId},approverRoleKeys:{hasSome:actor.roles}})},
@@ -96,6 +99,12 @@ export class ApprovalService {
             members:{some:{userId:actor.userId,role:{in:["REVIEWER","MANAGER"]}}}})},
       }});
       if(!p || !actor.permissions.has("projects.review"))throw notFound();
+    }
+    if(result.referenceType==="CONTENT_POST"&&result.requesterId!==actor.userId){
+      if(!actor.permissions.has("content.approve"))throw notFound();
+      const post=await this.db.contentPost.findFirst({where:{
+        id:result.referenceId??"",organizationId:actor.organizationId,approvalRequestId:id}});
+      if(!post)throw notFound();
     }
     return result;
   }
@@ -126,6 +135,16 @@ export class ApprovalService {
           !item.project.members.some(m=>m.role==="MANAGER"||m.role==="REVIEWER"))throw forbidden();
         if(outcome==="APPROVED"&&item.asset?.status==="ARCHIVED")throw invalid("Asset is archived");
       }
+    }
+    if(record.referenceType==="CONTENT_POST"){
+      if(outcome!=="CANCELLED")grant(actor,"content.approve");
+      const post=await this.db.contentPost.findFirst({where:{
+        id:record.referenceId??"",organizationId:actor.organizationId,
+        approvalRequestId:id,status:"IN_REVIEW"},
+        include:{assets:{select:{asset:{select:{status:true,clientId:true}}}}}});
+      if(!post)throw conflict();
+      if(outcome==="APPROVED"&&post.assets.some(x=>x.asset.status!=="ACTIVE"||x.asset.clientId!==post.clientId))
+        throw invalid("Referenced content asset has changed");
     }
     return this.db.$transaction(async tx=>{
       const now=new Date();
@@ -167,6 +186,21 @@ export class ApprovalService {
           eventKey:"project.deliverable.resolved."+id,kind:"projects.deliverable_resolved",
           aggregateType:"ProjectDeliverable",aggregateId:record.referenceId??"",
           payloadMinimal:{deliverableId:record.referenceId,approvalId:id,outcome}}});
+      }
+      if(record.referenceType==="CONTENT_POST"){
+        const changed=await tx.contentPost.updateMany({where:{
+          id:record.referenceId??"",organizationId:actor.organizationId,
+          approvalRequestId:id,status:"IN_REVIEW"},
+          data:{status:outcome==="APPROVED"?"APPROVED":
+            outcome==="REJECTED"?"CHANGES_REQUESTED":"DRAFT",version:{increment:1}}});
+        if(changed.count!==1)throw conflict();
+        await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
+          action:"content.review_"+outcome.toLowerCase(),entityType:"ContentPost",entityId:record.referenceId??"",
+          afterRedacted:{outcome}}});
+        await tx.outboxEvent.create({data:{organizationId:actor.organizationId,
+          eventKey:"content.review."+id,kind:"content.review_resolved",
+          aggregateType:"ContentPost",aggregateId:record.referenceId??"",
+          payloadMinimal:{postId:record.referenceId,approvalId:id,outcome}}});
       }
       await tx.approvalDecision.create({data:{
         requestId:id,actorId:actor.userId,outcome,reason:reason?.trim() || null,

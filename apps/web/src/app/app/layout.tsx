@@ -12,7 +12,6 @@ import { useAuth } from "@/components/auth-provider";
 import { Notice, Spinner } from "@/components/ui";
 
 const futureModules = [
-  { label: "Content calendar", icon: CalendarDays },
   { label: "Invoices & payments", icon: CreditCard },
   { label: "Reports", icon: ChartNoAxesCombined },
   { label: "Company settings", icon: Settings2 },
@@ -49,6 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSeeContent = session.identity.permissions.includes("content.read");
   const canSeeTasks = session.identity.permissions.includes("tasks.read");
   const canSeeProjects = session.identity.permissions.includes("projects.read");
   const canSeeAssets = session.identity.permissions.includes("assets.read");
@@ -82,6 +82,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {canSeeTasks && <Link href="/app/tasks" aria-current={pathname.startsWith("/app/tasks") ? "page" : undefined}
           className={"sidebar-link " + (pathname.startsWith("/app/tasks") ? "sidebar-active" : "")}>
           <CheckSquare2 className="h-4 w-4" aria-hidden="true" />Tasks
+        </Link>}
+        {canSeeContent && <Link href="/app/content" aria-current={pathname.startsWith("/app/content")?"page":undefined}
+          className={"sidebar-link "+(pathname.startsWith("/app/content")?"sidebar-active":"")}>
+          <CalendarDays className="h-4 w-4" aria-hidden="true" />Content calendar
         </Link>}
         {canSeeAssets && <Link href="/app/assets" aria-current={pathname.startsWith("/app/assets") ? "page" : undefined} className={"sidebar-link " + (pathname.startsWith("/app/assets") ? "sidebar-active" : "")}>
           <FileStack className="h-4 w-4" aria-hidden="true" />Files & assets
