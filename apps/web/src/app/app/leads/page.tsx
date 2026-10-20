@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Download, Plus, RefreshCw, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
@@ -75,13 +75,13 @@ export default function LeadsPage(){
    if(!canRead){setLoading(false);return;}
    setLoading(true);
    try{
-     const q=new URLSearchParams({limit:"30"});
+     const q=new URLSearchParams({limit:"30",sort:sortBy,direction:descending?"desc":"asc"});
      if(stage)q.set("stage",stage);if(search.trim())q.set("q",search.trim());
      if(cursor)q.set("cursor",cursor);
      const result=await request<Page>("/leads?"+q);
      setItems(result.items);setNextCursor(result.nextCursor);setError("");
    }catch(e){setError(errText(e));}finally{setLoading(false);}
- },[canRead,request,stage,search,cursor]);
+ },[canRead,request,stage,search,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const open=async(id:string)=>{
@@ -186,10 +186,7 @@ export default function LeadsPage(){
      setMessage("Organization CSV exported and recorded in audit history.");
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
- const sorted=useMemo(()=>[...items].sort((a,b)=>{
-  const value=String(a[sortBy]??"").localeCompare(String(b[sortBy]??""),undefined,{numeric:true,sensitivity:"base"});
-  return descending?-value:value;
- }),[items,sortBy,descending]);
+ const sorted=items;
  if(!session)return <Spinner label="Checking CRM access…"/>;
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
@@ -213,9 +210,9 @@ export default function LeadsPage(){
            <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
              <option value="">All stages</option>{stages.map(x=><option key={x}>{x}</option>)}
            </select>
-<select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>setSortBy(e.target.value as typeof sortBy)}>
+<select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setCursor(null);setHistory([]);}}>
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="location">Location</option><option value="status">Stage</option><option value="nextFollowUpAt">Follow-up</option>
- </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
+ </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading&&<Spinner label="Loading leads…"/>}
           {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}

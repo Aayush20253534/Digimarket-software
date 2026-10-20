@@ -32,7 +32,7 @@ export class ClientsService {
      ]}:{})};
    const rows=await this.db.client.findMany({where,take:input.limit+1,
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
-     orderBy:[{createdAt:"desc"},{id:"desc"}],
+     orderBy:[{[input.sort??"createdAt"]:input.direction??"desc"} as Prisma.ClientOrderByWithRelationInput,{id:input.direction??"desc"}],
      select:{id:true,businessName:true,businessType:true,phone:true,email:true,location:true,
        status:true,sourceLeadId:true,version:true,createdAt:true,updatedAt:true,
        _count:{select:{contacts:true,services:true}}}});

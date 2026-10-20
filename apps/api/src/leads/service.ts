@@ -88,7 +88,7 @@ export class LeadsService {
    };
    const rows=await this.db.lead.findMany({where,take:input.limit+1,
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
-     orderBy:[{createdAt:"desc"},{id:"desc"}],
+     orderBy:[{[input.sort??"createdAt"]:input.direction??"desc"} as Prisma.LeadOrderByWithRelationInput,{id:input.direction??"desc"}],
      select:{id:true,businessName:true,contactName:true,phone:true,businessType:true,location:true,
        websiteUrl:true,instagramUrl:true,source:true,status:true,assignedToId:true,createdById:true,
        nextFollowUpAt:true,version:true,createdAt:true,updatedAt:true,

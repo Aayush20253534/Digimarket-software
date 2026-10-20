@@ -91,6 +91,8 @@ export const leadNoteSchema = z.strictObject({note:z.string().trim().min(1).max(
 export const leadDuplicateReviewSchema = z.strictObject({resolution:z.enum(["CONFIRMED","DISMISSED"])});
 export const leadListQuerySchema = z.strictObject({
   stage:leadStageSchema.optional(),
+  sort:z.enum(["businessName","contactName","location","status","nextFollowUpAt"]).optional(),
+  direction:z.enum(["asc","desc"]).optional(),
   assignedToId:z.uuid().optional(),
   q:z.string().trim().max(100).optional(),
   cursor:z.uuid().optional(),
@@ -121,6 +123,8 @@ export const clientUpdateSchema=clientCreateSchema.partial().extend({
 export type ClientUpdateInput=z.infer<typeof clientUpdateSchema>;
 export const clientListQuerySchema=z.strictObject({
  q:z.string().trim().max(100).optional(),status:clientStatusSchema.optional(),
+ sort:z.enum(["businessName","businessType","location","status"]).optional(),
+ direction:z.enum(["asc","desc"]).optional(),
  cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(30),
 });
 export type ClientListQuery=z.infer<typeof clientListQuerySchema>;

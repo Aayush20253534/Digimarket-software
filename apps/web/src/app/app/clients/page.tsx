@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -55,14 +55,14 @@ export default function ClientsPage(){
    if(!canRead){setLoading(false);return;}
    setLoading(true);
    try{
-     const q=new URLSearchParams({limit:"30"});
+     const q=new URLSearchParams({limit:"30",sort:sortBy,direction:descending?"desc":"asc"});
      if(search.trim())q.set("q",search.trim());
      if(filter)q.set("status",filter);
      if(cursor)q.set("cursor",cursor);
      const result=await request<Register>("/clients?"+q.toString());
      setRows(result.items);setNextCursor(result.nextCursor);setError("");
    }catch(e){setError(readable(e));}finally{setLoading(false);}
- },[canRead,request,search,filter,cursor]);
+ },[canRead,request,search,filter,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
  const open=async(id:string)=>{
    try{
@@ -106,10 +106,7 @@ export default function ClientsPage(){
      await open(selected.id);setMessage("Service added to client.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
- const sorted=useMemo(()=>[...rows].sort((a,b)=>{
-  const result=String(a[sortBy]??"").localeCompare(String(b[sortBy]??""),undefined,{numeric:true,sensitivity:"base"});
-  return descending?-result:result;
- }),[rows,sortBy,descending]);
+ const sorted=rows;
  if(!session)return <Spinner label="Checking client access…"/>;
  if(!canRead)return <><PageHeader title="Clients access denied"/><Notice kind="error">Your account cannot view client records.</Notice></>;
  return <div data-aw-module="clients" className="aw-module-root space-y-7">
@@ -129,9 +126,9 @@ export default function ClientsPage(){
            <select aria-label="Filter clients" className="field" value={filter} onChange={e=>{setFilter(e.target.value);setCursor(null);setHistory([]);}}>
              <option value="">All clients</option>{(["ACTIVE","PAUSED","ARCHIVED"] as const).map(x=><option key={x}>{x}</option>)}
            </select>
-<select className="field" aria-label="Sort clients on this page" value={sortBy} onChange={e=>setSortBy(e.target.value as typeof sortBy)}>
+<select className="field" aria-label="Sort clients on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setCursor(null);setHistory([]);}}>
   <option value="businessName">Business</option><option value="businessType">Category</option><option value="location">Location</option><option value="status">Status</option>
- </select><button type="button" className="btn-secondary" aria-label="Reverse client sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
+ </select><button type="button" className="btn-secondary" aria-label="Reverse client sort" onClick={()=>{setDescending(x=>!x);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading&&<Spinner label="Loading clients…"/>}
           {!loading&&!rows.length&&<p className="aw-directory-empty-line"><BriefcaseBusiness size={16}/> No matching clients. Add a client or convert a won lead.</p>}
