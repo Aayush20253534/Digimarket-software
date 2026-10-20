@@ -64,6 +64,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.locator(".aw-workspace")).toHaveAttribute("data-restyled", "true");
   await page.getByRole("button", { name: "New note" }).click();
   await page.getByRole("textbox", { name: "Note title" }).fill("CI note for design review");
+  await page.getByText("Typed notes (optional)").click();
   await page.getByRole("textbox", { name: "Typed notes" }).fill("## Brief\\n**Approve** the violet layout.");
   const noteCanvas=page.locator("canvas.aw-notes-canvas");
   await expect(noteCanvas).toBeVisible();
@@ -82,10 +83,20 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.mouse.up();
   await drawingPersisted;
   await expect(page.getByText("All changes saved")).toBeVisible({timeout:20000});
+  await page.getByRole("button",{name:"Expand canvas"}).click();
+  await expect(page.locator(".aw-notes-editor-expanded")).toBeVisible();
+  await expect(page.locator("canvas.aw-notes-canvas")).toBeVisible();
+  await page.getByRole("button",{name:"Exit full screen"}).click();
+  await expect(page.locator(".aw-notes-editor-expanded")).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Note title" })).toHaveValue("CI note for design review");
+  await page.getByText("Typed notes (optional)").click();
   await expect(page.getByRole("textbox", { name: "Typed notes" })).toHaveValue(/Approve/);
   await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
+  await page.getByRole("button",{name:"Undo"}).click();
+  await expect(page.getByRole("button",{name:"Redo"})).toBeEnabled();
+  await page.getByRole("button",{name:"Redo"}).click();
+  await expect(page.getByRole("button",{name:"Eraser"})).toBeVisible();
   await page.getByRole("button", { name: "Preview" }).click();
   await expect(page.getByText("Approve", {exact:false}).first()).toBeVisible();
   await page.getByRole("button", { name: "Write" }).click();
@@ -95,7 +106,7 @@ test("login, first password change, MFA, admin user management and employee perm
   // Phase 8: small/mobile/tablet/desktop overflow and functional navigation gates.
   for(const width of [320,375,390,768,1024,1440]){
     await page.setViewportSize({width,height:850});
-    for(const route of ["notes","finance","billing","settings"]){
+    for(const route of ["notes","leads","clients","finance","billing","settings"]){
       await page.goto("/app/"+route);
       await expect(page.locator(".aw-workspace")).toHaveAttribute("data-restyled","true");
       const sizes=await page.evaluate(()=>({
@@ -252,7 +263,11 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("cell", { name: "₹150.2545" })).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
+  await expect(page.getByRole("table",{name:"Leads directory"})).toBeVisible();
+  await expect(page.getByRole("combobox",{name:"Sort leads on this page"})).toBeVisible();
+  await expect(page.getByRole("dialog",{name:"Add lead form"})).toHaveCount(0);
   await page.getByRole("button", { name: "Add lead" }).click();
+  await expect(page.getByRole("dialog",{name:"Add lead form"})).toBeVisible();
   await page.getByLabel("Business name", { exact: true }).fill("Cafe Demo Lead");
   await page.getByLabel("Phone", { exact: true }).fill("9876543210");
   await page.getByRole("button", { name: "Create lead" }).click();
@@ -282,6 +297,9 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByText("Won lead converted into a client.")).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Clients" }).click();
   await expect(page.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
+  await expect(page.getByRole("table",{name:"Clients directory"})).toBeVisible();
+  await expect(page.getByRole("combobox",{name:"Sort clients on this page"})).toBeVisible();
+  await expect(page.getByRole("dialog",{name:"Add client form"})).toHaveCount(0);
   await page.getByRole("row", { name: /Cafe Demo Lead/ }).getByRole("button", { name: "Open" }).click();
   await expect(page.getByRole("heading", { name: "Client: Cafe Demo Lead" })).toBeVisible();
   await page.getByLabel("Service name").fill("Social Media Management");
@@ -352,6 +370,11 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Password", { exact: true }).fill(employeePermanent);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/app\/dashboard/);
+  await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
+  for(const section of ["personal-pending","personal-completed","personal-overdue"]){
+    await expect(page.getByTestId(section)).toBeVisible();
+  }
+  await expect(page.getByTestId("dashboard-kpis")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Team & accounts" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Files & assets" })).toHaveCount(0);
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income, expenses & billing" }).click();
