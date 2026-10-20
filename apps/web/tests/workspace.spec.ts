@@ -252,6 +252,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("cell", { name: "₹150.2545" })).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
+  await page.getByRole("button", { name: "Add lead" }).click();
   await page.getByLabel("Business name", { exact: true }).fill("Cafe Demo Lead");
   await page.getByLabel("Phone", { exact: true }).fill("9876543210");
   await page.getByRole("button", { name: "Create lead" }).click();
@@ -281,7 +282,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByText("Won lead converted into a client.")).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Clients" }).click();
   await expect(page.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /Cafe Demo Lead/ }).first().click();
+  await page.getByRole("row", { name: /Cafe Demo Lead/ }).getByRole("button", { name: "Open" }).click();
   await expect(page.getByRole("heading", { name: "Client: Cafe Demo Lead" })).toBeVisible();
   await page.getByLabel("Service name").fill("Social Media Management");
   await page.getByRole("button", { name: "Add service" }).click();
@@ -310,6 +311,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("button", { name: "CI Brand Designs", exact: true })).toHaveCount(0);
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
+  await page.getByRole("button", { name: "Add lead" }).click();
   await page.locator("#new-businessName").fill("Cafe Demo Lead Other");
   await page.locator("#new-phone").fill("98765 43210");
   const createdDuplicateLead=page.waitForResponse(response =>
@@ -372,6 +374,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Potential duplicates" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add lead" }).click();
   await page.getByLabel("Business name", { exact: true }).fill("Employee Prospect");
   await page.getByRole("button", { name: "Create lead" }).click();
   await expect(page.getByRole("heading", { name: "Lead: Employee Prospect" })).toBeVisible();
