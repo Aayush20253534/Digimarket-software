@@ -104,7 +104,7 @@ export class AssetService {
    };
    const rows=await this.db.asset.findMany({where,take:input.limit+1,
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
-     orderBy:[{createdAt:"desc"},{id:"desc"}],
+     orderBy:[{[({name:"filename",date:"createdAt",size:"bytes",type:"contentType"} as const)[input.sort]]:input.direction},{id:input.direction}],
      select:{id:true,filename:true,contentType:true,resourceType:true,bytes:true,
        status:true,version:true,clientId:true,folderId:true,createdAt:true,
        client:{select:{businessName:true}},uploader:{select:{displayName:true}}}});

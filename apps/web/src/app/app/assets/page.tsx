@@ -67,7 +67,7 @@ export default function AssetsPage(){
    if(!canRead){setLoading(false);return;}
    setLoading(true);
    try{
-     const q=new URLSearchParams({limit:"30",status:filter});
+     const q=new URLSearchParams({limit:"30",status:filter,sort,direction:reverse?"desc":"asc"});
      if(search.trim())q.set("q",search.trim());
      if(filterClient)q.set("clientId",filterClient);
      if(cursor)q.set("cursor",cursor);
@@ -78,7 +78,7 @@ export default function AssetsPage(){
      ]);
      setItems(result.items);setFolders(folderList.folders);setNextCursor(result.nextCursor);setError("");
    }catch(e){setError(errText(e));}finally{setLoading(false);}
- },[canRead,request,filter,search,filterClient,cursor,folderId]);
+ },[canRead,request,filter,search,filterClient,cursor,folderId,sort,reverse]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{
    if(!canClients)return;
@@ -243,8 +243,8 @@ export default function AssetsPage(){
    <div className="aw-drive-search"><Search size={17}/><input aria-label="Search assets" value={search} placeholder="Search this folder…" onChange={e=>{setSearch(e.target.value);setCursor(null);}}/></div>
    <select aria-label="Asset status" className="aw-drive-select" value={filter} onChange={e=>{setFilter(e.target.value as "ACTIVE"|"ARCHIVED");setCursor(null);}}><option value="ACTIVE">Active files</option><option value="ARCHIVED">Archived files</option></select>
    {canClients&&<select aria-label="Filter assets by client" className="aw-drive-select" value={filterClient} onChange={e=>{setFilterClient(e.target.value);setCursor(null);}}><option value="">All clients</option>{clients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}</select>}
-   <select className="aw-drive-select" aria-label="Sort assets" value={sort} onChange={e=>setSort(e.target.value as typeof sort)}><option value="name">Name</option><option value="date">Date</option><option value="type">Type</option><option value="size">Size</option></select>
-   <button type="button" className="aw-drive-icon-button" aria-label="Reverse sort" title="Reverse sort" onClick={()=>setReverse(x=>!x)}><ArrowUpDown size={17}/></button>
+   <select className="aw-drive-select" aria-label="Sort assets" value={sort} onChange={e=>{setSort(e.target.value as typeof sort);setCursor(null);}}><option value="name">Name</option><option value="date">Date</option><option value="type">Type</option><option value="size">Size</option></select>
+   <button type="button" className="aw-drive-icon-button" aria-label="Reverse sort" title="Reverse sort" onClick={()=>{setReverse(x=>!x);setCursor(null);}}><ArrowUpDown size={17}/></button>
    <div className="aw-drive-view-switch"><button type="button" aria-label="Grid view" aria-pressed={view==="grid"} onClick={()=>setView("grid")}><Grid2X2 size={18}/></button><button type="button" aria-label="List view" aria-pressed={view==="list"} onClick={()=>setView("list")}><List size={18}/></button></div>
   </div>
   <nav className="aw-drive-path" aria-label="Folder path">

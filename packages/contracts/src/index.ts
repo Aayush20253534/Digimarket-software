@@ -152,6 +152,8 @@ export const assetListSchema=z.strictObject({
  q:z.string().trim().max(100).optional(),
  clientId:z.uuid().optional(),
  status:z.enum(["ACTIVE","ARCHIVED"]).default("ACTIVE"),
+ sort:z.enum(["name","date","size","type"]).default("date"),
+ direction:z.enum(["asc","desc"]).default("desc"),
  cursor:z.uuid().optional(),
  limit:z.coerce.number().int().min(1).max(100).default(30),
 });
