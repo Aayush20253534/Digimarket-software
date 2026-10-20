@@ -73,7 +73,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(drawer).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused();
   await page.getByRole("button", { name: "Open menu" }).click();
-  await drawer.getByRole("link", { name: "Overview" }).click();
+  await drawer.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Overview", exact: true }).click();
   await expect(drawer).not.toBeVisible();
   await expect(page).toHaveURL(/\/app\/dashboard/);
   const mobileWidth = await page.evaluate(() => ({
