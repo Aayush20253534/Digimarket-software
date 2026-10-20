@@ -1,9 +1,9 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Archive, ArrowLeft, ArrowUpDown, Check, ChevronRight, Download, Eye, File, FileImage, FileText, FileVideo, Folder, FolderPlus, Grid2X2, Home, List, MoreVertical, Palette, Pencil, Plus, RefreshCw, Search, Trash2, Upload, X } from "lucide-react";
+import { Archive, ArrowLeft, ArrowUpDown, ChevronRight, Download, Eye, File, FileImage, FileText, FileVideo, Folder, FolderPlus, Grid2X2, Home, List, MoreVertical, Pencil, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
-import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
+import { FormField, Notice, Spinner } from "@/components/ui";
 
 type Asset={id:string;filename:string;contentType:string;bytes:number;resourceType:string;
  status:"ACTIVE"|"ARCHIVED";version:number;createdAt:string;clientId:string|null;folderId?:string|null;
@@ -31,7 +31,6 @@ export default function AssetsPage(){
  const [newFolderColor,setNewFolderColor]=useState("#A56CE4");
  const [editedName,setEditedName]=useState("");
  const [destination,setDestination]=useState("");
- const [renaming,setRenaming]=useState<string|null>(null);
  const [clients,setClients]=useState<Client[]>([]);
  const [files,setFiles]=useState<File[]>([]);
  const fileInput=useRef<HTMLInputElement>(null);
@@ -124,7 +123,7 @@ export default function AssetsPage(){
  async function renameFolder(folder:FolderItem,updates:{name?:string;color?:string;parentId?:string|null}){
    setBusy(true);setError("");
    try{await request("/asset-folders/"+folder.id,{method:"PUT",body:{...updates,version:folder.version}});
-    setRenaming(null);await load();setMessage("Folder updated.");}catch(e){setError(errText(e));}finally{setBusy(false);}
+    await load();setMessage("Folder updated.");}catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function organizeFile(e:FormEvent){
    e.preventDefault();if(!selected)return;
