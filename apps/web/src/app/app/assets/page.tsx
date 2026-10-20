@@ -203,7 +203,7 @@ export default function AssetsPage(){
              <input type="color" aria-label={"Change "+folder.name+" color"} title="Change folder color" value={folder.color}
                onChange={e=>void renameFolder(folder,{color:e.target.value})}/>
               </>}
-            </div>}
+            </div>
             {renaming===folder.id&&<form className="aw-drive-rename" onSubmit={e=>{e.preventDefault();
               const input=e.currentTarget.elements.namedItem("folder-name") as HTMLInputElement|null;
               if(input)void renameFolder(folder,{name:input.value});}}>
