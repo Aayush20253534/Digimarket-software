@@ -147,11 +147,12 @@ export default function ContentPage(){
  }),[period,view]);
  if(!session)return <Spinner label="Checking content access…"/>;
  if(!canRead)return <><PageHeader title="Content calendar access denied"/><Notice kind="error">Content read permission required.</Notice></>;
- return <div className="space-y-6">
+ return <div data-aw-module="content" className="aw-module-root space-y-6">
   <PageHeader eyebrow="Campaign planning" title="Content calendar"
     description="Plan and review content without leaving the workspace. Publishing is recorded manually after approval."
     actions={<button type="button" className="btn-secondary" onClick={()=>void load()}>
       <RefreshCw className="h-4 w-4"/> Refresh</button>}/>
+  {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Editorial planning</span><span className="aw-module-count">{rows.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="list"?"All content":view==="week"?"Week view":"Month view"}</span></div>}
   {error&&<Notice kind="error">{error}</Notice>}
   {success&&<Notice kind="success">{success}</Notice>}
   <Card title="Editorial schedule" description="Browse month, week or all content in a list. Draft ideas without publish dates appear in the list view.">

@@ -103,9 +103,10 @@ export default function TasksPage(){
  }
  if(!session)return <Spinner label="Checking task permissions…"/>;
  if(!canRead)return <><PageHeader title="Task access denied"/><Notice kind="error">Task read permission required.</Notice></>;
- return <div className="space-y-6">
+ return <div data-aw-module="tasks" className="aw-module-root space-y-6">
   <PageHeader eyebrow="Delivery operations" title="Tasks & recurring work"
    description="Assign team work, maintain checklists, review progress and schedule automatic occurrences."/>
+  {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Task management</span><span className="aw-module-count">{tasks.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="mine"?"My tasks":"Team tasks"}</span></div>}
   {error&&<Notice kind="error">{error}</Notice>}
   {message&&<Notice kind="success">{message}</Notice>}
   <Card title="Task register" description="Your tasks are private to participants. Team-wide access requires management permissions.">

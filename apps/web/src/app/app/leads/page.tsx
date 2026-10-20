@@ -185,16 +185,17 @@ export default function LeadsPage(){
  }
  if(!session)return <Spinner label="Checking CRM access…"/>;
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
- return <div className="space-y-7">
+ return <div data-aw-module="leads" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
      description="Shared agency prospects, ownership, pipeline stages and follow-ups. Won leads can be converted to client records by authorized staff."
      actions={<div className="flex gap-2">
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
+   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage||"All stages"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
-   <div className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+   <div className="aw-two-col">
      <div className="space-y-5">
        <Card title="Lead register" description="Latest leads first. Search and filter are scoped to your organization.">
          <div className="flex flex-wrap gap-2">
