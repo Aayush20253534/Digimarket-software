@@ -59,6 +59,8 @@ try{
   contentType:"image/png",resourceType:"IMAGE",format:"png",bytes:200,
  }});
  const edited=await content.update(author,draft.id,{version:1,assetIds:[asset.id],caption:"Teaser v2"});
+ const fileBlind=actor(writer.id,org.id,["content.read"],["EMPLOYEE"]);
+ assert.equal((await content.detail(fileBlind,draft.id)).assets.length,0);
  assert.equal(edited.status,"DRAFT");assert.equal(edited.revision,2);
  await assert.rejects(()=>content.update(author,draft.id,{version:1,caption:"Old"}),fail(409));
  const policy=await db.approvalPolicy.create({data:{organizationId:org.id,category:"CONTENT",

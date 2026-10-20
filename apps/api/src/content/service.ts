@@ -70,7 +70,7 @@ export class ContentService {
   }
   async detail(a:Principal,id:string){
     await this.existing(a,id);
-    return this.db.contentPost.findFirstOrThrow({where:{id,organizationId:a.organizationId},
+    const post=await this.db.contentPost.findFirstOrThrow({where:{id,organizationId:a.organizationId},
       include:{client:{select:{businessName:true}},owner:{select:{displayName:true}},
         assets:{orderBy:{sortOrder:"asc"},select:{assetId:true,
           asset:{select:{filename:true,status:true}}}},
@@ -78,6 +78,8 @@ export class ContentService {
           decision:{select:{outcome:true,reason:true}}}},
         revisions:{orderBy:{revision:"desc"},take:30,select:{revision:true,createdAt:true,actorId:true}},
       }});
+    // Content access does not imply Cloudinary asset access.
+    return a.permissions.has("assets.read")?post:{...post,assets:[]};
   }
   async create(a:Principal,input:ContentCreateInput){
     grant(a,"content.create");grant(a,"content.read");
