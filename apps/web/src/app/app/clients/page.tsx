@@ -5,7 +5,7 @@ import Link from "next/link";
 import { BriefcaseBusiness, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
-import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
+import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
@@ -122,8 +122,8 @@ export default function ClientsPage(){
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Client directory" description="Records are scoped to the signed-in agency.">
-         <div className="flex flex-wrap gap-2">
+       <Card title="Client directory" description="Search and manage authorized business records.">
+         <div className="aw-client-toolbar">
            <input aria-label="Search clients" className="field min-w-[190px] flex-1" placeholder="Search business, city, phone, email"
              value={search} onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}}/>
            <select aria-label="Filter clients" className="field" value={filter} onChange={e=>{setFilter(e.target.value);setCursor(null);setHistory([]);}}>
@@ -134,14 +134,14 @@ export default function ClientsPage(){
  </select><button type="button" className="btn-secondary" aria-label="Reverse client sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading&&<Spinner label="Loading clients…"/>}
-          {!loading&&!rows.length&&<EmptyState icon={BriefcaseBusiness} title="No matching clients" description="Add a client or convert a won lead."/>}
+          {!loading&&!rows.length&&<p className="aw-directory-empty-line"><BriefcaseBusiness size={16}/> No matching clients. Add a client or convert a won lead.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Clients directory">
             <thead><tr><th>Business</th><th>Type</th><th>Phone</th><th>Email</th><th>Location</th><th>Status</th><th>Details</th></tr></thead>
-            <tbody>{sorted.map(c=><tr key={c.id} className={selected?.id===c.id?"aw-register-selected":""}>
+            <tbody>{sorted.map(c=><tr key={c.id} className={"aw-client-row cursor-pointer "+(selected?.id===c.id?"aw-register-selected":"")} onClick={()=>void open(c.id)} onKeyDown={e=>{if(e.key==="Enter")void open(c.id);}} tabIndex={0}>
              <td><strong>{c.businessName}</strong>{c.sourceLeadId&&<span>Converted from lead</span>}</td>
              <td>{c.businessType||"—"}</td><td>{c.phone||"—"}</td><td>{c.email||"—"}</td>
              <td>{c.location||"—"}</td><td><StatusBadge status={c.status}/></td>
-             <td><button type="button" className="aw-register-open" onClick={()=>void open(c.id)}>Open</button></td>
+             <td><button type="button" className="aw-register-open" onClick={e=>{e.stopPropagation();void open(c.id);}}>Open</button></td>
             </tr>)}</tbody></table></div>
          <div className="mt-4 flex justify-between">
            <button className="btn-secondary" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button><span className="aw-register-page">Page {history.length+1}</span>
@@ -161,7 +161,10 @@ export default function ClientsPage(){
          </form>
        </Card></div>}
      </div>
-     <div className="space-y-5">
+     <div className={selected?"aw-directory-details-shade":""} role={selected?"dialog":undefined} aria-modal={selected?"true":undefined} aria-label={selected?"Client details":undefined}>
+       {selected&&<button type="button" className="aw-directory-details-backdrop" aria-label="Close client details" onClick={()=>setSelected(null)}/>}
+       <div className={selected?"aw-directory-details-panel":"hidden"}>
+       {selected&&<div className="aw-directory-details-header"><strong>Client details</strong><button type="button" className="btn-secondary" onClick={()=>setSelected(null)}>Close</button></div>}
        {selected?<Card title={"Client: "+selected.businessName} description={"Profile version "+selected.version}>
          {selected.sourceLead&&<p className="mb-4 text-sm">Source lead: <Link href="/app/leads" className="text-indigo-700 underline">{selected.sourceLead.businessName}</Link></p>}
          {canEdit?<form onSubmit={save} className="space-y-3">
@@ -214,6 +217,7 @@ export default function ClientsPage(){
            <button disabled={busy} className="btn-secondary">Add service</button>
          </form>}
        </Card>}
+       </div>
      </div>
    </div>
  </div>;
