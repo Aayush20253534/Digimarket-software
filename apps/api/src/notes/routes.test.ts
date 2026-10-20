@@ -58,6 +58,21 @@ describe("private notes API isolation and version protection",()=>{
   expect(good.status).toBe(201);
   expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,organizationId,ownerId:userId}});
  });
+ it("accepts modern pen pressure and highlighter strokes while preserving legacy points",async()=>{
+  const ink=JSON.stringify([
+   {color:"#123ABC",width:3,points:[[.1,.2],[.2,.4]]},
+   {color:"#FFE080",width:20,tool:"highlighter",points:[[.1,.1,.5],[.5,.5,.9]]},
+   {color:"#243456",width:4,tool:"pencil",points:[[.33,.42]]}
+  ]);
+  db.personalNote.create.mockResolvedValue({id:noteId,...valid,strokes:ink,version:1});
+  const ok=await request(app()).post("/api/v1/notes").set("Authorization","Bearer token")
+   .send({...valid,strokes:ink});
+  expect(ok.status).toBe(201);
+  expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,strokes:ink,organizationId,ownerId:userId}});
+  const invalid=await request(app()).post("/api/v1/notes").set("Authorization","Bearer token")
+   .send({...valid,strokes:JSON.stringify([{color:"#123ABC",width:3,tool:"pen",points:[[.1,.2,null]]}])});
+  expect(invalid.status).toBe(422);
+ });
  it("uses compare-and-swap revisions for updates",async()=>{
   db.personalNote.updateMany.mockResolvedValue({count:0});
   db.personalNote.findFirst.mockResolvedValue({id:noteId});

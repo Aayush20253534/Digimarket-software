@@ -24,6 +24,15 @@ try{
   db.user.create({data:{organizationId:outside.id,loginId:"tasks-outsider",displayName:"Elsewhere",status:"ACTIVE"}}),
  ]);
  const mgr=actor(admin.id,org.id,perms);
+ const founder=actor(other.id,org.id,perms);
+ founder.roles=["FOUNDER"];
+ await assert.rejects(()=>tasks.create(founder,{title:"Unauthorized creation",priority:"LOW",
+   assigneeIds:[staff.id]}),failed(403));
+ await assert.rejects(()=>tasks.createRecurrence(founder,{
+   title:"Unauthorized recurring work",priority:"MEDIUM",frequency:"DAILY",interval:1,
+   timezone:"UTC",startAt:new Date().toISOString(),dueOffsetDays:0,assigneeIds:[staff.id]
+ }),failed(403));
+
  const staffActor=actor(staff.id,org.id,["tasks.read","tasks.update.own","tasks.comment"]);
  const readOnly=actor(other.id,org.id,["tasks.read","tasks.update.own","tasks.comment"]);
  const stranger=actor(foreign.id,outside.id,perms);
