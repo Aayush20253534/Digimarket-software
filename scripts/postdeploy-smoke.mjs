@@ -20,7 +20,7 @@ await check(api+"/api/v1/ready",(r,b)=>r.ok&&b?.data?.database==="ok","Live data
 await check(api+"/api/v1/me",r=>r.status===401,"Auth gate rejects anonymous access");
 await check(api+"/api/v1/notes",r=>r.status===401,"Notes route deployed and rejects anonymous access");
 await check(api+"/api/v1/ops/health",r=>r.status===404,"Operational stats are private");
-await check(web+"/",(r,b)=>r.ok&&typeof b==="string"&&b.includes("DigiMarket"),
+await check(web+"/",(r,b)=>r.ok&&typeof b==="string"&&b.includes("AmplifyWorld Workspace"),
  "Website responds");
 await check(web+"/api/v1/me",r=>r.status===401,"Frontend BFF rejects anonymous requests");
 await check(web+"/api/v1/notes",r=>r.status===401,"Frontend Notes proxy matches backend deployment");
