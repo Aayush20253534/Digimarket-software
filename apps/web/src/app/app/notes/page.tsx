@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
-import { BookOpen, Check, Cloud, CloudOff, Eraser, FilePlus2, NotebookPen, PenLine, RefreshCw, Save, Trash2, Undo2 } from "lucide-react";
+import { BookOpen, Check, Cloud, CloudOff, Eraser, FilePlus2, NotebookPen, PenLine, RefreshCw, Maximize2, Minimize2, Redo2, Save, Trash2, Undo2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { AWButton, AWNotice, AWPageHeader } from "@/components/aw-ui";
@@ -56,6 +56,8 @@ export default function NotesPage(){
  const [preview,setPreview]=useState(false);
  const [pen,setPen]=useState("#D18CFF"),[width,setWidth]=useState(3);
  const [drawing,setDrawing]=useState<Stroke|null>(null);
+ const [expanded,setExpanded]=useState(false),[eraser,setEraser]=useState(false);
+ const redoStack=useRef<Stroke[]>([]);
  const drawingRef=useRef<Stroke|null>(null),canvasRef=useRef<HTMLCanvasElement>(null);
  const inFlight=useRef(false), dirty=useRef(false), selectedRef=useRef<string|null>(null);
  const [actionBusy,setActionBusy]=useState(false);
@@ -93,6 +95,7 @@ export default function NotesPage(){
   try{
    const note=await request<Note>("/notes/"+id);
    selectedRef.current=id;setSelected(id);versionRef.current=note.version;
+   redoStack.current=[];
    const next={title:note.title,body:note.body,strokes:note.strokes};
    dirty.current=false;draftRef.current=next;setDraft(next);setSaveState("saved");
    setDrawing(null);drawingRef.current=null;
@@ -123,7 +126,7 @@ export default function NotesPage(){
    const note=await request<Note>("/notes",{method:"POST",body:blank});
    await listNotes();
    selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
-   draftRef.current=blank;setDraft(blank);dirty.current=false;setSaveState("saved");setPreview(false);
+   draftRef.current=blank;setDraft(blank);dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
  const saveConflictCopy=async()=>{
@@ -153,13 +156,25 @@ export default function NotesPage(){
   return [Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),
    Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height))] as [number,number];
  };
+ const eraseAt=(point:[number,number])=>{
+  const strokes=parseStrokes(draftRef.current.strokes);
+  const radius=Math.max(.016,width/W*3);
+  for(let i=strokes.length-1;i>=0;i--){
+   if(strokes[i].points.some(p=>Math.hypot(p[0]-point[0],p[1]-point[1])<radius)){
+    redoStack.current=[];strokes.splice(i,1);
+    setEdited({...draftRef.current,strokes:JSON.stringify(strokes)});break;
+   }
+  }
+ };
  const down=(e:PointerEvent<HTMLCanvasElement>)=>{
   if(!selected||actionBusy||e.button!==0)return;
   e.currentTarget.setPointerCapture(e.pointerId);
+  if(eraser){eraseAt(mark(e));return;}
   const s:Stroke={color:pen,width,points:[mark(e)]};
   drawingRef.current=s;setDrawing(s);
  };
  const move=(e:PointerEvent<HTMLCanvasElement>)=>{
+  if(eraser){if(e.buttons||e.pressure>0)eraseAt(mark(e));return;}
   const stroke=drawingRef.current;
   if(!stroke)return;
   const next={...stroke,points:[...stroke.points,mark(e)]};
@@ -169,12 +184,25 @@ export default function NotesPage(){
   const s=drawingRef.current;if(!s)return;
   drawingRef.current=null;setDrawing(null);
   const all=[...parseStrokes(draftRef.current.strokes),s];
+  redoStack.current=[];
   setEdited({...draftRef.current,strokes:JSON.stringify(all)});
  };
  const undo=()=>{
-  const all=parseStrokes(draftRef.current.strokes);all.pop();
+  const all=parseStrokes(draftRef.current.strokes),last=all.pop();
+  if(!last)return;redoStack.current.push(last);
   setEdited({...draftRef.current,strokes:JSON.stringify(all)});
  };
+ const redo=()=>{
+  const last=redoStack.current.pop();if(!last)return;
+  setEdited({...draftRef.current,strokes:JSON.stringify([...parseStrokes(draftRef.current.strokes),last])});
+ };
+ useEffect(()=>{
+  if(!expanded)return;
+  const before=document.body.style.overflow;document.body.style.overflow="hidden";
+  const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setExpanded(false);};
+  window.addEventListener("keydown",onKey);
+  return()=>{document.body.style.overflow=before;window.removeEventListener("keydown",onKey);};
+ },[expanded]);
  const insert=(text:string)=>{
   const el=document.getElementById("aw-note-body") as HTMLTextAreaElement|null;
   if(!el)return;
@@ -199,7 +227,7 @@ export default function NotesPage(){
       <strong>{n.title}</strong><span>{new Date(n.updatedAt).toLocaleString()}</span>
      </button>)}
    </aside>
-   <div className="aw-notes-editor">
+   <div className={"aw-notes-editor"+(expanded?" aw-notes-editor-expanded":"")}>
     {!selected?<div className="aw-notes-empty"><NotebookPen size={32}/><p>Choose a saved note or create a new one.</p></div>:
     <>
      <div className="aw-notes-toolbar">
@@ -208,6 +236,11 @@ export default function NotesPage(){
        {saveState==="saved"?"All changes saved":saveState==="saving"?"Saving…":saveState==="conflict"?"Save conflict":"Unsaved changes"}
       </span>
       <div className="aw-notes-actions">
+       <button type="button" className="aw-notes-expand" aria-label={expanded?"Exit full screen":"Expand canvas"} onClick={()=>setExpanded(v=>!v)}>
+        {expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>} {expanded?"Exit full screen":"Expand canvas"}
+       </button>
+       {expanded&&<button type="button" onClick={()=>{setExpanded(false);void create();}} disabled={actionBusy}><FilePlus2 size={16}/> New note</button>}
+       {expanded&&<button type="button" onClick={()=>setExpanded(false)}><BookOpen size={16}/> Notes list</button>}
        {saveState==="conflict"&&<button type="button" onClick={()=>void saveConflictCopy()} disabled={actionBusy}>Save recovered copy</button>}
        <button type="button" onClick={()=>void flush()} disabled={saveState==="saved"||saveState==="saving"||saveState==="conflict"}><Save size={16}/> Save</button>
        <button type="button" onClick={()=>void open(selected,true)} disabled={saveState!=="saved"} aria-label="Reload note"><RefreshCw size={16}/></button>
@@ -218,6 +251,24 @@ export default function NotesPage(){
      <input id="aw-note-title" aria-label="Note title" maxLength={180} value={draft.title}
        onChange={e=>setEdited({...draftRef.current,title:e.target.value})}
        className="aw-notes-title" placeholder="Untitled note"/>
+     <div className="aw-notes-draw-head">
+      <div><h2><PenLine size={18}/> Handwriting canvas</h2><p>Use a mouse, finger or stylus. The drawing is saved together with the text.</p></div>
+      <div className="aw-notes-pen">
+       <label htmlFor="aw-pen-color">Ink</label><input id="aw-pen-color" type="color" value={pen} onChange={e=>setPen(e.target.value)}/>
+       <label htmlFor="aw-pen-width">Size</label><input id="aw-pen-width" type="range" min={1} max={14} value={width} onChange={e=>setWidth(Number(e.target.value))}/>
+       <button type="button" aria-pressed={!eraser} onClick={()=>setEraser(false)}><PenLine size={16}/> Pen</button>
+       <button type="button" aria-pressed={eraser} onClick={()=>setEraser(true)}><Eraser size={16}/> Eraser</button>
+       <button type="button" onClick={undo} disabled={!parseStrokes(draft.strokes).length}><Undo2 size={16}/> Undo</button>
+       <button type="button" onClick={redo} disabled={!redoStack.current.length}><Redo2 size={16}/> Redo</button>
+       <button type="button" onClick={()=>{redoStack.current=[];setEdited({...draftRef.current,strokes:"[]"});}} disabled={!parseStrokes(draft.strokes).length}>
+        <Eraser size={16}/> Clear
+       </button>
+      </div>
+     </div>
+     <canvas ref={canvasRef} className="aw-notes-canvas" width={W} height={H}
+       role="img" aria-label="Handwriting canvas. Draw with mouse, touch or stylus."
+       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}/>
+     {!expanded&&<details className="aw-notes-typed"><summary><BookOpen size={16}/> Typed notes (optional)</summary>
      <div className="aw-notes-tabs" role="group" aria-label="Text and preview">
       <button type="button" aria-pressed={!preview} onClick={()=>setPreview(false)}>Write</button>
       <button type="button" aria-pressed={preview} onClick={()=>setPreview(true)}>Preview</button>
@@ -229,20 +280,7 @@ export default function NotesPage(){
        <textarea id="aw-note-body" aria-label="Typed notes" className="aw-notes-textarea" rows={11}
         value={draft.body} onChange={e=>setEdited({...draftRef.current,body:e.target.value})}
         placeholder="Write notes here. **Bold**, *italic*, and # headings are supported."/>}
-     <div className="aw-notes-draw-head">
-      <div><h2><PenLine size={18}/> Handwriting canvas</h2><p>Use a mouse, finger or stylus. The drawing is saved together with the text.</p></div>
-      <div className="aw-notes-pen">
-       <label htmlFor="aw-pen-color">Ink</label><input id="aw-pen-color" type="color" value={pen} onChange={e=>setPen(e.target.value)}/>
-       <label htmlFor="aw-pen-width">Size</label><input id="aw-pen-width" type="range" min={1} max={14} value={width} onChange={e=>setWidth(Number(e.target.value))}/>
-       <button type="button" onClick={undo} disabled={!parseStrokes(draft.strokes).length}><Undo2 size={16}/> Undo</button>
-       <button type="button" onClick={()=>setEdited({...draftRef.current,strokes:"[]"})} disabled={!parseStrokes(draft.strokes).length}>
-        <Eraser size={16}/> Clear
-       </button>
-      </div>
-     </div>
-     <canvas ref={canvasRef} className="aw-notes-canvas" width={W} height={H}
-       role="img" aria-label="Handwriting canvas. Draw with mouse, touch or stylus."
-       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}/>
+     </details>}
     </>}
    </div>
   </div>
