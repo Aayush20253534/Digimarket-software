@@ -11,7 +11,7 @@ if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarke
  throw new Error("Module 14 runs only against disposable digimarket_ci PostgreSQL");
 const db=createDatabaseClient(),service=new ProfitabilityService(db),billing=new BillingService(db);
 const rights=["profitability.read","profitability.manage","finance.read.all","clients.read","invoices.read",
- "invoices.draft","invoices.issue","finance.approve","payments.read","payments.record","payments.verify"];
+ "invoices.draft","invoices.issue","invoices.manage","finance.approve","payments.read","payments.record","payments.verify"];
 const principal=(userId:string,organizationId:string,permissions=rights):Principal=>({
  userId,organizationId,sessionId:"module14-ci",roles:["ADMIN"],permissions:new Set(permissions)});
 const fail=(code:number)=>(e:{status?:number})=>e.status===code;
@@ -126,6 +126,15 @@ try{
  await service.setExpenseAllocations(admin,exp.id,{version:1,allocations:[]});
  assert.equal((await service.report(admin,{from:when,to:when})).totals.unallocatedExpense,"100.0000");
  assert.equal(await db.costAllocation.count({where:{expenseId:exp.id}}),0);
+ const races=await Promise.allSettled([
+   service.setExpenseAllocations(admin,exp.id,{version:2,allocations:[
+     {clientId:first.id,amount:"35"}]}),
+   service.setExpenseAllocations(admin,exp.id,{version:2,allocations:[
+     {clientId:second.id,amount:"45"}]}),
+ ]);
+ assert.equal(races.filter(x=>x.status==="fulfilled").length,1);
+ assert.equal(await db.costAllocation.count({where:{expenseId:exp.id}}),1);
+ assert.equal((await db.financialTransaction.findUniqueOrThrow({where:{id:exp.id}})).costAllocationVersion,3);
  assert.equal(await db.revenueRecognition.count({where:{invoiceId:draft.id}}),2);
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,entityType:"RevenueRecognition"}}))>=2);
  console.info("Module 14 PASS: scoped profit, billed/cash/recognition separation, tax, reallocation caps and CAS, reversals, cross-org isolation, audit and CSV");

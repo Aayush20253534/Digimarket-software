@@ -195,7 +195,9 @@ export class ProfitabilityService{
     const m=data.get(client.id)!;
     const contribution=m.recognizedRevenue.minus(m.directCosts);
     return {clientId:client.id,clientName:client.businessName,status:client.status,
-      ...Object.fromEntries(Object.entries(m).map(([k,v])=>[k,money(v)])),
+      billedNet:money(m.billedNet),billedTax:money(m.billedTax),
+      billedGross:money(m.billedGross),collectedCash:money(m.collectedCash),
+      recognizedRevenue:money(m.recognizedRevenue),directCosts:money(m.directCosts),
       contribution:money(contribution),
       marginPercent:m.recognizedRevenue.gt(0)?
         contribution.div(m.recognizedRevenue).times(100).toDecimalPlaces(2).toFixed(2):null};
@@ -205,7 +207,11 @@ export class ProfitabilityService{
     a[k]=a[k].plus(dec(v[k]));return a;},
     {billedNet:dec("0"),billedTax:dec("0"),billedGross:dec("0"),
       collectedCash:dec("0"),recognizedRevenue:dec("0"),directCosts:dec("0"),contribution:dec("0")});
-  const totalMetrics={...Object.fromEntries(Object.entries(totals).map(([k,v])=>[k,money(v)])),
+  const totalMetrics={
+    billedNet:money(totals.billedNet),billedTax:money(totals.billedTax),
+    billedGross:money(totals.billedGross),collectedCash:money(totals.collectedCash),
+    recognizedRevenue:money(totals.recognizedRevenue),directCosts:money(totals.directCosts),
+    contribution:money(totals.contribution),
     marginPercent:totals.recognizedRevenue.gt(0)?
       totals.contribution.div(totals.recognizedRevenue).times(100).toDecimalPlaces(2).toFixed(2):null,
     unallocatedExpense:period.clientId?null:money(unallocated),
