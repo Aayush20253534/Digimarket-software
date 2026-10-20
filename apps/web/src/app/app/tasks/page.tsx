@@ -70,6 +70,7 @@ export default function TasksPage(){
   catch(e){setError(err(e));}
  },[canRepeat,request]);
  useEffect(()=>{void load();},[load]);
+  useEffect(()=>{const id=new URLSearchParams(window.location.search).get("task");if(id&&/^[0-9a-f-]{36}$/i.test(id))void open(id);},[open]);
  useEffect(()=>{
   if(canCreate)void request<User[]>("/tasks/team").then(setStaff).catch(()=>{});
   if(grants.includes("projects.read"))void request<Result<Project>>("/projects?limit=100").then(r=>setProjects(r.items)).catch(()=>{});

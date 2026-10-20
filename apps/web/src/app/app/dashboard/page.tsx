@@ -12,6 +12,7 @@ import { AWBadge, AWEmptyState, AWNotice, AWStatusBadge } from "@/components/aw-
 import { AWDataToolbar, AWLocalPagination, AWPanel, AWSortButton, AWStat } from "@/components/aw-data-patterns";
 import { permittedGroups } from "@/components/workspace-navigation";
 import { AWActionCenter } from "@/components/aw-action-center";
+import { AWPersonalTasks } from "@/components/aw-personal-tasks";
 
 type Source = "Clients" | "Leads" | "Projects";
 type Entry = { id: string; name: string; status: string; source: Source; href: string; };
@@ -53,7 +54,7 @@ export default function Dashboard() {
   const nav=useMemo(()=>permittedGroups(grants).flatMap(group=>group.items),[grants]);
 
   const load=useCallback(async()=>{
-    if(!session)return;
+    if(!session||!session.identity.roles.some(role=>["ADMIN","SUPER_ADMIN"].includes(role)))return;
     const toLoad: Source[]=[];
     if(session.identity.permissions.includes("clients.read"))toLoad.push("Clients");
     if(session.identity.permissions.includes("leads.read"))toLoad.push("Leads");
@@ -101,7 +102,8 @@ export default function Dashboard() {
   const visible=filtered.slice((Math.min(page,pages)-1)*7,Math.min(page,pages)*7);
   const firstName=session?.user.displayName.split(" ")[0]??"there";
   if(!session)return null;
-  const leadership=session.identity.roles.some(role=>["ADMIN","SUPER_ADMIN","FOUNDER"].includes(role));
+  const leadership=session.identity.roles.some(role=>["ADMIN","SUPER_ADMIN"].includes(role));
+  if(!leadership)return <AWPersonalTasks/>;
   const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
   overview?.records.forEach(x=>{groupCounts[x.source]++;});
   return <div className="aw-dashboard space-y-7" data-testid="amplifyworld-dashboard">

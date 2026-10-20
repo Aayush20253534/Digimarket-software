@@ -50,7 +50,7 @@ export class TasksService {
     if(input.view==="team")need(a,"tasks.manage");
     const where:Prisma.TaskWhereInput={
       organizationId:a.organizationId,
-      ...(input.view==="mine"?own(a):{}),
+      ...(input.view==="team"&&manager(a)?{}:own(a)),
       ...(input.status?{status:input.status}:{}),
       ...(input.projectId?{projectId:input.projectId}:{}),
       ...(input.q?{title:{contains:input.q,mode:"insensitive"}}:{}),
