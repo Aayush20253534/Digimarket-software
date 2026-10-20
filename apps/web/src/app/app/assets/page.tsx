@@ -57,6 +57,30 @@ export default function AssetsPage(){
  const [folderCatalog,setFolderCatalog]=useState<FolderItem[]>([]),[folderCatalogLimited,setFolderCatalogLimited]=useState(false);
  const [folderEditName,setFolderEditName]=useState(""),[folderEditColor,setFolderEditColor]=useState("#A56CE4"),[folderMove,setFolderMove]=useState("");
  const [dropActive,setDropActive]=useState(false);
+ useEffect(()=>{
+  const handler=(event:PointerEvent)=>{
+   const target=event.target as HTMLElement;
+   if(!target.closest(".aw-drive-item-menu,.aw-drive-menu-trigger"))setContext(null);
+   if(!target.closest(".aw-drive-new-wrap"))setNewMenu(false);
+  };
+  document.addEventListener("pointerdown",handler);
+  return()=>document.removeEventListener("pointerdown",handler);
+ },[]);
+ useEffect(()=>{
+  if(!(folderDialog||folderEdit||uploadDialog||detailsOpen||preview))return;
+  const before=document.body.style.overflow;
+  document.body.style.overflow="hidden";
+  return()=>{document.body.style.overflow=before;};
+ },[folderDialog,folderEdit,uploadDialog,detailsOpen,preview]);
+ useEffect(()=>{
+  const esc=(event:KeyboardEvent)=>{
+   if(event.key!=="Escape")return;
+   setContext(null);setNewMenu(false);
+   if(!busy){setPreview(null);setFolderDialog(false);setFolderEdit(null);setUploadDialog(false);setDetailsOpen(false);}
+  };
+  document.addEventListener("keydown",esc);
+  return()=>document.removeEventListener("keydown",esc);
+ },[busy]);
  const displayed=useMemo(()=>[...items].sort((a,b)=>{
    const x=sort==="name"?a.filename:sort==="type"?a.contentType:sort==="size"?a.bytes:a.createdAt;
    const y=sort==="name"?b.filename:sort==="type"?b.contentType:sort==="size"?b.bytes:b.createdAt;
