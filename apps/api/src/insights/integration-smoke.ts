@@ -62,7 +62,8 @@ try{
   subtotal:"100.0000",total:"100.0000",paidTotal:"0",
  }});
  const publicHits=(await insights.search(employee,"Sunrise")).items;
- assert.ok(publicHits.some(x=>x.id===client.id));
+ // Access to client lists does not expose other users' clients in personal search.
+ assert.equal(publicHits.some(x=>x.id===client.id),false);
  assert.ok(publicHits.some(x=>x.id===lead.id));
  assert.ok(publicHits.some(x=>x.id===visibleProject.id));
  assert.ok(publicHits.some(x=>x.id===visibleTask.id));
@@ -70,7 +71,7 @@ try{
  for(const bad of [hiddenProject.id,hiddenTask.id,hiddenContent.id,invoice.id])
   assert.equal(publicHits.some(x=>x.id===bad),false);
  const managedHits=(await insights.search(admin,"Sunrise")).items;
- for(const id of [hiddenProject.id,hiddenTask.id,hiddenContent.id,invoice.id])
+ for(const id of [client.id,lead.id,hiddenProject.id,hiddenTask.id,hiddenContent.id,invoice.id])
   assert.ok(managedHits.some(x=>x.id===id));
  assert.equal((await insights.search(external,"Sunrise")).items.some(x=>x.id===client.id),false);
  const report=await insights.report(employee,"2026-10-01","2026-11-30");

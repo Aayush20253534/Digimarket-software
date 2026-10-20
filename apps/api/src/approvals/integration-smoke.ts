@@ -38,6 +38,10 @@ try {
     svc.decide(administrator,original.id,{outcome:"REJECTED",reason:"Different reviewer decision"}),
   ]);
   assert.equal(outcomes.filter(x=>x.status==="fulfilled").length,1);
+  assert.equal((await svc.list(administrator,"queue")).some(x=>x.id===original.id),false);
+  assert.ok((await svc.list(administrator,"history")).some(x=>x.id===original.id));
+  assert.ok((await svc.list(employee,"mine")).some(x=>x.id===original.id));
+  await assert.rejects(()=>svc.list(employee,"history"),(error:{status?:number})=>error.status===403);
   assert.equal((await db.approvalDecision.count({where:{requestId:original.id}})),1);
   assert.equal((await db.outboxEvent.count({where:{organizationId:org.id,aggregateId:original.id}})),2);
   await assert.rejects(()=>svc.cancel(employee,original.id),(error:{status?:number})=>error.status===409);
