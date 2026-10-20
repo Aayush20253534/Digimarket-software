@@ -201,9 +201,10 @@ export default function AssetsPage(){
    finally{setBusy(false);setUploadProgress("");await load();}
  }
  function queueFiles(chosen:FileList|File[]){
-  const next=Array.from(chosen).filter(f=>accepted.includes(f.type)).slice(0,10);
+  const raw=Array.from(chosen),next=raw.filter(f=>accepted.includes(f.type)).slice(0,10);
+  if(raw.length!==next.length)setError("Only the first 10 supported image, video or PDF files can be uploaded per batch.");
   if(!next.length){setError("Choose JPEG, PNG, WebP, MP4, MOV, WebM or PDF files.");return;}
-  setFiles(next);setUploadDialog(true);setNewMenu(false);setError("");
+  setFiles(next);setUploadDialog(true);setNewMenu(false);
  }
  async function moveAssets(ids:string[],destinationId:string|null){
   if(!canUpload||!ids.length)return;
@@ -244,7 +245,7 @@ export default function AssetsPage(){
   try{for(const id of selectedIds){const asset=items.find(x=>x.id===id);if(!asset)continue;
     await request("/assets/"+id+"/archive",{method:"POST",body:{version:asset.version}});done++;}}
   catch(e){setError(errText(e));}
-  finally{setBusy(false);setSelectedIds([]);setMessage(done+" file(s) archived.");await load();}
+  finally{setBusy(false);setSelectedIds([]);if(done===selectedIds.length)setMessage(done+" file(s) archived.");await load();}
  }
  async function loadFolderCatalog(){
   try{
@@ -380,7 +381,7 @@ export default function AssetsPage(){
        {canArchive&&asset.status==="ACTIVE"&&<button type="button" onClick={()=>{open(asset);setDetailsOpen(true);setContext(null);}}>Archive…</button>}
       </div>}
      </div>)}</div>}
-    <div className="aw-drive-pager"><button type="button" disabled={!cursor||loading} onClick={()=>setCursor(null)}>First page</button><span>{items.length} loaded</span><button type="button" disabled={!nextCursor||loading} onClick={()=>setCursor(nextCursor)}>Next page</button></div>
+    <div className="aw-drive-pager"><button type="button" disabled={!cursor||loading} onClick={()=>{setCursor(null);setSelectedIds([]);setSelected(null);}}>First page</button><span>{items.length} loaded</span><button type="button" disabled={!nextCursor||loading} onClick={()=>{setCursor(nextCursor);setSelectedIds([]);setSelected(null);}}>Next page</button></div>
    </section>
   </>}
   {dropActive&&<div className="aw-drive-drop-mask"><Upload size={38}/><strong>Drop files to upload</strong></div>}
