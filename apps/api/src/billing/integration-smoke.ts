@@ -6,6 +6,7 @@ import type {Principal} from "../auth/service";
 import {BillingService} from "./service";
 import {FinanceService} from "../finance/service";
 import {sweepBillingSchedules} from "../../../worker/src/billing-recurrence";
+import {invoiceDraftSchema,paymentRecordSchema} from "@digimarket/contracts";
 if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarket_ci"))
  throw new Error("Module 13 requires disposable digimarket_ci PostgreSQL");
 const db=createDatabaseClient(),billing=new BillingService(db),finance=new FinanceService(db);
@@ -38,6 +39,10 @@ try{
   buyerName:"Cafe",dueOn:"2026-11-30",lines:[{description:"Marketing services",quantity:"1.00",
    unitPrice:"100.0000",taxRate:"0"}]};
  await assert.rejects(()=>billing.create(admin,{...draftInput,clientId:otherClient.id}),fail(404));
+ invoiceDraftSchema.parse(draftInput);
+ paymentRecordSchema.parse({clientId:client.id,categoryId:income.id,amount:"40.0000",
+  receivedOn:"2026-10-20",method:"UPI",reference:"receipt-xxxx",idempotencyKey:randomUUID(),
+  allocations:[{invoiceId:randomUUID(),amount:"40.0000"}]});
  const draft=await billing.create(admin,draftInput);
  assert.equal(draft.status,"DRAFT");assert.equal(draft.total.toFixed(4),"100.0000");
  assert.equal((await billing.list(foreign,{limit:20})).items.length,0);
@@ -108,7 +113,7 @@ try{
  const paused=await billing.toggleSchedule(admin,sched.id,2,false);
  assert.equal(paused.enabled,false);
  assert.equal((await sweepBillingSchedules(db,new Date(Date.now()+40*86400000),100)).created,0);
- assert.equal((await db.payment.count({where:{organizationId:a.id,status:"VERIFIED"}}),2);
+ assert.equal(await db.payment.count({where:{organizationId:a.id,status:"VERIFIED"}}),2);
  assert.ok((await db.outboxEvent.count({where:{organizationId:a.id,kind:"payments.verified"}}))===2);
  assert.ok((await db.auditLog.count({where:{organizationId:a.id,entityType:"Invoice"}}))>=5);
  console.info("Module 13 PASS: invoice numbering, PDF, locked issue, cross-org, partial allocations, ledger once, self-verification, idempotency, void, overdue and recurring drafts");

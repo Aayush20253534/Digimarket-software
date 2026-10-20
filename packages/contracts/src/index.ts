@@ -289,11 +289,11 @@ export const contentPublishSchema=z.strictObject({
 });
 
 // Module 13: safe, exact-decimal invoice and payment contracts.
-const invoiceMoney=z.string().regex(/^(?:0|[1-9][0-9]{0,13})(?:\\.[0-9]{1,4})?$/);
-const qty=z.string().regex(/^(?:0|[1-9][0-9]{0,8})(?:\\.[0-9]{1,2})?$/);
+const invoiceMoney=z.string().regex(/^(?:0|[1-9][0-9]{0,13})(?:\.[0-9]{1,4})?$/);
+const qty=z.string().regex(/^(?:0|[1-9][0-9]{0,8})(?:\.[0-9]{1,2})?$/);
 export const invoiceLineSchema=z.strictObject({
  description:z.string().trim().min(2).max(500),quantity:qty,unitPrice:invoiceMoney,
- taxRate:z.string().regex(/^(?:0|[1-9][0-9]?|100)(?:\\.[0-9]{1,2})?$/).default("0"),
+ taxRate:z.string().regex(/^(?:0|[1-9][0-9]?|100)(?:\.[0-9]{1,2})?$/).default("0"),
 });
 export const invoiceDraftSchema=z.strictObject({
  clientId:z.uuid(),sellerName:z.string().trim().min(2).max(180),
