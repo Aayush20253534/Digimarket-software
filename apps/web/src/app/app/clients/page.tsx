@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BriefcaseBusiness, Plus, RefreshCw, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
@@ -41,6 +41,8 @@ export default function ClientsPage(){
  const [status,setStatus]=useState<Status>("ACTIVE");
  const [filter,setFilter]=useState("");
  const [search,setSearch]=useState("");
+ const [history,setHistory]=useState<string[]>([]);
+ const [sortBy,setSortBy]=useState<"businessName"|"businessType"|"location"|"status">("businessName"),[descending,setDescending]=useState(false);
  const [cursor,setCursor]=useState<string|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [loading,setLoading]=useState(true);
@@ -73,7 +75,7 @@ export default function ClientsPage(){
    e.preventDefault();setBusy(true);setError("");setMessage("");
    try{
      const client=await request<Client>("/clients",{method:"POST",body:createDraft});
-     setCreateDraft(clean);setCursor(null);
+     setCreateDraft(clean);setCreating(false);setCursor(null);setHistory([]);
      setMessage("Client created. No billing or credentials have been inferred.");
      await load();await open(client.id);
    }catch(e){setError(readable(e));}finally{setBusy(false);}
@@ -104,6 +106,10 @@ export default function ClientsPage(){
      await open(selected.id);setMessage("Service added to client.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
+ const sorted=useMemo(()=>[...rows].sort((a,b)=>{
+  const result=String(a[sortBy]??"").localeCompare(String(b[sortBy]??""),undefined,{numeric:true,sensitivity:"base"});
+  return descending?-result:result;
+ }),[rows,sortBy,descending]);
  if(!session)return <Spinner label="Checking client access…"/>;
  if(!canRead)return <><PageHeader title="Clients access denied"/><Notice kind="error">Your account cannot view client records.</Notice></>;
  return <div data-aw-module="clients" className="aw-module-root space-y-7">
@@ -119,27 +125,32 @@ export default function ClientsPage(){
        <Card title="Client directory" description="Records are scoped to the signed-in agency.">
          <div className="flex flex-wrap gap-2">
            <input aria-label="Search clients" className="field min-w-[190px] flex-1" placeholder="Search business, city, phone, email"
-             value={search} onChange={e=>{setSearch(e.target.value);setCursor(null);}}/>
-           <select aria-label="Filter clients" className="field" value={filter} onChange={e=>{setFilter(e.target.value);setCursor(null);}}>
+             value={search} onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}}/>
+           <select aria-label="Filter clients" className="field" value={filter} onChange={e=>{setFilter(e.target.value);setCursor(null);setHistory([]);}}>
              <option value="">All clients</option>{(["ACTIVE","PAUSED","ARCHIVED"] as const).map(x=><option key={x}>{x}</option>)}
            </select>
+<select className="field" aria-label="Sort clients on this page" value={sortBy} onChange={e=>setSortBy(e.target.value as typeof sortBy)}>
+  <option value="businessName">Business</option><option value="businessType">Category</option><option value="location">Location</option><option value="status">Status</option>
+ </select><button type="button" className="btn-secondary" aria-label="Reverse client sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading?<Spinner label="Loading clients…"/>:rows.length===0?
            <EmptyState icon={BriefcaseBusiness} title="No matching clients" description="Add a client or convert a won lead."/>:
            <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Clients directory">
             <thead><tr><th>Business</th><th>Type</th><th>Phone</th><th>Email</th><th>Location</th><th>Status</th><th>Details</th></tr></thead>
-            <tbody>{rows.map(c=><tr key={c.id} className={selected?.id===c.id?"aw-register-selected":""}>
+            <tbody>{sorted.map(c=><tr key={c.id} className={selected?.id===c.id?"aw-register-selected":""}>
              <td><strong>{c.businessName}</strong>{c.sourceLeadId&&<span>Converted from lead</span>}</td>
              <td>{c.businessType||"—"}</td><td>{c.phone||"—"}</td><td>{c.email||"—"}</td>
              <td>{c.location||"—"}</td><td><StatusBadge status={c.status}/></td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(c.id)}>Open</button></td>
             </tr>)}</tbody></table></div>}
          <div className="mt-4 flex justify-between">
-           <button className="btn-secondary" disabled={!cursor||loading} onClick={()=>setCursor(null)}>First page</button>
-           <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>setCursor(nextCursor)}>Next page</button>
+           <button className="btn-secondary" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button><span className="aw-register-page">Page {history.length+1}</span>
+           <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
-       {canCreate&&creating&&<Card title="Add client" description="Create a client directly when there is no lead to convert.">
+       {canCreate&&creating&&<div className="aw-register-drawer" role="dialog" aria-modal="true" aria-label="Add client form">
+  <div className="aw-register-drawer-head"><strong>New client</strong><button type="button" className="btn-secondary" onClick={()=>setCreating(false)}>Close client form</button></div>
+  <Card title="Add client" description="Create a client directly when there is no lead to convert.">
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {editableFields.map(([key,label])=><FormField key={key} id={"new-client-"+key} label={label}>
              <input id={"new-client-"+key} className="field" required={key==="businessName"}
@@ -148,7 +159,7 @@ export default function ClientsPage(){
            </FormField>)}
            <div className="sm:col-span-2"><button className="btn-primary" disabled={busy}>Create client</button></div>
          </form>
-       </Card>}
+       </Card></div>}
      </div>
      <div className="space-y-5">
        {selected?<Card title={"Client: "+selected.businessName} description={"Profile version "+selected.version}>
@@ -172,7 +183,7 @@ export default function ClientsPage(){
            {selected.notes&&<p className="whitespace-pre-wrap">{selected.notes}</p>}
            <StatusBadge status={selected.status}/>
          </div>}
-       </Card>:<Card title="Client details"><EmptyState icon={UsersRound} title="Select a client" description="Open a client record to review profile, contacts and services."/></Card>}
+       </Card>:null}
        {selected&&<Card title="Contacts" description="People connected with this client. No login credentials are stored.">
          {selected.contacts.length===0?<p className="text-sm text-slate-500">No contacts recorded.</p>:
            <div className="space-y-2">{selected.contacts.map(x=><div key={x.id} className="rounded-lg border p-3 text-sm">
