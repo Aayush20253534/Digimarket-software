@@ -80,6 +80,7 @@ export class ApprovalService {
         : {status:view==="history"?{not:"PENDING" as const}:"PENDING" as const,
            requesterId:{not:actor.userId},approverRoleKeys:{hasSome:actor.roles},
            ...(view==="history"?{decision:{is:{actorId:actor.userId}}}:{})}),
+      },
       include:{policy:{select:{category:true,name:true}},requester:{select:{displayName:true}},
         decision:{select:{outcome:true,reason:true,createdAt:true,actor:{select:{displayName:true}}}}},
       orderBy:{createdAt:"desc"},take:100,
