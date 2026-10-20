@@ -287,3 +287,39 @@ export const contentVersionSchema=z.strictObject({version:z.number().int().posit
 export const contentPublishSchema=z.strictObject({
   version:z.number().int().positive(),publishedUrl:z.url().startsWith("https://").max(1000).nullable().optional(),
 });
+
+// Module 13: safe, exact-decimal invoice and payment contracts.
+const invoiceMoney=z.string().regex(/^(?:0|[1-9][0-9]{0,13})(?:\\.[0-9]{1,4})?$/);
+const qty=z.string().regex(/^(?:0|[1-9][0-9]{0,8})(?:\\.[0-9]{1,2})?$/);
+export const invoiceLineSchema=z.strictObject({
+ description:z.string().trim().min(2).max(500),quantity:qty,unitPrice:invoiceMoney,
+ taxRate:z.string().regex(/^(?:0|[1-9][0-9]?|100)(?:\\.[0-9]{1,2})?$/).default("0"),
+});
+export const invoiceDraftSchema=z.strictObject({
+ clientId:z.uuid(),sellerName:z.string().trim().min(2).max(180),
+ sellerAddress:z.string().trim().min(3).max(500),sellerTaxId:z.string().trim().max(40).optional(),
+ buyerName:z.string().trim().min(2).max(180),buyerAddress:z.string().trim().max(500).optional(),
+ dueOn:z.iso.date(),notes:z.string().trim().max(2000).optional(),
+ lines:z.array(invoiceLineSchema).min(1).max(50),
+});
+export type InvoiceDraftInput=z.infer<typeof invoiceDraftSchema>;
+export const invoiceEditSchema=invoiceDraftSchema.omit({clientId:true}).extend({version:z.number().int().positive()}).strict();
+export type InvoiceEditInput=z.infer<typeof invoiceEditSchema>;
+export const invoiceListSchema=z.strictObject({clientId:z.uuid().optional(),status:z.enum(["DRAFT","ISSUED","VOID"]).optional(),
+ limit:z.coerce.number().int().min(1).max(100).default(50),cursor:z.uuid().optional()});
+export type InvoiceListInput=z.infer<typeof invoiceListSchema>;
+export const invoiceVersionSchema=z.strictObject({version:z.number().int().positive()});
+export const paymentRecordSchema=z.strictObject({
+ clientId:z.uuid(),categoryId:z.uuid(),amount:invoiceMoney,
+ receivedOn:z.iso.date(),method:z.enum(["CASH","UPI","BANK_TRANSFER","CARD","OTHER"]),
+ reference:z.string().trim().min(4).max(180),idempotencyKey:z.uuid(),
+ allocations:z.array(z.strictObject({invoiceId:z.uuid(),amount:invoiceMoney})).min(1).max(30)
+  .refine(x=>new Set(x.map(y=>y.invoiceId)).size===x.length,"Duplicate invoice allocation"),
+});
+export type PaymentRecordInput=z.infer<typeof paymentRecordSchema>;
+export const billingScheduleSchema=invoiceDraftSchema.extend({
+ frequency:z.enum(["MONTHLY","QUARTERLY","YEARLY"]),
+ startAt:z.iso.datetime({offset:true}),dueAfterDays:z.number().int().min(0).max(90).default(14),
+}).omit({dueOn:true}).strict();
+export type BillingScheduleInput=z.infer<typeof billingScheduleSchema>;
+export const billingToggleSchema=z.strictObject({version:z.number().int().positive(),enabled:z.boolean()});

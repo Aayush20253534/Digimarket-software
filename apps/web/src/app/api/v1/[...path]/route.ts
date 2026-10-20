@@ -27,6 +27,10 @@ const endpoints: Record<string, string[]> = {
   "projects/assignees": ["GET"],
   "tasks": ["GET","POST"],
   "content": ["GET","POST"],
+  "invoices": ["GET","POST"],
+  "invoices/receivables": ["GET"],
+  "payments": ["GET","POST"],
+  "billing-schedules": ["GET","POST"],
   "content/staff": ["GET"],
   "tasks/team": ["GET"],
   "task-recurrences": ["GET","POST"],
@@ -41,6 +45,11 @@ const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/st
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
+const invoiceDetailPattern=/^invoices\/[0-9a-fA-F-]{36}$/;
+const invoiceActionPattern=/^invoices\/[0-9a-fA-F-]{36}\/(issue|void)$/;
+const invoicePdfPattern=/^invoices\/[0-9a-fA-F-]{36}\/pdf$/;
+const paymentActionPattern=/^payments\/[0-9a-fA-F-]{36}\/(verify|reject)$/;
+const billingSchedulePattern=/^billing-schedules\/[0-9a-fA-F-]{36}$/;
 const contentDetailPattern=/^content\/[0-9a-fA-F-]{36}$/;
 const contentActionPattern=/^content\/[0-9a-fA-F-]{36}\/(submit|schedule|publish|cancel)$/;
 const taskDetailPattern=/^tasks\/[0-9a-fA-F-]{36}$/;
@@ -65,6 +74,11 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(invoiceDetailPattern.test(path))return ["GET","PUT"].includes(method);
+  if(invoiceActionPattern.test(path))return method==="POST";
+  if(invoicePdfPattern.test(path))return method==="GET";
+  if(paymentActionPattern.test(path))return method==="POST";
+  if(billingSchedulePattern.test(path))return method==="PUT";
   if(contentDetailPattern.test(path))return ["GET","PUT"].includes(method);
   if(contentActionPattern.test(path))return method==="POST";
   if(taskDetailPattern.test(path))return ["GET","PUT"].includes(method);
@@ -125,6 +139,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
+  }
+  if(path==="invoices"){
+    for(const key of ["clientId","status","limit","cursor"]){
+      const v=request.nextUrl.searchParams.get(key);
+      if(v!==null)url.searchParams.set(key,v);
+    }
+  }
+  if(path==="payments"){
+    const v=request.nextUrl.searchParams.get("clientId");
+    if(v!==null)url.searchParams.set("clientId",v);
   }
   if (path === "content") {
     for (const key of ["clientId","ownerId","status","platform","start","end","q","limit","cursor"]) {
