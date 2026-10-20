@@ -133,16 +133,16 @@ export default function ClientsPage(){
   <option value="businessName">Business</option><option value="businessType">Category</option><option value="location">Location</option><option value="status">Status</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse client sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
-         {loading?<Spinner label="Loading clients…"/>:rows.length===0?
-           <EmptyState icon={BriefcaseBusiness} title="No matching clients" description="Add a client or convert a won lead."/>:
-           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Clients directory">
+         {loading&&<Spinner label="Loading clients…"/>}
+          {!loading&&!rows.length&&<EmptyState icon={BriefcaseBusiness} title="No matching clients" description="Add a client or convert a won lead."/>}
+          <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Clients directory">
             <thead><tr><th>Business</th><th>Type</th><th>Phone</th><th>Email</th><th>Location</th><th>Status</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(c=><tr key={c.id} className={selected?.id===c.id?"aw-register-selected":""}>
              <td><strong>{c.businessName}</strong>{c.sourceLeadId&&<span>Converted from lead</span>}</td>
              <td>{c.businessType||"—"}</td><td>{c.phone||"—"}</td><td>{c.email||"—"}</td>
              <td>{c.location||"—"}</td><td><StatusBadge status={c.status}/></td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(c.id)}>Open</button></td>
-            </tr>)}</tbody></table></div>}
+            </tr>)}</tbody></table></div>
          <div className="mt-4 flex justify-between">
            <button className="btn-secondary" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button><span className="aw-register-page">Page {history.length+1}</span>
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>

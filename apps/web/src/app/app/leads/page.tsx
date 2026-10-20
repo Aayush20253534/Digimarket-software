@@ -217,16 +217,16 @@ export default function LeadsPage(){
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="location">Location</option><option value="status">Stage</option><option value="nextFollowUpAt">Follow-up</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
-         {loading?<Spinner label="Loading leads…"/>:items.length===0?
-           <EmptyState icon={BriefcaseBusiness} title="No leads found" description="Add the agency's first prospect, or adjust your search."/>:
-           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
+         {loading&&<Spinner label="Loading leads…"/>}
+          {!loading&&!items.length&&<EmptyState icon={BriefcaseBusiness} title="No leads found" description="Add the agency's first prospect, or adjust your search."/>}
+          <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
             <thead><tr><th>Business / contact</th><th>Phone</th><th>Location</th><th>Stage</th><th>Assigned to</th><th>Follow-up</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
              <td><strong>{l.businessName}</strong><span>{l.contactName||"No contact"}</span></td>
              <td>{l.phone||"—"}</td><td>{l.location||"—"}</td><td><StatusBadge status={l.status}/></td>
              <td>{l.assignee?.displayName||"Unassigned"}</td><td>{fmt(l.nextFollowUpAt)}</td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
-            </tr>)}</tbody></table></div>}
+            </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
            <button className="btn-secondary" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button><span className="aw-register-page">Page {history.length+1}</span>
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
