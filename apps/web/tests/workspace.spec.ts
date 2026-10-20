@@ -1,23 +1,9 @@
-import { createHmac } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 
 const INITIAL = process.env.E2E_ADMIN_INITIAL_PASSWORD ?? "";
 const UPDATED = process.env.E2E_ADMIN_UPDATED_PASSWORD ?? "";
 if (!INITIAL || !UPDATED) throw Error("Missing isolated browser CI credentials");
 
-function otp(secret:string){
-  const abc="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",bytes:number[]=[];
-  let buffer=0,bits=0;
-  for(const letter of secret.replace(/\s|=/g,"").toUpperCase()){
-    const index=abc.indexOf(letter);if(index<0)throw Error("Invalid TOTP secret");
-    buffer=(buffer<<5)|index;bits+=5;
-    if(bits>=8){bytes.push((buffer>>>(bits-8))&255);bits-=8;}
-  }
-  const n=Buffer.alloc(8);n.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
-  const digest=createHmac("sha1",Buffer.from(bytes)).update(n).digest();
-  const offset=digest[19]&15;
-  return String((digest.readUInt32BE(offset)&0x7fffffff)%1000000).padStart(6,"0");
-}
 async function login(page:Page,id:string,password:string){
   await page.goto("/login");
   await page.getByLabel("Login ID").fill(id);
@@ -51,10 +37,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.setViewportSize({width:1366,height:768});
   await login(page,"admin-e2e",INITIAL);
   await finishPasswordRotation(page,UPDATED);
-  await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toBeVisible();
-  await page.getByRole("button",{name:"Generate authenticator setup"}).click();
-  await page.getByLabel("Six-digit authenticator code").fill(otp(await page.getByTestId("mfa-secret").innerText()));
-  await page.getByRole("button",{name:"Enable MFA and sign in"}).click();
+  // Admin now signs in with credentials alone; no authenticator challenge remains.
+  await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
   for(const label of ["My notes","Global search","Leads CRM","Content calendar","Files & assets","Income, expenses & billing"])
@@ -145,10 +129,39 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toBeVisible();
   await page.getByRole("button",{name:"Add lead"}).click();
-  await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
+  const leadDialog=page.getByRole("dialog",{name:"Create a lead"});
+  await expect(leadDialog).toBeVisible();
+  await expect(leadDialog.getByLabel("Business name",{exact:true})).toBeVisible();
+  const leadPosition=await leadDialog.boundingBox();
+  expect(leadPosition).not.toBeNull();
+  expect(leadPosition!.x).toBeGreaterThanOrEqual(0);
+  expect(leadPosition!.x+leadPosition!.width).toBeLessThanOrEqual(1366);
+  await page.keyboard.press("Escape");
+  await expect(leadDialog).toHaveCount(0);
+  await page.getByRole("button",{name:"Add lead"}).click();
+  await expect(leadDialog).toBeVisible();
+  await leadDialog.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
   await page.getByLabel("Phone",{exact:true}).fill("9876543210");
   await page.getByRole("button",{name:"Create lead"}).click();
   await expect(page.getByRole("heading",{name:"Lead: Founder CI Lead"})).toBeVisible();
+  await expect(page.getByRole("dialog",{name:"Create a lead"})).toHaveCount(0);
+  await page.goto("/app/clients");
+  await expect(page.getByRole("table",{name:"Clients directory"})).toBeVisible();
+  await page.getByRole("button",{name:"Add client"}).click();
+  const clientDialog=page.getByRole("dialog",{name:"Add client"});
+  await expect(clientDialog).toBeVisible();
+  await expect(clientDialog.getByLabel("Business name",{exact:true})).toBeVisible();
+  await clientDialog.getByLabel("Business name",{exact:true}).fill("CI Client Popup");
+  await clientDialog.getByLabel("Business phone",{exact:true}).fill("9999991234");
+  await clientDialog.getByRole("button",{name:"Create client"}).click();
+  await expect(clientDialog).toHaveCount(0);
+  await expect(page.getByText("CI Client Popup",{exact:true})).toBeVisible();
+  // Client creation opens its detail drawer. Close that modal before using the page toolbar.
+  await page.getByRole("dialog",{name:"Client details"}).getByRole("button",{name:"Close",exact:true}).click();
+  await page.getByRole("button",{name:"Add client"}).click();
+  await expect(page.getByRole("dialog",{name:"Add client"})).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog",{name:"Add client"})).toHaveCount(0);
   await page.getByRole("button",{name:"Sign out"}).click();
 
   await login(page,"ci-employee",employeeInitial);

@@ -32,8 +32,6 @@ services:
         sync: false
       - key: JWT_CHALLENGE_SECRET
         sync: false
-      - key: MFA_ENCRYPTION_KEY_BASE64
-        sync: false
       - key: JWT_ISSUER
         value: digimarket-api
       - key: JWT_AUDIENCE

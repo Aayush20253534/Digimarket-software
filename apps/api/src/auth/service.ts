@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@digimarket/db";
 import {
-  decryptSecret, encryptSecret, generateTotpSecret, hashPassword, hashToken,
-  issueJwt, decodeJwt, newRefreshSecret, verifyPassword, verifyTotp, type AuthConfig,
+  hashPassword, hashToken, issueJwt, decodeJwt, newRefreshSecret,
+  verifyPassword, type AuthConfig,
 } from "./crypto";
 import { AuthError, forbidden, invalid, unauthorized } from "./errors";
 import { privilegedRole, SYSTEM_ROLES, type SystemRole } from "./policies";
@@ -42,7 +42,7 @@ export class AuthService {
     return user.roles.filter(({ role }) => role.organizationId === user.organizationId).map(({ role }) => role);
   }
 
-  private async challengeUser(token: string, purpose: "change_password" | "enroll_mfa" | "verify_mfa") {
+  private async challengeUser(token: string, purpose: "change_password") {
     let claims;
     try { claims = await decodeJwt(this.config, token, purpose); } catch { throw unauthorized(); }
     const user = await this.fullUser(claims.userId);
@@ -63,21 +63,16 @@ export class AuthService {
     if (user.mustChangePassword || user.status === "INVITED") {
       return { next: "CHANGE_PASSWORD" as const, challengeToken: await issueJwt(this.config, "change_password", user) };
     }
-    if (privilegedRole(this.rolesFor(user).map((r) => r.key))) {
-      const action = user.mfaSecretEncrypted ? "VERIFY_MFA" as const : "ENROLL_MFA" as const;
-      return { next: action, challengeToken: await issueJwt(this.config, action === "VERIFY_MFA" ? "verify_mfa" : "enroll_mfa", user) };
-    }
-    return this.newSession(user, false);
+    return this.newSession(user);
   }
 
-  private async newSession(user: { id: string; organizationId: string; authVersion: number; loginId: string; displayName: string; status: string; mustChangePassword: boolean }, mfaVerified: boolean) {
+  private async newSession(user: { id: string; organizationId: string; authVersion: number; loginId: string; displayName: string; status: string; mustChangePassword: boolean }) {
     const secret = newRefreshSecret();
     const session = await this.db.session.create({
       data: {
         userId: user.id,
         refreshTokenHash: hashToken(secret),
         expiresAt: sessionExpiry(),
-        mfaVerifiedAt: mfaVerified ? new Date() : null,
       },
     });
     const accessToken = await issueJwt(this.config, "access", user, session.id);
@@ -100,50 +95,6 @@ export class AuthService {
     return { next: "LOGIN_AGAIN" as const };
   }
 
-  async setupMfa(challengeToken: string) {
-    const user = await this.challengeUser(challengeToken, "enroll_mfa");
-    if (user.mustChangePassword || user.mfaSecretEncrypted || !privilegedRole(this.rolesFor(user).map((r) => r.key))) throw forbidden();
-    let secret = user.mfaPendingEncrypted && user.mfaPendingExpiresAt && user.mfaPendingExpiresAt > new Date()
-      ? decryptSecret(this.config.mfaEncryptionKey, user.mfaPendingEncrypted) : null;
-    if (!secret) {
-      secret = generateTotpSecret();
-      await this.db.user.update({ where: { id: user.id }, data: {
-        mfaPendingEncrypted: encryptSecret(this.config.mfaEncryptionKey, secret),
-        mfaPendingExpiresAt: new Date(Date.now() + 10 * 60_000),
-      } });
-    }
-    const uri = `otpauth://totp/${encodeURIComponent("DigiMarket:" + user.loginId)}?secret=${secret}&issuer=DigiMarket&algorithm=SHA1&digits=6&period=30`;
-    return { secret, otpauthUrl: uri };
-  }
-
-  async confirmMfa(challengeToken: string, code: string) {
-    const user = await this.challengeUser(challengeToken, "enroll_mfa");
-    if (!user.mfaPendingEncrypted || !user.mfaPendingExpiresAt || user.mfaPendingExpiresAt <= new Date() || user.mfaSecretEncrypted) throw unauthorized();
-    const secret = decryptSecret(this.config.mfaEncryptionKey, user.mfaPendingEncrypted);
-    if (!verifyTotp(secret, code)) throw unauthorized();
-    const result = await this.db.user.updateMany({
-      where: { id: user.id, authVersion: user.authVersion, mfaSecretEncrypted: null, mfaPendingExpiresAt: { gt: new Date() } },
-      data: { mfaSecretEncrypted: user.mfaPendingEncrypted, mfaPendingEncrypted: null, mfaPendingExpiresAt: null, lastMfaStep: Math.floor(Date.now() / 30_000) },
-    });
-    if (result.count !== 1) throw unauthorized();
-    await this.db.auditLog.create({ data: { organizationId: user.organizationId, actorId: user.id, action: "auth.mfa_enrolled", entityType: "User", entityId: user.id } });
-    return this.newSession(user, true);
-  }
-
-  async verifyMfa(challengeToken: string, code: string) {
-    const user = await this.challengeUser(challengeToken, "verify_mfa");
-    if (user.mustChangePassword || !user.mfaSecretEncrypted || !privilegedRole(this.rolesFor(user).map((r) => r.key))) throw unauthorized();
-    const secret = decryptSecret(this.config.mfaEncryptionKey, user.mfaSecretEncrypted);
-    if (!verifyTotp(secret, code)) throw unauthorized();
-    const timeStep = Math.floor(Date.now() / 30_000);
-    const updated = await this.db.user.updateMany({
-      where: { id: user.id, authVersion: user.authVersion, OR: [{ lastMfaStep: null }, { lastMfaStep: { lt: timeStep } }] },
-      data: { lastMfaStep: timeStep },
-    });
-    if (updated.count !== 1) throw unauthorized();
-    return this.newSession(user, true);
-  }
-
   async authenticate(accessToken: string): Promise<Principal> {
     let claims;
     try { claims = await decodeJwt(this.config, accessToken, "access"); } catch { throw unauthorized(); }
@@ -152,7 +103,6 @@ export class AuthService {
       user.organizationId !== claims.organizationId || user.authVersion !== claims.version ||
       session.userId !== user.id || session.revokedAt || session.expiresAt <= new Date()) throw unauthorized();
     const roles = this.rolesFor(user);
-    if (privilegedRole(roles.map((role) => role.key)) && !session.mfaVerifiedAt) throw unauthorized();
     return {
       userId: user.id, organizationId: user.organizationId, sessionId: session.id,
       roles: roles.map((role) => role.key),
@@ -174,7 +124,6 @@ export class AuthService {
     }
     const user = await this.fullUser(session.userId);
     if (!user) throw unauthorized();
-    if (privilegedRole(this.rolesFor(user).map((r) => r.key)) && !session.mfaVerifiedAt) throw unauthorized();
     const nextSecret = newRefreshSecret();
     const rotated = await this.db.session.updateMany({
       where: { id: session.id, refreshTokenHash: digest, revokedAt: null },

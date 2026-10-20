@@ -49,7 +49,7 @@ export default function ProfilePage() {
         }}><LogOut className="h-4 w-4" aria-hidden="true" />Sign out</button>
       </div>
       {error && <div className="mt-4"><Notice kind="error">{error}</Notice></div>}
-      <p className="mt-4 flex items-center gap-2 text-xs text-slate-500"><UserRound className="h-4 w-4" aria-hidden="true" />Password changes and MFA recovery for active accounts will be added before production rollout.</p>
+      <p className="mt-4 flex items-center gap-2 text-xs text-slate-500"><UserRound className="h-4 w-4" aria-hidden="true" />Contact your administrator for password resets. Sessions remain secured with individual passwords and server-side role checks.</p>
     </Card>
   </div>;
 }

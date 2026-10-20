@@ -5,7 +5,7 @@ import request from "supertest";
 import { createDatabaseClient } from "@digimarket/db";
 import { createApp } from "../app";
 import { bootstrapFirstAdmin } from "./bootstrap";
-import { loadAuthConfig, totpCode } from "./crypto";
+import { loadAuthConfig } from "./crypto";
 import { AuthService } from "./service";
 
 if (process.env.NODE_ENV !== "test" || !process.env.DATABASE_URL?.includes("digimarket_ci")) {
@@ -41,18 +41,14 @@ try {
   assert.equal((await change(adminFirst.body.data.challengeToken, initialAdmin, permanentAdmin)).status, 200);
   assert.equal((await login("owner-test", initialAdmin)).status, 401);
 
-  const adminEnrollment = await login("owner-test", permanentAdmin);
-  assert.equal(adminEnrollment.body.data.next, "ENROLL_MFA");
-  const setup = await request(app).post("/api/v1/auth/mfa/setup").send({ challengeToken: adminEnrollment.body.data.challengeToken });
-  assert.equal(setup.status, 200);
-  assert.ok(setup.body.data.otpauthUrl.startsWith("otpauth://totp/"));
-  const confirmed = await request(app).post("/api/v1/auth/mfa/confirm").send({
-    challengeToken: adminEnrollment.body.data.challengeToken,
-    code: totpCode(setup.body.data.secret),
-  });
-  assert.equal(confirmed.status, 200);
-  const adminAccess = confirmed.body.data.accessToken as string;
-  const adminCookie = cookie(confirmed);
+  const adminSignedIn = await login("owner-test", permanentAdmin);
+  assert.equal(adminSignedIn.body.data.next, "SIGNED_IN");
+  const adminAccess = adminSignedIn.body.data.accessToken as string;
+  const adminCookie = cookie(adminSignedIn);
+  // The obsolete MFA API no longer exists and cannot enroll an authenticator.
+  for(const action of ["setup","verify","confirm"]){
+    assert.equal((await request(app).post("/api/v1/auth/mfa/"+action).send({challengeToken:"legacy",code:"123456"})).status,404);
+  }
   const profile = await request(app).get("/api/v1/me").set("Authorization", authHeader(adminAccess));
   assert.equal(profile.status, 200);
   assert.ok(profile.body.data.roles.includes("SUPER_ADMIN"));
@@ -101,21 +97,10 @@ try {
   assert.equal((await request(app).get("/api/v1/users").set("Authorization", authHeader(adminAccess))).status, 200);
 
   const nextAdmin = await login("owner-test", permanentAdmin);
-  assert.equal(nextAdmin.body.data.next, "VERIFY_MFA");
-  const failOtp = await request(app).post("/api/v1/auth/mfa/verify").send({
-    challengeToken: nextAdmin.body.data.challengeToken, code: "not-a-code",
-  });
-  assert.equal(failOtp.status, 422);
-  // Move the initial verification watermark back strictly for this isolated test.
-  await db.user.update({ where: { id: confirmed.body.data.user.id }, data: { lastMfaStep: 0 } });
-  const verifyAdmin = await request(app).post("/api/v1/auth/mfa/verify").send({
-    challengeToken: nextAdmin.body.data.challengeToken, code: totpCode(setup.body.data.secret),
-  });
-  assert.equal(verifyAdmin.status, 200);
-  assert.ok(cookie(verifyAdmin));
+  assert.equal(nextAdmin.body.data.next, "SIGNED_IN");
+  assert.ok(cookie(nextAdmin));
   assert.ok(adminCookie);
-
-  console.info("Module 3 auth integration PASS: bootstrap, password change, MFA, JWT, RBAC, staff provisioning, refresh replay and revocation.");
+  console.info("Module 3 auth integration PASS: bootstrap, password change, password-only administrator login, JWT, RBAC, staff provisioning, refresh replay and revocation.");
 } finally {
   await db.$disconnect();
 }

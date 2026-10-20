@@ -14,7 +14,7 @@ assert.ok(!render.includes("preDeployCommand:"),"Render Free cannot run pre-depl
 assert.ok(render.includes("startCommand:")&&render.includes("db:migrate:deploy")&&render.includes("seed.ts")&&render.includes("@digimarket/api start"));
 assert.ok(render.includes("healthCheckPath: /api/v1/ready"));
 for(const key of ["DATABASE_URL","DIRECT_DATABASE_URL","JWT_ACCESS_SECRET","JWT_CHALLENGE_SECRET",
- "MFA_ENCRYPTION_KEY_BASE64","CORS_ALLOWED_ORIGINS","CLOUDINARY_API_SECRET","OPS_MONITOR_TOKEN"]){
+ "CORS_ALLOWED_ORIGINS","CLOUDINARY_API_SECRET","OPS_MONITOR_TOKEN"]){
  assert.ok(render.includes("key: "+key),"Missing template variable "+key);
 }
 for(const value of ["*.age","*.dump",".env.production.example"]){

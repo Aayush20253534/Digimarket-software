@@ -8,7 +8,6 @@ const live={
  NODE_ENV:"production",DATABASE_URL:"postgresql://dev:secret@db.example.net/agency?sslmode=require",
  DIRECT_DATABASE_URL:"postgresql://dev:secret@db.example.net/agency?sslmode=require",
  JWT_ACCESS_SECRET:"a".repeat(42),JWT_CHALLENGE_SECRET:"b".repeat(42),
- MFA_ENCRYPTION_KEY_BASE64:Buffer.alloc(32,7).toString("base64"),
  CORS_ALLOWED_ORIGINS:"https://agency.example.com",CLOUDINARY_CLOUD_NAME:"private",
  CLOUDINARY_API_KEY:"non-secret-id",CLOUDINARY_API_SECRET:"secret-placeholder",
  OPS_MONITOR_TOKEN:"x".repeat(48),
@@ -22,8 +21,7 @@ describe("module17 production safeguards",()=>{
   expect(()=>validateProductionApiConfig({...live,CORS_ALLOWED_ORIGINS:"http://localhost:3000"})).toThrow("HTTPS");
   expect(()=>validateProductionApiConfig({...live,CORS_ALLOWED_ORIGINS:"https://a.example/path"})).toThrow("HTTPS");
  });
- it("rejects weak MFA encryption and insecure database connection strings",()=>{
-  expect(()=>validateProductionApiConfig({...live,MFA_ENCRYPTION_KEY_BASE64:"MA=="})).toThrow("32 bytes");
+ it("rejects insecure database connection strings",()=>{
   expect(()=>validateProductionApiConfig({...live,DATABASE_URL:"postgresql://a:b@host/db"})).toThrow("sslmode");
  });
  it("accepts complete production configuration with independent secrets",()=>{

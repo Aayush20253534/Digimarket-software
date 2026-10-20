@@ -48,7 +48,7 @@ export type SessionPayload = {
   user: LoginUser;
 };
 export type ChallengePayload = {
-  next: "CHANGE_PASSWORD" | "ENROLL_MFA" | "VERIFY_MFA";
+  next: "CHANGE_PASSWORD";
   challengeToken: string;
 };
 export type LoginResult = SessionPayload | ChallengePayload;

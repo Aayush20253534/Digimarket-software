@@ -40,7 +40,6 @@
 .aw-auth-icon {display:grid;place-items:center;width:52px;height:52px;border-radius:15px;border:1px solid #71438C;background:#361B4D;color:#D38AFF;}
 .aw-auth-heading {font-size:clamp(1.6rem,3vw,2.2rem);font-weight:760;line-height:1.18;letter-spacing:-.04em;color:#F8F4FF;}
 .aw-auth-message {font-size:.875rem;line-height:1.7;color:#B4A9C5;}
-.aw-auth-mfa-key {display:block;max-width:100%;overflow-wrap:anywhere;border:1px solid #503C5F;border-radius:10px;background:#110A1A;padding:13px;color:#F1CFFF;letter-spacing:.15em;font-family:var(--aw-font-mono);font-size:.84rem;user-select:all;}
 .aw-auth-secure-chip {display:inline-flex;align-items:center;gap:7px;border:1px solid #4C3263;border-radius:999px;background:#271838;padding:7px 11px;color:#DBB1F9;font-size:11px;letter-spacing:.04em;}
 @media(max-width:1023px) {.aw-hero-panel{transform:none}.aw-hero-stage{min-height:400px}.aw-float-label-top{right:1%}.aw-float-label-bottom{left:1%}}
 @media(max-width:639px) {

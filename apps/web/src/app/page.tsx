@@ -164,7 +164,7 @@ export default async function HomePage() {
             <h2 className="aw-section-heading mt-3">Your team&apos;s work stays <span className="aw-gradient-text">in the right hands.</span></h2>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-[#B5ABCA]">
               AmplifyWorld Workspace supports administrator-issued accounts, role-based access checks,
-              first-login password changes and authenticator challenges for privileged accounts.
+              first-login password changes, scoped permissions and secure access sessions.
               There is no public account registration.
             </p>
             <div className="mt-6 flex flex-wrap gap-2"><AWBadge tone="accent">Role-aware access</AWBadge><AWBadge>Private workspace</AWBadge><AWBadge>Multi-factor verification</AWBadge></div>

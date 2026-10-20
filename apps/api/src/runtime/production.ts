@@ -14,7 +14,7 @@ function httpsOrigin(value:string,key:string){
 export function validateProductionApiConfig(env:NodeJS.ProcessEnv){
  if(env.NODE_ENV!=="production")return;
  for(const key of ["DATABASE_URL","DIRECT_DATABASE_URL","JWT_ACCESS_SECRET",
-  "JWT_CHALLENGE_SECRET","MFA_ENCRYPTION_KEY_BASE64","CORS_ALLOWED_ORIGINS",
+  "JWT_CHALLENGE_SECRET","CORS_ALLOWED_ORIGINS",
   "CLOUDINARY_CLOUD_NAME","CLOUDINARY_API_KEY","CLOUDINARY_API_SECRET",
   "OPS_MONITOR_TOKEN"])required(env,key);
  if(required(env,"OPS_MONITOR_TOKEN").length<32)throw new Error("OPS_MONITOR_TOKEN too short");
@@ -27,6 +27,4 @@ export function validateProductionApiConfig(env:NodeJS.ProcessEnv){
     ||(uri.searchParams.get("sslmode")==="require"&&uri.searchParams.get("uselibpqcompat")==="true"))
    throw new Error("Production PostgreSQL URL requires verified TLS (sslmode=verify-full or legacy require): "+key);
  }
- const bytes=Buffer.from(required(env,"MFA_ENCRYPTION_KEY_BASE64"),"base64");
- if(bytes.length!==32)throw new Error("MFA encryption key must be 32 bytes");
 }

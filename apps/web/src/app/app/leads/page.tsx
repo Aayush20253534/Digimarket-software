@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Plus, RefreshCw, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { DirectoryModal } from "@/components/directory-modal";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
@@ -239,9 +240,7 @@ export default function LeadsPage(){
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
-       {canCreate&&creating&&<div className="aw-register-drawer" role="dialog" aria-modal="true" aria-label="Add lead form">
-  <div className="aw-register-drawer-head"><strong>New prospect</strong><button type="button" className="btn-secondary" onClick={()=>setCreating(false)}>Close lead form</button></div>
-  <Card title="Create a lead" description="Lead notes are preserved in the private activity timeline.">
+       {canCreate&&creating&&<DirectoryModal title="Create a lead" description="Add a prospect to the CRM. Notes are saved to their private activity timeline." onClose={()=>{if(!busy)setCreating(false);}}>
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {([
              ["businessName","Business name",true],["contactName","Contact name",false],
@@ -250,12 +249,15 @@ export default function LeadsPage(){
              ["websiteUrl","Website URL",false],["instagramUrl","Instagram URL",false],
              ["note","First note",false],
            ] as const).map(([field,label,required])=><FormField key={field} id={"new-"+field} label={label}>
-             <input id={"new-"+field} className="field" required={required} maxLength={field==="note"?2000:500}
+             <input id={"new-"+field} className="field" autoFocus={field==="businessName"} required={required} maxLength={field==="note"?2000:500}
                value={created[field]} onChange={e=>setCreated(v=>({...v,[field]:e.target.value}))}/>
            </FormField>)}
-           <div className="sm:col-span-2"><button className="btn-primary" disabled={busy} type="submit">Create lead</button></div>
+           <div className="sm:col-span-2 aw-directory-modal-actions">
+             <button className="btn-secondary" type="button" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button>
+             <button className="btn-primary" disabled={busy} type="submit">Create lead</button>
+           </div>
          </form>
-       </Card></div>}
+       </DirectoryModal>}
      </div>
      <div className="space-y-5">
        {selected?<Card title={"Lead: "+selected.businessName} description={"Version "+selected.version+" · "+selected.status}>

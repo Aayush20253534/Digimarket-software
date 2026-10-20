@@ -69,7 +69,7 @@ export async function bootstrapIfConfigured(db: PrismaClient, env: NodeJS.Proces
 if (process.argv[1]?.endsWith("bootstrap.ts")) {
   bootstrapFirstAdmin()
     .then(({ organizationId, adminLoginId }) => {
-      console.info(`Organization ${organizationId} bootstrapped for login ${adminLoginId}. Password not printed; mandatory password change and MFA enrollment on first use.`);
+      console.info(`Organization ${organizationId} bootstrapped for login ${adminLoginId}. Password not printed; mandatory password change on first use.`);
     })
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : "Bootstrap failed");

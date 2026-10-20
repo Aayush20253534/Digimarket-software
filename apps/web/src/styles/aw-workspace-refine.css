@@ -145,3 +145,53 @@
 .aw-theme input[type='color']::-webkit-color-swatch{border-radius:50%;border:0}
 .aw-theme input[type='color']::-moz-color-swatch{border-radius:50%;border:0}
 .aw-theme input[type='color']:focus-visible{outline:2px solid #d9a0ff;outline-offset:3px}
+
+/* Portal-based CRM registration dialogs: bounded, centered and keyboard accessible. */
+.aw-directory-modal-overlay{position:fixed!important;inset:0!important;z-index:10020!important;
+ display:grid!important;place-items:center!important;overflow-y:auto!important;
+ padding:clamp(12px,2.8vw,32px)!important;background:rgba(6,3,12,.82)!important;backdrop-filter:blur(8px)}
+.aw-directory-modal-panel{width:min(100%,900px)!important;max-height:min(92dvh,920px)!important;
+ overflow:hidden!important;display:flex!important;flex-direction:column!important;
+ border:1px solid #6e4786!important;border-radius:18px!important;
+ background:#190f24!important;box-shadow:0 26px 100px rgba(0,0,0,.68)!important;color:#f4eafd!important;}
+.aw-directory-modal-header{flex:none;display:flex;align-items:flex-start;justify-content:space-between;
+ gap:14px;padding:19px 22px;border-bottom:1px solid #4b315c;background:#24152f}
+.aw-directory-modal-header h2{margin:0;color:#fff;font-size:1.15rem;font-weight:750}
+.aw-directory-modal-header p{margin:5px 0 0;color:#bfaed1;font-size:.85rem;line-height:1.5}
+.aw-directory-modal-dismiss{display:grid;place-items:center;width:36px;height:36px;flex:none;
+ color:#e9dbf5;background:#382545;border:1px solid #604477;border-radius:10px;cursor:pointer}
+.aw-directory-modal-dismiss:hover{background:#563369}
+.aw-directory-modal-content{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 22px 24px}
+.aw-directory-modal-content form{width:100%;min-width:0}
+.aw-directory-modal-content .field{width:100%!important;min-width:0!important;box-sizing:border-box}
+.aw-directory-modal-content form>div{min-width:0}
+.aw-directory-modal-content .btn-primary{min-height:42px}
+#staff-search.field{padding-left:42px!important;padding-inline-start:42px!important}
+@media(max-width:640px){.aw-directory-modal-overlay{padding:8px!important;place-items:end center!important}
+ .aw-directory-modal-panel{width:100%!important;max-height:95dvh!important;border-radius:18px 18px 12px 12px!important}
+ .aw-directory-modal-header{padding:15px}.aw-directory-modal-content{padding:16px}
+ .aw-directory-modal-content form{grid-template-columns:1fr!important}
+ .aw-directory-modal-content form>div{grid-column:1/-1!important}
+}
+
+.aw-directory-modal-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;
+  position:sticky;bottom:-24px;padding:14px 0 2px;background:#190f24}
+.aw-directory-modal-actions button{min-width:110px}
+@media(max-width:640px){.aw-directory-modal-actions{bottom:-16px;gap:8px}
+  .aw-directory-modal-actions button{flex:1;min-width:0}}
+
+/* Popup controls live in a portal, outside .aw-module-root. Keep the dark theme legible. */
+.aw-directory-modal-content label{color:#f0e4fa!important}
+.aw-directory-modal-content .field,
+.aw-directory-modal-content input,
+.aw-directory-modal-content textarea,
+.aw-directory-modal-content select{
+  background:#10091b!important;color:#f8eeff!important;
+  border:1px solid #644477!important;border-radius:12px!important;
+  min-height:44px!important;max-width:100%!important
+}
+.aw-directory-modal-content .field:focus-visible{outline:2px solid #c389f0!important;outline-offset:1px!important}
+.aw-directory-modal-content .field::placeholder{color:#a895bd!important}
+.aw-directory-modal-content form>.sm\:col-span-2{display:flex;justify-content:flex-end;padding-top:6px}
+@media(max-width:640px){.aw-directory-modal-content form>.sm\:col-span-2 .btn-primary{width:100%}}
+.aw-directory-details-portal{position:fixed!important;inset:0!important;z-index:10021!important}\n

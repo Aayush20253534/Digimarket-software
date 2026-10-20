@@ -7,11 +7,8 @@ import { AuthError, unauthorized } from "./errors";
 
 const password = z.string().min(12).max(128);
 const loginId = z.string().trim().min(3).max(80).regex(/^[a-zA-Z0-9_.-]+$/);
-const code = z.string().regex(/^\d{6}$/);
 const loginSchema = z.strictObject({ loginId, password: z.string().min(1).max(128) });
 const changeSchema = z.strictObject({ challengeToken: z.string().min(20), oldPassword: z.string().min(1), newPassword: password });
-const challengeSchema = z.strictObject({ challengeToken: z.string().min(20) });
-const verifySchema = z.strictObject({ challengeToken: z.string().min(20), code });
 const createSchema = z.strictObject({
   loginId, displayName: z.string().trim().min(1).max(160),
   email: z.email().optional(), temporaryPassword: password,
@@ -86,19 +83,6 @@ export function registerAuthRoutes(app: Express, service: AuthService, allowedOr
   app.post("/api/v1/auth/change-password", async (request, response) => {
     const input = body(changeSchema, request.body);
     response.json({ data: await service.changePassword(input.challengeToken, input.oldPassword, input.newPassword) });
-  });
-  app.post("/api/v1/auth/mfa/setup", async (request, response) => {
-    const input = body(challengeSchema, request.body);
-    response.set("Cache-Control", "no-store");
-    response.json({ data: await service.setupMfa(input.challengeToken) });
-  });
-  app.post("/api/v1/auth/mfa/confirm", async (request, response) => {
-    const input = body(verifySchema, request.body);
-    finishLogin(response, await service.confirmMfa(input.challengeToken, input.code));
-  });
-  app.post("/api/v1/auth/mfa/verify", credentialLimit, async (request, response) => {
-    const input = body(verifySchema, request.body);
-    finishLogin(response, await service.verifyMfa(input.challengeToken, input.code));
   });
   app.post("/api/v1/auth/refresh", cookieOrigin, async (request, response) => {
     const token = request.cookies?.digimarket_refresh;

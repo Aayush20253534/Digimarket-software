@@ -3,13 +3,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Fingerprint, KeyRound, LockKeyhole, ShieldCheck, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, EyeOff, KeyRound, LockKeyhole, ShieldCheck, Sparkles, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWButton, AWFormField, AWInput, AWNotice } from "@/components/aw-ui";
 import { BrandLogo } from "@/components/brand-logo";
 import { ApiError, apiRequest, type LoginResult, type SessionPayload } from "@/lib/api";
 
-type Step = "credentials" | "change" | "enroll" | "verify";
+type Step = "credentials" | "change";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,8 +19,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [challenge, setChallenge] = useState("");
-  const [mfaSecret, setMfaSecret] = useState("");
-  const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -48,7 +46,7 @@ export default function LoginPage() {
         await finish(result);
       } else {
         setChallenge(result.challengeToken);
-        setStep(result.next === "CHANGE_PASSWORD" ? "change" : result.next === "ENROLL_MFA" ? "enroll" : "verify");
+        setStep("change");
       }
     } catch (failure) {
       setError(failure instanceof ApiError ? failure.message : "Unable to connect to the authentication service.");
@@ -70,35 +68,6 @@ export default function LoginPage() {
     } finally { setBusy(false); }
   }
 
-  async function setupMfa() {
-    setBusy(true); setError("");
-    try {
-      const result = await apiRequest<{ secret: string; otpauthUrl: string }>("/auth/mfa/setup", {
-        method: "POST", body: { challengeToken: challenge },
-      });
-      setMfaSecret(result.secret);
-      // otpauth URI is issued by backend and can be entered into any TOTP authenticator.
-      // Keep this secret in memory only; do not log it or persist it.
-    } catch (failure) {
-      setError(failure instanceof ApiError ? failure.message : "MFA setup is unavailable.");
-    } finally { setBusy(false); }
-  }
-
-  async function submitMfa(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true); setError("");
-    try {
-      const url = step === "enroll" ? "/auth/mfa/confirm" : "/auth/mfa/verify";
-      const result = await apiRequest<SessionPayload>(url, { method: "POST", body: {
-        challengeToken: challenge, code: otp,
-      } });
-      setOtp(""); setMfaSecret(""); setPassword(""); setChallenge("");
-      await finish(result);
-    } catch (failure) {
-      setError(failure instanceof ApiError ? failure.message : "Verification failed.");
-    } finally { setBusy(false); }
-  }
-
   if (status === "loading" || status === "authenticated") {
     return <main className="aw-theme flex min-h-screen items-center justify-center bg-[#09070E]">
       <div role="status" className="flex items-center gap-3 text-sm text-[#CFBFDF]">
@@ -108,14 +77,10 @@ export default function LoginPage() {
     </main>;
   }
 
-  const stepTitle = step === "credentials" ? "Sign in to your workspace"
-    : step === "change" ? "Set your new password"
-    : step === "enroll" ? "Enable two-factor security"
-    : "Verify your sign-in";
-  const stepDescription = step === "credentials" ? "Use the login ID and password issued by your administrator."
-    : step === "change" ? "Replace your temporary password before accessing the workspace."
-    : step === "enroll" ? "Connect a time-based authenticator to protect your privileged account."
-    : "Enter the six-digit code from your authenticator application.";
+  const stepTitle = step === "credentials" ? "Sign in to your workspace" : "Set your new password";
+  const stepDescription = step === "credentials"
+    ? "Use the login ID and password issued by your administrator."
+    : "Change your temporary password to keep your account secure.";
 
   return <main className="aw-theme flex min-h-[100svh] items-center justify-center overflow-x-clip bg-[#09070E]">
     <a href="#auth-form-heading" className="aw-skip-link">Skip to sign in</a>
@@ -161,8 +126,7 @@ export default function LoginPage() {
           <div className="mb-6 flex items-center justify-between gap-4">
             <div className="aw-auth-icon">
               {step === "credentials" ? <LockKeyhole size={23} aria-hidden="true" />
-                : step === "change" ? <KeyRound size={23} aria-hidden="true" />
-                : <Fingerprint size={23} aria-hidden="true" />}
+                : <KeyRound size={23} aria-hidden="true" />}
             </div>
             <span className="aw-auth-secure-chip"><ShieldCheck size={14} aria-hidden="true"/> Secure access</span>
           </div>
@@ -211,31 +175,8 @@ export default function LoginPage() {
             <AWButton type="submit" className="w-full" disabled={busy}>{busy ? "Updating…" : "Change password"}<ArrowRight size={17} aria-hidden="true"/></AWButton>
           </form>}
 
-          {step === "enroll" && !mfaSecret && <div className="mt-7 space-y-5">
-            <AWNotice tone="info">Keep your authenticator app available. Setup will provide a one-time secret key.</AWNotice>
-            <AWButton type="button" className="w-full" onClick={setupMfa} disabled={busy}>{busy ? "Preparing…" : "Generate authenticator setup"}<ArrowRight size={17} aria-hidden="true"/></AWButton>
-          </div>}
-
-          {(step === "verify" || (step === "enroll" && mfaSecret)) && <form onSubmit={submitMfa} className="mt-7 space-y-5">
-            {step === "enroll" && <div className="rounded-xl border border-[#68457D] bg-[#251633] p-4">
-              <p className="text-sm font-semibold text-[#F6E6FF]">Add a time-based account to your authenticator.</p>
-              <p className="mt-2 text-xs leading-6 text-[#CBB8DA]">Enter the setup key manually. It is displayed only during enrollment, so keep it private.</p>
-              <code data-testid="mfa-secret" className="aw-auth-mfa-key mt-3">{mfaSecret}</code>
-            </div>}
-            <AWFormField id="otp" label="Six-digit authenticator code">
-              <AWInput id="otp" type="text" inputMode="numeric" autoComplete="one-time-code"
-                minLength={6} maxLength={6} pattern="[0-9]{6}" required
-                value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder="000000" className="text-center font-mono text-lg tracking-[.35em]"/>
-            </AWFormField>
-            <AWButton type="submit" className="w-full" disabled={busy}>
-              {busy ? "Verifying…" : step === "enroll" ? "Enable MFA and sign in" : "Verify and sign in"}
-              <ArrowRight size={17} aria-hidden="true"/>
-            </AWButton>
-          </form>}
-
           {step !== "credentials" && <button type="button"
-            onClick={() => { setStep("credentials"); setChallenge(""); setOtp(""); setMfaSecret(""); setError(""); }}
+            onClick={() => { setStep("credentials"); setChallenge(""); setError(""); }}
             className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#CE9DEF] hover:text-white">
             <ArrowLeft size={16} aria-hidden="true"/> Start over
           </button>}

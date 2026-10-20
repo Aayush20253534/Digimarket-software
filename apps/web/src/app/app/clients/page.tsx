@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import { DirectoryModal, DirectoryDetailsPortal } from "@/components/directory-modal";
 import { ApiError } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
@@ -155,22 +156,22 @@ export default function ClientsPage(){
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
-       {canCreate&&creating&&<div className="aw-register-drawer" role="dialog" aria-modal="true" aria-label="Add client form">
-  <div className="aw-register-drawer-head"><strong>New client</strong><button type="button" className="btn-secondary" onClick={()=>setCreating(false)}>Close client form</button></div>
-  <Card title="Add client" description="Create a client directly when there is no lead to convert.">
+       {canCreate&&creating&&<DirectoryModal title="Add client" description="Create a client profile directly without converting a lead." onClose={()=>{if(!busy)setCreating(false);}}>
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {editableFields.map(([key,label])=><FormField key={key} id={"new-client-"+key} label={label}>
-             <input id={"new-client-"+key} className="field" required={key==="businessName"}
+             <input id={"new-client-"+key} className="field" autoFocus={key==="businessName"} required={key==="businessName"}
                type={key==="email"?"email":key.endsWith("Url")?"url":"text"}
                value={createDraft[key]} onChange={e=>setCreateDraft(v=>({...v,[key]:e.target.value}))}/>
            </FormField>)}
-           <div className="sm:col-span-2"><button className="btn-primary" disabled={busy}>Create client</button></div>
+           <div className="sm:col-span-2 aw-directory-modal-actions">
+             <button className="btn-secondary" type="button" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button>
+             <button className="btn-primary" disabled={busy} type="submit">Create client</button>
+           </div>
          </form>
-       </Card></div>}
+       </DirectoryModal>}
      </div>
-     <div className={selected?"aw-directory-details-shade":""} role={selected?"dialog":undefined} aria-modal={selected?"true":undefined} aria-label={selected?"Client details":undefined}>
-       {selected&&<button type="button" className="aw-directory-details-backdrop" aria-label="Close client details" onClick={()=>setSelected(null)}/>}
-       <div className={selected?"aw-directory-details-panel":"hidden"}>
+     {selected&&<DirectoryDetailsPortal onClose={()=>setSelected(null)}>
+       <div className="aw-directory-details-panel">
        {selected&&<div className="aw-directory-details-header"><strong>Client details</strong><button type="button" className="btn-secondary" onClick={()=>setSelected(null)}>Close</button></div>}
        {selected?<Card title={"Client: "+selected.businessName} description={"Profile version "+selected.version}>
          {selected.sourceLead&&<p className="mb-4 text-sm">Source lead: <Link href="/app/leads" className="text-indigo-700 underline">{selected.sourceLead.businessName}</Link></p>}
@@ -225,7 +226,7 @@ export default function ClientsPage(){
          </form>}
        </Card>}
        </div>
-     </div>
+     </DirectoryDetailsPortal>}
    </div>
  </div>;
 }
