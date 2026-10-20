@@ -201,3 +201,35 @@
 .aw-finance-admin-modal h2{font-size:1.2rem;font-weight:750}.aw-finance-admin-modal p{color:#c3afd3;margin:7px 0 17px}
 .aw-finance-admin-modal label{color:#f2e7fc}.aw-finance-admin-modal .field{background:#10091b;color:#fff;border:1px solid #73548f}
 .aw-finance-admin-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+
+/* Financial register and team directory need a contained scrolling viewport. */
+.aw-finance-register-scroll,.aw-team-table-scroll{min-width:0;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;border:1px solid #604171;border-radius:14px;scrollbar-color:#774a90 #1c1127}
+.aw-finance-register,.aw-team-table{width:100%;min-width:1060px;border-collapse:separate;border-spacing:0;text-align:left;font-size:.84rem;color:#f3e8fa}
+.aw-finance-register th,.aw-team-table th{background:#30203e;color:#e1c9ed;text-transform:uppercase;font-size:.69rem;letter-spacing:.04em;font-weight:800;white-space:nowrap;padding:14px 13px;text-align:left}
+.aw-finance-register td,.aw-team-table td{padding:15px 13px;border-top:1px solid #4c335c;vertical-align:middle;color:#f0e3f8;line-height:1.4}
+.aw-finance-register tbody tr:nth-child(even),.aw-team-table tbody tr:nth-child(even){background:#291a36a6}
+.aw-finance-register tbody tr:hover,.aw-team-table tbody tr:hover{background:#422957b8}
+.aw-finance-register td{white-space:nowrap}.aw-finance-register td:nth-child(4){min-width:145px;max-width:270px;white-space:normal;overflow-wrap:anywhere}
+.aw-finance-register td:nth-child(9){min-width:235px}.aw-finance-register td:nth-child(9)>div{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+.aw-finance-kind{display:inline-flex;align-items:center;gap:7px;font-weight:750}.aw-finance-kind.income,.aw-finance-amount.income{color:#59e3a2!important}.aw-finance-kind.expense,.aw-finance-amount.expense{color:#ff858e!important}
+.aw-finance-amount{font-weight:850;font-variant-numeric:tabular-nums;font-size:.93rem}
+.aw-finance-status{display:inline-block;font-size:.69rem;font-weight:800;padding:5px 9px;border-radius:20px;border:1px solid #856498;color:#e5cbee;background:#40294f}
+.aw-finance-status.status-posted{color:#70e9b1;border-color:#338968;background:#1a4939}.aw-finance-status.status-rejected,.aw-finance-status.status-cancelled{color:#ffa3b0;background:#502330;border-color:#994458}.aw-finance-status.status-pending{color:#ffd58d;background:#493323;border-color:#8c683b}
+.aw-finance-approval-link{color:#d6a0ff;font-weight:750;text-decoration:underline;text-underline-offset:3px}
+.aw-finance-register .btn-secondary{background:#402751!important;color:#f7e7ff!important;border:1px solid #764d90!important;font-size:.75rem;min-height:33px;padding:5px 10px}
+.aw-team-table{min-width:800px}.aw-team-table td:first-child{min-width:230px;max-width:330px;overflow-wrap:anywhere}
+.aw-team-table td:first-child p{color:#f7eaff!important;overflow-wrap:anywhere}.aw-team-table td:first-child p+p{color:#baa5ca!important}
+.aw-team-table td:nth-child(2){min-width:160px}.aw-team-table td:nth-child(2) span{color:#eddef5!important}
+.aw-team-table select.field{max-width:170px;width:100%;min-height:40px;background:#2b1939;color:#fff;border:1px solid #79518e}
+.aw-team-row-actions{display:flex;align-items:center;flex-wrap:wrap;gap:9px;min-width:190px}.aw-team-row-actions button{white-space:nowrap;min-height:37px;padding:7px 12px}
+.aw-team-security-note{display:flex;align-items:flex-start;gap:12px;padding:17px 19px;border:1px solid #73508c;border-radius:15px;background:#261734;color:#d9c4e8;font-size:.84rem;line-height:1.6}
+.aw-team-security-note strong{color:#fff}.aw-team-security-note svg{color:#d89bf4;flex:none}
+.aw-cash-ledger{display:grid;gap:12px;margin-top:13px}.aw-cash-ledger-currency{font-size:.73rem;color:#cdb3d9}
+.aw-cash-ledger-line{display:grid;gap:5px;padding:11px 12px;border:1px solid #ffffff20;border-radius:12px;background:#180f23aa}
+.aw-cash-ledger-line span{font-weight:800;text-transform:uppercase;letter-spacing:.055em;font-size:.72rem}
+.aw-cash-ledger-line strong{font-size:clamp(1.25rem,1.7vw,1.7rem);font-variant-numeric:tabular-nums;white-space:nowrap}
+.aw-cash-income{color:#5ce6a7}.aw-cash-expense{color:#ff898f}
+.aw-report-card:has(.aw-cash-ledger){padding:18px!important}
+.aw-notes-trash-actions{display:flex;align-items:center;gap:5px}.aw-notes-trash-actions button{min-width:34px}
+.aw-notes-trash-actions button.danger{color:#ff9cae}
+@media(max-width:650px){.aw-finance-register,.aw-team-table{font-size:.79rem}.aw-finance-register td,.aw-team-table td{padding:12px 10px}.aw-team-security-note{padding:14px}.aw-cash-ledger-line strong{font-size:1.3rem}}

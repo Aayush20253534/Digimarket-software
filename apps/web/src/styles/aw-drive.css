@@ -49,3 +49,11 @@
 @media(max-width:380px){.aw-drive-tile-grid,.aw-drive-items.aw-drive-grid{grid-template-columns:minmax(0,1fr)}.aw-drive-folder-tile{min-height:54px}.aw-drive-heading h1{font-size:1.55rem}}
 
 .aw-drive-storage-label{font-size:.72rem;color:#baa4c9;line-height:1.5;margin-top:-9px}
+
+/* Protected images get a real thumbnail; no unsigned public delivery paths. */
+.aw-drive-file-icon.aw-drive-has-image{overflow:hidden;background:#120a1a;border:1px solid #755390}
+.aw-drive-image-thumb{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+.aw-drive-grid .aw-drive-file-icon.aw-drive-has-image{width:100%;height:135px;border-radius:9px}
+.aw-drive-grid .aw-drive-file-primary:has(.aw-drive-image-thumb){align-items:flex-start;flex-wrap:wrap}
+.aw-drive-grid .aw-drive-file-primary:has(.aw-drive-image-thumb) .aw-drive-file-name{width:100%}
+.aw-drive-list .aw-drive-file-icon.aw-drive-has-image{width:44px;height:44px}

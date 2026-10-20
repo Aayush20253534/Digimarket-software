@@ -26,6 +26,7 @@ export default function AssetsPage(){
  const canArchive=!!session?.identity.permissions.includes("assets.delete");
  const canClients=!!session?.identity.permissions.includes("clients.read");
  const [items,setItems]=useState<Asset[]>([]);
+ const [imagePreviews,setImagePreviews]=useState<Record<string,string>>({});
  const [trail,setTrail]=useState<FolderItem[]>([]);
  const folderId=trail.length?trail[trail.length-1].id:null;
  const [folders,setFolders]=useState<FolderItem[]>([]);
@@ -113,6 +114,26 @@ export default function AssetsPage(){
    }catch(e){setError(errText(e));}finally{setLoading(false);}
  },[canRead,request,filter,search,filterClient,cursor,folderId,sort,reverse]);
  useEffect(()=>{void load();},[load]);
+ // Short-lived authenticated URLs are held only in component memory.
+ // Backend authorization is checked for each image, never inferred from its public ID.
+ useEffect(()=>{
+  let cancelled=false;
+  const images=items.filter(x=>x.status==="ACTIVE"&&x.contentType.startsWith("image/")).slice(0,24);
+  setImagePreviews({});
+  const collect=async()=>{
+   for(const batch of [images.slice(0,8),images.slice(8,16),images.slice(16,24)]){
+    if(cancelled)return;
+    await Promise.all(batch.map(async asset=>{
+     try{
+      const result=await request<{url:string}>("/assets/"+asset.id+"/authorized-download",{method:"POST",body:{}});
+      if(!cancelled)setImagePreviews(old=>({...old,[asset.id]:result.url}));
+     }catch{/* Individual thumbnails remain icons if storage denies preview. */}
+    }));
+   }
+  };
+  void collect();
+  return()=>{cancelled=true;};
+ },[items,request]);
  useEffect(()=>{
    if(!canClients)return;
    void request<{items:Client[]}>("/clients?limit=100&status=ACTIVE").then(data=>setClients(data.items)).catch(()=>{});
@@ -443,7 +464,13 @@ export default function AssetsPage(){
       <label className="aw-drive-check"><input type="checkbox" aria-label={"Select "+asset.filename} checked={selectedIds.includes(asset.id)}
        onChange={e=>setSelectedIds(v=>e.target.checked?[...v,asset.id]:v.filter(id=>id!==asset.id))}/></label>
       <button type="button" className="aw-drive-file-primary" onClick={()=>open(asset)} onDoubleClick={()=>void previewAsset(asset)}>
-       <span className="aw-drive-file-icon">{asset.contentType.startsWith("image/")?<FileImage size={24}/>:asset.contentType.startsWith("video/")?<FileVideo size={24}/>:asset.contentType==="application/pdf"?<FileText size={24}/>:<File size={24}/>}</span>
+       <span className={"aw-drive-file-icon"+(imagePreviews[asset.id]?" aw-drive-has-image":"")}>
+         {asset.contentType.startsWith("image/")&&imagePreviews[asset.id]?
+          <img src={imagePreviews[asset.id]} alt="" loading="lazy" className="aw-drive-image-thumb"/>:
+          asset.contentType.startsWith("image/")?<FileImage size={24}/>:
+          asset.contentType.startsWith("video/")?<FileVideo size={24}/>:
+          asset.contentType==="application/pdf"?<FileText size={24}/>:<File size={24}/>}
+        </span>
        <span className="aw-drive-file-name"><strong>{asset.filename}</strong><small>{prettyBytes(asset.bytes)} · {new Date(asset.createdAt).toLocaleDateString()}</small></span>
       </button>
       <span className="aw-drive-file-type">{asset.contentType}</span>
