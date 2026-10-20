@@ -67,6 +67,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("textbox", { name: "Typed notes" }).fill("## Brief\\n**Approve** the violet layout.");
   const noteCanvas=page.locator("canvas.aw-notes-canvas");
   await expect(noteCanvas).toBeVisible();
+  await noteCanvas.scrollIntoViewIfNeeded();
   const bounds=await noteCanvas.boundingBox();
   if(!bounds)throw new Error("Note canvas did not render");
   await page.mouse.move(bounds.x+bounds.width*.2,bounds.y+bounds.height*.2);
