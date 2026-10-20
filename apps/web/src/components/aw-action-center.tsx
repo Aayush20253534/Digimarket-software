@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, CalendarClock, CheckSquare2, Clock3, FolderKanban, ListOrdered, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowRight, CalendarClock, Clock3, FolderKanban, ListOrdered, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWBadge, AWNotice } from "@/components/aw-ui";
 import { AWPanel } from "@/components/aw-data-patterns";
@@ -40,12 +40,12 @@ export function AWActionCenter() {
   const [feed,setFeed]=useState<Feed|null>(null);
   const [loading,setLoading]=useState(false);
   const [run,setRun]=useState(0);
+  const [clock,setClock]=useState(()=>Date.now());
   const [pendingVisible,setPendingVisible]=useState(8);
   const [overdueVisible,setOverdueVisible]=useState(8);
   const canTasks=!!session?.identity.permissions.includes("tasks.read");
   const canProjects=!!session?.identity.permissions.includes("projects.read");
   const canTeam=!!session?.identity.permissions.includes("tasks.manage");
-  const userId=session?.identity.userId;
 
   const load=useCallback(async()=>{
     if(!session)return;
@@ -85,7 +85,7 @@ export function AWActionCenter() {
   },[session,request,canTasks,canProjects,canTeam]);
 
   useEffect(()=>{void load();},[load,run]);
-  const currentTime=Date.now(),today=localDateKey(new Date(currentTime));
+  const currentTime=clock,today=localDateKey(new Date(currentTime));
   const pending=useMemo(()=>feed?.tasks.filter(x=>!taskClosed.has(x.status)).sort(compareByDue)??[],[feed]);
   const overdue=useMemo(()=>{
     const tasks=feed?.tasks.filter(x=>!taskClosed.has(x.status)&&x.dueAt&&new Date(x.dueAt).getTime()<currentTime)
@@ -104,7 +104,7 @@ export function AWActionCenter() {
         <h2 className="aw-action-heading">What needs your attention</h2>
         <p className="aw-panel-description">Live, permission-scoped tasks and project deadlines. Completed and cancelled work is excluded.</p>
       </div>
-      <button type="button" className="aw-dashboard-refresh" onClick={()=>setRun(v=>v+1)} disabled={loading}
+      <button type="button" className="aw-dashboard-refresh" onClick={()=>{setClock(Date.now());setRun(v=>v+1);}} disabled={loading}
         aria-label="Refresh priorities"><RefreshCw size={16} className={loading?"animate-spin":""} aria-hidden="true" />
         {loading?"Loading…":"Refresh priorities"}</button>
     </div>

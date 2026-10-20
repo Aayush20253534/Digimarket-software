@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth-provider";
 import { AWBadge, AWEmptyState, AWNotice, AWStatusBadge } from "@/components/aw-ui";
 import { AWDataToolbar, AWLocalPagination, AWPanel, AWSortButton, AWStat } from "@/components/aw-data-patterns";
 import { permittedGroups } from "@/components/workspace-navigation";
+import { AWActionCenter } from "@/components/aw-action-center";
 
 type Source = "Clients" | "Leads" | "Projects";
 type Entry = { id: string; name: string; status: string; source: Source; href: string; };
@@ -152,6 +153,8 @@ export default function Dashboard() {
       These counts and rows show the first 10 records returned from each permitted module, not agency-wide totals.
       More records are available in: {overview.more.join(", ")}.
     </AWNotice> : null}
+
+    <AWActionCenter />
 
     <div className="aw-dashboard-main-grid">
       <AWPanel title="Recent workspace records" description="Live data from modules your account can access. Results are limited to the first API page.">
