@@ -58,6 +58,36 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("heading", { name: /Welcome,/ })).toBeVisible();
   await expect(page.getByText("Authenticated", { exact: true })).toBeVisible();
 
+  // Phase 7: notes persist as private server records, including handwritten strokes.
+  await page.goto("/app/notes");
+  await expect(page.getByRole("heading", { name: "My notes" })).toBeVisible();
+  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-restyled", "true");
+  await page.getByRole("button", { name: "New note" }).click();
+  await page.getByRole("textbox", { name: "Note title" }).fill("CI note for design review");
+  await page.getByRole("textbox", { name: "Typed notes" }).fill("## Brief\\n**Approve** the violet layout.");
+  const noteCanvas=page.locator("canvas.aw-notes-canvas");
+  await expect(noteCanvas).toBeVisible();
+  const bounds=await noteCanvas.boundingBox();
+  if(!bounds)throw new Error("Note canvas did not render");
+  await page.mouse.move(bounds.x+bounds.width*.2,bounds.y+bounds.height*.2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x+bounds.width*.3,bounds.y+bounds.height*.35,{steps:6});
+  await page.mouse.up();
+  await expect(page.getByText("All changes saved")).toBeVisible({timeout:20000});
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Note title" })).toHaveValue("CI note for design review");
+  await expect(page.getByRole("textbox", { name: "Typed notes" })).toContainText("Approve");
+  await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByText("Approve", {exact:false}).first()).toBeVisible();
+  await page.getByRole("button", { name: "Write" }).click();
+  page.once("dialog", dialog=>void dialog.accept());
+  await page.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("No saved notes. Create one to begin.")).toBeVisible();
+  await page.goto("/app/dashboard");
+  await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
+
+
   // Dashboard action-center regression uses scoped, read-only API fixtures.
   await expect(page.getByTestId("dashboard-action-center")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pending tasks" })).toBeVisible();
