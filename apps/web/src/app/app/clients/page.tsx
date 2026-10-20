@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -45,6 +45,7 @@ export default function ClientsPage(){
  const [sortBy,setSortBy]=useState<"businessName"|"businessType"|"location"|"status">("businessName"),[descending,setDescending]=useState(false);
  const [cursor,setCursor]=useState<string|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
+ const [legacySort,setLegacySort]=useState(false);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -59,7 +60,13 @@ export default function ClientsPage(){
      if(search.trim())q.set("q",search.trim());
      if(filter)q.set("status",filter);
      if(cursor)q.set("cursor",cursor);
-     const result=await request<Register>("/clients?"+q.toString());
+     let result:Register;
+     try{result=await request<Register>("/clients?"+q.toString());setLegacySort(false);}
+     catch(e){
+      if(!(e instanceof ApiError)||e.status!==422)throw e;
+      q.delete("sort");q.delete("direction");
+      result=await request<Register>("/clients?"+q.toString());setLegacySort(true);
+     }
      setRows(result.items);setNextCursor(result.nextCursor);setError("");
    }catch(e){setError(readable(e));}finally{setLoading(false);}
  },[canRead,request,search,filter,cursor,sortBy,descending]);
@@ -106,7 +113,10 @@ export default function ClientsPage(){
      await open(selected.id);setMessage("Service added to client.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
- const sorted=rows;
+ const sorted=useMemo(()=>legacySort?[...rows].sort((a,b)=>{
+  const delta=String(a[sortBy]??"").localeCompare(String(b[sortBy]??""),undefined,{numeric:true,sensitivity:"base"});
+  return descending?-delta:delta;
+ }):rows,[rows,sortBy,descending,legacySort]);
  if(!session)return <Spinner label="Checking client access…"/>;
  if(!canRead)return <><PageHeader title="Clients access denied"/><Notice kind="error">Your account cannot view client records.</Notice></>;
  return <div data-aw-module="clients" className="aw-module-root space-y-7">
