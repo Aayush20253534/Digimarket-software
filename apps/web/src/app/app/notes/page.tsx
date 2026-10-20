@@ -6,7 +6,30 @@ import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { AWButton, AWNotice, AWPageHeader } from "@/components/aw-ui";
 
-type Stroke={color:string;width:number;points:[number,number][]};
+type Tool="pen"|"pencil"|"highlighter"|"marker"|"eraser";
+type Point=[number,number,number?];
+type Stroke={color:string;width:number;points:Point[];tool?:Exclude<Tool,"eraser">};
+function partialErase(stroke:Stroke,point:Point,radius:number):Stroke[]{
+ const old=stroke.points;if(!old.length)return[];
+ const cx=point[0]*W,cy=point[1]*H;
+ const touches=(a:Point,b:Point)=>{
+  const ax=a[0]*W,ay=a[1]*H,bx=b[0]*W,by=b[1]*H,dx=bx-ax,dy=by-ay;
+  const scale=dx*dx+dy*dy,t=scale?Math.max(0,Math.min(1,((cx-ax)*dx+(cy-ay)*dy)/scale)):0;
+  return Math.hypot(ax+t*dx-cx,ay+t*dy-cy)<=radius+stroke.width/2;
+ };
+ if(!old.some((p,i)=>touches(p,old[Math.max(0,i-1)])))return[stroke];
+ const parts:Point[][]=[];let current:Point[]=[];
+ const push=()=>{if(current.length)parts.push(current);current=[];};
+ if(old.length===1)return touches(old[0],old[0])?[]:[stroke];
+ for(let i=1;i<old.length;i++){
+  const a=old[i-1],b=old[i],n=Math.max(1,Math.ceil(Math.hypot((b[0]-a[0])*W,(b[1]-a[1])*H)/2));
+  for(let j=i===1?0:1;j<=n;j++){
+   const t=j/n,p:Point=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]===undefined?undefined:(a[2]??.5)+((b[2]??.5)-(a[2]??.5))*t];
+   if(Math.hypot(p[0]*W-cx,p[1]*H-cy)<=radius+stroke.width/2)push();else current.push(p);
+  }
+ }
+ push();return parts.map(points=>({...stroke,points}));
+}
 type Note={id:string;title:string;body:string;strokes:string;version:number;updatedAt:string};
 type NoteSummary=Pick<Note,"id"|"title"|"version"|"updatedAt">;
 type Draft={title:string;body:string;strokes:string};
@@ -36,14 +59,21 @@ function draw(ctx:CanvasRenderingContext2D,strokes:Stroke[]){
  ctx.clearRect(0,0,W,H);
  for(const stroke of strokes){
   if(!stroke.points.length)continue;
-  ctx.beginPath();ctx.strokeStyle=stroke.color;ctx.fillStyle=stroke.color;
-  ctx.lineWidth=stroke.width;ctx.lineJoin="round";ctx.lineCap="round";
-  const first=stroke.points[0];ctx.moveTo(first[0]*W,first[1]*H);
-  for(const p of stroke.points.slice(1))ctx.lineTo(p[0]*W,p[1]*H);
-  if(stroke.points.length===1){ctx.arc(first[0]*W,first[1]*H,stroke.width/2,0,Math.PI*2);ctx.fill();}
-  else ctx.stroke();
+  ctx.save();ctx.strokeStyle=stroke.color;ctx.fillStyle=stroke.color;
+  ctx.globalAlpha=stroke.tool==="highlighter"?.28:stroke.tool==="pencil"?.66:stroke.tool==="marker"?.88:1;
+  ctx.lineJoin="round";ctx.lineCap="round";
+  if(stroke.tool==="pencil")ctx.setLineDash([1,1.8]);
+  const pts=stroke.points;
+  if(pts.length===1){ctx.beginPath();ctx.arc(pts[0][0]*W,pts[0][1]*H,stroke.width/2,0,Math.PI*2);ctx.fill();}
+  else for(let i=1;i<pts.length;i++){
+   ctx.beginPath();ctx.moveTo(pts[i-1][0]*W,pts[i-1][1]*H);ctx.lineTo(pts[i][0]*W,pts[i][1]*H);
+   ctx.lineWidth=stroke.width*(stroke.tool==="highlighter"||stroke.tool==="marker"?1:(.7+Math.max(.1,pts[i][2]??.5)*.6));
+   ctx.stroke();
+  }
+  ctx.restore();
  }
 }
+
 export default function NotesPage(){
  const {session,request}=useAuth();
  const [list,setList]=useState<NoteSummary[]>([]);
@@ -54,10 +84,13 @@ export default function NotesPage(){
  const [saveState,setSaveState]=useState<"saved"|"unsaved"|"saving"|"conflict">("saved");
  const [error,setError]=useState("");
  const [preview,setPreview]=useState(false);
- const [pen,setPen]=useState("#D18CFF"),[width,setWidth]=useState(3);
+ const [pen,setPen]=useState("#D18CFF"),[width,setWidth]=useState(3),[eraserSize,setEraserSize]=useState(16);
+ const [tool,setTool]=useState<Tool>("pen");
  const [drawing,setDrawing]=useState<Stroke|null>(null);
- const [expanded,setExpanded]=useState(false),[eraser,setEraser]=useState(false);
- const redoStack=useRef<Stroke[]>([]);
+ const [expanded,setExpanded]=useState(false);
+ const redoStack=useRef<string[]>([]),history=useRef<string[]>([]);
+ const eraserWork=useRef<Stroke[]|null>(null);
+ const [erasing,setErasing]=useState<Stroke[]|null>(null);
  const drawingRef=useRef<Stroke|null>(null),canvasRef=useRef<HTMLCanvasElement>(null);
  const inFlight=useRef(false), dirty=useRef(false), selectedRef=useRef<string|null>(null);
  const [actionBusy,setActionBusy]=useState(false);
@@ -95,7 +128,7 @@ export default function NotesPage(){
   try{
    const note=await request<Note>("/notes/"+id);
    selectedRef.current=id;setSelected(id);versionRef.current=note.version;
-   redoStack.current=[];
+   redoStack.current=[];history.current=[];setErasing(null);
    const next={title:note.title,body:note.body,strokes:note.strokes};
    dirty.current=false;draftRef.current=next;setDraft(next);setSaveState("saved");
    setDrawing(null);drawingRef.current=null;
@@ -116,8 +149,8 @@ export default function NotesPage(){
  },[draft,selected,saveState,flush]);
  useEffect(()=>{
   const el=canvasRef.current,ctx=el?.getContext("2d");
-  if(ctx)draw(ctx,[...parseStrokes(draft.strokes),...(drawing?[drawing]:[])]);
- },[draft.strokes,drawing]);
+  if(ctx)draw(ctx,[...(erasing??parseStrokes(draft.strokes)),...(drawing?[drawing]:[])]);
+ },[draft.strokes,drawing,erasing]);
  const create=async()=>{
   if(inFlight.current)return;
   if(dirty.current&&!await flush())return;
@@ -126,7 +159,7 @@ export default function NotesPage(){
    const note=await request<Note>("/notes",{method:"POST",body:blank});
    await listNotes();
    selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
-   draftRef.current=blank;setDraft(blank);dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];
+   draftRef.current=blank;setDraft(blank);dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];history.current=[];
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
  const saveConflictCopy=async()=>{
@@ -156,45 +189,52 @@ export default function NotesPage(){
   return [Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),
    Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height))] as [number,number];
  };
- const eraseAt=(point:[number,number])=>{
-  const strokes=parseStrokes(draftRef.current.strokes);
-  const radius=Math.max(.016,width/W*3);
-  for(let i=strokes.length-1;i>=0;i--){
-   if(strokes[i].points.some(p=>Math.hypot(p[0]-point[0],p[1]-point[1])<radius)){
-    redoStack.current=[];strokes.splice(i,1);
-    setEdited({...draftRef.current,strokes:JSON.stringify(strokes)});break;
-   }
-  }
+ const setStrokes=(next:Stroke[],addUndo=true)=>{
+  if(addUndo){history.current.push(draftRef.current.strokes);if(history.current.length>80)history.current.shift();redoStack.current=[];}
+  setEdited({...draftRef.current,strokes:JSON.stringify(next)});
+ };
+ const markPressure=(e:PointerEvent<HTMLCanvasElement>):Point=>{
+  const [x,y]=mark(e);return[x,y,e.pointerType==="pen"?Math.max(.1,e.pressure):.5];
+ };
+ const eraseAt=(point:Point)=>{
+  if(!eraserWork.current)return;
+  const before=eraserWork.current;
+  const result=before.flatMap(stroke=>partialErase(stroke,point,eraserSize));
+  eraserWork.current=result;setErasing(result);
  };
  const down=(e:PointerEvent<HTMLCanvasElement>)=>{
   if(!selected||actionBusy||e.button!==0)return;
   e.currentTarget.setPointerCapture(e.pointerId);
-  if(eraser){eraseAt(mark(e));return;}
-  const s:Stroke={color:pen,width,points:[mark(e)]};
-  drawingRef.current=s;setDrawing(s);
+  if(tool==="eraser"){eraserWork.current=parseStrokes(draftRef.current.strokes);eraseAt(markPressure(e));return;}
+  const stroke:Stroke={color:pen,width:tool==="highlighter"?Math.max(12,width*5):tool==="marker"?Math.max(7,width*2):width,tool,points:[markPressure(e)]};
+  drawingRef.current=stroke;setDrawing(stroke);
  };
  const move=(e:PointerEvent<HTMLCanvasElement>)=>{
-  if(eraser){if(e.buttons||e.pressure>0)eraseAt(mark(e));return;}
-  const stroke=drawingRef.current;
-  if(!stroke)return;
-  const next={...stroke,points:[...stroke.points,mark(e)]};
+  if(tool==="eraser"){if(eraserWork.current)eraseAt(markPressure(e));return;}
+  const stroke=drawingRef.current;if(!stroke)return;
+  const next={...stroke,points:[...stroke.points,markPressure(e)]};
   drawingRef.current=next;setDrawing(next);
  };
  const up=()=>{
-  const s=drawingRef.current;if(!s)return;
+  if(eraserWork.current){
+   const next=eraserWork.current;eraserWork.current=null;setErasing(null);
+   if(JSON.stringify(next)!==draftRef.current.strokes)setStrokes(next);
+   return;
+  }
+  const stroke=drawingRef.current;if(!stroke)return;
   drawingRef.current=null;setDrawing(null);
-  const all=[...parseStrokes(draftRef.current.strokes),s];
-  redoStack.current=[];
-  setEdited({...draftRef.current,strokes:JSON.stringify(all)});
+  setStrokes([...parseStrokes(draftRef.current.strokes),stroke]);
  };
  const undo=()=>{
-  const all=parseStrokes(draftRef.current.strokes),last=all.pop();
-  if(!last)return;redoStack.current.push(last);
-  setEdited({...draftRef.current,strokes:JSON.stringify(all)});
+  const current=draftRef.current.strokes;
+  const previous=history.current.pop();
+  if(previous!==undefined){redoStack.current.push(current);setEdited({...draftRef.current,strokes:previous});return;}
+  const all=parseStrokes(current),last=all.pop();if(!last)return;
+  redoStack.current.push(current);setEdited({...draftRef.current,strokes:JSON.stringify(all)});
  };
  const redo=()=>{
-  const last=redoStack.current.pop();if(!last)return;
-  setEdited({...draftRef.current,strokes:JSON.stringify([...parseStrokes(draftRef.current.strokes),last])});
+  const next=redoStack.current.pop();if(next===undefined)return;
+  history.current.push(draftRef.current.strokes);setEdited({...draftRef.current,strokes:next});
  };
  useEffect(()=>{
   if(!expanded)return;
@@ -252,15 +292,22 @@ export default function NotesPage(){
        onChange={e=>setEdited({...draftRef.current,title:e.target.value})}
        className="aw-notes-title" placeholder="Untitled note"/>
      <div className="aw-notes-draw-head">
-      <div><h2><PenLine size={18}/> Handwriting canvas</h2><p>Use a mouse, finger or stylus. The drawing is saved together with the text.</p></div>
+      <div><h2><PenLine size={18}/> Handwriting canvas</h2><p>Sketch, highlight and take notes using a mouse, finger or stylus.</p></div>
       <div className="aw-notes-pen">
-       <label htmlFor="aw-pen-color">Ink</label><input id="aw-pen-color" type="color" value={pen} onChange={e=>setPen(e.target.value)}/>
-       <label htmlFor="aw-pen-width">Size</label><input id="aw-pen-width" type="range" min={1} max={14} value={width} onChange={e=>setWidth(Number(e.target.value))}/>
-       <button type="button" aria-pressed={!eraser} onClick={()=>setEraser(false)}><PenLine size={16}/> Pen</button>
-       <button type="button" aria-pressed={eraser} onClick={()=>setEraser(true)}><Eraser size={16}/> Eraser</button>
+       <div className="aw-notes-tool-choices" role="group" aria-label="Drawing tools">
+        {(["pen","pencil","highlighter","marker","eraser"] as Tool[]).map(t=><button type="button" key={t} aria-pressed={tool===t} onClick={()=>setTool(t)}>
+          {t==="eraser"?<Eraser size={15}/>:<PenLine size={15}/>} {t[0].toUpperCase()+t.slice(1)}</button>)}
+       </div>
+       <label htmlFor="aw-pen-color">Color</label><input id="aw-pen-color" aria-label="Ink color" type="color" value={pen} onChange={e=>setPen(e.target.value)}/>
+       {["#29202e","#D18CFF","#FF6099","#F2C94C","#54C7D5","#78D4A1"].map(c=>
+        <button key={c} type="button" className="aw-notes-swatch" aria-label={"Select color "+c} aria-pressed={pen.toLowerCase()===c.toLowerCase()} onClick={()=>setPen(c)}><span style={{background:c}}/></button>)}
+       <label htmlFor="aw-pen-width">{tool==="eraser"?"Eraser size":"Brush size"}</label>
+       {tool==="eraser"?<input id="aw-pen-width" aria-label="Eraser size" type="range" min={4} max={80} step={2} value={eraserSize} onChange={e=>setEraserSize(Number(e.target.value))}/>:
+        <input id="aw-pen-width" aria-label="Brush size" type="range" min={1} max={18} value={width} onChange={e=>setWidth(Number(e.target.value))}/>}
+       <span className="aw-notes-tool-size">{tool==="eraser"?eraserSize:width}px</span>
        <button type="button" onClick={undo} disabled={!parseStrokes(draft.strokes).length}><Undo2 size={16}/> Undo</button>
        <button type="button" onClick={redo} disabled={!redoStack.current.length}><Redo2 size={16}/> Redo</button>
-       <button type="button" onClick={()=>{redoStack.current=[];setEdited({...draftRef.current,strokes:"[]"});}} disabled={!parseStrokes(draft.strokes).length}>
+       <button type="button" onClick={()=>{if(window.confirm("Clear the entire drawing?"))setStrokes([]);}} disabled={!parseStrokes(draft.strokes).length}>
         <Eraser size={16}/> Clear
        </button>
       </div>
