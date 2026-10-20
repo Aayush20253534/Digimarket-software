@@ -10,7 +10,7 @@ services:
     region: singapore
     autoDeployTrigger: off
     healthCheckPath: /api/v1/ready
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api build
     preDeployCommand: pnpm --filter @digimarket/db db:migrate:deploy && pnpm --filter @digimarket/api exec tsx ../../packages/db/src/seed.ts
     startCommand: pnpm --filter @digimarket/api start
     maxShutdownDelaySeconds: 60
@@ -48,7 +48,7 @@ services:
     branch: main
     region: singapore
     autoDeployTrigger: off
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/worker build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/worker build
     startCommand: pnpm --filter @digimarket/worker start
     maxShutdownDelaySeconds: 120
     envVars:
