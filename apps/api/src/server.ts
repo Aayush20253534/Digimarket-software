@@ -3,7 +3,11 @@ import { createApp } from "./app";
 import { createDatabaseClient } from "@digimarket/db";
 import { AuthService } from "./auth/service";
 import { loadAuthConfig } from "./auth/crypto";
+import { validateProductionApiConfig } from "./runtime/production";
 
+validateProductionApiConfig(process.env);
+if(process.env.NODE_ENV==="production"&&!process.env.DATABASE_URL)
+ throw new Error("Live API cannot start without DATABASE_URL");
 const rawPort = Number(process.env.PORT ?? "4000");
 if (!Number.isInteger(rawPort) || rawPort < 1 || rawPort > 65535) {
   throw new Error("PORT must be a valid TCP port number");

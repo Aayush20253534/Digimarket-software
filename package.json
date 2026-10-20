@@ -16,7 +16,11 @@
     "smoke": "node scripts/smoke.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:validate": "pnpm --filter @digimarket/db db:validate"
+    "db:validate": "pnpm --filter @digimarket/db db:validate",
+    "release:check": "node scripts/release-static-check.mjs",
+    "release:smoke": "node scripts/postdeploy-smoke.mjs",
+    "db:backup": "node scripts/db-recovery.mjs backup",
+    "db:restore:rehearsal": "node scripts/db-recovery.mjs restore"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",

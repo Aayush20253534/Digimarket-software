@@ -1,0 +1,88 @@
+name: Module 17 Production Release Gates
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  release-readiness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: digimarket_ci
+          POSTGRES_PASSWORD: ephemeral-release-only
+          POSTGRES_DB: digimarket_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U digimarket_ci -d digimarket_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://digimarket_ci:ephemeral-release-only@127.0.0.1:5432/digimarket_ci?sslmode=disable
+      DIRECT_DATABASE_URL: postgresql://digimarket_ci:ephemeral-release-only@127.0.0.1:5432/digimarket_ci?sslmode=disable
+      RESTORE_DATABASE_URL: postgresql://digimarket_ci:ephemeral-release-only@127.0.0.1:5432/digimarket_ci_restore_rehearsal?sslmode=disable
+      RESTORE_REHEARSAL_CONFIRM: YES_RESTORE_DISPOSABLE_DB
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate release manifests and secret exclusions
+        run: node scripts/release-static-check.mjs
+      - name: Migrate production-equivalent disposable PostgreSQL
+        run: |
+          test -s packages/db/prisma/migrations/20261020060000_production_heartbeat/migration.sql
+          pnpm --filter @digimarket/db db:validate
+          pnpm --filter @digimarket/db db:generate
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+          pnpm --filter @digimarket/api exec tsx ../../packages/db/src/seed.ts
+      - name: Production security tests and all workspace quality checks
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: Install encrypted-backup and database-recovery tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends age postgresql-client
+      - name: Encrypted PostgreSQL backup and disposable restore rehearsal
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGPASSWORD="ephemeral-release-only"
+          psql -h 127.0.0.1 -U digimarket_ci -d digimarket_ci -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE digimarket_ci_restore_rehearsal;'
+          KEY_FILE="${RUNNER_TEMP}/release-rehearsal-age.key"
+          age-keygen -o "$KEY_FILE"
+          export BACKUP_AGE_IDENTITY_FILE="$KEY_FILE"
+          export BACKUP_AGE_RECIPIENT="$(age-keygen -y "$KEY_FILE")"
+          node scripts/db-recovery.mjs backup "${RUNNER_TEMP}/release-rehearsal.age"
+          node scripts/db-recovery.mjs restore "${RUNNER_TEMP}/release-rehearsal.age"
+          ORIGINAL="$(psql -h 127.0.0.1 -U digimarket_ci -d digimarket_ci -At -c 'SELECT COUNT(*) FROM "Permission";')"
+          RESTORED="$(psql -h 127.0.0.1 -U digimarket_ci -d digimarket_ci_restore_rehearsal -At -c 'SELECT COUNT(*) FROM "Permission";')"
+          test "$ORIGINAL" -gt 20
+          test "$ORIGINAL" = "$RESTORED"
+          test -s "${RUNNER_TEMP}/release-rehearsal.age.sha256"
+          echo "PASS encrypted-backup restore with matching permission catalog"
+      - name: Repo E2E regression with independent Postgres
+        run: |
+          pnpm --filter @digimarket/api exec tsx src/auth/integration-smoke.ts
+          pnpm --filter @digimarket/api exec tsx src/billing/integration-smoke.ts
+          pnpm --filter @digimarket/api exec tsx src/insights/integration-smoke.ts

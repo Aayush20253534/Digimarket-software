@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -25,6 +26,19 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
   app.use(helmet());
   app.use(cors({ origin: allowedOrigins, credentials: true }));
   app.use(express.json({ limit: "128kb" }));
+  app.use((req,res,next)=>{
+    const id=crypto.randomUUID();
+    res.set("X-Request-ID",id);
+    const start=process.hrtime.bigint();
+    res.on("finish",()=>{
+      if(res.statusCode>=500){
+        const elapsed=Number(process.hrtime.bigint()-start)/1e6;
+        // Never log Authorization, cookies, request/query bodies or billing data.
+        console.error(JSON.stringify({level:"error",kind:"http",requestId:id,
+          method:req.method,status:res.statusCode,elapsedMs:Math.round(elapsed)}));
+      }
+    });next();
+  });
 
   app.get("/api/v1/health", (_request, response) => {
     response.set("Cache-Control", "no-store");
@@ -32,6 +46,40 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
       data: { service: "api", status: "ok", timestamp: new Date().toISOString() },
       meta: { version: "v1" },
     }));
+  });
+
+  app.get("/api/v1/ready",async(_req,res)=>{
+    res.set("Cache-Control","no-store");
+    if(!authService)return res.status(503).json({data:{status:"unavailable"}});
+    try{
+      await authService.database.$queryRaw`SELECT 1`;
+      return res.json({data:{status:"ready",database:"ok"}});
+    }catch{
+      return res.status(503).json({data:{status:"unavailable"}});
+    }
+  });
+  app.get("/api/v1/ops/health",async(req,res)=>{
+    res.set("Cache-Control","no-store");
+    const expected=process.env.OPS_MONITOR_TOKEN;
+    const candidate=req.get("x-ops-token")??"";
+    if(!authService||!expected||expected.length<32||
+      Buffer.byteLength(candidate)!==Buffer.byteLength(expected)||
+      !timingSafeEqual(Buffer.from(candidate),Buffer.from(expected)))
+      return res.status(404).json({error:{code:"NOT_FOUND",message:"Route not found"}});
+    try{
+      const [beat,pending,failed]=await Promise.all([
+        authService.database.serviceHeartbeat.findUnique({where:{service:"worker"}}),
+        authService.database.outboxEvent.count({where:{status:"PENDING"}}),
+        authService.database.outboxEvent.count({where:{attempts:{gte:5},status:"PENDING"}}),
+      ]);
+      const age=beat?Math.max(0,Date.now()-beat.lastSeenAt.getTime()):null;
+      const workerHealthy=age!==null&&age<180_000;
+      res.status(workerHealthy?200:503).json({data:{status:workerHealthy?"ok":"degraded",
+        database:"ok",workerAlive:workerHealthy,workerAgeSeconds:age===null?null:Math.round(age/1000),
+        pendingOutbox:pending,stalledOutbox:failed}});
+    }catch{
+      res.status(503).json({data:{status:"unavailable"}});
+    }
   });
 
   if (authService) {

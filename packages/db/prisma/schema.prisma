@@ -1113,3 +1113,11 @@ model Notification {
   @@index([organizationId,recipientId,createdAt,id])
   @@index([organizationId,recipientId,readAt])
 }
+
+// Module 17: deployment/worker liveness, never customer data.
+model ServiceHeartbeat {
+  service String @id @db.VarChar(40)
+  startedAt DateTime @default(now()) @db.Timestamptz(6)
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}

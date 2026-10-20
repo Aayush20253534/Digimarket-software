@@ -2,9 +2,11 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.production.example
 *.pem
 *.key
 *.p12
@@ -36,3 +38,10 @@ pnpm-debug.log*
 tmp/
 temp/
 uploads/
+
+# Private database backups, encrypted recovery packages, and key materials
+*.age
+*.dump
+*.backup
+*.pgpass
+*.sha256

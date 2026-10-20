@@ -1,6 +1,6 @@
 # DigiMarket Software
 
-An internal digital marketing agency workspace, built as a pnpm TypeScript monorepo. Module 0 specifications are maintained under [docs/](docs/). Module 1 introduces the executable foundation: Next.js web, Express API, shared contracts, Prisma workspace, local Redis, CI and smoke testing.
+An internal digital marketing agency workspace, built as a pnpm TypeScript monorepo. All application modules are implemented in this repository; the live release requires dedicated provider configuration and verification. Specifications and release guides are maintained under [docs/](docs/).
 
 ## Stack
 - **Web:** Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4
@@ -47,7 +47,7 @@ The committed `pnpm-lock.yaml` is used with `--frozen-lockfile` in CI and local 
 apps/
   api/       Express API: versioned health route + integration tests
   web/       Next.js App Router + server-side API connectivity screen
-  worker/    reserved for future BullMQ queue consumers
+  worker/    BullMQ task, billing, alert and reconciliation jobs
 packages/
   contracts/ Zod shared DTOs and tests
   db/        Prisma v7 organization and identity models with committed migrations
@@ -63,7 +63,7 @@ docs/        full product, architecture, DB, permissions and UI specifications
 - [Module 1 setup, boundaries and verification](docs/12-MODULE-01-IMPLEMENTATION.md)
 
 ## Security
-No public signup or client credentials stored here. **Authentication is implemented at the API level, but no production organization or user has been bootstrapped.**. All runtime provider credentials must be in untracked environment files or hosting secret stores; never commit real secrets to this public repository. Sensitive Cloudinary files must use authenticated delivery when the asset module is built.
+No public signup or client credentials stored here. **The repository does not contain production credentials or a bootstrapped live organization.** All runtime provider credentials must be in untracked environment files or hosting secret stores; never commit real secrets to this public repository. Sensitive Cloudinary files must use authenticated delivery when the asset module is built.
 
 ## Roadmap
 - [x] Module 0: product architecture and wireframes
@@ -83,7 +83,7 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 14: client profitability, cost attribution, earned-revenue recognition and corrections
 - [x] Module 15: founder responsibilities, organization profile, versioned billing defaults and configuration governance
 - [x] Module 16: permission-filtered global search, operational reports, private SSE notifications and reconciliation alerts
-- [ ] Module 17: production readiness and deployment
+- [x] Module 17: production release configuration, safeguards, encrypted recovery scripts and deployment CI (live release still requires provider provisioning)
 
 **Design and scaffolding are not a production release.**
 
@@ -131,3 +131,6 @@ The `/app/profitability` dashboard separates issued invoices, verified collectio
 
 ## Module 16: search, reports and notifications
 `/app/search` respects the same source and record permissions as each module. `/app/reports` provides authorized operational KPIs, while `/app/notifications` delivers private task, lead, approval and overdue invoice notices via authenticated SSE (with polling fallback). Redis worker runs idempotent scheduled alert and read-only invoice reconciliation jobs. See [Module 16 guide](docs/27-MODULE-16-INSIGHTS.md). Live deployment remains Module 17.
+
+## Module 17 release engineering
+Production release configuration is included in [Render Blueprint](render.yaml), [Vercel build settings](apps/web/vercel.json), [production environment template](.env.production.example), [encrypted database recovery script](scripts/db-recovery.mjs) and the [Module 17 release runbook](docs/28-MODULE-17-PRODUCTION.md). The API has DB readiness and token-protected worker/outbox health, while CI rehearses encrypted PostgreSQL backup and restore in a disposable database. Render auto-deployment remains disabled until operators validate live credentials, external backups, DNS, MFA and release checks. **This is deployable configuration, not proof of a live public deployment.**

@@ -19,6 +19,14 @@ function redisOptions():ConnectionOptions {
 }
 if(!process.env.DATABASE_URL)throw new Error("DATABASE_URL required for task worker");
 const db=createDatabaseClient(),connection=redisOptions();
+const heartbeat=async()=>{
+  await db.serviceHeartbeat.upsert({where:{service:"worker"},
+    create:{service:"worker",startedAt:new Date(),lastSeenAt:new Date()},
+    update:{lastSeenAt:new Date()}});
+};
+await heartbeat();
+const beatTimer=setInterval(()=>{void heartbeat().catch(e=>
+  console.error("Worker liveness update failed",e instanceof Error?e.name:"UNKNOWN"));},30_000);
 const queue=new Queue("digimarket-task-recurrence",{connection});
 const worker=new Worker("digimarket-task-recurrence",async job=>{
  if(job.name==="scan-billing-schedules"){
@@ -59,6 +67,7 @@ console.info("Task, billing, alerts and reconciliation BullMQ worker ready");
 let shuttingDown=false;
 async function shutdown(){
  if(shuttingDown)return;shuttingDown=true;
+ clearInterval(beatTimer);
  await worker.close();
  await queue.close();
  await db.$disconnect();
