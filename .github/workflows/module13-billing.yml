@@ -1,0 +1,59 @@
+name: Module 13 Invoices and Payments Integration
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  billing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: digimarket_ci
+          POSTGRES_PASSWORD: ephemeral-billing-only
+          POSTGRES_DB: digimarket_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U digimarket_ci -d digimarket_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://digimarket_ci:ephemeral-billing-only@127.0.0.1:5432/digimarket_ci
+      DIRECT_DATABASE_URL: postgresql://digimarket_ci:ephemeral-billing-only@127.0.0.1:5432/digimarket_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Migrate and check schema drift
+        run: |
+          test -s packages/db/prisma/migrations/20261020020000_invoices_payments/migration.sql
+          pnpm --filter @digimarket/db db:validate
+          pnpm --filter @digimarket/db db:generate
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db db:migrate:deploy
+          pnpm --filter @digimarket/db exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - name: Workspace lint types tests and builds
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+      - name: Billing and payment lifecycle PostgreSQL integration
+        run: pnpm --filter @digimarket/api exec tsx src/billing/integration-smoke.ts
+      - name: Finance and approvals regression
+        run: |
+          pnpm --filter @digimarket/api exec tsx src/finance/integration-smoke.ts
+          pnpm --filter @digimarket/api exec tsx src/approvals/integration-smoke.ts

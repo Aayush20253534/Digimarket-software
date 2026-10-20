@@ -79,7 +79,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 10: client projects, membership, milestones, versioned deliverables and approval integration
 - [x] Module 11: employee/team tasks, checklist/comments, recurrence cursor and BullMQ worker
 - [x] Module 12: content calendar, editorial workflow, immutable revisions, approvals and manual publishing
-- [ ] Modules 13–17: invoices/payments, profitability, settings, reporting and production readiness
+- [x] Module 13: invoices, payment verification and allocation, receivables, private PDF generation and recurring draft templates
+- [ ] Modules 14–17: profitability, founders/settings, reporting and production readiness
 
 **Design and scaffolding are not a production release.**
 
@@ -115,3 +116,6 @@ The `/app/projects` page provides a client-linked project status board, membersh
 
 ## Module 12 content calendar
 The `/app/content` calendar supports editorial planning, immutable revisions, client-linked media, policy-based review and manual publishing records. Editing an approved post invalidates prior approval. See [Module 12 guide](docs/23-MODULE-12-CONTENT.md). Live social-media publishing is intentionally not automated.
+
+## Module 13: invoices and collections
+`/app/billing` includes numbered invoices, immutable issued amounts, manual PDF download, client payments linked exactly once to the existing finance ledger, receivables and BullMQ-generated recurring drafts. See [Module 13](docs/24-MODULE-13-BILLING.md). Cloudinary PDF archival, live configuration and deployment are not yet complete.
