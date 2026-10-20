@@ -61,6 +61,8 @@ export const permissionCatalog = [
   ["assets.upload", "Upload assets"],
   ["assets.read", "Read permitted assets"],
   ["assets.delete", "Delete authorized assets"],
+  ["profitability.read", "View privileged client-level financial performance"],
+  ["profitability.manage", "Assign direct costs and record or reverse recognized revenue"],
   ["reports.business.read", "View authorized company analytics"],
   ["founders.edit", "Edit founder responsibilities"],
   ["organization.settings.manage", "Manage company configuration"],

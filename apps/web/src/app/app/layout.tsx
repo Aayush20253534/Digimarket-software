@@ -47,6 +47,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSeeProfitability = session.identity.permissions.includes("profitability.read");
   const canSeeBilling = session.identity.permissions.includes("invoices.read") || session.identity.permissions.includes("payments.read");
   const canSeeContent = session.identity.permissions.includes("content.read");
   const canSeeTasks = session.identity.permissions.includes("tasks.read");
@@ -93,6 +94,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {canSeeBilling && <Link href="/app/billing" aria-current={pathname.startsWith("/app/billing")?"page":undefined}
           className={"sidebar-link "+(pathname.startsWith("/app/billing")?"sidebar-active":"")}>
           <CreditCard className="h-4 w-4" aria-hidden="true" />Invoices & payments
+        </Link>}
+        {canSeeProfitability && <Link href="/app/profitability"
+          aria-current={pathname.startsWith("/app/profitability")?"page":undefined}
+          className={"sidebar-link "+(pathname.startsWith("/app/profitability")?"sidebar-active":"")}>
+          <ChartNoAxesCombined className="h-4 w-4" aria-hidden="true" />Client profitability
         </Link>}
         {canSeeFinance && <Link href="/app/finance" aria-current={pathname === "/app/finance" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/finance" ? "sidebar-active" : "")}>
           <Wallet className="h-4 w-4" aria-hidden="true" />Income & expenses

@@ -11,7 +11,7 @@ const admin = [
   "clients.read", "clients.create", "clients.edit", "finance.entry.create",
   "finance.entry.read.own", "finance.read.all", "finance.category.manage", "finance.approve", "projects.create", "projects.assign", "projects.read",
   "projects.update", "projects.deliverables.write", "projects.review", "tasks.create", "tasks.read", "tasks.manage", "tasks.recurrence.manage", "tasks.comment", "tasks.update.own", "content.read", "content.manage", "content.publish", "content.create",
-  "content.edit", "content.approve", "assets.upload", "assets.read", "assets.delete",
+  "content.edit", "content.approve", "profitability.read", "profitability.manage", "assets.upload", "assets.read", "assets.delete",
 ] as const;
 const founder = [
   "approvals.read", "approvals.submit", "approvals.decide",
@@ -19,7 +19,7 @@ const founder = [
   "clients.read", "clients.create", "clients.edit", "finance.entry.create",
   "finance.entry.read.own", "finance.read.all", "finance.approve", "projects.create", "projects.assign", "projects.read", "projects.update", "projects.deliverables.write", "projects.review",
   "tasks.create", "tasks.update.own", "content.read", "content.manage", "content.publish", "content.create", "content.edit", "content.approve",
-  "invoices.read", "invoices.draft", "invoices.manage", "invoices.issue", "payments.read", "payments.record", "payments.verify", "assets.upload", "assets.read",
+  "invoices.read", "invoices.draft", "invoices.manage", "invoices.issue", "payments.read", "payments.record", "payments.verify", "profitability.read", "profitability.manage", "assets.upload", "assets.read",
 ] as const;
 const employee = ["approvals.read", "approvals.submit", "leads.read", "leads.create", "leads.edit.own", "clients.read", "finance.entry.create", "finance.entry.read.own", "projects.read", "projects.deliverables.write", "tasks.read", "tasks.comment", "tasks.update.own"] as const;
 export const systemRoleGrants: Record<SystemRole, readonly string[]> = {

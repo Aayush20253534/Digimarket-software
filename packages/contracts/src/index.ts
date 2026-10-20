@@ -323,3 +323,28 @@ export const billingScheduleSchema=invoiceDraftSchema.extend({
 }).omit({dueOn:true}).strict();
 export type BillingScheduleInput=z.infer<typeof billingScheduleSchema>;
 export const billingToggleSchema=z.strictObject({version:z.number().int().positive(),enabled:z.boolean()});
+
+// Module 14: exact-decimal client profitability and revenue recognition.
+const profitAmount=z.string().regex(/^(?:0|[1-9][0-9]{0,13})(?:\.[0-9]{1,4})?$/);
+export const profitabilityPeriodSchema=z.strictObject({
+  from:z.iso.date(),to:z.iso.date(),clientId:z.uuid().optional(),
+}).refine(v=>v.from<=v.to,{message:"Period end must not precede start"});
+export type ProfitabilityPeriod=z.infer<typeof profitabilityPeriodSchema>;
+export const costAllocationUpdateSchema=z.strictObject({
+  version:z.number().int().nonnegative(),
+  allocations:z.array(z.strictObject({
+    clientId:z.uuid(),projectId:z.uuid().nullable().optional(),
+    amount:profitAmount,note:z.string().trim().max(500).optional(),
+  })).max(100).refine(a=>new Set(a.map(x=>x.clientId)).size===a.length,"Duplicate client attribution"),
+});
+export type CostAllocationUpdate=z.infer<typeof costAllocationUpdateSchema>;
+export const revenueRecognitionCreateSchema=z.strictObject({
+  invoiceId:z.uuid(),recognizedOn:z.iso.date(),amount:profitAmount,
+  note:z.string().trim().min(4).max(500),idempotencyKey:z.uuid(),
+});
+export type RevenueRecognitionCreate=z.infer<typeof revenueRecognitionCreateSchema>;
+export const revenueRecognitionReverseSchema=z.strictObject({
+  recognizedOn:z.iso.date(),note:z.string().trim().min(4).max(500),
+  idempotencyKey:z.uuid(),
+});
+export type RevenueRecognitionReverse=z.infer<typeof revenueRecognitionReverseSchema>;

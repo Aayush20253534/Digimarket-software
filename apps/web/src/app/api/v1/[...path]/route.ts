@@ -31,6 +31,10 @@ const endpoints: Record<string, string[]> = {
   "invoices/receivables": ["GET"],
   "payments": ["GET","POST"],
   "billing-schedules": ["GET","POST"],
+  "profitability/report": ["GET"],
+  "profitability/export": ["GET"],
+  "profitability/expenses": ["GET"],
+  "profitability/recognitions": ["GET","POST"],
   "content/staff": ["GET"],
   "tasks/team": ["GET"],
   "task-recurrences": ["GET","POST"],
@@ -45,6 +49,8 @@ const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/st
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
+const profitExpensePattern=/^profitability\/expenses\/[0-9a-fA-F-]{36}\/allocations$/;
+const profitReversePattern=/^profitability\/recognitions\/[0-9a-fA-F-]{36}\/reverse$/;
 const invoiceDetailPattern=/^invoices\/[0-9a-fA-F-]{36}$/;
 const invoiceActionPattern=/^invoices\/[0-9a-fA-F-]{36}\/(issue|void)$/;
 const invoicePdfPattern=/^invoices\/[0-9a-fA-F-]{36}\/pdf$/;
@@ -74,6 +80,8 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(profitExpensePattern.test(path))return method==="PUT";
+  if(profitReversePattern.test(path))return method==="POST";
   if(invoiceDetailPattern.test(path))return ["GET","PUT"].includes(method);
   if(invoiceActionPattern.test(path))return method==="POST";
   if(invoicePdfPattern.test(path))return method==="GET";
@@ -139,6 +147,16 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
+  }
+  if(["profitability/report","profitability/export","profitability/expenses"].includes(path)){
+    for(const key of ["from","to","clientId"]){
+      const v=request.nextUrl.searchParams.get(key);
+      if(v!==null)url.searchParams.set(key,v);
+    }
+  }
+  if(path==="profitability/recognitions"){
+    const id=request.nextUrl.searchParams.get("clientId");
+    if(id!==null)url.searchParams.set("clientId",id);
   }
   if(path==="invoices"){
     for(const key of ["clientId","status","limit","cursor"]){

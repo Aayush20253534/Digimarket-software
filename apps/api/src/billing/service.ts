@@ -115,6 +115,8 @@ export class BillingService{
    const p=await tx.invoice.findFirst({where:{id,organizationId:a.organizationId}});
    if(!p)throw missing();
    if(p.paidTotal.gt(0)||p.status!=="ISSUED")throw invalid("Cannot void collected or non-issued invoice");
+   if(await tx.revenueRecognition.count({where:{invoiceId:id}}))
+     throw invalid("Invoice has revenue recognition history; reverse and use a correction workflow");
    const done=await tx.invoice.updateMany({where:{id,organizationId:a.organizationId,version,status:"ISSUED",
      paidTotal:0},data:{version:{increment:1},status:"VOID"}});
    if(done.count!==1)throw clash();

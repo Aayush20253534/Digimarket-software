@@ -210,6 +210,8 @@ model Organization {
   invoices Invoice[]
   payments Payment[]
   billingSchedules BillingSchedule[]
+  costAllocations CostAllocation[]
+  revenueRecognitions RevenueRecognition[]
   leads Lead[]
   leadDuplicateCandidates LeadDuplicateCandidate[]
   clients Client[]
@@ -251,6 +253,7 @@ model User {
   paymentsRecorded Payment[] @relation("PaymentRecorder")
   paymentsVerified Payment[] @relation("PaymentVerifier")
   billingSchedulesCreated BillingSchedule[]
+  revenueRecognitionsCreated RevenueRecognition[]
 
   leadsCreated Lead[] @relation("LeadCreator")
   leadsAssigned Lead[] @relation("LeadAssignee")
@@ -493,6 +496,8 @@ model FinancialTransaction {
   category          FinancialCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   approvalRequest   ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Restrict)
   verifiedPayment   Payment? @relation("PaymentLedgerEntry")
+  costAllocationVersion Int @default(0)
+  costAllocations CostAllocation[]
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, status, kind, occurredOn])
   @@index([organizationId, enteredById, createdAt])
@@ -594,6 +599,8 @@ model Client {
   invoices Invoice[]
   payments Payment[]
   billingSchedules BillingSchedule[]
+  costAllocations CostAllocation[]
+  revenueRecognitions RevenueRecognition[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
 }
@@ -695,6 +702,7 @@ model Project {
   tasks Task[]
   taskRecurrences TaskRecurrence[]
   contentPosts ContentPost[]
+  costAllocations CostAllocation[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,clientId,createdAt])
 }
@@ -936,6 +944,7 @@ model Invoice {
  schedule BillingSchedule? @relation(fields:[scheduleId],references:[id],onDelete:Restrict)
  lines InvoiceLine[]
  allocations PaymentAllocation[]
+ revenueRecognitions RevenueRecognition[]
  @@unique([organizationId,number])
  @@unique([scheduleId,scheduledFor])
  @@index([organizationId,status,dueOn])
@@ -1024,4 +1033,46 @@ model BillingSchedule {
  drafts Invoice[]
  @@index([enabled,nextRunAt])
  @@index([organizationId,clientId])
+}
+
+// Module 14: cost attribution of already-posted expense ledger entries.
+model CostAllocation {
+  expenseId String @db.Uuid
+  clientId String @db.Uuid
+  projectId String? @db.Uuid
+  organizationId String @db.Uuid
+  amount Decimal @db.Decimal(19,4)
+  note String? @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  expense FinancialTransaction @relation(fields:[expenseId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[projectId],references:[id],onDelete:Restrict)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@id([expenseId,clientId])
+  @@index([organizationId,clientId])
+  @@index([projectId])
+}
+
+model RevenueRecognition {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  invoiceId String @db.Uuid
+  clientId String @db.Uuid
+  createdById String @db.Uuid
+  idempotencyKey String @db.Uuid
+  recognizedOn DateTime @db.Date
+  amount Decimal @db.Decimal(19,4)
+  note String @db.VarChar(500)
+  reversalOfId String? @unique @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  invoice Invoice @relation(fields:[invoiceId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  creator User @relation(fields:[createdById],references:[id],onDelete:Restrict)
+  reversalOf RevenueRecognition? @relation("RecognitionReversal",fields:[reversalOfId],references:[id],onDelete:Restrict)
+  reversal RevenueRecognition? @relation("RecognitionReversal")
+  @@unique([organizationId,idempotencyKey])
+  @@index([organizationId,clientId,recognizedOn])
+  @@index([invoiceId,recognizedOn])
 }
