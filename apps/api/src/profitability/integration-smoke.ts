@@ -11,7 +11,7 @@ if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarke
  throw new Error("Module 14 runs only against disposable digimarket_ci PostgreSQL");
 const db=createDatabaseClient(),service=new ProfitabilityService(db),billing=new BillingService(db);
 const rights=["profitability.read","profitability.manage","finance.read.all","clients.read","invoices.read",
- "invoices.draft","invoices.issue","finance.approve","payments.read","payments.record","payments.verify"];
+ "invoices.draft","invoices.issue","invoices.manage","finance.approve","payments.read","payments.record","payments.verify"];
 const principal=(userId:string,organizationId:string,permissions=rights):Principal=>({
  userId,organizationId,sessionId:"module14-ci",roles:["ADMIN"],permissions:new Set(permissions)});
 const fail=(code:number)=>(e:{status?:number})=>e.status===code;
