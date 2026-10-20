@@ -21,6 +21,7 @@ function app(){
  const auth={database:db,authenticate:vi.fn().mockResolvedValue(principal)} as unknown as AuthService;
  registerNotesRoutes(expressApp,auth);
  expressApp.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
+  void _next;
   if(error instanceof AuthError)return res.status(error.status).json({error:{code:error.code,message:error.message}});
   return res.status(500).json({error:{code:"INTERNAL_ERROR"}});
  });
