@@ -20,7 +20,7 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:30
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-// Fail closed if database mode is enabled but JWT/MFA secrets are missing.
+// Fail closed if database mode is enabled but JWT secrets are missing.
 const database = process.env.DATABASE_URL ? createDatabaseClient() : null;
 const authService = database ? new AuthService(database, loadAuthConfig()) : undefined;
 async function startServer() {
@@ -32,6 +32,22 @@ async function startServer() {
       console.info("Initial administrator created; remove BOOTSTRAP_* secrets after first successful login.");
     } else if (result === "already_initialized") {
       console.info("Organization already initialized; bootstrap credentials were ignored. Remove BOOTSTRAP_* secrets.");
+    }
+  }
+  // Finance entries must enter an approval queue. Existing organizations created
+  // before FINANCE policies were introduced should receive a safe default, while
+  // administrators' explicit disabled policies remain untouched.
+  if(database){
+    const organizations=await database.organization.findMany({select:{id:true}});
+    if(organizations.length){
+      await database.approvalPolicy.createMany({
+        data:organizations.map(organization=>({
+          organizationId:organization.id,category:"FINANCE" as const,
+          name:"Finance approvals",active:true,
+          approverRoleKeys:["SUPER_ADMIN","ADMIN","FOUNDER"],
+        })),
+        skipDuplicates:true,
+      });
     }
   }
   const server = createApp(allowedOrigins, authService).listen(rawPort, "0.0.0.0", () => {

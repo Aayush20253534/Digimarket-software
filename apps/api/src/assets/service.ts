@@ -3,7 +3,7 @@ import type { PrismaClient, Prisma } from "@digimarket/db";
 import type { AssetIntentInput, AssetListQuery } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden } from "../auth/errors";
-import { type AssetProvider, CloudinaryAssetProvider, validateMedia } from "./provider";
+import { type AssetProvider, CloudinaryAssetProvider, validateMedia, IMAGE_FORMATS } from "./provider";
 
 const deny=(a:Principal,key:string)=>{if(!a.permissions.has(key))throw forbidden();};
 const missing=()=>new AuthError(404,"NOT_FOUND","Asset not found");
@@ -38,7 +38,7 @@ export class AssetService {
    const id=randomUUID();
    const publicId=(financeProof?financeProofPrefix(a.organizationId):"digimarket/"+a.organizationId+"/")+id+(type.kind==="raw"?".pdf":"");
    // The provider is configured before creating any database record.
-   const options=this.provider.uploadOptions(publicId,type.kind,[type.format]);
+   const options=this.provider.uploadOptions(publicId,type.kind,type.kind==="image"?[...IMAGE_FORMATS]:[type.format]);
    const expiresAt=new Date(Date.now()+10*60_000);
    await this.db.assetUploadIntent.create({data:{
      id,organizationId:a.organizationId,createdById:a.userId,clientId,
@@ -75,7 +75,8 @@ export class AssetService {
    const verified=await this.provider.inspect(intent.publicId,info.kind);
    if(verified.asset_id!==providerAssetId||verified.public_id!==intent.publicId||
       verified.resource_type!==info.kind||verified.type!=="authenticated"||
-      verified.format.toLowerCase()!==info.format||verified.bytes!==intent.expectedBytes){
+      (info.kind==="image"?!IMAGE_FORMATS.includes(verified.format.toLowerCase() as typeof IMAGE_FORMATS[number]):verified.format.toLowerCase()!==info.format)||
+      verified.bytes!==intent.expectedBytes){
      throw new AuthError(422,"PROVIDER_MISMATCH","Uploaded file does not match the authorized intent");
    }
    if(verified.created_at){

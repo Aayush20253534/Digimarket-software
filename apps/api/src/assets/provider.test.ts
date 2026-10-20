@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { cloudinarySign,validateMedia } from "./provider";
+import { cloudinarySign,validateMedia,IMAGE_FORMATS } from "./provider";
 describe("Cloudinary signed upload security",()=>{
  it("does not include api_key or signature in the signing payload",()=>{
    const secret="not-a-real-secret";
@@ -13,6 +13,13 @@ describe("Cloudinary signed upload security",()=>{
    expect(validateMedia("image/jpeg",500).kind).toBe("image");
    expect(validateMedia("video/mp4",100_000_000).kind).toBe("video");
    expect(()=>validateMedia("text/html",200)).toThrow();
+   for(const type of ["image/jpeg","image/jfif","image/png","image/gif","image/webp","image/avif","image/bmp","image/tiff","image/heic","image/heif"]){
+     expect(validateMedia(type,10_000_000).kind).toBe("image");
+     expect(()=>validateMedia(type,10_000_001)).toThrow();
+   }
+   expect(IMAGE_FORMATS).toContain("jpg");
+   expect(IMAGE_FORMATS).toContain("jpeg");
+   expect(IMAGE_FORMATS).toContain("jfif");
    expect(()=>validateMedia("image/png",20_000_001)).toThrow();
  });
 });

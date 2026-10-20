@@ -8,7 +8,7 @@ import { AWNotice } from "@/components/aw-ui";
 
 type Tool="pen"|"pencil"|"highlighter"|"marker"|"eraser"|"brush"|"fountain"|"select"|"shape"|"text"|"sticky";
 type Point=[number,number,number?];
-type Stroke={color:string;width:number;points:Point[];tool?:Exclude<Tool,"eraser"|"select">;opacity?:number;style?:"solid"|"dashed"|"dotted";shape?:"line"|"rectangle"|"ellipse"|"arrow";text?:string};
+type Stroke={color:string;width:number;points:Point[];tool?:Exclude<Tool,"eraser"|"select">;opacity?:number;style?:"solid"|"dashed"|"dotted";shape?:"line"|"rectangle"|"roundedRectangle"|"ellipse"|"circle"|"triangle"|"diamond"|"pentagon"|"hexagon"|"star"|"arrow";text?:string};
 function partialErase(stroke:Stroke,point:Point,radius:number):Stroke[]{
  const old=stroke.points;if(!old.length)return[];if(stroke.tool==="sticky"||stroke.tool==="text")return[stroke];
  const cx=point[0]*W,cy=point[1]*H;
@@ -77,8 +77,21 @@ function draw(ctx:CanvasRenderingContext2D,strokes:Stroke[]){
     const x=pts[0][0]*W,y=pts[0][1]*H,dx=pts[1][0]*W-x,dy=pts[1][1]*H-y;
     ctx.lineWidth=stroke.width;ctx.beginPath();
     if(stroke.shape==="rectangle")ctx.rect(x,y,dx,dy);
-    else if(stroke.shape==="ellipse")ctx.ellipse(x+dx/2,y+dy/2,Math.max(1,Math.abs(dx)/2),Math.max(1,Math.abs(dy)/2),0,0,Math.PI*2);
-    else{ctx.moveTo(x,y);ctx.lineTo(x+dx,y+dy);}
+    else if(stroke.shape==="roundedRectangle")ctx.roundRect(x,y,dx,dy,Math.min(18,Math.abs(dx)/5,Math.abs(dy)/5));
+    else if(stroke.shape==="ellipse"||stroke.shape==="circle"){
+      const radiusX=Math.max(1,Math.abs(dx)/2),radiusY=stroke.shape==="circle"?radiusX:Math.max(1,Math.abs(dy)/2);
+      ctx.ellipse(x+dx/2,y+dy/2,radiusX,radiusY,0,0,Math.PI*2);
+    }else if(["triangle","diamond","pentagon","hexagon","star"].includes(stroke.shape??"")){
+      const count=stroke.shape==="triangle"?3:stroke.shape==="diamond"?4:stroke.shape==="pentagon"?5:stroke.shape==="hexagon"?6:10;
+      const cx=x+dx/2,cy=y+dy/2,rx=Math.abs(dx)/2,ry=Math.abs(dy)/2;
+      for(let i=0;i<count;i++){
+        const angle=-Math.PI/2+i*2*Math.PI/count;
+        const factor=stroke.shape==="star"&&i%2===1?.42:1;
+        const px=cx+Math.cos(angle)*rx*factor,py=cy+Math.sin(angle)*ry*factor;
+        if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+      }
+      ctx.closePath();
+    }else{ctx.moveTo(x,y);ctx.lineTo(x+dx,y+dy);}
     ctx.stroke();
     if(stroke.shape==="arrow"){const theta=Math.atan2(dy,dx);ctx.beginPath();ctx.moveTo(x+dx,y+dy);ctx.lineTo(x+dx-15*Math.cos(theta-.5),y+dy-15*Math.sin(theta-.5));ctx.moveTo(x+dx,y+dy);ctx.lineTo(x+dx-15*Math.cos(theta+.5),y+dy-15*Math.sin(theta+.5));ctx.stroke();}
     ctx.restore();continue;
@@ -121,7 +134,7 @@ export default function NotesPage(){
  const [libraryOpen,setLibraryOpen]=useState(false),[inspectorOpen,setInspectorOpen]=useState(false);
  const [opacity,setOpacity]=useState(100);
  const [strokeStyle,setStrokeStyle]=useState<"solid"|"dashed"|"dotted">("solid");
- const [shape,setShape]=useState<"line"|"rectangle"|"ellipse"|"arrow">("rectangle");
+ const [shape,setShape]=useState<NonNullable<Stroke["shape"]>>("rectangle");
  const selection=useRef<{index:number;start:Point;before:Stroke[]}|null>(null);
  const [drawing,setDrawing]=useState<Stroke|null>(null);
  const [expanded,setExpanded]=useState(false);
@@ -554,6 +567,23 @@ export default function NotesPage(){
    </>}
   </main>
   <aside className={"aw-studio-inspector"+(inspectorOpen?" aw-studio-inspector-open":"")} aria-label="Tool inspector">
+   {selected&&<section className="aw-studio-page-switcher" aria-label="Note pages">
+    <div className="aw-studio-page-switcher-head"><strong>All pages ({pageCount})</strong><button type="button" onClick={addPage} aria-label="Add note page">+ Add</button></div>
+    <div className="aw-studio-page-grid">
+     {Array.from({length:pageCount},(_,index)=>{
+       const notePage=pages[index];
+       const strokes=parseStrokes(index===activePage?draft.strokes:(notePage?.strokes??"[]"));
+       return <button key={notePage?.id??index} className="aw-studio-page-tile" aria-label={"Open note page "+(index+1)}
+        aria-current={index===activePage?"page":undefined}
+        type="button" onClick={()=>changePage(index)}>
+        <span className="aw-studio-page-thumbnail" aria-hidden="true">
+          <svg viewBox="0 0 900 520">{strokes.slice(0,55).map((stroke,i)=><polyline key={i} points={stroke.points.map(pt=>pt[0]*900+","+pt[1]*520).join(" ")}
+            fill="none" stroke={stroke.color} strokeWidth={Math.max(2,stroke.width*3)}/>)}</svg>
+        </span><span>Page {index+1}</span>
+       </button>;
+     })}
+    </div>
+   </section>}
    <div className="aw-studio-inspector-tabs" role="tablist" aria-label="Inspector tabs">
     <button type="button" role="tab" aria-selected={panel==="tools"} onClick={()=>setPanel("tools")}>Tool Settings</button>
     <button type="button" role="tab" aria-selected={panel==="page"} onClick={()=>setPanel("page")}>Page</button>
@@ -567,7 +597,7 @@ export default function NotesPage(){
     <label htmlFor="aw-opacity">Opacity</label><div className="aw-studio-range"><input id="aw-opacity" type="range" min={10} max={100} value={opacity} onChange={e=>setOpacity(Number(e.target.value))}/><span>{opacity}%</span></div>
     <label htmlFor="aw-eraser-width">Eraser Size</label><div className="aw-studio-range"><input id="aw-eraser-width" aria-label="Eraser size" type="range" min={4} max={80} step={2} value={eraserSize} onChange={e=>setEraserSize(Number(e.target.value))}/><span>{eraserSize} mm</span></div>
     <p className="aw-studio-label">Stroke Style</p><div className="aw-studio-options">{(["solid","dashed","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={strokeStyle===s} onClick={()=>setStrokeStyle(s)}>{s}</button>)}</div>
-    {tool==="shape"&&<><p className="aw-studio-label">Shape</p><div className="aw-studio-options">{(["line","rectangle","ellipse","arrow"] as const).map(s=><button key={s} type="button" aria-pressed={shape===s} onClick={()=>setShape(s)}>{s}</button>)}</div></>}
+    {tool==="shape"&&<><p className="aw-studio-label">Shape</p><div className="aw-studio-options">{(["line","rectangle","roundedRectangle","ellipse","circle","triangle","diamond","pentagon","hexagon","star","arrow"] as const).map(s=><button key={s} type="button" aria-pressed={shape===s} onClick={()=>setShape(s)}>{s}</button>)}</div></>}
     <p className="aw-studio-label">Paper Style</p><div className="aw-studio-paper-options">{(["blank","ruled","grid","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={paper===s} onClick={()=>choosePaper(s)}><span className={"paper-"+s}/>{s}</button>)}</div>
     <button type="button" className="aw-studio-clear" onClick={()=>{if(window.confirm("Clear the entire drawing?"))setStrokes([]);}} disabled={!parseStrokes(draft.strokes).length}><Eraser size={16}/> Clear drawing</button>
    </div>:panel==="page"?<div className="aw-studio-settings"><p className="aw-studio-label">Pages: {pageCount}</p>

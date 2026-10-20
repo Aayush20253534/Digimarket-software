@@ -243,13 +243,13 @@ export default function LeadsPage(){
        {canCreate&&creating&&<DirectoryModal title="Create a lead" description="Add a prospect to the CRM. Notes are saved to their private activity timeline." onClose={()=>{if(!busy)setCreating(false);}}>
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {([
-             ["businessName","Business name",true],["contactName","Contact name",false],
-             ["phone","Phone",false],["businessType","Business type",false],
-             ["location","City / location",false],["source","Source",false],
+             ["businessName","Business name",true],["contactName","Contact name",true],
+             ["phone","Phone",true],["businessType","Business type",true],
+             ["location","City / location",true],["source","Source",true],
              ["websiteUrl","Website URL",false],["instagramUrl","Instagram URL",false],
-             ["note","First note",false],
+             ["note","First note",true],
            ] as const).map(([field,label,required])=><FormField key={field} id={"new-"+field} label={label}>
-             <input id={"new-"+field} className="field" autoFocus={field==="businessName"} required={required} maxLength={field==="note"?2000:500}
+             <input id={"new-"+field} className="field" autoFocus={field==="businessName"} required={required} type={field.endsWith("Url")?"url":field==="phone"?"tel":"text"} maxLength={field==="note"?2000:500}
                value={created[field]} onChange={e=>setCreated(v=>({...v,[field]:e.target.value}))}/>
            </FormField>)}
            <div className="sm:col-span-2 aw-directory-modal-actions">

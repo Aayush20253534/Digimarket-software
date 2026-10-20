@@ -71,10 +71,22 @@ export class CloudinaryAssetProvider implements AssetProvider {
    return "https://api.cloudinary.com/v1_1/"+cloudName+"/"+resourceType+"/download?"+q.toString();
  }
 }
+// Signed Cloudinary uploads are limited by BOTH MIME type and actual extension.
+/// JPEG browsers frequently call the media type image/jpeg while Cloudinary
+// reports the format as jpg. Keep the aliases in the signed whitelist.
+export const IMAGE_FORMATS=["jpg","jpeg","jfif","png","gif","webp","avif","bmp","tif","tiff","heic","heif"] as const;
 export const MEDIA_TYPES:Record<string,{kind:AssetType;format:string;maxBytes:number}>={
- "image/jpeg":{kind:"image",format:"jpg",maxBytes:20_000_000},
- "image/png":{kind:"image",format:"png",maxBytes:20_000_000},
- "image/webp":{kind:"image",format:"webp",maxBytes:20_000_000},
+ "image/jpeg":{kind:"image",format:"jpg",maxBytes:10_000_000},
+ "image/pjpeg":{kind:"image",format:"jpg",maxBytes:10_000_000},
+ "image/jfif":{kind:"image",format:"jfif",maxBytes:10_000_000},
+ "image/png":{kind:"image",format:"png",maxBytes:10_000_000},
+ "image/gif":{kind:"image",format:"gif",maxBytes:10_000_000},
+ "image/webp":{kind:"image",format:"webp",maxBytes:10_000_000},
+ "image/avif":{kind:"image",format:"avif",maxBytes:10_000_000},
+ "image/bmp":{kind:"image",format:"bmp",maxBytes:10_000_000},
+ "image/tiff":{kind:"image",format:"tiff",maxBytes:10_000_000},
+ "image/heic":{kind:"image",format:"heic",maxBytes:10_000_000},
+ "image/heif":{kind:"image",format:"heif",maxBytes:10_000_000},
  "video/mp4":{kind:"video",format:"mp4",maxBytes:100_000_000},
  "video/quicktime":{kind:"video",format:"mov",maxBytes:100_000_000},
  "video/webm":{kind:"video",format:"webm",maxBytes:100_000_000},
@@ -82,7 +94,7 @@ export const MEDIA_TYPES:Record<string,{kind:AssetType;format:string;maxBytes:nu
 };
 export function validateMedia(contentType:string,bytes:number){
  const kind=MEDIA_TYPES[contentType];
- if(!kind)throw invalid("Only JPEG, PNG, WebP, MP4, MOV, WebM and PDF files are supported");
+ if(!kind)throw invalid("Supported: JPG, JPEG, JFIF, PNG, GIF, WebP, AVIF, BMP, TIFF, HEIC, HEIF, MP4, MOV, WebM, PDF");
  if(!Number.isSafeInteger(bytes)||bytes<1||bytes>kind.maxBytes)
    throw invalid("File exceeds the allowed size for this format");
  return kind;

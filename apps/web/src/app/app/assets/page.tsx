@@ -13,7 +13,9 @@ type Listing={items:Asset[];nextCursor:string|null};
 type Client={id:string;businessName:string};
 type Intent={intentId:string;expiresAt:string;uploadUrl:string;
  params:Record<string,string>;resourceType:string};
-const accepted=["image/jpeg","image/png","image/webp","video/mp4","video/quicktime","video/webm","application/pdf"];
+const accepted=["image/jpeg","image/pjpeg","image/jfif","image/png","image/gif","image/webp","image/avif","image/bmp","image/tiff","image/heic","image/heif","video/mp4","video/quicktime","video/webm","application/pdf"];
+const imageExtMime:Record<string,string>={jpg:"image/jpeg",jpeg:"image/jpeg",jfif:"image/jpeg",png:"image/png",gif:"image/gif",webp:"image/webp",avif:"image/avif",bmp:"image/bmp",tif:"image/tiff",tiff:"image/tiff",heic:"image/heic",heif:"image/heif"};
+function fileMime(file:File){return accepted.includes(file.type)?file.type:imageExtMime[file.name.split(".").pop()?.toLowerCase()??""]??file.type;}
 const errText=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Asset operation failed";
 const prettyBytes=(n:number)=>n>=1_000_000?(n/1_000_000).toFixed(1)+" MB":(n/1000).toFixed(0)+" KB";
 
@@ -192,11 +194,13 @@ export default function AssetsPage(){
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function uploadOne(file:File,index:number,total:number){
-   if(!accepted.includes(file.type))throw new Error("Unsupported file format: "+file.name);
+   const contentType=fileMime(file);
+   if(!accepted.includes(contentType))throw new Error("Unsupported file format: "+file.name);
    if(!file.size)throw new Error("Empty file: "+file.name);
+   if(contentType.startsWith("image/")&&file.size>10_000_000)throw new Error("Images must not exceed 10 MB: "+file.name);
    setUploadProgress("Authorizing "+index+" of "+total+": "+file.name);
    const intent=await request<Intent>("/assets/upload-intent",{method:"POST",body:{
-    filename:file.name,contentType:file.type,bytes:file.size,clientId:clientId||null}});
+    filename:file.name,contentType,bytes:file.size,clientId:clientId||null}});
    if(new Date(intent.expiresAt).getTime()<=Date.now())throw new Error("Upload authorization expired");
    const form=new FormData();
    for(const [key,value] of Object.entries(intent.params))form.append(key,value);
@@ -476,7 +480,7 @@ export default function AssetsPage(){
   {uploadDialog&&<div className="aw-drive-modal-shade" role="dialog" aria-modal="true" aria-label="Upload files"><div className="aw-drive-modal">
    <div className="aw-drive-modal-head"><h2>Upload files</h2><button type="button" aria-label="Close upload" disabled={busy} onClick={()=>setUploadDialog(false)}><X size={18}/></button></div>
    <form className="aw-drive-modal-form" onSubmit={e=>void upload(e)}>
-    <FormField id="asset-file" label="Choose image, video or PDF files"><input ref={fileInput} id="asset-file" className="field" type="file" accept={accepted.join(",")} multiple
+    <FormField id="asset-file" label="Choose image, video or PDF files"><input ref={fileInput} id="asset-file" className="field" type="file" accept={accepted.join(",")+",.jpg,.jpeg,.jfif,.tif,.tiff,.heic,.heif"} multiple
       onChange={e=>setFiles(Array.from(e.target.files??[]).slice(0,10))}/></FormField>
     {canClients&&<FormField id="asset-client" label="Associate with client (optional)"><select className="field" id="asset-client" value={clientId} onChange={e=>setClientId(e.target.value)}><option value="">General agency asset</option>{clients.map(c=><option value={c.id} key={c.id}>{c.businessName}</option>)}</select></FormField>}
     <p>{files.length} file(s) queued. Maximum 10 per batch.</p>

@@ -72,6 +72,16 @@ describe("private notes API isolation and version protection",()=>{
   expect(good.status).toBe(201);
   expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,organizationId,ownerId:userId}});
  });
+ it("supports expanded drawn shapes within persisted note pages",async()=>{
+  const forms=["triangle","diamond","star","pentagon","hexagon","circle","roundedRectangle"];
+  for(const shape of forms){
+    const strokes=JSON.stringify([{color:"#3366cc",width:4,tool:"shape",shape,points:[[.1,.1],[.8,.8]]}]);
+    db.personalNote.create.mockResolvedValue({id:noteId,...valid,strokes,version:1});
+    const response=await request(app()).post("/api/v1/notes")
+      .set("Authorization","Bearer token").send({...valid,strokes});
+    expect(response.status).toBe(201);
+  }
+ });
  it("accepts a persisted handwritten page and identifies invalid fields",async()=>{
   const pages=JSON.stringify([{id:"page-1",paper:"dotted",strokes:JSON.stringify([
     {color:"#3366CC",width:3,tool:"pen",points:[[0.2,0.3,0.5]]}

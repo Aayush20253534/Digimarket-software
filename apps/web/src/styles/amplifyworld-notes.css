@@ -192,3 +192,14 @@
 .aw-studio-notebook-row>button:last-child{display:flex;padding:8px;align-items:center;color:#af91c5}
 .aw-studio-note-book-select{display:flex;align-items:center;gap:7px;font-size:11px;color:#b8a9d2;margin-right:auto}
 .aw-studio-note-book-select select{background:#18182c;border:1px solid #45415e;border-radius:7px;color:#f4eafa;padding:7px}
+/* Persistent page navigation in the right inspector, independent of tool tabs. */
+.aw-studio-page-switcher{padding:13px;border-bottom:1px solid #36364f;background:#111326;}
+.aw-studio-page-switcher-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#ede6fb;font-size:13px}
+.aw-studio-page-switcher-head button{border:1px solid #7854aa;border-radius:9px;color:#f1e7ff;padding:5px 10px}
+.aw-studio-page-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-height:260px;overflow-y:auto;margin-top:12px}
+.aw-studio-page-tile{min-width:0;display:flex;align-items:center;flex-direction:column;gap:5px;border:1px solid #41415a;border-radius:10px;padding:7px;color:#dbd2ee;font-size:12px;cursor:pointer}
+.aw-studio-page-tile[aria-current="page"]{border-color:#d48eff;box-shadow:0 0 0 1px #d48eff80;background:#322347}
+.aw-studio-page-thumbnail{display:block;width:100%;aspect-ratio:9/5.2;max-height:72px;border-radius:5px;background:#fafaff;overflow:hidden}
+.aw-studio-page-thumbnail svg{width:100%;height:100%}
+.aw-studio-page-tile:hover{border-color:#aa77dc}
+@media(max-width:600px){.aw-studio-page-grid{max-height:190px}}

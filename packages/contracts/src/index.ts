@@ -141,7 +141,7 @@ export const clientServiceSchema=z.strictObject({
 export type ClientServiceInput=z.infer<typeof clientServiceSchema>;
 export const clientConvertSchema=z.strictObject({version:z.number().int().min(1)});
 
-export const assetContentTypeSchema=z.enum(["image/jpeg","image/png","image/webp","video/mp4","video/quicktime","video/webm","application/pdf"]);
+export const assetContentTypeSchema=z.enum(["image/jpeg","image/pjpeg","image/jfif","image/png","image/gif","image/webp","image/avif","image/bmp","image/tiff","image/heic","image/heif","video/mp4","video/quicktime","video/webm","application/pdf"]);
 export const assetIntentSchema=z.strictObject({
  filename:z.string().trim().min(1).max(180).refine(name=>!name.includes("/")&&!name.includes("\\")&&[...name].every(ch=>ch.charCodeAt(0)>=32),"Invalid filename"),
  contentType:assetContentTypeSchema,

@@ -20,7 +20,7 @@ const content=z.strictObject({
     (s.tool===undefined||["pen","pencil","highlighter","marker","brush","fountain","shape","text","sticky"].includes(s.tool))&&
     (s.opacity===undefined||(typeof s.opacity==="number"&&s.opacity>=0&&s.opacity<=1))&&
      (s.style===undefined||["solid","dashed","dotted"].includes(s.style))&&
-     (s.shape===undefined||["line","rectangle","ellipse","arrow"].includes(s.shape))&&
+     (s.shape===undefined||["line","rectangle","roundedRectangle","ellipse","circle","triangle","diamond","pentagon","hexagon","star","arrow"].includes(s.shape))&&
      (s.text===undefined||(typeof s.text==="string"&&s.text.length<=200))&&
      Array.isArray(s.points)&&s.points.length<=2500&&
     s.points.every((p:unknown)=>Array.isArray(p)&&(p.length===2||p.length===3)&&p.every(n=>typeof n==="number"&&Number.isFinite(n)&&n>=0&&n<=1)));

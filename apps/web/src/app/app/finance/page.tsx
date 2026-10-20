@@ -82,7 +82,7 @@ export default function FinancePage(){
     try{
       let receiptAssetId:string|null=null;
       if(receipt){
-       if(!["image/jpeg","image/png","image/webp","application/pdf"].includes(receipt.type))throw new Error("Receipt must be JPEG, PNG, WebP or PDF.");
+       if(!["image/jpeg","image/png","image/gif","image/webp","image/avif","image/bmp","image/tiff","image/heic","image/heif","application/pdf"].includes(receipt.type))throw new Error("Receipt must be an image or PDF.");
        if(receipt.size>10_000_000||receipt.size===0)throw new Error("Receipt must be between 1 byte and 10 MB.");
        setUploadStatus("Authorizing private receipt upload…");
        const intent=await request<{intentId:string;expiresAt:string;params:Record<string,string>;uploadUrl:string}>(
@@ -183,8 +183,8 @@ export default function FinancePage(){
         <p className="mt-2 text-xs text-slate-500">{view==="all"?"Organization":"Your entries"} · {totals.currency}</p>
       </Card>)}
     </div>
-    {!financeReady&&<div className="aw-finance-policy-warning" role="status">
-    <span aria-hidden="true">i</span><p>To submit finance entries, an administrator must activate the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
+    {!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
+    <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}
     <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       {canCreate&&<Card title="New income or expense" description="Every submission enters the approval queue. Amounts are stored with four decimal places, not floating-point math.">
@@ -207,13 +207,13 @@ export default function FinancePage(){
             value={description} onChange={e=>setDescription(e.target.value)}/></FormField></div>
           <div className="sm:col-span-2"><FormField id="finance-receipt" label="Receipt image or payment proof (optional)">
              <input id="finance-receipt" className="field" type="file"
-               accept="image/jpeg,image/png,image/webp,application/pdf"
+               accept="image/jpeg,image/png,image/gif,image/webp,image/avif,image/bmp,image/tiff,image/heic,image/heif,application/pdf,.jpg,.jfif,.jpeg,.gif,.png,.tif,.tiff"
                onChange={e=>setReceipt(e.target.files?.[0]??null)}/>
             </FormField>
             {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
             {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
           </div>
-          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||!categoryId||!financeReady}>
+          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||!financeReady} title={!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
             <Plus className="h-4 w-4"/>{busy?"Submitting…":"Submit for approval"}</button></div>
         </form>
       </Card>}
