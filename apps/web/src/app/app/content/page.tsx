@@ -113,7 +113,7 @@ export default function ContentPage(){
   }catch(e){setError(errorMessage(e));}finally{setBusy(false);}
  };
  const cardFor=(p:Summary)=> <button key={p.id} type="button"
-  className="block w-full rounded-lg border border-slate-200 bg-white p-2 text-left shadow-sm hover:border-indigo-400"
+  className="aw-calendar-item block w-full rounded-lg border border-slate-200 bg-white p-2 text-left shadow-sm hover:border-indigo-400"
   onClick={()=>void open(p.id)}>
     <b className="block truncate text-xs">{p.title}</b>
     <span className="block truncate text-[11px] text-slate-500">{p.client.businessName} · {p.platform}</span>
@@ -156,8 +156,8 @@ export default function ContentPage(){
   {error&&<Notice kind="error">{error}</Notice>}
   {success&&<Notice kind="success">{success}</Notice>}
   <Card title="Editorial schedule" description="Browse month, week or all content in a list. Draft ideas without publish dates appear in the list view.">
-   <div className="flex flex-wrap items-center gap-2">
-    <div className="inline-flex overflow-hidden rounded-lg border">
+   <div className="aw-editorial-controls">
+    <div className="aw-view-switch inline-flex overflow-hidden rounded-lg border">
      {(["month","week","list"] as const).map(v=><button key={v} className={"px-3 py-2 text-sm "+(view===v?"bg-indigo-600 text-white":"bg-white")}
        type="button" onClick={()=>{setView(v);setCursor(null);}}>{v[0].toUpperCase()+v.slice(1)}</button>)}
     </div>
@@ -176,13 +176,22 @@ export default function ContentPage(){
    {loading?<Spinner label="Loading editorial schedule…"/>:view==="list"?
     <div className="mt-5 space-y-2">{rows.length?rows.map(cardFor):
       <EmptyState title="No scheduled content" description="Choose another date or create a draft."/>}</div>:
-    <div className="mt-5 grid grid-cols-7 gap-1.5">
-      {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(x=><div key={x} className="py-1 text-center text-xs font-semibold text-slate-500">{x}</div>)}
-      {calendarDays.map(d=><div key={d} className="min-h-28 rounded-lg border bg-slate-50 p-1.5 sm:p-2">
+    <><div className="aw-calendar-grid mt-5">
+      {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(x=><div key={x} className="aw-calendar-weekday">{x}</div>)}
+      {calendarDays.map(d=><div key={d} className="aw-calendar-day">
         <span className={"text-xs "+(d===dateKey(new Date())?"font-bold text-indigo-600":"text-slate-600")}>{Number(d.slice(8))}</span>
         <div className="mt-2 space-y-1">{rows.filter(p=>p.publishAt&&dateKey(new Date(p.publishAt))===d).map(cardFor)}</div>
       </div>)}
-    </div>}
+    </div>
+    <div className="aw-mobile-agenda mt-5" aria-label="Content agenda">
+     {calendarDays.some(d=>rows.some(p=>p.publishAt&&dateKey(new Date(p.publishAt))===d)) ?
+      calendarDays.filter(d=>rows.some(p=>p.publishAt&&dateKey(new Date(p.publishAt))===d))
+       .map(d=><section key={d} className="aw-agenda-group">
+        <h3 className="aw-agenda-heading">{new Date(d+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}</h3>
+        <div className="space-y-2">{rows.filter(p=>p.publishAt&&dateKey(new Date(p.publishAt))===d).map(cardFor)}</div>
+       </section>) :
+      <EmptyState title="Nothing scheduled in this period" description="Drafts without publish dates can be found in List view."/>}
+    </div></>}
    {nextCursor&&<button className="btn-secondary mt-4" type="button" onClick={()=>setCursor(nextCursor)}>Next page</button>}
   </Card>
   {canCreate&&<Card title={editing?"Revise content":"Create content idea"}
