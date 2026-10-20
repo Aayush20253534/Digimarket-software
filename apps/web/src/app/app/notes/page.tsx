@@ -126,6 +126,17 @@ export default function NotesPage(){
    draftRef.current=blank;setDraft(blank);dirty.current=false;setSaveState("saved");setPreview(false);
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
+ const saveConflictCopy=async()=>{
+  if(inFlight.current||actionBusy)return;
+  setActionBusy(true);setError("");
+  try{
+   const note=await request<Note>("/notes",{method:"POST",body:{...draftRef.current,
+     title:draftRef.current.title.slice(0,167)+" (recovered)"}});
+   await listNotes();selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
+   const next={title:note.title,body:note.body,strokes:note.strokes};
+   draftRef.current=next;setDraft(next);dirty.current=false;setSaveState("saved");
+  }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
+ };
  const remove=async()=>{
   if(!selected||!window.confirm("Permanently delete this note?"))return;
   if(inFlight.current)return;
@@ -197,6 +208,7 @@ export default function NotesPage(){
        {saveState==="saved"?"All changes saved":saveState==="saving"?"Saving…":saveState==="conflict"?"Save conflict":"Unsaved changes"}
       </span>
       <div className="aw-notes-actions">
+       {saveState==="conflict"&&<button type="button" onClick={()=>void saveConflictCopy()} disabled={actionBusy}>Save recovered copy</button>}
        <button type="button" onClick={()=>void flush()} disabled={saveState==="saved"||saveState==="saving"||saveState==="conflict"}><Save size={16}/> Save</button>
        <button type="button" onClick={()=>void open(selected,true)} disabled={saveState!=="saved"} aria-label="Reload note"><RefreshCw size={16}/></button>
        <button type="button" className="danger" onClick={()=>void remove()} disabled={actionBusy||saveState==="saving"}><Trash2 size={16}/> Delete</button>
