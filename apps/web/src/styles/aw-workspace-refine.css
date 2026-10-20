@@ -132,3 +132,9 @@
 .aw-report-icon{width:35px!important;height:35px!important;border-radius:11px!important}.aw-report-card-top>svg{width:15px!important;height:15px!important}
 .aw-report-hero-value{font-size:clamp(1.2rem,1.6vw,1.7rem)!important;margin-top:5px!important}.aw-report-details{margin-top:10px!important;padding-top:4px!important}
 .aw-report-details>div{padding:5px 0!important;font-size:.73rem!important}.aw-report-sectionhead{margin:15px 0 10px!important}
+
+.aw-lead-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) minmax(125px,160px) minmax(125px,160px) auto;align-items:center;gap:9px}
+.aw-lead-toolbar .field{width:100%!important;min-width:0!important;min-height:40px!important;padding:8px 10px!important}
+.aw-lead-toolbar .btn-secondary{min-height:40px!important;white-space:nowrap}
+@media(max-width:950px){.aw-lead-toolbar{grid-template-columns:minmax(220px,1fr) minmax(130px,180px)}}
+@media(max-width:550px){.aw-lead-toolbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.aw-lead-toolbar input[aria-label="Search leads"]{grid-column:1/-1}}
