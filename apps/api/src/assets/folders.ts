@@ -83,7 +83,7 @@ export class AssetFolderService{
    ]);
    if(sub.length>=100||assets.length>30||files.length+assets.length>30)
     throw new AuthError(422,"ARCHIVE_LIMIT","Download one folder with 30 files or fewer.");
-   for(const child of sub)stack.push([child.id,path+child.name.replace(/[\\/:*?"<>|\x00-\x1f]/g,"_")+"/",depth+1]);
+   for(const child of sub)stack.push([child.id,path+child.name.replace(/[\\/:*?"<>|]/g,"_").replace(/\p{Cc}/gu,"_")+"/",depth+1]);
    for(const asset of assets){
     if(bytes+asset.bytes>25_000_000)throw new AuthError(422,"ARCHIVE_LIMIT","Folder exceeds 25 MB ZIP limit");
     const link=cloudinary.download(asset.publicId,asset.resourceType.toLowerCase() as "image"|"video"|"raw",asset.format);
@@ -96,7 +96,7 @@ export class AssetFolderService{
     if(raw.length>asset.bytes+65536||bytes+raw.length>25_000_000)
       throw new AuthError(422,"ARCHIVE_LIMIT","Folder ZIP would exceed size limits");
     bytes+=raw.length;
-    files.push({name:path+asset.filename.replace(/[\\/:*?"<>|\x00-\x1f]/g,"_"),data:raw});
+    files.push({name:path+asset.filename.replace(/[\\/:*?"<>|]/g,"_").replace(/\p{Cc}/gu,"_"),data:raw});
    }
   }
   await this.db.auditLog.create({data:{organizationId:p.organizationId,actorId:p.userId,
