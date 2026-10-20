@@ -2,7 +2,7 @@ import { permissionCatalog } from "@digimarket/db/permissions";
 
 export type SystemRole = "SUPER_ADMIN" | "ADMIN" | "FOUNDER" | "EMPLOYEE";
 export const SYSTEM_ROLES: SystemRole[] = ["SUPER_ADMIN", "ADMIN", "FOUNDER", "EMPLOYEE"];
-export const privilegedRole = (roles: string[]) => roles.some((role) => role === "SUPER_ADMIN" || role === "ADMIN" || role === "FOUNDER");
+export const privilegedRole = (roles: string[]) => roles.some((role) => role === "SUPER_ADMIN" || role === "ADMIN");
 
 const admin = [
   "notifications.read", "search.read", "reports.business.read", "approvals.read", "approvals.submit", "approvals.decide", "approvals.policy.manage",

@@ -1158,10 +1158,27 @@ model PersonalNote {
   title String @default("Untitled") @db.VarChar(180)
   body String @default("") @db.Text
   strokes String @default("[]") @db.Text
+  pages String @default("[]") @db.Text
+  notebookId String? @db.Uuid
+  starred Boolean @default(false)
+  deletedAt DateTime? @db.Timestamptz(6)
   version Int @default(1)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
   owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
   @@index([organizationId,ownerId,updatedAt,id])
+  @@index([organizationId,ownerId,deletedAt])
+}
+
+
+// User-owned notebook organization. Existing PersonalNote records remain valid.
+model PersonalNotebook {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  ownerId String @db.Uuid
+  name String @db.VarChar(100)
+  color String @default("#8C45DB") @db.VarChar(7)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  @@index([organizationId,ownerId,name])
 }

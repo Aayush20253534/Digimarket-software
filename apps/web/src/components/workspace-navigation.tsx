@@ -6,28 +6,28 @@ import {
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
 
-type Item={label:string;href:string;icon:LucideIcon;permits?:readonly string[]};
+type Item={label:string;href:string;icon:LucideIcon;permits?:readonly string[]; operational?:boolean};
 type Group={title:string;items:readonly Item[]};
 const sections:readonly Group[]=[
  {title:"Workspace",items:[
   {label:"Overview",href:"/app/dashboard",icon:LayoutDashboard},
-  {label:"My notes",href:"/app/notes",icon:NotebookPen},
-  {label:"Global search",href:"/app/search",icon:Search,permits:["search.read"]},
+  {label:"My notes",operational:true,href:"/app/notes",icon:NotebookPen},
+  {label:"Global search",operational:true,href:"/app/search",icon:Search,permits:["search.read"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
  {title:"Relationships",items:[
-  {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
+  {label:"Leads CRM",operational:true,href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]}
  ]},
  {title:"Delivery",items:[
   {label:"Projects",href:"/app/projects",icon:FolderKanban,permits:["projects.read"]},
   {label:"Tasks",href:"/app/tasks",icon:CheckSquare2,permits:["tasks.read"]},
-  {label:"Content calendar",href:"/app/content",icon:CalendarDays,permits:["content.read"]},
-  {label:"Files & assets",href:"/app/assets",icon:FileStack,permits:["assets.read"]},
+  {label:"Content calendar",operational:true,href:"/app/content",icon:CalendarDays,permits:["content.read"]},
+  {label:"Files & assets",operational:true,href:"/app/assets",icon:FileStack,permits:["assets.read"]},
   {label:"Approvals",href:"/app/approvals",icon:CheckSquare2,permits:["approvals.read"]}
  ]},
  {title:"Finance",items:[
-  {label:"Income, expenses & billing",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all","invoices.read","payments.read"]}
+  {label:"Income, expenses & billing",operational:true,href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all","invoices.read","payments.read"]}
  ]},
  {title:"Administration",items:[
   {label:"Founders & responsibilities",href:"/app/founders",icon:UsersRound,permits:["founders.read"]},
@@ -36,9 +36,10 @@ const sections:readonly Group[]=[
  ]},
  {title:"Account",items:[{label:"My account",href:"/app/profile",icon:ShieldCheck}]}
 ];
-export function permittedGroups(permissions:readonly string[]):Group[]{
+export function permittedGroups(permissions:readonly string[],roles:readonly string[]=[]):Group[]{
+  const admin=roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN");
  const granted=new Set(permissions);
- return sections.map(group=>({...group,items:group.items.filter(item=>!item.permits||item.permits.some(p=>granted.has(p)))}))
+ return sections.map(group=>({...group,items:group.items.filter(item=>(!admin||!item.operational)&&(!item.permits||item.permits.some(p=>granted.has(p))))}))
   .filter(group=>group.items.length>0);
 }
 export function currentSection(groups:Group[],pathname:string){

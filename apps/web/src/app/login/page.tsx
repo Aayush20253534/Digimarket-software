@@ -117,9 +117,9 @@ export default function LoginPage() {
     : step === "enroll" ? "Connect a time-based authenticator to protect your privileged account."
     : "Enter the six-digit code from your authenticator application.";
 
-  return <main className="aw-theme min-h-[100svh] overflow-x-clip bg-[#09070E] lg:grid lg:grid-cols-[.97fr_1.03fr]">
+  return <main className="aw-theme flex min-h-[100svh] items-center justify-center overflow-x-clip bg-[#09070E]">
     <a href="#auth-form-heading" className="aw-skip-link">Skip to sign in</a>
-    <aside className="aw-auth-side hidden min-h-[100svh] flex-col justify-between border-r border-[#39234C] p-9 text-[#F7F1FF] lg:flex xl:p-14">
+    <aside className="aw-auth-side hidden" aria-hidden="true">
       <Link href="/" aria-label="Back to AmplifyWorld homepage" className="relative z-[2] self-start">
         <BrandLogo tagline workspace />
       </Link>
@@ -150,9 +150,9 @@ export default function LoginPage() {
       </div>
     </aside>
 
-    <section className="relative flex min-h-[100svh] flex-col items-center justify-center px-4 py-8 sm:px-8 lg:px-10">
+    <section className="relative flex w-full min-h-[100svh] flex-col items-center justify-center px-4 py-5 sm:px-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_45%_45%_at_90%_5%,rgba(164,41,222,.13),transparent)]" aria-hidden="true"/>
-      <div className="relative z-[1] w-full max-w-[470px]">
+      <div className="relative z-[1] w-full max-w-[430px]">
         <div className="mb-7 flex items-center justify-between gap-3 lg:hidden">
           <Link href="/" className="min-w-0" aria-label="AmplifyWorld Workspace homepage"><BrandLogo compact workspace/></Link>
           <Link href="/" className="inline-flex shrink-0 items-center gap-1 text-xs text-[#DAB0F9]"><ArrowLeft size={15} aria-hidden="true"/> Home</Link>

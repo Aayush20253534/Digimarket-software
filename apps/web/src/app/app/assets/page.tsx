@@ -116,8 +116,34 @@ export default function AssetsPage(){
    void request<{items:Client[]}>("/clients?limit=100&status=ACTIVE").then(data=>setClients(data.items)).catch(()=>{});
  },[canClients,request]);
  const open=(asset:Asset)=>{setSelected(asset);setEditedName(asset.filename);setDestination(asset.folderId??"");setLinkClient(asset.clientId??"");};
- const enter=(folder:FolderItem)=>{setTrail(v=>[...v,folder]);setCursor(null);setSelected(null);setSelectedIds([]);setContext(null);};
- const goTo=(depth:number)=>{setTrail(v=>v.slice(0,depth));setCursor(null);setSelected(null);setSelectedIds([]);setContext(null);};
+ const navigateTrail=(next:FolderItem[],push=true)=>{
+  setTrail(next);setCursor(null);setNextCursor(null);setSelected(null);setSelectedIds([]);setContext(null);
+  const url=new URL(window.location.href);
+  if(next.length)url.searchParams.set("folders",JSON.stringify(next.map(f=>({id:f.id,name:f.name,color:f.color,parentId:f.parentId,version:f.version}))));
+  else url.searchParams.delete("folders");
+  if(push)window.history.pushState({awDriveTrail:next},"",url);
+  else window.history.replaceState({awDriveTrail:next},"",url);
+ };
+ const enter=(folder:FolderItem)=>navigateTrail([...trail,folder]);
+ const goTo=(depth:number)=>navigateTrail(trail.slice(0,depth));
+ useEffect(()=>{
+  const readPath=(state:unknown):FolderItem[]=>{
+   if(state&&typeof state==="object"&&"awDriveTrail" in state&&Array.isArray(state.awDriveTrail))return state.awDriveTrail as FolderItem[];
+   try{
+    const value=new URLSearchParams(window.location.search).get("folders");
+    const found=value?JSON.parse(value):[];
+    if(!Array.isArray(found)||found.length>30)return[];
+    return found.every(x=>typeof x?.id==="string"&&/^[0-9a-f-]{36}$/i.test(x.id)&&typeof x?.name==="string")?found:[];
+   }catch{return[];}
+  };
+  const initial=readPath(window.history.state);
+  if(initial.length)setTrail(initial);
+  const onPop=(event:PopStateEvent)=>{
+   setTrail(readPath(event.state));setCursor(null);setNextCursor(null);setSelected(null);setSelectedIds([]);setContext(null);
+  };
+  window.addEventListener("popstate",onPop);
+  return()=>window.removeEventListener("popstate",onPop);
+ },[]);
  async function downloadFolder(folder:FolderItem){
   if(!session)return;
   setBusy(true);setError("");
@@ -334,7 +360,7 @@ export default function AssetsPage(){
   </div>
   <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files. {legacySort?"Sorting is limited to this page until the API updates.":""}</p>
   <nav className="aw-drive-path" aria-label="Folder path">
-   {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>goTo(trail.length-1)}><ArrowLeft size={17}/></button>}
+   {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>{if(window.history.state?.awDriveTrail)window.history.back();else goTo(trail.length-1);}}><ArrowLeft size={17}/></button>}
    <button type="button" onClick={()=>goTo(0)}><Home size={17}/> My Drive</button>
    {trail.map((f,i)=><span key={f.id} className="aw-drive-crumb"><ChevronRight size={14}/><button type="button" onClick={()=>goTo(i+1)}>{f.name}</button></span>)}
   </nav>

@@ -63,3 +63,132 @@
 .aw-notes-editor-expanded .aw-notes-toolbar{flex-shrink:0}.aw-notes-editor-expanded .aw-notes-draw-head{flex-shrink:0}
 .aw-notes-editor-expanded .aw-notes-canvas{max-height:calc(100dvh - 290px)!important;width:min(100%,calc((100dvh - 290px) * 900 / 520))!important}
 @media(max-width:630px){.aw-notes-editor-expanded{padding:8px!important}.aw-notes-editor-expanded .aw-notes-canvas{width:100%!important;max-height:calc(100dvh - 375px)!important}.aw-notes-tool-choices{gap:3px}.aw-notes-pen .aw-notes-tool-choices button{padding:6px}}
+
+/* Notes Studio 2026: desktop three-pane workspace with compact tablet/mobile drawers. */
+.aw-work-content:has(.aw-studio){padding:0!important;overflow:visible}
+.aw-work-content-width:has(.aw-studio){max-width:none!important;padding:0!important}
+.aw-studio{--studio-text:#eee7fa;display:grid;grid-template-columns:minmax(215px,265px) minmax(0,1fr) minmax(220px,270px);align-items:stretch;gap:0;min-width:0;height:calc(100dvh - 68px);min-height:600px;background:#080912;color:var(--studio-text);border:1px solid #23203a;border-radius:17px;overflow:hidden;font-size:14px}
+.aw-studio button{cursor:pointer}
+.aw-studio button:focus-visible,.aw-studio input:focus-visible,.aw-studio textarea:focus-visible{outline:2px solid #bb70ff;outline-offset:3px}
+.aw-studio-library{min-width:0;border-right:1px solid #26263e;background:linear-gradient(150deg,#101022 5%,#0b101c 60%,#1d1032 110%);display:flex;flex-direction:column;overflow:auto}
+.aw-studio-brand{display:flex;align-items:center;gap:13px;padding:20px 15px;border-bottom:1px solid #232239}
+.aw-studio-logo{width:40px;height:44px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(155deg,#9545f5,#4739ed);box-shadow:0 0 25px #8b4cf25e}
+.aw-studio-brand strong,.aw-studio-brand span{display:block;line-height:1.15}
+.aw-studio-brand strong{font-size:17px;font-weight:800;letter-spacing:-.03em}.aw-studio-brand span{font-size:14px;font-weight:700;color:#ca70ff}
+.aw-studio-library-body{display:flex;flex-direction:column;gap:11px;padding:16px 12px}
+.aw-studio-search{display:flex;align-items:center;gap:10px;background:#1b1b33;border:1px solid #323050;border-radius:12px;padding:10px 12px;color:#bfb9d9}
+.aw-studio-search input{background:none!important;border:0!important;outline:0!important;min-width:0;width:100%;color:#fff;font-size:13px}
+.aw-studio-new{display:flex;align-items:center;justify-content:center;gap:9px;border-radius:10px;background:linear-gradient(110deg,#8136ff,#d129b7);padding:12px;color:#fff;font-weight:700;box-shadow:0 7px 24px #a52dff30}
+.aw-studio-collections{display:grid;gap:5px;margin-top:8px}
+.aw-studio-collections button{display:flex;align-items:center;gap:11px;text-align:left;width:100%;color:#d8d5eb;padding:11px 9px;border-radius:8px;font-weight:500}
+.aw-studio-collections button:hover,.aw-studio-collections button.selected{background:#251e3e}
+.aw-studio-collections span{margin-left:auto;color:#a9a3c8;font-variant-numeric:tabular-nums}
+.aw-studio-section-title{font-size:11px;letter-spacing:.045em;color:#aaa9cb;margin:22px 4px 1px}
+.aw-studio-note-item{display:flex;gap:10px;align-items:center;padding:8px;text-align:left;border:1px solid transparent;border-radius:10px;min-width:0}
+.aw-studio-note-item:hover{background:#211c34}
+.aw-studio-note-item.active{background:#2b1b4a;border-color:#9958f7;box-shadow:inset 0 0 0 1px #623d9f}
+.aw-studio-note-preview{width:45px;height:52px;border-radius:6px;display:grid;place-items:center;flex:0 0 auto;color:#a06bec;background:radial-gradient(#d7b6f8 1px,transparent 1px) 0 0/9px 9px,#faf9fc}
+.aw-studio-note-item>span{display:block;min-width:0}
+.aw-studio-note-item strong,.aw-studio-note-item small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aw-studio-note-item strong{font-size:12px;color:#f4eafa}.aw-studio-note-item small{font-size:11px;color:#b4aaca;margin-top:4px}
+.aw-studio-main{min-width:0;display:flex;flex-direction:column;overflow:hidden;background:radial-gradient(ellipse at top,#15162a 0,#0b0e1a 48%,#090c16 100%)}
+.aw-studio-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 15px;min-height:67px;border-bottom:1px solid #26253b}
+.aw-studio-header-name{display:flex;align-items:center;gap:10px;min-width:160px;flex:1}
+.aw-studio-header-name input{background:#090d1e!important;border:1px solid #2b2745!important;border-radius:8px!important;font-weight:760;font-size:clamp(16px,1.65vw,22px)!important;letter-spacing:-.035em;color:#fff!important;padding:8px!important;width:min(100%,490px)}
+.aw-studio-header-name h1{font-weight:700;font-size:18px}
+.aw-studio-header-name svg{flex:0 0 auto;color:#c98aff}
+.aw-studio-header .aw-notes-save-status{padding:0;border:0;font-size:11px;color:#aec8c8;white-space:nowrap}
+.aw-studio-head-actions{display:flex;gap:7px;align-items:center}
+.aw-studio-head-actions button{display:inline-flex;align-items:center;gap:7px;background:#15192a;border:1px solid #34364f;border-radius:10px;padding:9px 11px;color:#eee6f9;font-size:12px}
+.aw-studio-head-actions button:hover{background:#2a1f46}
+.aw-studio-head-actions button:disabled{opacity:.5}
+.aw-studio-export{display:flex;gap:4px}
+.aw-studio-modebar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px 8px;min-width:0}
+.aw-studio-mode-switch{display:flex;border:1px solid #353353;border-radius:9px;overflow:hidden;flex-shrink:0}
+.aw-studio-mode-switch button{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#101226;color:#dedaf4;font-weight:620;font-size:12px}
+.aw-studio-mode-switch button[aria-pressed=true]{background:linear-gradient(100deg,#5830d5,#3c267c);color:#fff;box-shadow:inset 0 0 0 1px #a566ff}
+.aw-studio-utility{display:flex;align-items:center;gap:4px;color:#ebe6fd;font-size:12px;white-space:nowrap}
+.aw-studio-utility button{padding:9px;color:#ddd6fa;background:#14182b;border-radius:8px}
+.aw-studio-utility button:hover{background:#302548}.aw-studio-utility button:disabled{opacity:.35}
+.aw-studio-utility span{padding:0 8px;font-variant-numeric:tabular-nums}
+.aw-studio-tools{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;background:linear-gradient(#181a2d,#111726);margin:0 13px 8px;padding:7px;border:1px solid #30364b;border-radius:13px;flex-shrink:0}
+.aw-studio-tools button{min-width:64px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;padding:9px 7px;border:1px solid transparent;border-radius:8px;font-size:10px;color:#e0d8ec;white-space:nowrap}
+.aw-studio-tools button:hover{background:#2b2540}
+.aw-studio-tools button[aria-pressed=true]{color:#fff;background:linear-gradient(135deg,#7633d7,#382178);border-color:#bb6fff;box-shadow:0 0 20px #943cf052}
+.aw-studio-sheet-scroll{flex:1;min-height:0;overflow:auto;padding:0 13px 13px;display:flex;align-items:flex-start}
+.aw-studio-sheet{flex-shrink:0;min-width:480px;max-width:none;background:#fff;border-radius:14px;box-shadow:0 8px 45px #0008;overflow:hidden}
+.aw-studio-sheet .aw-notes-canvas{display:block;width:100%;height:auto;border-radius:14px;background:transparent;aspect-ratio:900/520;box-shadow:none;touch-action:none;cursor:crosshair}
+.aw-studio-sheet.paper-dotted,.aw-studio-paper-options .paper-dotted{background-color:#fff;background-image:radial-gradient(#d6d6df 0.8px,transparent .9px);background-size:17px 17px}
+.aw-studio-sheet.paper-ruled,.aw-studio-paper-options .paper-ruled{background-color:#fff;background-image:repeating-linear-gradient(transparent 0 26px,#dbe1f1 27px,#dbe1f1 28px)}
+.aw-studio-sheet.paper-grid,.aw-studio-paper-options .paper-grid{background-color:#fff;background-image:linear-gradient(#e4e4ee 1px,transparent 1px),linear-gradient(90deg,#e4e4ee 1px,transparent 1px);background-size:22px 22px}
+.aw-studio-sheet.paper-blank,.aw-studio-paper-options .paper-blank{background-color:#fff}
+.aw-studio-typed{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;margin:0 13px 13px;border-radius:14px;padding:14px;background:#fff;color:#201d32}
+.aw-studio-typed .aw-notes-tabs{flex-shrink:0}
+.aw-studio-typed .aw-notes-textarea{flex:1;min-height:300px;width:100%;background:#fff!important;color:#201d32!important;border-color:#ded6e4}
+.aw-studio-typed .aw-notes-preview{flex:1;overflow:auto}
+.aw-studio-foot{display:flex;gap:10px;justify-content:flex-end;padding:5px 14px 11px}
+.aw-studio-foot button{display:flex;align-items:center;gap:6px;font-size:11px;color:#c5bdda}
+.aw-studio-foot button:hover{color:#fff}.aw-studio-foot button.danger{color:#f4a5b8}
+.aw-studio-inspector{min-width:0;overflow-y:auto;background:linear-gradient(150deg,#121426,#0b0e1d);border-left:1px solid #30314c}
+.aw-studio-inspector-tabs{display:flex;position:sticky;top:0;z-index:2;background:#17192b;border-bottom:1px solid #33334e}
+.aw-studio-inspector-tabs button{padding:15px 7px;flex:1;text-align:center;font-size:12px;color:#b1adcc;border-bottom:2px solid transparent}
+.aw-studio-inspector-tabs button[aria-selected=true]{color:#d38aff;border-bottom-color:#ba4dff;background:#211839}
+.aw-studio-settings{display:flex;flex-direction:column;gap:12px;padding:18px 15px;color:#e6def8}
+.aw-studio-settings label,.aw-studio-label{display:block;font-weight:640;font-size:12px;margin-top:7px}
+.aw-studio-picker{display:flex;align-items:center;gap:14px;border:1px solid #444262;padding:14px;background:linear-gradient(130deg,#251532,#6a2090);border-radius:12px;min-height:88px}
+.aw-studio-picker input[type=color]{width:53px!important;height:53px!important}.aw-studio-picker span{font-size:12px;color:#fff;font-family:monospace}
+.aw-studio-swatches{display:flex;gap:5px;flex-wrap:wrap;padding-bottom:9px;border-bottom:1px solid #36354e}
+.aw-studio-swatches button{height:22px;width:22px;border-radius:50%;border:1px solid #8c809b;box-shadow:0 1px 3px #0009}
+.aw-studio-swatches button[aria-pressed=true]{outline:2px solid #d98cff;outline-offset:2px}
+.aw-studio-range{display:flex;align-items:center;gap:8px;padding-bottom:15px;border-bottom:1px solid #36354e}
+.aw-studio-range input{flex:1;min-width:0;accent-color:#a650f3}
+.aw-studio-range span{flex:0 0 48px;text-align:right;background:#1c2036;padding:8px 4px;border-radius:8px;font-size:11px;white-space:nowrap}
+.aw-studio-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.aw-studio-options button,.aw-studio-paper-options button{border:1px solid #3b3d59;border-radius:8px;padding:11px 3px;font-size:10px;text-transform:capitalize;background:#191e30;color:#dbd9f0}
+.aw-studio-options button[aria-pressed=true],.aw-studio-paper-options button[aria-pressed=true]{border-color:#b25fff;background:#352051;color:#fff;box-shadow:0 0 10px #8638e74d}
+.aw-studio-paper-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.aw-studio-paper-options button{display:flex;align-items:center;gap:8px;flex-direction:column;padding:9px 3px}
+.aw-studio-paper-options button span{display:block;width:35px;height:35px;border-radius:3px;border:1px solid #d1cadd}
+.aw-studio-clear{display:flex;align-items:center;gap:8px;color:#ffd1e1;padding:9px}
+.aw-studio-mobile-menu{display:none}
+.aw-studio-fullscreen{position:fixed!important;inset:0!important;z-index:300!important;height:100dvh!important;border-radius:0!important;grid-template-columns:minmax(205px,250px) minmax(0,1fr) minmax(220px,265px)!important}
+@media(max-width:1150px){.aw-studio{grid-template-columns:210px minmax(0,1fr) 220px}.aw-studio-brand strong{font-size:14px}.aw-studio-mode-switch button{padding:8px}.aw-studio-header .aw-notes-save-status{display:none}}
+@media(max-width:920px){
+.aw-studio{grid-template-columns:minmax(0,1fr);min-height:0;height:calc(100dvh - 65px);position:relative}
+.aw-studio-fullscreen{grid-template-columns:minmax(0,1fr)!important}
+.aw-studio-library,.aw-studio-inspector{position:absolute;z-index:6;top:0;bottom:0;transform:translateX(-103%);width:min(285px,88vw);box-shadow:0 8px 30px #0008;transition:transform .2s}
+.aw-studio-inspector{right:0;left:auto;transform:translateX(103%);width:min(300px,88vw)}
+.aw-studio-library-open,.aw-studio-inspector-open{transform:translateX(0)}
+.aw-studio-mobile-menu{display:flex;align-items:center}
+.aw-studio-main{height:100%;width:100%}
+.aw-studio-sheet{min-width:min(470px,100%)}
+}
+@media(max-width:590px){
+.aw-studio{height:calc(100dvh - 64px);border-radius:0}
+.aw-studio-header{min-height:56px;padding:8px;gap:4px}
+.aw-studio-header-name{min-width:0}
+.aw-studio-header-name input{min-width:0;font-size:15px!important}
+.aw-studio-head-actions button{padding:7px}.aw-studio-head-actions button span{display:none}
+.aw-studio-export button:nth-child(2){display:none}
+.aw-studio-modebar{padding:7px;flex-wrap:wrap}
+.aw-studio-mode-switch{width:100%}.aw-studio-mode-switch button{flex:1;justify-content:center}
+.aw-studio-utility{margin-left:auto}
+.aw-studio-tools{margin:0 5px 6px}
+.aw-studio-tools button{min-width:62px}
+.aw-studio-sheet-scroll{padding:0 5px 7px}
+.aw-studio-sheet{min-width:0}
+.aw-studio-typed{margin:0 5px 6px}
+.aw-studio-foot{padding:8px}
+}
+
+.aw-studio-note-open{display:flex;align-items:center;gap:9px;min-width:0;flex:1;text-align:left}
+.aw-studio-note-item>button:last-child{display:grid;place-items:center;min-width:28px;height:28px;color:#c69af4;font-size:11px}
+.aw-studio-note-item>button:last-child:hover{color:#fff}
+.aw-studio-note-preview svg{display:block;width:42px;height:49px;border-radius:4px}
+.aw-studio-section-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.aw-studio-section-row>button{padding:5px;color:#d8a8ff}
+.aw-studio-notebook-row{display:flex;align-items:center;gap:4px}
+.aw-studio-notebook-row>button:first-child{min-width:0;flex:1;overflow:hidden}
+.aw-studio-notebook-row>button:last-child{display:flex;padding:8px;align-items:center;color:#af91c5}
+.aw-studio-note-book-select{display:flex;align-items:center;gap:7px;font-size:11px;color:#b8a9d2;margin-right:auto}
+.aw-studio-note-book-select select{background:#18182c;border:1px solid #45415e;border-radius:7px;color:#f4eafa;padding:7px}

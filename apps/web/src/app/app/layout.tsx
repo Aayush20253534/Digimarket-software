@@ -78,9 +78,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <AWButton onClick={()=>void refresh()}>Retry connection</AWButton></div>
  </main>;
 
- const groups=permittedGroups(session.identity.permissions);
+ const isAdmin=session.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN");
+  const groups=permittedGroups(session.identity.permissions,session.identity.roles);
  const current=currentSection(groups,pathname);
- const canSearch=session.identity.permissions.includes("search.read");
+ const canSearch=!isAdmin&&session.identity.permissions.includes("search.read");
  const name=session.user.displayName;
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
@@ -127,7 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      </div>
     </div>
     <div className="aw-work-topactions">
-     <Link href="/app/notes" aria-label="Open saved notes" title="My notes" className="aw-work-icon"><NotebookPen size={19} aria-hidden="true"/></Link>
+     {!isAdmin&&<Link href="/app/notes" aria-label="Open saved notes" title="My notes" className="aw-work-icon"><NotebookPen size={19} aria-hidden="true"/></Link>}
      {canSearch&&<Link href="/app/search" aria-label="Search workspace" className="aw-work-search">
       <Search size={17} aria-hidden="true"/><span>Search workspace</span>
      </Link>}
@@ -139,7 +140,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <main id="workspace-content" className="aw-work-content">
     <div className="aw-work-content-width">
      {signOutError&&<div className="mb-5"><AWNotice tone="error">{signOutError}</AWNotice></div>}
-     {children}
+     {isAdmin&&["/app/notes","/app/search","/app/leads","/app/content","/app/assets","/app/finance","/app/billing"].some(p=>pathname===p||pathname.startsWith(p+"/"))?<AWNotice tone="error">This operational module is not available to administrator accounts.</AWNotice>:children}
     </div>
    </main>
   </div>

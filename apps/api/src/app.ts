@@ -102,6 +102,25 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
   });
 
   if (authService) {
+    // Governance accounts do not gain operational access through direct API URLs,
+    // even when older role-permission rows still contain legacy grants.
+    const operationalPrefixes = [
+      "/notes", "/leads", "/assets", "/asset-folders", "/content",
+      "/finance", "/billing", "/invoices", "/payments", "/search",
+    ];
+    app.use("/api/v1", async (request,response,next)=>{
+      const protectedOperation=operationalPrefixes.some(prefix=>request.path===prefix||request.path.startsWith(prefix+"/"));
+      if(!protectedOperation)return next();
+      const bearer=request.get("authorization");
+      if(!bearer?.startsWith("Bearer "))return next();
+      try{
+        const principal=await authService.authenticate(bearer.slice(7));
+        if(principal.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")){
+          return response.status(403).json({error:{code:"ADMIN_OPERATION_RESTRICTED",message:"Operational modules are not available to administrator accounts"}});
+        }
+        next();
+      }catch(error){next(error);}
+    });
     registerNotesRoutes(app, authService);
     registerInsightsRoutes(app, authService);
     registerCompanyRoutes(app, authService);

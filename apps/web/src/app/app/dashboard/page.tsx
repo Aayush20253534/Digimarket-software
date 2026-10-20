@@ -11,7 +11,6 @@ import { useAuth } from "@/components/auth-provider";
 import { AWBadge, AWEmptyState, AWNotice, AWStatusBadge } from "@/components/aw-ui";
 import { AWDataToolbar, AWLocalPagination, AWPanel, AWSortButton, AWStat } from "@/components/aw-data-patterns";
 import { permittedGroups } from "@/components/workspace-navigation";
-import { AWActionCenter } from "@/components/aw-action-center";
 import { AWPersonalTasks } from "@/components/aw-personal-tasks";
 
 type Source = "Clients" | "Leads" | "Projects";
@@ -50,14 +49,15 @@ export default function Dashboard() {
   const [page,setPage]=useState(1);
   const grants=session?.identity.permissions ?? [];
   const permitted=useMemo(()=>new Set(grants),[grants]);
-  const available=useMemo(()=>topics.filter(x=>x.permits.some(p=>permitted.has(p))),[permitted]);
-  const nav=useMemo(()=>permittedGroups(grants).flatMap(group=>group.items),[grants]);
+  const isAdmin=session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")??false;
+  const available=useMemo(()=>topics.filter(x=>(!isAdmin||!["/app/leads","/app/content","/app/assets","/app/finance"].includes(x.href))&&x.permits.some(p=>permitted.has(p))),[permitted,isAdmin]);
+  const nav=useMemo(()=>permittedGroups(grants,session?.identity.roles??[]).flatMap(group=>group.items),[grants]);
 
   const load=useCallback(async()=>{
     if(!session||!session.identity.roles.some(role=>["ADMIN","SUPER_ADMIN"].includes(role)))return;
     const toLoad: Source[]=[];
     if(session.identity.permissions.includes("clients.read"))toLoad.push("Clients");
-    if(session.identity.permissions.includes("leads.read"))toLoad.push("Leads");
+    // Administrators do not access the founder-owned leads pipeline.
     if(session.identity.permissions.includes("projects.read"))toLoad.push("Projects");
     if(!toLoad.length){setOverview({records:[],sources:[],more:[],errors:[]});return;}
     setBusy(true);
@@ -102,7 +102,7 @@ export default function Dashboard() {
   const visible=filtered.slice((Math.min(page,pages)-1)*7,Math.min(page,pages)*7);
   const firstName=session?.user.displayName.split(" ")[0]??"there";
   if(!session)return null;
-  const leadership=session.identity.roles.some(role=>["ADMIN","SUPER_ADMIN"].includes(role));
+  const leadership=isAdmin;
   if(!leadership)return <AWPersonalTasks/>;
   const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
   overview?.records.forEach(x=>{groupCounts[x.source]++;});
@@ -138,7 +138,7 @@ export default function Dashboard() {
     {leadership&&<div className="aw-records-summary" aria-label="Loaded record summary">
       {(["Clients","Leads","Projects"] as const).filter(label=>{
         const permission=label==="Clients"?"clients.read":label==="Leads"?"leads.read":"projects.read";
-        return permitted.has(permission);
+        return label!=="Leads"&&permitted.has(permission);
       }).map(label=><Link key={label} href={paths[label]} className="aw-summary-item">
         <span className="aw-summary-number">{overview ? groupCounts[label] : "…"}</span>
         <span className="min-w-0">
@@ -157,7 +157,6 @@ export default function Dashboard() {
       More records are available in: {overview.more.join(", ")}.
     </AWNotice> : null}
 
-    <AWActionCenter />
 
     <div className="aw-dashboard-main-grid">
       <AWPanel title="Recent workspace records" description="Live data from modules your account can access. Results are limited to the first API page.">
@@ -220,7 +219,7 @@ export default function Dashboard() {
         </AWPanel>
       </div>
     </div>
-    <div className="mt-4 flex justify-end"><Link href="/app/notes" className="aw-dashboard-refresh"><NotebookPen size={16} aria-hidden="true"/> Open or save a note</Link></div>
+    {!isAdmin&&<div className="mt-4 flex justify-end"><Link href="/app/notes" className="aw-dashboard-refresh"><NotebookPen size={16} aria-hidden="true"/> Open or save a note</Link></div>}
     <footer className="aw-dashboard-footer">
       <Activity size={15} aria-hidden="true"/> AmplifyWorld Workspace · Live account context
     </footer>

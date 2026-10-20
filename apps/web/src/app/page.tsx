@@ -53,7 +53,7 @@ export default async function HomePage() {
     </header>
 
     <div id="main-content" className="relative">
-      <section className="aw-shell aw-hero-grid relative grid items-center gap-12 pb-20 pt-16 lg:grid-cols-[1.04fr_.96fr] lg:gap-12 lg:pb-28 lg:pt-24">
+      <section className="aw-shell aw-hero-grid relative grid items-center gap-10 pb-16 pt-8 lg:grid-cols-[1.04fr_.96fr] lg:gap-12 lg:pb-20 lg:pt-12">
         <div className="relative z-[1] min-w-0">
           <AWBadge tone="accent"><Sparkles size={13} aria-hidden="true" /> The operating system for growing agencies</AWBadge>
           <h1 className="aw-hero-heading mt-7 max-w-[720px]">

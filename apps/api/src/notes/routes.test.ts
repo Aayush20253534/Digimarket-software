@@ -11,6 +11,7 @@ const noteId="33333333-3333-4333-8333-333333333333";
 const valid={title:"Design ideas",body:"**New homepage**",strokes:"[]"};
 const principal={userId,organizationId,sessionId:"session",roles:["EMPLOYEE"],permissions:new Set<string>()};
 const db={
+ personalNotebook:{findMany:vi.fn(),findFirst:vi.fn(),create:vi.fn(),updateMany:vi.fn(),delete:vi.fn()},
  personalNote:{
   findMany:vi.fn(),findFirst:vi.fn(),findFirstOrThrow:vi.fn(),create:vi.fn(),updateMany:vi.fn(),deleteMany:vi.fn(),
  }
@@ -29,6 +30,19 @@ function app(){
 }
 beforeEach(()=>{vi.resetAllMocks();});
 describe("private notes API isolation and version protection",()=>{
+ it("blocks administrators from personal notes even with a valid session",async()=>{
+  const expressApp=express();
+  const auth={database:db,authenticate:vi.fn().mockResolvedValue({...principal,roles:["ADMIN"]})} as unknown as AuthService;
+  registerNotesRoutes(expressApp,auth);
+  expressApp.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
+    void _next;
+    if(error instanceof AuthError)return res.status(error.status).json({error:{code:error.code}});
+    return res.status(500).json({});
+  });
+  const result=await request(expressApp).get("/api/v1/notes").set("Authorization","Bearer token");
+  expect(result.status).toBe(403);
+  expect(db.personalNote.findMany).not.toHaveBeenCalled();
+ });
  it("rejects missing access token",async()=>{
   const response=await request(app()).get("/api/v1/notes");
   expect(response.status).toBe(401);
@@ -39,7 +53,7 @@ describe("private notes API isolation and version protection",()=>{
   const response=await request(app()).get("/api/v1/notes").set("Authorization","Bearer token");
   expect(response.status).toBe(200);
   expect(db.personalNote.findMany).toHaveBeenCalledWith(expect.objectContaining({
-   where:{organizationId,ownerId:userId},take:100
+   where:{organizationId,ownerId:userId,deletedAt:null},take:100
   }));
  });
  it("does not disclose a foreign note by id",async()=>{
@@ -81,17 +95,18 @@ describe("private notes API isolation and version protection",()=>{
   expect(response.status).toBe(409);
   expect(response.body.error.code).toBe("VERSION_CONFLICT");
   expect(db.personalNote.updateMany).toHaveBeenCalledWith({
-   where:{id:noteId,organizationId,ownerId:userId,version:2},
+   where:{id:noteId,organizationId,ownerId:userId,deletedAt:null,version:2},
    data:{...valid,version:{increment:1}},
   });
  });
  it("requires matching ownership and version on deletion",async()=>{
-  db.personalNote.deleteMany.mockResolvedValue({count:0});
+  db.personalNote.updateMany.mockResolvedValue({count:0});
   const response=await request(app()).delete("/api/v1/notes/"+noteId+"?version=1")
    .set("Authorization","Bearer token");
   expect(response.status).toBe(409);
-  expect(db.personalNote.deleteMany).toHaveBeenCalledWith({
-   where:{id:noteId,organizationId,ownerId:userId,version:1},
+  expect(db.personalNote.updateMany).toHaveBeenCalledWith({
+   where:{id:noteId,organizationId,ownerId:userId,version:1,deletedAt:null},
+   data:{deletedAt:expect.any(Date)},
   });
  });
 });
