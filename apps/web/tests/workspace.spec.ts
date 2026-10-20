@@ -72,7 +72,14 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.mouse.move(bounds.x+bounds.width*.2,bounds.y+bounds.height*.2);
   await page.mouse.down();
   await page.mouse.move(bounds.x+bounds.width*.3,bounds.y+bounds.height*.35,{steps:6});
+  const drawingPersisted = page.waitForResponse(response =>
+    response.url().includes("/api/v1/notes/") &&
+    response.request().method() === "PUT" &&
+    response.status() === 200 &&
+    (response.request().postData() ?? "").includes("points"),
+    {timeout:30000});
   await page.mouse.up();
+  await drawingPersisted;
   await expect(page.getByText("All changes saved")).toBeVisible({timeout:20000});
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Note title" })).toHaveValue("CI note for design review");
