@@ -37,7 +37,9 @@ export function registerAssetRoutes(app:Express,auth:AuthService) {
    const folderId=req.query.folderId;
    if(folderId!==undefined && folderId!=="root" && !uuid.safeParse(folderId).success)
     throw new AuthError(422,"VALIDATION_ERROR","Invalid folder");
-   const input=parse(assetListSchema,req.query);
+   const knownQuery={...req.query};
+   delete knownQuery.folderId; // Folder is validated separately; assetListSchema is intentionally strict.
+   const input=parse(assetListSchema,knownQuery);
    res.json({data:await service.list(actor(res),{...input,
      ...(folderId!==undefined?{folderId:folderId==="root"?null:String(folderId)}:{})})});
  });
