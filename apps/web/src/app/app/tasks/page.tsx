@@ -2,6 +2,7 @@
 import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
+import { TeamMultiSelect } from "@/components/team-multi-select";
 import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
 
 type Status="TODO"|"IN_PROGRESS"|"BLOCKED"|"IN_REVIEW"|"DONE"|"CANCELLED";
@@ -82,9 +83,9 @@ export default function TasksPage(){
    setMessage(done);
   }catch(e){setError(err(e));}finally{setBusy(false);}
  }
- const multi=(target:HTMLSelectElement)=>Array.from(target.selectedOptions).map(v=>v.value);
  async function submitTask(e:FormEvent){
   e.preventDefault();
+  if(!create.assigneeIds.length){setError("Select at least one employee.");return;}
   await run(async()=>{
    const task=await request<Task>("/tasks",{method:"POST",body:{
     ...create,projectId:create.projectId||null,dueAt:create.dueAt?new Date(create.dueAt).toISOString():null}});
@@ -93,6 +94,7 @@ export default function TasksPage(){
  }
  async function submitRecurring(e:FormEvent){
   e.preventDefault();
+  if(!schedule.assigneeIds.length){setError("Select at least one employee.");return;}
   if(!schedule.startAt)return;
   await run(async()=>{
    await request("/task-recurrences",{method:"POST",body:{
@@ -146,11 +148,8 @@ export default function TasksPage(){
        <option value="">General task</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
      <label className="text-sm">Due date/time<input type="datetime-local" className="field mt-1 w-full"
        value={create.dueAt} onChange={e=>setCreate(p=>({...p,dueAt:e.target.value}))}/></label>
-     <label className="text-sm md:col-span-2">Assign employees (Ctrl/Cmd to select multiple)
-      <select multiple required size={Math.min(Math.max(staff.length,2),6)} className="field mt-1 w-full"
-       value={create.assigneeIds} onChange={e=>setCreate(p=>({...p,assigneeIds:multi(e.target)}))}>
-       {staff.map(p=><option key={p.id} value={p.id}>{p.displayName}</option>)}</select>
-     </label>
+     <div className="md:col-span-2"><TeamMultiSelect label="Assign employees" options={staff} value={create.assigneeIds}
+       onChange={ids=>setCreate(p=>({...p,assigneeIds:ids}))}/></div>
      <label className="text-sm md:col-span-2">Description
       <textarea className="field mt-1 w-full" maxLength={2000} rows={2} value={create.description}
        onChange={e=>setCreate(p=>({...p,description:e.target.value}))}/></label>
@@ -216,10 +215,8 @@ export default function TasksPage(){
        <option value="">General work</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
      <label className="text-sm">Days until due<input className="field mt-1 w-full" type="number" min={0} max={30}
        value={schedule.dueOffsetDays} onChange={e=>setSchedule(p=>({...p,dueOffsetDays:Number(e.target.value)}))}/></label>
-     <label className="text-sm md:col-span-2">Assign employees
-      <select className="field mt-1 w-full" multiple required size={Math.min(Math.max(staff.length,2),6)}
-       value={schedule.assigneeIds} onChange={e=>setSchedule(p=>({...p,assigneeIds:multi(e.target)}))}>
-       {staff.map(p=><option key={p.id} value={p.id}>{p.displayName}</option>)}</select></label>
+     <div className="md:col-span-2"><TeamMultiSelect label="Assign recurring employees" options={staff} value={schedule.assigneeIds}
+       onChange={ids=>setSchedule(p=>({...p,assigneeIds:ids}))}/></div>
      <label className="text-sm md:col-span-2">Description<textarea className="field mt-1 w-full" maxLength={2000}
        value={schedule.description} onChange={e=>setSchedule(p=>({...p,description:e.target.value}))}/></label>
      <p className="text-xs text-slate-500 md:col-span-2">Timezone: {browserTimezone}. Schedules automatically pause if their staff or project becomes unavailable.</p>

@@ -6,6 +6,9 @@ export const dynamic = "force-dynamic";
 const endpoints: Record<string, string[]> = {
   "health": ["GET"],
   "notes": ["GET","POST"],
+  "asset-folders": ["GET","POST"],
+  "finance/proof-intent": ["POST"],
+  "finance/proof-confirm": ["POST"],
   "search": ["GET"],
   "reports/overview": ["GET"],
   "notifications": ["GET"],
@@ -55,6 +58,10 @@ const endpoints: Record<string, string[]> = {
   "leads/import": ["POST"],
   "leads/export": ["GET"],
 };
+const folderArchivePattern=/^asset-folders\/[0-9a-fA-F-]{36}\/download$/;
+const folderDetailPattern=/^asset-folders\/[0-9a-fA-F-]{36}$/;
+const financeProofPattern=/^finance\/entries\/[0-9a-fA-F-]{36}\/proof$/;
+const assetOrganizePattern=/^assets\/[0-9a-fA-F-]{36}\/organize$/;
 const noteDetailPattern=/^notes\/[0-9a-fA-F-]{36}$/;
 const notificationReadPattern=/^notifications\/[0-9a-fA-F-]{36}\/read$/;
 const founderDetailPattern=/^founders\/[0-9a-fA-F-]{36}$/;
@@ -93,6 +100,10 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(financeProofPattern.test(path))return method==="GET";
+  if(folderArchivePattern.test(path))return method==="POST";
+  if(folderDetailPattern.test(path))return ["PUT","DELETE"].includes(method);
+  if(assetOrganizePattern.test(path))return method==="POST";
   if(noteDetailPattern.test(path))return ["GET","PUT","DELETE"].includes(method);
   if(notificationReadPattern.test(path))return method==="POST";
   if(founderDetailPattern.test(path))return method==="PUT";
@@ -209,8 +220,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       if(v!==null)url.searchParams.set(key,v);
     }
   }
+  if (path === "asset-folders") {
+    const parentId=request.nextUrl.searchParams.get("parentId");
+    if(parentId!==null)url.searchParams.set("parentId",parentId);
+  }
   if (path === "assets") {
-    for (const key of ["q","clientId","status","cursor","limit"]) {
+    for (const key of ["q","clientId","status","cursor","limit","folderId"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
@@ -286,7 +301,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const response = await fetch(url, {
       method: request.method, headers, body,
-      cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(12000),
+      cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(folderArchivePattern.test(path)?55000:12000),
     });
     // A new web deployment can point at a stale Render API. Its fallback 404
     // includes meta.requestId, unlike an actual missing note. Report the
@@ -304,6 +319,11 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const responseHeaders = new Headers({ "Cache-Control": "no-store" });
     const contentType = response.headers.get("content-type");
     if (contentType?.startsWith("application/json")) responseHeaders.set("content-type", "application/json");
+    if (folderArchivePattern.test(path) && contentType?.startsWith("application/zip")){
+      responseHeaders.set("content-type","application/zip");
+      const disposition=response.headers.get("content-disposition");
+      if(disposition)responseHeaders.set("content-disposition",disposition);
+    }
     for (const value of response.headers.getSetCookie()) responseHeaders.append("set-cookie", value);
     return new NextResponse(response.status === 204 ? null : await response.arrayBuffer(), {
       status: response.status, headers: responseHeaders,

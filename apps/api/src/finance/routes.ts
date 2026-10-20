@@ -6,6 +6,8 @@ import {
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { FinanceService } from "./service";
+import { AssetService } from "../assets/service";
+import { assetIntentSchema,assetConfirmSchema } from "@digimarket/contracts";
 
 function parse<T>(schema:z.ZodType<T>,value:unknown):T {
   const result=schema.safeParse(value);
@@ -14,6 +16,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T {
 }
 export function registerFinanceRoutes(app:Express,auth:AuthService) {
   const finance=new FinanceService(auth.database);
+  const proofAssets=new AssetService(auth.database);
   const authenticate=async(req:Request,res:Response,next:NextFunction)=>{
     try{
       const header=req.get("authorization");
@@ -24,6 +27,18 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   };
   const actor=(res:Response)=>res.locals.principal as Principal;
   const view=(req:Request)=>parse(financeViewSchema,req.query.view??"mine");
+  app.post("/api/v1/finance/proof-intent",authenticate,async(req,res)=>{
+    const body=parse(assetIntentSchema,req.body);
+    res.status(201).json({data:await proofAssets.intent(actor(res),body,true)});
+  });
+  app.post("/api/v1/finance/proof-confirm",authenticate,async(req,res)=>{
+    const body=parse(assetConfirmSchema,req.body);
+    res.status(201).json({data:await proofAssets.confirm(actor(res),body.intentId,body.assetId,true)});
+  });
+  app.get("/api/v1/finance/entries/:id/proof",authenticate,async(req,res)=>{
+    res.set("Cache-Control","no-store").json({data:await proofAssets.financeDownload(actor(res),
+      parse(z.uuid(),req.params.id))});
+  });
   app.get("/api/v1/finance/categories",authenticate,async(_req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({data:await finance.categories(actor(res))});

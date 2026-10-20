@@ -62,6 +62,7 @@ export const financeEntryInputSchema = z.strictObject({
   merchantOrSource: z.string().trim().max(160).optional(),
   description: z.string().trim().max(2000).optional(),
   idempotencyKey: z.uuid(),
+  receiptAssetId: z.uuid().nullable().optional(),
 });
 export type FinanceEntryInput = z.infer<typeof financeEntryInputSchema>;
 export const financeCategoryStatusSchema = z.strictObject({active:z.boolean()});

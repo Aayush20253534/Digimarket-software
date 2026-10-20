@@ -220,6 +220,7 @@ model Organization {
   leadDuplicateCandidates LeadDuplicateCandidate[]
   clients Client[]
   assets Asset[]
+  assetFolders AssetFolder[]
   assetUploadIntents AssetUploadIntent[]
   projects Project[]
   contentPosts ContentPost[]
@@ -488,6 +489,8 @@ model FinancialTransaction {
   enteredById       String @db.Uuid
   categoryId        String @db.Uuid
   approvalRequestId String @unique @db.Uuid
+  receiptAssetId String? @db.Uuid
+  receiptAsset Asset? @relation("FinanceReceipt",fields:[receiptAssetId],references:[id],onDelete:Restrict)
   idempotencyKey    String @db.Uuid
   kind              FinanceKind
   amount            Decimal @db.Decimal(19,4)
@@ -507,6 +510,7 @@ model FinancialTransaction {
   costAllocationVersion Int @default(0)
   costAllocations CostAllocation[]
   @@unique([organizationId, idempotencyKey])
+  @@index([organizationId,receiptAssetId])
   @@index([organizationId, status, kind, occurredOn])
   @@index([organizationId, enteredById, createdAt])
 }
@@ -658,7 +662,26 @@ model AssetUploadIntent {
   @@index([organizationId,expiresAt,status])
 }
 
+model AssetFolder {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  createdById String @db.Uuid
+  parentId String? @db.Uuid
+  name String @db.VarChar(120)
+  color String @default("#A56CE4") @db.VarChar(7)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  parent AssetFolder? @relation("FolderTree",fields:[parentId],references:[id],onDelete:Restrict)
+  children AssetFolder[] @relation("FolderTree")
+  assets Asset[]
+  @@index([organizationId,parentId,name])
+}
+
 model Asset {
+  folderId String? @db.Uuid
+  folder AssetFolder? @relation(fields:[folderId],references:[id],onDelete:SetNull)
   id String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   uploadedById String @db.Uuid
@@ -681,7 +704,9 @@ model Asset {
   uploadIntent AssetUploadIntent @relation(fields: [uploadIntentId], references: [id], onDelete: Restrict)
   projectDeliverables ProjectDeliverable[]
   contentPostAssets ContentPostAsset[]
+  financeReceipts FinancialTransaction[] @relation("FinanceReceipt")
   @@index([organizationId,status,createdAt])
+  @@index([organizationId,folderId,status,createdAt])
   @@index([organizationId,clientId,createdAt])
   @@index([organizationId,filename])
 }

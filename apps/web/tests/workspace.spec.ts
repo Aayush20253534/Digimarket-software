@@ -238,8 +238,8 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Category", { exact: true }).last().selectOption("FINANCE");
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.getByText("Routing policy saved.")).toBeVisible();
-  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income & expenses" }).click();
-  await expect(page.getByRole("heading", { name: "Income & expenses" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income, expenses & billing" }).click();
+  await expect(page.getByRole("heading", { name: "Income, expenses & billing" })).toBeVisible();
   await page.getByLabel("Category name").fill("Rapido");
   await page.getByRole("button", { name: "Add category" }).click();
   await expect(page.getByText("Category created for the whole agency.")).toBeVisible();
@@ -252,6 +252,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("cell", { name: "₹150.2545" })).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
+  await page.getByRole("button", { name: "Add lead" }).click();
   await page.getByLabel("Business name", { exact: true }).fill("Cafe Demo Lead");
   await page.getByLabel("Phone", { exact: true }).fill("9876543210");
   await page.getByRole("button", { name: "Create lead" }).click();
@@ -281,7 +282,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByText("Won lead converted into a client.")).toBeVisible();
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Clients" }).click();
   await expect(page.getByRole("heading", { name: "Clients", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /Cafe Demo Lead/ }).first().click();
+  await page.getByRole("row", { name: /Cafe Demo Lead/ }).getByRole("button", { name: "Open" }).click();
   await expect(page.getByRole("heading", { name: "Client: Cafe Demo Lead" })).toBeVisible();
   await page.getByLabel("Service name").fill("Social Media Management");
   await page.getByRole("button", { name: "Add service" }).click();
@@ -292,8 +293,25 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Files & assets" }).click();
   await expect(page.getByRole("heading", { name: "Files & assets" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Secure upload" })).toBeVisible();
+  // Persistent folders, private ZIP downloads and empty-folder deletion.
+  await page.getByRole("textbox", { name: "New folder name" }).fill("CI Campaign Artwork");
+  await page.getByRole("button", { name: "Create folder" }).click();
+  await expect(page.getByRole("button", { name: "CI Campaign Artwork", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Rename CI Campaign Artwork" }).click();
+  await page.getByRole("textbox", { name: "Rename folder" }).fill("CI Brand Designs");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("button", { name: "CI Brand Designs", exact: true })).toBeVisible();
+  const archive=page.waitForResponse(response=>response.url().includes("/asset-folders/")
+    && response.url().endsWith("/download")&&response.status()===200);
+  await page.getByRole("button", { name: "Download CI Brand Designs as ZIP" }).click();
+  const zip=await archive;
+  expect(zip.headers()["content-type"]).toContain("application/zip");
+  page.once("dialog", dialog=>void dialog.accept());
+  await page.getByRole("button", { name: "Delete empty folder CI Brand Designs" }).click();
+  await expect(page.getByRole("button", { name: "CI Brand Designs", exact: true })).toHaveCount(0);
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
+  await page.getByRole("button", { name: "Add lead" }).click();
   await page.locator("#new-businessName").fill("Cafe Demo Lead Other");
   await page.locator("#new-phone").fill("98765 43210");
   const createdDuplicateLead=page.waitForResponse(response =>
@@ -313,6 +331,14 @@ test("login, first password change, MFA, admin user management and employee perm
   expect(generatedPassword.length).toBeGreaterThanOrEqual(12);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("Demo CI Employee")).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Tasks" }).click();
+  await expect(page.getByRole("heading", { name: "Tasks & recurring work" })).toBeVisible();
+  await page.getByRole("button", { name: "Assign employees" }).click();
+  const availableEmployee=page.locator(".aw-team-option input[type=checkbox]").first();
+  await expect(availableEmployee).toBeVisible();
+  await availableEmployee.check();
+  await expect(availableEmployee).toBeChecked();
+  await page.getByRole("button", { name: /Done · 1 selected/ }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
 
@@ -328,8 +354,8 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("link", { name: "Team & accounts" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Files & assets" })).toHaveCount(0);
-  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income & expenses" }).click();
-  await expect(page.getByRole("heading", { name: "Income & expenses" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income, expenses & billing" }).click();
+  await expect(page.getByRole("heading", { name: "Income, expenses & billing" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Agency totals" })).toHaveCount(0);
   await expect(page.getByLabel("Category name")).toHaveCount(0);
   await page.getByLabel("Entry type").selectOption("INCOME");
@@ -348,6 +374,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Export" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Potential duplicates" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add lead" }).click();
   await page.getByLabel("Business name", { exact: true }).fill("Employee Prospect");
   await page.getByRole("button", { name: "Create lead" }).click();
   await expect(page.getByRole("heading", { name: "Lead: Employee Prospect" })).toBeVisible();

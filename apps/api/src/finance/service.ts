@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@digimarket/db";
+import { financeProofPrefix } from "../assets/service";
 import type { FinanceCategoryInput, FinanceEntryInput, FinanceKind } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
@@ -72,6 +73,15 @@ export class FinanceService {
     if(!category)throw invalid("Select an active category belonging to this workspace and type");
     if(!policy?.active||!policy.approverRoleKeys.length)throw invalid("An administrator must activate a FINANCE approval policy");
     if(!organization||organization.defaultCurrency!=="INR")throw invalid("This finance module currently supports INR workspaces only");
+    if(input.receiptAssetId){
+      const proof=await this.db.asset.findFirst({where:{
+        id:input.receiptAssetId,organizationId:actor.organizationId,uploadedById:actor.userId,
+        status:"ACTIVE",clientId:null,resourceType:{in:["IMAGE","RAW"]},
+        publicId:{startsWith:financeProofPrefix(actor.organizationId)}}});
+      if(!proof)throw invalid("Receipt image or PDF must belong to your workspace and account");
+      const used=await this.db.financialTransaction.findFirst({where:{organizationId:actor.organizationId,receiptAssetId:proof.id},select:{id:true}});
+      if(used)throw invalid("This receipt is already linked to another entry");
+    }
     try{
       return await this.db.$transaction(async tx=>{
         const approval=await tx.approvalRequest.create({data:{
@@ -88,6 +98,7 @@ export class FinanceService {
           occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
           merchantOrSource:input.merchantOrSource?.trim()||null,
           method:input.method,description:input.description?.trim()||null,
+          receiptAssetId:input.receiptAssetId??null,
         }});
         await tx.approvalRequest.update({where:{id:approval.id},data:{referenceId:entry.id}});
         await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,

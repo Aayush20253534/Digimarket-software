@@ -107,9 +107,12 @@ export default function ApprovalsPage() {
     {canSubmit&&<Card title="New approval request" description="An active category policy is required before requests can be submitted.">
       <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
         <FormField id="approval-category" label="Category">
-          <select id="approval-category" className="field" value={category} onChange={e=>setCategory(e.target.value as Category)}>
-            {activePolicies.map(p=><option key={p.id} value={p.category}>{p.name}</option>)}
-          </select>
+          <select id="approval-category" className="field" aria-label="Approval category"
+  value={activePolicies.some(p=>p.category===category)?category:""} disabled={!activePolicies.length}
+  onChange={e=>setCategory(e.target.value as Category)}>
+  <option value="" disabled>{activePolicies.length?"Choose a category":"No active approval categories"}</option>
+  {activePolicies.map(p=><option key={p.id} value={p.category}>{p.name} ({p.category})</option>)}
+ </select>
         </FormField>
         <FormField id="approval-title" label="Title">
           <input id="approval-title" className="field" minLength={4} maxLength={180} required value={title} onChange={e=>setTitle(e.target.value)}/>

@@ -101,6 +101,7 @@ export default function Dashboard() {
   const visible=filtered.slice((Math.min(page,pages)-1)*7,Math.min(page,pages)*7);
   const firstName=session?.user.displayName.split(" ")[0]??"there";
   if(!session)return null;
+  const leadership=session.identity.roles.some(role=>["ADMIN","SUPER_ADMIN","FOUNDER"].includes(role));
   const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
   overview?.records.forEach(x=>{groupCounts[x.source]++;});
   return <div className="aw-dashboard space-y-7" data-testid="amplifyworld-dashboard">
@@ -121,7 +122,7 @@ export default function Dashboard() {
       </div>
     </header>
 
-    <div className="aw-stat-grid" data-testid="dashboard-kpis">
+    {leadership&&<div className="aw-stat-grid" data-testid="dashboard-kpis">
       <AWStat label="Your session" value="Authenticated" description="Verified against the active API session"
         icon={<BadgeCheck size={21}/>} accent/>
       <AWStat label="Assigned roles" value={session.identity.roles.length} description={session.identity.roles.join(", ")||"No roles"}
@@ -130,9 +131,9 @@ export default function Dashboard() {
         icon={<ShieldCheck size={21}/>}/>
       <AWStat label="Available modules" value={nav.length} description="Navigation destinations your role can open"
         icon={<Layers size={21}/>}/>
-    </div>
+    </div>}
 
-    <div className="aw-records-summary" aria-label="Loaded record summary">
+    {leadership&&<div className="aw-records-summary" aria-label="Loaded record summary">
       {(["Clients","Leads","Projects"] as const).filter(label=>{
         const permission=label==="Clients"?"clients.read":label==="Leads"?"leads.read":"projects.read";
         return permitted.has(permission);
@@ -144,7 +145,7 @@ export default function Dashboard() {
         </span>
         <ArrowUpRight size={17} className="ml-auto shrink-0 text-[#BA80E8]" aria-hidden="true"/>
       </Link>)}
-    </div>
+    </div>}
 
     {overview?.errors.length ? <AWNotice tone="error">
       Could not load recent {overview.errors.join(", ").toLowerCase()} records. Other workspace functions remain available.
