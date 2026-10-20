@@ -1,0 +1,56 @@
+/* Phase 2: public marketing and authentication screens only. No legacy workspace selectors. */
+.aw-public {
+  overflow-x: clip;
+  position: relative;
+}
+.aw-public-grid {
+  position: absolute; inset: 0 0 auto; height: min(750px, 85svh); pointer-events: none; opacity: .35;
+  background-image: linear-gradient(to right, rgba(169,96,222,.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(169,96,222,.1) 1px, transparent 1px);
+  background-size: 76px 76px; mask-image: linear-gradient(to bottom, rgba(0,0,0,.85), transparent);
+}
+.aw-skip-link {position:fixed; top:8px;left:8px;z-index:200; background:#EEE2FF; padding:10px 15px; color:#22102B;border-radius:10px;transform:translateY(-160%);}
+.aw-skip-link:focus {transform:translateY(0);}
+.aw-site-header {position:relative;z-index:20;border-bottom:1px solid rgba(123,72,155,.25);background:rgba(8,6,14,.64);backdrop-filter:blur(15px);}
+.aw-nav-link {transition:color .15s;}
+.aw-nav-link:hover {color:#FCF7FF;}
+.aw-hero-heading {font-size:clamp(2.8rem,5.5vw,5.3rem);line-height:1.06;font-weight:830;letter-spacing:-.065em;color:#F7F4FF;overflow-wrap:break-word;}
+.aw-section-heading {font-size:clamp(1.9rem,3.4vw,3.25rem);font-weight:770;line-height:1.12;letter-spacing:-.045em;color:#F6F2FC;max-width:760px;overflow-wrap:break-word;}
+.aw-hero-stage {min-height:435px;display:grid;place-items:center;}
+.aw-hero-orb {position:absolute;width:min(100%,460px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 62% 36%, rgba(242,81,250,.38), rgba(133,25,236,.21) 37%, rgba(45,13,74,.28) 55%,transparent 70%);filter:blur(7px);}
+.aw-hero-orb-ring {position:absolute;width:min(90%,475px);aspect-ratio:1;border-radius:50%;border:1px solid rgba(202,66,245,.42);box-shadow:0 0 42px rgba(125,27,237,.22),inset 0 0 70px rgba(170,22,208,.11);transform:rotate(-18deg) scaleY(.83);}
+.aw-hero-panel {z-index:1;width:min(100%,510px);border:1px solid rgba(182,97,223,.41);border-radius:22px;background:linear-gradient(145deg,rgba(33,20,47,.94),rgba(13,9,23,.98));box-shadow:0 35px 95px rgba(0,0,0,.55),0 0 50px rgba(161,40,244,.11);overflow:hidden;transform:perspective(1100px) rotateY(-5deg) rotateX(2deg);}
+.aw-preview-dot {width:9px;height:9px;display:inline-block;border-radius:999px;background:#B55DFF;box-shadow:0 0 13px rgba(206,84,255,.8);}
+.aw-mini-metric {border:1px solid #3B2851;border-radius:14px;background:rgba(56,34,76,.42);padding:16px;}
+.aw-float-label {position:absolute;z-index:2;display:flex;align-items:center;gap:8px;border:1px solid #704093;border-radius:11px;background:#23122F;color:#EFD9FF;padding:11px 13px;box-shadow:0 10px 40px #0008;font-size:12px;font-weight:640;white-space:nowrap;}
+.aw-float-label-top {right:-6px;top:10px;}
+.aw-float-label-bottom {left:-5px;bottom:12px;}
+.aw-feature-card {min-width:0;border:1px solid #382748;border-radius:18px;background:linear-gradient(150deg,rgba(32,22,45,.94),rgba(16,11,25,.98));padding:25px;transition:border-color .15s,transform .15s;}
+.aw-feature-card:hover {border-color:#7D4DA0;transform:translateY(-2px);}
+.aw-feature-icon {display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:1px solid #694187;border-radius:13px;background:#331B49;color:#D18CFF;box-shadow:inset 0 0 20px #61268233;}
+.aw-feature-band {border:1px solid #442C5A;border-radius:24px;background:radial-gradient(ellipse 65% 90% at 0 100%,rgba(117,40,199,.16),transparent 70%),#171020;}
+.aw-workflow-step {display:flex;gap:18px;align-items:center;border:1px solid #412A55;border-radius:15px;background:rgba(23,14,34,.79);padding:18px;}
+.aw-step-number {display:grid;place-items:center;flex:none;width:44px;height:44px;border:1px solid #6B3E8E;border-radius:12px;background:#311943;color:#E1A4FF;font-size:13px;font-weight:800;}
+.aw-security-card {border:1px solid #402B52;border-radius:22px;background:linear-gradient(130deg,#20132E,#100B1A);padding:35px;}
+.aw-status-card {border:1px solid #402B52;border-radius:22px;background:#191126;padding:29px;align-self:stretch;}
+.aw-final-cta {border:1px solid #76419C;border-radius:26px;background:radial-gradient(ellipse 70% 120% at 8% 80%,rgba(164,41,240,.25),transparent 70%),radial-gradient(ellipse 70% 130% at 100% 0%,rgba(227,57,220,.22),transparent 70%),#1D1129;}
+.aw-auth-side {position:relative;overflow:hidden;background:radial-gradient(circle at 68% 43%,rgba(153,26,241,.23),transparent 42%),radial-gradient(circle at 4% 100%,rgba(239,45,219,.12),transparent 46%),#100A1C;}
+.aw-auth-side::after {content:"";position:absolute;right:-230px;top:26%;width:500px;height:500px;border-radius:50%;border:2px solid rgba(209,79,255,.2);box-shadow:0 0 90px rgba(182,39,255,.12);pointer-events:none;}
+.aw-auth-form-panel {width:100%;border:1px solid #503267;border-radius:24px;background:linear-gradient(155deg,rgba(32,21,46,.95),rgba(17,11,27,.97));padding:clamp(23px,4vw,42px);box-shadow:0 25px 80px rgba(0,0,0,.26);}
+.aw-auth-icon {display:grid;place-items:center;width:52px;height:52px;border-radius:15px;border:1px solid #71438C;background:#361B4D;color:#D38AFF;}
+.aw-auth-heading {font-size:clamp(1.6rem,3vw,2.2rem);font-weight:760;line-height:1.18;letter-spacing:-.04em;color:#F8F4FF;}
+.aw-auth-message {font-size:.875rem;line-height:1.7;color:#B4A9C5;}
+.aw-auth-mfa-key {display:block;max-width:100%;overflow-wrap:anywhere;border:1px solid #503C5F;border-radius:10px;background:#110A1A;padding:13px;color:#F1CFFF;letter-spacing:.15em;font-family:var(--aw-font-mono);font-size:.84rem;user-select:all;}
+.aw-auth-secure-chip {display:inline-flex;align-items:center;gap:7px;border:1px solid #4C3263;border-radius:999px;background:#271838;padding:7px 11px;color:#DBB1F9;font-size:11px;letter-spacing:.04em;}
+@media(max-width:1023px) {.aw-hero-panel{transform:none}.aw-hero-stage{min-height:400px}.aw-float-label-top{right:1%}.aw-float-label-bottom{left:1%}}
+@media(max-width:639px) {
+ .aw-hero-heading {font-size:clamp(2.45rem,10vw,3.65rem);}
+ .aw-hero-stage {min-height:355px;}
+ .aw-hero-panel {width:100%;}
+ .aw-float-label {display:none;}
+ .aw-mini-metric {padding:12px;}
+ .aw-feature-card {padding:21px;}
+ .aw-security-card,.aw-status-card {padding:24px;}
+ .aw-auth-form-panel {border-radius:20px;}
+}
+@media(prefers-reduced-motion:reduce){.aw-feature-card{transition:none}.aw-feature-card:hover{transform:none}}
