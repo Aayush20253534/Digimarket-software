@@ -98,7 +98,9 @@ export class BillingService{
    const counter=await tx.invoiceCounter.upsert({where:{organizationId:a.organizationId},
      create:{organizationId:a.organizationId,nextNumber:1},
      update:{nextNumber:{increment:1}}});
-   const number="INV-"+String(new Date().getUTCFullYear())+"-"+String(counter.nextNumber).padStart(6,"0");
+   const settings=await tx.organizationBillingSettings.findUnique({where:{organizationId:a.organizationId}});
+   const invoicePrefix=settings?.invoicePrefix??"INV";
+   const number=invoicePrefix+"-"+String(new Date().getUTCFullYear())+"-"+String(counter.nextNumber).padStart(6,"0");
    const changed=await tx.invoice.updateMany({where:{id,organizationId:a.organizationId,status:"DRAFT",version},
      data:{number,status:"ISSUED",issuedOn:dated(new Date().toISOString().slice(0,10)),issuedById:a.userId,version:{increment:1}}});
    if(changed.count!==1)throw clash();

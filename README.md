@@ -81,7 +81,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 12: content calendar, editorial workflow, immutable revisions, approvals and manual publishing
 - [x] Module 13: invoices, payment verification and allocation, receivables, private PDF generation and recurring draft templates
 - [x] Module 14: client profitability, cost attribution, earned-revenue recognition and corrections
-- [ ] Modules 15–17: founders/settings, reporting and production readiness
+- [x] Module 15: founder responsibilities, organization profile, versioned billing defaults and configuration governance
+- [ ] Modules 16–17: reporting/search/notifications and production readiness
 
 **Design and scaffolding are not a production release.**
 
@@ -123,3 +124,6 @@ The `/app/content` calendar supports editorial planning, immutable revisions, cl
 
 ## Module 14 client profitability
 The `/app/profitability` dashboard separates issued invoices, verified collections, explicitly earned revenue and attributed posted expense. Contribution is calculated without inventing income or charging unrelated overhead. CSV export, versioned cost splitting, original-and-reversal recognition records and tenant-scoped permissions are included. See [Module 14](docs/25-MODULE-14-PROFITABILITY.md). Production deployment remains Module 17.
+
+## Module 15 founders and settings
+`/app/founders` displays responsibility profiles separately from permission grants. `/app/settings` manages organization identity/timezone, invoice prefixes, payment terms and instructions, with existing finance/approval/billing setting links. Issued invoices remain immutable; company currency stays INR. See [Module 15 documentation](docs/26-MODULE-15-FOUNDERS-SETTINGS.md). The next work is search/reports/notifications (Module 16) and deployment (Module 17).

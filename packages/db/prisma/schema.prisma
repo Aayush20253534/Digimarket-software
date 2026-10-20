@@ -194,6 +194,8 @@ model Organization {
   name            String           @db.VarChar(160)
   timezone        String           @default("Asia/Kolkata") @db.VarChar(80)
   defaultCurrency String           @default("INR") @db.VarChar(3)
+  settingsVersion Int @default(1)
+  billingSettings OrganizationBillingSettings?
   createdAt       DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime         @updatedAt @db.Timestamptz(6)
   users           User[]
@@ -361,6 +363,8 @@ model FounderProfile {
   title            String        @db.VarChar(160)
   responsibilities String        @db.Text
   sortOrder        Int           @default(0)
+  version          Int           @default(1)
+  isActive         Boolean       @default(true)
   createdAt        DateTime      @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime      @updatedAt @db.Timestamptz(6)
   organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1075,4 +1079,16 @@ model RevenueRecognition {
   @@unique([organizationId,idempotencyKey])
   @@index([organizationId,clientId,recognizedOn])
   @@index([invoiceId,recognizedOn])
+}
+
+// Module 15: organization billing configuration; existing invoice snapshots remain unchanged.
+model OrganizationBillingSettings {
+  organizationId String @id @db.Uuid
+  invoicePrefix String @default("INV") @db.VarChar(12)
+  defaultDueDays Int @default(14)
+  paymentInstructions String? @db.VarChar(1000)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
 }

@@ -348,3 +348,30 @@ export const revenueRecognitionReverseSchema=z.strictObject({
   idempotencyKey:z.uuid(),
 });
 export type RevenueRecognitionReverse=z.infer<typeof revenueRecognitionReverseSchema>;
+
+// Module 15: controlled founder directories and versioned company configuration.
+export const founderCreateSchema=z.strictObject({
+ displayName:z.string().trim().min(2).max(160),
+ title:z.string().trim().min(2).max(160),
+ responsibilities:z.string().trim().min(4).max(4000),
+ sortOrder:z.number().int().min(0).max(10000).default(0),
+ userId:z.uuid().nullable().optional(),
+});
+export type FounderCreate=z.infer<typeof founderCreateSchema>;
+export const founderUpdateSchema=founderCreateSchema.extend({
+ version:z.number().int().positive(),isActive:z.boolean(),
+}).strict();
+export type FounderUpdate=z.infer<typeof founderUpdateSchema>;
+export const companySettingsSchema=z.strictObject({
+ version:z.number().int().positive(),
+ name:z.string().trim().min(2).max(160),
+ timezone:z.string().trim().min(1).max(80),
+});
+export type CompanySettingsUpdate=z.infer<typeof companySettingsSchema>;
+export const billingSettingsSchema=z.strictObject({
+ version:z.number().int().positive(),
+ invoicePrefix:z.string().regex(/^[A-Z][A-Z0-9]{1,11}$/),
+ defaultDueDays:z.number().int().min(0).max(365),
+ paymentInstructions:z.string().trim().max(1000).nullable(),
+});
+export type BillingSettingsUpdate=z.infer<typeof billingSettingsSchema>;

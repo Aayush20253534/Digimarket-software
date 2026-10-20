@@ -5,6 +5,11 @@ export const dynamic = "force-dynamic";
 
 const endpoints: Record<string, string[]> = {
   "health": ["GET"],
+  "founders": ["GET","POST"],
+  "founders/eligible-staff": ["GET"],
+  "company-settings": ["GET","PUT"],
+  "billing-defaults": ["GET"],
+  "company-settings/billing": ["PUT"],
   "auth/login": ["POST"],
   "auth/change-password": ["POST"],
   "auth/mfa/setup": ["POST"],
@@ -45,6 +50,7 @@ const endpoints: Record<string, string[]> = {
   "leads/import": ["POST"],
   "leads/export": ["GET"],
 };
+const founderDetailPattern=/^founders\/[0-9a-fA-F-]{36}$/;
 const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/status$/;
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
@@ -80,6 +86,7 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(founderDetailPattern.test(path))return method==="PUT";
   if(profitExpensePattern.test(path))return method==="PUT";
   if(profitReversePattern.test(path))return method==="POST";
   if(invoiceDetailPattern.test(path))return ["GET","PUT"].includes(method);

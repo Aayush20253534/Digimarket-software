@@ -38,6 +38,7 @@ export default function BillingPage(){
  const [clients,setClients]=useState<Client[]>([]),[categories,setCategories]=useState<Category[]>([]);
  const [receivables,setReceivables]=useState<Receivable|null>(null);
  const [draft,setDraft]=useState<Draft>(initial);
+ const [defaults,setDefaults]=useState({defaultDueDays:14,paymentInstructions:""});
  const [editing,setEditing]=useState(false),[payment,setPayment]=useState({
   clientId:"",categoryId:"",amount:"",receivedOn:new Date().toISOString().slice(0,10),
   method:"UPI",reference:"",invoiceId:""});
@@ -45,6 +46,17 @@ export default function BillingPage(){
  const [filterClient,setFilterClient]=useState("");
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
  const [error,setError]=useState(""),[success,setSuccess]=useState("");
+ useEffect(()=>{
+  if(!canDraft)return;
+  void request<{invoicePrefix:string;defaultDueDays:number;paymentInstructions:string|null}>("/billing-defaults")
+   .then(data=>{
+    setDefaults({defaultDueDays:data.defaultDueDays,paymentInstructions:data.paymentInstructions??""});
+    setDraft(d=>d.clientId||d.sellerName||d.notes||d.lines[0]?.unitPrice?d:{
+     ...d,dueOn:new Date(Date.now()+data.defaultDueDays*86400000).toISOString().slice(0,10),
+     notes:data.paymentInstructions??"",
+    });
+   }).catch(()=>{});
+ },[canDraft,request]);
  const availableInvoices=useMemo(()=>invoices.filter(x=>x.clientId===payment.clientId&&x.status==="ISSUED"&&Number(x.balance)>0),[invoices,payment.clientId]);
  const selectedInvoice=availableInvoices.find(x=>x.id===payment.invoiceId);
  const reload=useCallback(async()=>{
@@ -92,7 +104,7 @@ export default function BillingPage(){
      "Draft updated.",current.id);
   }else await run(async()=>{
    const created=await request<Invoice>("/invoices",{method:"POST",body:body(draft)});
-   setDraft(initial());await open(created.id);
+   setDraft({...initial(),dueOn:new Date(Date.now()+defaults.defaultDueDays*86400000).toISOString().slice(0,10),notes:defaults.paymentInstructions});await open(created.id);
   },"Invoice draft created.");
  };
  const download=async(invoice:Invoice)=>{
@@ -225,7 +237,7 @@ export default function BillingPage(){
      </div>
      <div className="flex flex-wrap gap-2 md:col-span-2">
       <button disabled={busy} className="btn-primary">{editing?"Save draft changes":"Create draft"}</button>
-      {editing&&<button type="button" className="btn-secondary" onClick={()=>{setEditing(false);setDraft(initial());}}>Cancel</button>}
+      {editing&&<button type="button" className="btn-secondary" onClick={()=>{setEditing(false);setDraft({...initial(),dueOn:new Date(Date.now()+defaults.defaultDueDays*86400000).toISOString().slice(0,10),notes:defaults.paymentInstructions});}}>Cancel</button>}
      </div>
     </form>
    </Card>}

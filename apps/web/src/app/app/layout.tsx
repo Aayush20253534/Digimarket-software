@@ -13,7 +13,6 @@ import { Notice, Spinner } from "@/components/ui";
 
 const futureModules = [
   { label: "Reports", icon: ChartNoAxesCombined },
-  { label: "Company settings", icon: Settings2 },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -47,6 +46,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "error") return <main className="mx-auto max-w-md px-6 py-24"><Notice kind="error">Unable to verify your session. Check the API connection.</Notice><button className="btn-secondary mt-5" onClick={() => void refresh()}>Retry connection</button></main>;
   if (!session) return <div className="min-h-screen bg-slate-50"><Spinner label="Redirecting to sign in…" /></div>;
 
+  const canSeeFounders = session.identity.permissions.includes("founders.read");
+  const canSeeSettings = session.identity.permissions.includes("organization.settings.manage");
   const canSeeProfitability = session.identity.permissions.includes("profitability.read");
   const canSeeBilling = session.identity.permissions.includes("invoices.read") || session.identity.permissions.includes("payments.read");
   const canSeeContent = session.identity.permissions.includes("content.read");
@@ -105,6 +106,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Link>}
         {canSeeApprovals && <Link href="/app/approvals" aria-current={pathname === "/app/approvals" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/approvals" ? "sidebar-active" : "")}>
           <CheckSquare2 className="h-4 w-4" aria-hidden="true" />Approvals
+        </Link>}
+        {canSeeFounders && <Link href="/app/founders"
+          aria-current={pathname.startsWith("/app/founders")?"page":undefined}
+          className={"sidebar-link "+(pathname.startsWith("/app/founders")?"sidebar-active":"")}>
+          <UsersRound className="h-4 w-4" aria-hidden="true" />Founders & responsibilities
+        </Link>}
+        {canSeeSettings && <Link href="/app/settings"
+          aria-current={pathname.startsWith("/app/settings")?"page":undefined}
+          className={"sidebar-link "+(pathname.startsWith("/app/settings")?"sidebar-active":"")}>
+          <Settings2 className="h-4 w-4" aria-hidden="true" />Company settings
         </Link>}
         {canSeeTeam && <Link href="/app/team/users" aria-current={pathname === "/app/team/users" ? "page" : undefined} className={"sidebar-link " + (pathname === "/app/team/users" ? "sidebar-active" : "")}>
           <Users className="h-4 w-4" aria-hidden="true" />Team & accounts
