@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@digimarket/db";
+import { financeProofPrefix } from "../assets/service";
 import type { FinanceCategoryInput, FinanceEntryInput, FinanceKind } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
@@ -75,7 +76,8 @@ export class FinanceService {
     if(input.receiptAssetId){
       const proof=await this.db.asset.findFirst({where:{
         id:input.receiptAssetId,organizationId:actor.organizationId,uploadedById:actor.userId,
-        status:"ACTIVE",clientId:null,resourceType:{in:["IMAGE","RAW"]}}});
+        status:"ACTIVE",clientId:null,resourceType:{in:["IMAGE","RAW"]},
+        publicId:{startsWith:financeProofPrefix(actor.organizationId)}}});
       if(!proof)throw invalid("Receipt image or PDF must belong to your workspace and account");
       const used=await this.db.financialTransaction.findFirst({where:{organizationId:actor.organizationId,receiptAssetId:proof.id},select:{id:true}});
       if(used)throw invalid("This receipt is already linked to another entry");

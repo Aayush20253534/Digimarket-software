@@ -4,6 +4,7 @@ import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
 import {buildZip} from "./zip";
 import {CloudinaryAssetProvider} from "./provider";
+import {financeProofPrefix} from "./service";
 
 const uuid=z.uuid(),folderLabel=z.string().trim().min(1).max(120);
 const color=z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -36,6 +37,7 @@ export class AssetFolderService{
     this.db.assetFolder.findMany({where:{organizationId:p.organizationId,parentId},
       orderBy:[{name:"asc"},{id:"asc"}],take:200}),
     this.db.asset.count({where:{organizationId:p.organizationId,folderId:parentId,status:"ACTIVE",
+      publicId:{not:{startsWith:financeProofPrefix(p.organizationId)}},
       ...(p.permissions.has("clients.read")?{}:{clientId:null})}}),
   ]);
   return {folders,fileCount:count,limited:folders.length===200};
@@ -82,6 +84,7 @@ export class AssetFolderService{
    const [sub,assets]=await Promise.all([
     this.db.assetFolder.findMany({where:{organizationId:p.organizationId,parentId:folderId},take:100}),
     this.db.asset.findMany({where:{organizationId:p.organizationId,folderId,status:"ACTIVE",
+      publicId:{not:{startsWith:financeProofPrefix(p.organizationId)}},
       ...(p.permissions.has("clients.read")?{}:{clientId:null})},
       select:{filename:true,bytes:true,publicId:true,format:true,resourceType:true},take:31}),
    ]);
@@ -119,9 +122,11 @@ export class AssetFolderService{
  async organize(p:Principal,id:string,raw:unknown){
   need(p,"assets.upload");need(p,"assets.read");
   const v=validate(fileInput,raw);await this.parent(p,v.folderId);
-  const file=await this.db.asset.findFirst({where:{id,organizationId:p.organizationId,status:"ACTIVE"}});
+  const file=await this.db.asset.findFirst({where:{id,organizationId:p.organizationId,status:"ACTIVE",
+    publicId:{not:{startsWith:financeProofPrefix(p.organizationId)}}}});
   if(!file||file.clientId&&!p.permissions.has("clients.read"))throw new AuthError(404,"NOT_FOUND","Asset not found");
-  const updated=await this.db.asset.updateMany({where:{id,organizationId:p.organizationId,status:"ACTIVE",version:v.version},
+  const updated=await this.db.asset.updateMany({where:{id,organizationId:p.organizationId,status:"ACTIVE",version:v.version,
+    publicId:{not:{startsWith:financeProofPrefix(p.organizationId)}}},
     data:{filename:v.filename,folderId:v.folderId,version:{increment:1}}});
   if(!updated.count)throw new AuthError(409,"VERSION_CONFLICT","File changed. Refresh and retry.");
   await this.db.auditLog.create({data:{organizationId:p.organizationId,actorId:p.userId,

@@ -9,6 +9,8 @@ const deny=(a:Principal,key:string)=>{if(!a.permissions.has(key))throw forbidden
 const missing=()=>new AuthError(404,"NOT_FOUND","Asset not found");
 const clash=()=>new AuthError(409,"VERSION_CONFLICT","Asset changed; reload before updating");
 const expired=()=>new AuthError(409,"INTENT_EXPIRED","Upload intent expired or already completed");
+// Keep private finance proof files segregated before their transaction is submitted.
+export const financeProofPrefix=(orgId:string)=>"digimarket/"+orgId+"/finance/";
 const resource=(kind:"IMAGE"|"VIDEO"|"RAW")=>kind.toLowerCase() as "image"|"video"|"raw";
 export class AssetService {
  constructor(private readonly db:PrismaClient,private readonly provider:AssetProvider=new CloudinaryAssetProvider()){}
@@ -24,6 +26,7 @@ export class AssetService {
    const found=await this.db.asset.findFirst({where:{id,organizationId:a.organizationId}});
    if(!found)throw missing();
    if(found.clientId&&!a.permissions.has("clients.read"))throw missing();
+   if(found.publicId.startsWith(financeProofPrefix(a.organizationId)))throw missing();
    return found;
  }
  async intent(a:Principal,input:AssetIntentInput,financeProof=false){
@@ -33,7 +36,7 @@ export class AssetService {
    if(financeProof&&type.kind==="video")throw new AuthError(422,"VALIDATION_ERROR","Only images and PDFs are accepted as finance proof");
    const clientId=financeProof?null:await this.client(a,input.clientId);
    const id=randomUUID();
-   const publicId="digimarket/"+a.organizationId+"/"+id+(type.kind==="raw"?".pdf":"");
+   const publicId=(financeProof?financeProofPrefix(a.organizationId):"digimarket/"+a.organizationId+"/")+id+(type.kind==="raw"?".pdf":"");
    // The provider is configured before creating any database record.
    const options=this.provider.uploadOptions(publicId,type.kind,[type.format]);
    const expiresAt=new Date(Date.now()+10*60_000);
@@ -55,7 +58,10 @@ export class AssetService {
    if(intent.status!=="PENDING"||intent.expiresAt<=new Date())throw expired();
    if(intent.clientId)await this.client(a,intent.clientId);
    const info=validateMedia(intent.contentType,intent.expectedBytes);
-   if(financeProof&&(intent.clientId||info.kind==="video"))throw new AuthError(422,"VALIDATION_ERROR","Invalid finance proof");
+   if(financeProof&&(intent.clientId||info.kind==="video"
+     ||!intent.publicId.startsWith(financeProofPrefix(a.organizationId))))
+     throw new AuthError(422,"VALIDATION_ERROR","Invalid finance proof");
+   if(!financeProof&&intent.publicId.startsWith(financeProofPrefix(a.organizationId)))throw missing();
    const verified=await this.provider.inspect(intent.publicId,info.kind);
    if(verified.asset_id!==providerAssetId||verified.public_id!==intent.publicId||
       verified.resource_type!==info.kind||verified.type!=="authenticated"||
@@ -89,6 +95,7 @@ export class AssetService {
    if(input.clientId)await this.client(a,input.clientId);
    const where:Prisma.AssetWhereInput={
      organizationId:a.organizationId,status:input.status,
+     publicId:{not:{startsWith:financeProofPrefix(a.organizationId)}},
      ...(input.folderId!==undefined?{folderId:input.folderId}:{}),
      ...(!a.permissions.has("clients.read")?{clientId:null}:{}),
      ...(input.clientId?{clientId:input.clientId}:{}),
