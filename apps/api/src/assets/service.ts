@@ -90,7 +90,7 @@ export class AssetService {
      return asset;
    });
  }
- async list(a:Principal,input:AssetListQuery & {folderId?:string|null}){
+ async list(a:Principal,input:Omit<AssetListQuery,"sort"|"direction"> & Partial<Pick<AssetListQuery,"sort"|"direction">> & {folderId?:string|null}){
    deny(a,"assets.read");
    if(input.clientId)await this.client(a,input.clientId);
    const where:Prisma.AssetWhereInput={
@@ -104,7 +104,7 @@ export class AssetService {
    };
    const rows=await this.db.asset.findMany({where,take:input.limit+1,
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
-     orderBy:[{[({name:"filename",date:"createdAt",size:"bytes",type:"contentType"} as const)[input.sort]]:input.direction},{id:input.direction}],
+     orderBy:[{[({name:"filename",date:"createdAt",size:"bytes",type:"contentType"} as const)[input.sort??"date"]]:input.direction??"desc"},{id:input.direction??"desc"}],
      select:{id:true,filename:true,contentType:true,resourceType:true,bytes:true,
        status:true,version:true,clientId:true,folderId:true,createdAt:true,
        client:{select:{businessName:true}},uploader:{select:{displayName:true}}}});
