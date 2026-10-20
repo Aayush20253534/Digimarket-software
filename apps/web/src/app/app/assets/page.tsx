@@ -54,6 +54,7 @@ export default function AssetsPage(){
  const [view,setView]=useState<"grid"|"list">("grid"),[sort,setSort]=useState<"name"|"date"|"size"|"type">("name"),[reverse,setReverse]=useState(false);
  const [selectedIds,setSelectedIds]=useState<string[]>([]);
  const [folderEdit,setFolderEdit]=useState<FolderItem|null>(null);
+ const [folderCatalog,setFolderCatalog]=useState<FolderItem[]>([]),[folderCatalogLimited,setFolderCatalogLimited]=useState(false);
  const [folderEditName,setFolderEditName]=useState(""),[folderEditColor,setFolderEditColor]=useState("#A56CE4"),[folderMove,setFolderMove]=useState("");
  const [dropActive,setDropActive]=useState(false);
  const displayed=useMemo(()=>[...items].sort((a,b)=>{
@@ -183,7 +184,22 @@ export default function AssetsPage(){
   catch(e){setError(errText(e));}
   finally{setBusy(false);setSelectedIds([]);setMessage(done+" file(s) archived.");await load();}
  }
+ async function loadFolderCatalog(){
+  try{
+   const all:FolderItem[]=[],visited=new Set<string>(),queue:(string|null)[]=[null];
+   let limited=false;
+   while(queue.length&&visited.size<80&&all.length<1200){
+    const id=queue.shift()??null,key=id??"root";
+    if(visited.has(key))continue;visited.add(key);
+    const response=await request<{folders:FolderItem[];limited:boolean}>("/asset-folders?parentId="+key);
+    if(response.limited)limited=true;
+    for(const f of response.folders){all.push(f);queue.push(f.id);}
+   }
+   setFolderCatalog(all);setFolderCatalogLimited(limited||queue.length>0);
+  }catch(e){setError(errText(e));}
+ }
  function editFolder(folder:FolderItem){
+  void loadFolderCatalog();
   setFolderEdit(folder);setFolderEditName(folder.name);setFolderEditColor(folder.color);
   setFolderMove(folder.parentId??"");setContext(null);
  }
@@ -247,6 +263,7 @@ export default function AssetsPage(){
    <button type="button" className="aw-drive-icon-button" aria-label="Reverse sort" title="Reverse sort" onClick={()=>{setReverse(x=>!x);setCursor(null);}}><ArrowUpDown size={17}/></button>
    <div className="aw-drive-view-switch"><button type="button" aria-label="Grid view" aria-pressed={view==="grid"} onClick={()=>setView("grid")}><Grid2X2 size={18}/></button><button type="button" aria-label="List view" aria-pressed={view==="list"} onClick={()=>setView("list")}><List size={18}/></button></div>
   </div>
+  <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files.</p>
   <nav className="aw-drive-path" aria-label="Folder path">
    {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>goTo(trail.length-1)}><ArrowLeft size={17}/></button>}
    <button type="button" onClick={()=>goTo(0)}><Home size={17}/> My Drive</button>
@@ -282,7 +299,7 @@ export default function AssetsPage(){
       <button type="button" className="aw-drive-menu-trigger" aria-label={"More actions for "+asset.filename} onClick={()=>{open(asset);setContext(v=>v==="file:"+asset.id?null:"file:"+asset.id);}}><MoreVertical size={17}/></button>
       {context==="file:"+asset.id&&<div className="aw-drive-item-menu">
        <button type="button" onClick={()=>void previewAsset(asset)}>Preview</button>
-       <button type="button" onClick={()=>{open(asset);setDetailsOpen(true);setContext(null);}}>Details, rename or move</button>
+       <button type="button" onClick={()=>{open(asset);setDetailsOpen(true);setContext(null);void loadFolderCatalog();}}>Details, rename or move</button>
        <button type="button" onClick={()=>{open(asset);setContext(null);void request<{url:string}>("/assets/"+asset.id+"/authorized-download",{method:"POST",body:{}}).then(d=>{const a=document.createElement("a");a.href=d.url;a.target="_blank";a.rel="noopener noreferrer";a.click();}).catch(e=>setError(errText(e)));}}>Download</button>
        {canArchive&&asset.status==="ACTIVE"&&<button type="button" onClick={()=>{open(asset);setDetailsOpen(true);setContext(null);}}>Archive…</button>}
       </div>}
@@ -304,8 +321,9 @@ export default function AssetsPage(){
     <FormField id="edit-folder-name" label="Folder name"><input id="edit-folder-name" className="field" aria-label="Rename folder" value={folderEditName} maxLength={120} required onChange={e=>setFolderEditName(e.target.value)}/></FormField>
     <FormField id="edit-folder-color" label="Color"><input id="edit-folder-color" type="color" aria-label="Change folder color" value={folderEditColor} onChange={e=>setFolderEditColor(e.target.value)}/></FormField>
     <FormField id="move-folder-to" label="Move folder"><select id="move-folder-to" className="field" value={folderMove} onChange={e=>setFolderMove(e.target.value)}>
-     <option value="">My Drive (root)</option>{[...trail,...folders].filter(f=>f.id!==folderEdit.id).map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
+     <option value="">My Drive (root)</option>{folderCatalog.filter(f=>f.id!==folderEdit.id).map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
     </select></FormField>
+    {folderCatalogLimited&&<p className="aw-drive-muted">Some deeply nested folders are not in this list.</p>}
     <div className="aw-drive-modal-actions"><button type="button" onClick={()=>setFolderEdit(null)}>Cancel</button><button type="submit" className="btn-primary" disabled={busy}>Save folder</button></div>
    </form></div></div>}
   {uploadDialog&&<div className="aw-drive-modal-shade" role="dialog" aria-modal="true" aria-label="Upload files"><div className="aw-drive-modal">
@@ -326,8 +344,9 @@ export default function AssetsPage(){
     {selected.status==="ACTIVE"&&canUpload&&<form className="aw-drive-modal-form" onSubmit={async e=>{await organizeFile(e);}}>
      <FormField id="asset-rename" label="Filename"><input className="field" id="asset-rename" value={editedName} onChange={e=>setEditedName(e.target.value)} required maxLength={180}/></FormField>
      <FormField id="asset-folder-destination" label="Move to folder"><select className="field" id="asset-folder-destination" value={destination} onChange={e=>setDestination(e.target.value)}>
-      <option value="">My Drive / root</option>{[...trail,...folders].map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
+      <option value="">My Drive / root</option>{folderCatalog.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}
      </select></FormField>
+     {folderCatalogLimited&&<p className="aw-drive-muted">Additional destinations exist; open their parent folder to move files there.</p>}
      <button type="submit" disabled={busy} className="btn-primary"><Pencil size={15}/> Save file changes</button>
     </form>}
     {selected.status==="ACTIVE"&&<div className="aw-drive-detail-actions"><button type="button" className="btn-secondary" onClick={()=>void previewAsset(selected)}><Eye size={15}/> Preview</button><button type="button" className="btn-secondary" disabled={busy} onClick={()=>void download()}><Download size={15}/> Protected download</button></div>}
