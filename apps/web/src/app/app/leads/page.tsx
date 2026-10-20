@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { BriefcaseBusiness, Download, Plus, RefreshCw, Upload, Users } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { BriefcaseBusiness, Download, Plus, RefreshCw, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError, type StaffUser } from "@/lib/api";
@@ -52,6 +52,8 @@ export default function LeadsPage(){
  const [cursor,setCursor]=useState<string|null>(null);
  const [stage,setStage]=useState("");
  const [search,setSearch]=useState("");
+ const [history,setHistory]=useState<string[]>([]);
+ const [sortBy,setSortBy]=useState<"businessName"|"contactName"|"location"|"status"|"nextFollowUpAt">("businessName"),[descending,setDescending]=useState(false);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -106,7 +108,7 @@ export default function LeadsPage(){
    e.preventDefault();setBusy(true);setError("");setMessage("");
    try{
      const data=await request<Lead>("/leads",{method:"POST",body:created});
-     setCreated(blank);setMessage("Lead created. Potential duplicates will be flagged for human review.");
+     setCreated(blank);setCreating(false);setMessage("Lead created. Potential duplicates will be flagged for human review.");
      setCursor(null);await load();await open(data.id);
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
@@ -184,6 +186,10 @@ export default function LeadsPage(){
      setMessage("Organization CSV exported and recorded in audit history.");
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
+ const sorted=useMemo(()=>[...items].sort((a,b)=>{
+  const value=String(a[sortBy]??"").localeCompare(String(b[sortBy]??""),undefined,{numeric:true,sensitivity:"base"});
+  return descending?-value:value;
+ }),[items,sortBy,descending]);
  if(!session)return <Spinner label="Checking CRM access…"/>;
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
@@ -203,27 +209,32 @@ export default function LeadsPage(){
        <Card title="Lead register" description="Latest leads first. Search and filter are scoped to your organization.">
          <div className="flex flex-wrap gap-2">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
-             onChange={e=>{setSearch(e.target.value);setCursor(null);}} placeholder="Search business, contact, city, phone"/>
-           <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);}}>
+             onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search business, contact, city, phone"/>
+           <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
              <option value="">All stages</option>{stages.map(x=><option key={x}>{x}</option>)}
            </select>
+<select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>setSortBy(e.target.value as typeof sortBy)}>
+  <option value="businessName">Business</option><option value="contactName">Contact</option><option value="location">Location</option><option value="status">Stage</option><option value="nextFollowUpAt">Follow-up</option>
+ </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading?<Spinner label="Loading leads…"/>:items.length===0?
            <EmptyState icon={BriefcaseBusiness} title="No leads found" description="Add the agency's first prospect, or adjust your search."/>:
            <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
             <thead><tr><th>Business / contact</th><th>Phone</th><th>Location</th><th>Stage</th><th>Assigned to</th><th>Follow-up</th><th>Details</th></tr></thead>
-            <tbody>{items.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
+            <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
              <td><strong>{l.businessName}</strong><span>{l.contactName||"No contact"}</span></td>
              <td>{l.phone||"—"}</td><td>{l.location||"—"}</td><td><StatusBadge status={l.status}/></td>
              <td>{l.assignee?.displayName||"Unassigned"}</td><td>{fmt(l.nextFollowUpAt)}</td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
             </tr>)}</tbody></table></div>}
          <div className="mt-4 flex items-center justify-between gap-3">
-           <button className="btn-secondary" disabled={!cursor||loading} onClick={()=>setCursor(null)}>First page</button>
-           <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>setCursor(nextCursor)}>Next page</button>
+           <button className="btn-secondary" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button><span className="aw-register-page">Page {history.length+1}</span>
+           <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
-       {canCreate&&creating&&<Card title="Create a lead" description="Lead notes are preserved in the private activity timeline.">
+       {canCreate&&creating&&<div className="aw-register-drawer" role="dialog" aria-modal="true" aria-label="Add lead form">
+  <div className="aw-register-drawer-head"><strong>New prospect</strong><button type="button" className="btn-secondary" onClick={()=>setCreating(false)}>Close lead form</button></div>
+  <Card title="Create a lead" description="Lead notes are preserved in the private activity timeline.">
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {([
              ["businessName","Business name",true],["contactName","Contact name",false],
@@ -237,7 +248,7 @@ export default function LeadsPage(){
            </FormField>)}
            <div className="sm:col-span-2"><button className="btn-primary" disabled={busy} type="submit">Create lead</button></div>
          </form>
-       </Card>}
+       </Card></div>}
      </div>
      <div className="space-y-5">
        {selected?<Card title={"Lead: "+selected.businessName} description={"Version "+selected.version+" · "+selected.status}>
@@ -279,7 +290,7 @@ export default function LeadsPage(){
              </div>)}</div>
            </div>}
          </div>
-       </Card>:<Card title="Lead details"><EmptyState icon={Users} title="Select a lead" description="Open any lead to view its current stage, owner and permitted activity."/></Card>}
+       </Card>:null}
        {canReview&&<Card title="Potential duplicates" description="Matches use normalized phone or business name. Reviewing never merges records.">
          <button type="button" className="btn-secondary" onClick={()=>void loadDuplicates()}>Load suspected duplicates</button>
          <div className="mt-3 space-y-3">{duplicates.map(d=><div key={d.id} className="rounded-lg border p-3 text-sm">
