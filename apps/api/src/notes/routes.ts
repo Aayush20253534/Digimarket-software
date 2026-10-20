@@ -10,8 +10,10 @@ const content=z.strictObject({
  strokes:z.string().max(60000).refine(value=>{
   try{const v=JSON.parse(value);return Array.isArray(v)&&v.length<=500&&v.every(s=>
     typeof s==="object"&&s!==null&&typeof s.color==="string"&&/^#[0-9a-fA-F]{6}$/.test(s.color)&&
-    typeof s.width==="number"&&s.width>=1&&s.width<=30&&Array.isArray(s.points)&&s.points.length<=2500&&
-    s.points.every((p:unknown)=>Array.isArray(p)&&p.length===2&&p.every(n=>typeof n==="number"&&Number.isFinite(n)&&n>=0&&n<=1)));
+    typeof s.width==="number"&&s.width>=1&&s.width<=30&&
+    (s.tool===undefined||["pen","pencil","highlighter","marker"].includes(s.tool))&&
+    Array.isArray(s.points)&&s.points.length<=2500&&
+    s.points.every((p:unknown)=>Array.isArray(p)&&(p.length===2||p.length===3)&&p.every(n=>typeof n==="number"&&Number.isFinite(n)&&n>=0&&n<=1)));
   }catch{return false;}
  },"Invalid drawing"),
 });

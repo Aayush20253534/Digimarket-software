@@ -22,7 +22,7 @@ function partialErase(stroke:Stroke,point:Point,radius:number):Stroke[]{
  const push=()=>{if(current.length)parts.push(current);current=[];};
  if(old.length===1)return touches(old[0],old[0])?[]:[stroke];
  for(let i=1;i<old.length;i++){
-  const a=old[i-1],b=old[i],n=Math.max(1,Math.ceil(Math.hypot((b[0]-a[0])*W,(b[1]-a[1])*H)/2));
+  const a=old[i-1],b=old[i],n=Math.max(1,Math.ceil(Math.hypot((b[0]-a[0])*W,(b[1]-a[1])*H)/5));
   for(let j=i===1?0:1;j<=n;j++){
    const t=j/n,p:Point=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]===undefined?undefined:(a[2]??.5)+((b[2]??.5)-(a[2]??.5))*t];
    if(Math.hypot(p[0]*W-cx,p[1]*H-cy)<=radius+stroke.width/2)push();else current.push(p);
@@ -194,7 +194,7 @@ export default function NotesPage(){
   setEdited({...draftRef.current,strokes:JSON.stringify(next)});
  };
  const markPressure=(e:PointerEvent<HTMLCanvasElement>):Point=>{
-  const [x,y]=mark(e);return[x,y,e.pointerType==="pen"?Math.max(.1,e.pressure):.5];
+  const [x,y]=mark(e);return e.pointerType==="pen"?[x,y,Math.max(.1,e.pressure)]:[x,y];
  };
  const eraseAt=(point:Point)=>{
   if(!eraserWork.current)return;
@@ -206,7 +206,7 @@ export default function NotesPage(){
   if(!selected||actionBusy||e.button!==0)return;
   e.currentTarget.setPointerCapture(e.pointerId);
   if(tool==="eraser"){eraserWork.current=parseStrokes(draftRef.current.strokes);eraseAt(markPressure(e));return;}
-  const stroke:Stroke={color:pen,width:tool==="highlighter"?Math.max(12,width*5):tool==="marker"?Math.max(7,width*2):width,tool,points:[markPressure(e)]};
+  const stroke:Stroke={color:pen,width:tool==="highlighter"?Math.min(30,Math.max(12,width*3)):tool==="marker"?Math.min(30,Math.max(7,width*2)):width,tool,points:[markPressure(e)]};
   drawingRef.current=stroke;setDrawing(stroke);
  };
  const move=(e:PointerEvent<HTMLCanvasElement>)=>{
