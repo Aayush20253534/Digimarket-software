@@ -80,7 +80,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 11: employee/team tasks, checklist/comments, recurrence cursor and BullMQ worker
 - [x] Module 12: content calendar, editorial workflow, immutable revisions, approvals and manual publishing
 - [x] Module 13: invoices, payment verification and allocation, receivables, private PDF generation and recurring draft templates
-- [ ] Modules 14–17: profitability, founders/settings, reporting and production readiness
+- [x] Module 14: client profitability, cost attribution, earned-revenue recognition and corrections
+- [ ] Modules 15–17: founders/settings, reporting and production readiness
 
 **Design and scaffolding are not a production release.**
 
@@ -119,3 +120,6 @@ The `/app/content` calendar supports editorial planning, immutable revisions, cl
 
 ## Module 13: invoices and collections
 `/app/billing` includes numbered invoices, immutable issued amounts, manual PDF download, client payments linked exactly once to the existing finance ledger, receivables and BullMQ-generated recurring drafts. See [Module 13](docs/24-MODULE-13-BILLING.md). Cloudinary PDF archival, live configuration and deployment are not yet complete.
+
+## Module 14 client profitability
+The `/app/profitability` dashboard separates issued invoices, verified collections, explicitly earned revenue and attributed posted expense. Contribution is calculated without inventing income or charging unrelated overhead. CSV export, versioned cost splitting, original-and-reversal recognition records and tenant-scoped permissions are included. See [Module 14](docs/25-MODULE-14-PROFITABILITY.md). Production deployment remains Module 17.

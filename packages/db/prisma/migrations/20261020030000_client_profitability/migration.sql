@@ -29,7 +29,7 @@ CREATE TABLE "RevenueRecognition"(
 );
 CREATE INDEX "CostAllocation_organizationId_clientId_idx" ON "CostAllocation"("organizationId","clientId");
 CREATE INDEX "CostAllocation_projectId_idx" ON "CostAllocation"("projectId");
-CREATE UNIQUE INDEX "RevenueRecognition_idempotency_key" ON "RevenueRecognition"("organizationId","idempotencyKey");
+CREATE UNIQUE INDEX "RevenueRecognition_organizationId_idempotencyKey_key" ON "RevenueRecognition"("organizationId","idempotencyKey");
 CREATE UNIQUE INDEX "RevenueRecognition_reversalOfId_key" ON "RevenueRecognition"("reversalOfId");
 CREATE INDEX "RevenueRecognition_organizationId_clientId_recognizedOn_idx" ON "RevenueRecognition"("organizationId","clientId","recognizedOn");
 CREATE INDEX "RevenueRecognition_invoiceId_recognizedOn_idx" ON "RevenueRecognition"("invoiceId","recognizedOn");
