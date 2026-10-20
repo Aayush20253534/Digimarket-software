@@ -78,7 +78,8 @@ No public signup or client credentials stored here. **Authentication is implemen
 - [x] Module 9: private Cloudinary assets, signed upload intents, provider verification and secure downloads
 - [x] Module 10: client projects, membership, milestones, versioned deliverables and approval integration
 - [x] Module 11: employee/team tasks, checklist/comments, recurrence cursor and BullMQ worker
-- [ ] Modules 12–17: content calendar, billing, profitability, settings, reporting and deployment
+- [x] Module 12: content calendar, editorial workflow, immutable revisions, approvals and manual publishing
+- [ ] Modules 13–17: invoices/payments, profitability, settings, reporting and production readiness
 
 **Design and scaffolding are not a production release.**
 
@@ -111,3 +112,6 @@ The `/app/projects` page provides a client-linked project status board, membersh
 
 ## Module 11 tasks and recurrence
 `/app/tasks` supports personal/team task queues, assignments, status updates, checklists, comments and daily/weekly/monthly recurrence schedules. A separate BullMQ worker advances due recurrences with a PostgreSQL transactional cursor and uniqueness key, guaranteeing no duplicate task occurrence under retries. CI uses disposable PostgreSQL and Redis. See [Module 11 details](docs/22-MODULE-11-TASKS.md). Live managed Redis and deployment remain Module 17.
+
+## Module 12 content calendar
+The `/app/content` calendar supports editorial planning, immutable revisions, client-linked media, policy-based review and manual publishing records. Editing an approved post invalidates prior approval. See [Module 12 guide](docs/23-MODULE-12-CONTENT.md). Live social-media publishing is intentionally not automated.
