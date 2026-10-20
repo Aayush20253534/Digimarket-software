@@ -199,6 +199,7 @@ model Organization {
   createdAt       DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt       DateTime         @updatedAt @db.Timestamptz(6)
   users           User[]
+  personalNotes   PersonalNote[]
   roles           Role[]
   teams           Team[]
   founderProfiles FounderProfile[]
@@ -245,6 +246,7 @@ model User {
   organization       Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   roles              UserRole[]
   sessions           Session[]
+  personalNotes      PersonalNote[]
   teamMemberships    TeamMember[]
   founderProfile     FounderProfile?
   auditActions       AuditLog[]      @relation("AuditActor")
@@ -1120,4 +1122,21 @@ model ServiceHeartbeat {
   startedAt DateTime @default(now()) @db.Timestamptz(6)
   lastSeenAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
+}
+
+ 
+// Personal workspace notes: tenant and owner isolation, CAS revision for safe autosave.
+model PersonalNote {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  ownerId String @db.Uuid
+  title String @default("Untitled") @db.VarChar(180)
+  body String @default("") @db.Text
+  strokes String @default("[]") @db.Text
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict)
+  @@index([organizationId,ownerId,updatedAt,id])
 }

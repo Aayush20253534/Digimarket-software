@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronRight, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
+import { Bell, ChevronRight, LogOut, Menu, NotebookPen, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { AWButton, AWNotice } from "@/components/aw-ui";
@@ -85,7 +85,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
- return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
+ return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/finance","/app/billing","/app/profitability","/app/reports","/app/settings","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notifications","/app/notes"].includes(pathname)?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
   <a href="#workspace-content" className="aw-skip-link">Skip to workspace content</a>
   <aside aria-label="Workspace sidebar" className="aw-work-sidebar">
    <div className="aw-work-sidehead">{brand}
@@ -127,6 +127,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      </div>
     </div>
     <div className="aw-work-topactions">
+     <Link href="/app/notes" aria-label="Open saved notes" title="My notes" className="aw-work-icon"><NotebookPen size={19} aria-hidden="true"/></Link>
      {canSearch&&<Link href="/app/search" aria-label="Search workspace" className="aw-work-search">
       <Search size={17} aria-hidden="true"/><span>Search workspace</span>
      </Link>}

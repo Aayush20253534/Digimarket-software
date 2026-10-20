@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity, ArrowRight, ArrowUpRight, BadgeCheck, BriefcaseBusiness, CheckCircle2,
-  CircleHelp, FileStack, FolderKanban, KeyRound, Layers, RefreshCw, ShieldCheck,
+  CircleHelp, FileStack, FolderKanban, KeyRound, Layers, NotebookPen, RefreshCw, ShieldCheck,
   Sparkles, Users, Wallet, Workflow
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -217,6 +217,7 @@ export default function Dashboard() {
         </AWPanel>
       </div>
     </div>
+    <div className="mt-4 flex justify-end"><Link href="/app/notes" className="aw-dashboard-refresh"><NotebookPen size={16} aria-hidden="true"/> Open or save a note</Link></div>
     <footer className="aw-dashboard-footer">
       <Activity size={15} aria-hidden="true"/> AmplifyWorld Workspace · Live account context
     </footer>
