@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
  Bell, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CheckSquare2,
- CreditCard, FileStack, FolderKanban, LayoutDashboard, NotebookPen, Search, Settings2,
+ FileStack, FolderKanban, LayoutDashboard, NotebookPen, Search, Settings2,
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
 
@@ -28,9 +28,8 @@ const sections:readonly Group[]=[
   {label:"Approvals",href:"/app/approvals",icon:CheckSquare2,permits:["approvals.read"]}
  ]},
  {title:"Finance",items:[
-  {label:"Invoices & payments",href:"/app/billing",icon:CreditCard,permits:["invoices.read","payments.read"]},
   {label:"Client profitability",href:"/app/profitability",icon:ChartNoAxesCombined,permits:["profitability.read"]},
-  {label:"Income & expenses",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]}
+  {label:"Income, expenses & billing",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all","invoices.read","payments.read"]}
  ]},
  {title:"Administration",items:[
   {label:"Founders & responsibilities",href:"/app/founders",icon:UsersRound,permits:["founders.read"]},
