@@ -253,3 +253,37 @@ export const taskRecurrenceCreateSchema=z.strictObject({
 });
 export type TaskRecurrenceCreateInput=z.infer<typeof taskRecurrenceCreateSchema>;
 export const taskRecurrenceUpdateSchema=z.strictObject({version:z.number().int().positive(),enabled:z.boolean()});
+
+// Module 12: content calendar, immutable revision history and manual publish records.
+export const contentPlatformSchema=z.enum(["INSTAGRAM","FACEBOOK","LINKEDIN","YOUTUBE","GOOGLE_BUSINESS","WEBSITE","OTHER"]);
+export const contentFormatSchema=z.enum(["REEL","POST","STORY","CAROUSEL","VIDEO","BLOG","OTHER"]);
+export const contentStatusSchema=z.enum(["IDEA","DRAFT","IN_REVIEW","CHANGES_REQUESTED","APPROVED","SCHEDULED","PUBLISHED","CANCELLED"]);
+const contentAssetIds=z.array(z.uuid()).max(10).refine(x=>new Set(x).size===x.length,{message:"Duplicate asset"});
+const contentHashtags=z.array(z.string().trim().regex(/^#[a-zA-Z0-9_]{1,50}$/)).max(30);
+export const contentCreateSchema=z.strictObject({
+  clientId:z.uuid(),projectId:z.uuid().nullable().optional(),ownerId:z.uuid().optional(),
+  title:z.string().trim().min(2).max(180),caption:z.string().trim().max(10000).default(""),
+  hashtags:contentHashtags.default([]),platform:contentPlatformSchema,format:contentFormatSchema,
+  publishAt:z.iso.datetime({offset:true}).nullable().optional(),assetIds:contentAssetIds.default([]),
+});
+export type ContentCreateInput=z.infer<typeof contentCreateSchema>;
+export const contentUpdateSchema=z.strictObject({
+  version:z.number().int().positive(),
+  title:z.string().trim().min(2).max(180).optional(),
+  caption:z.string().trim().max(10000).optional(),
+  hashtags:contentHashtags.optional(),platform:contentPlatformSchema.optional(),format:contentFormatSchema.optional(),
+  publishAt:z.iso.datetime({offset:true}).nullable().optional(),
+  projectId:z.uuid().nullable().optional(),ownerId:z.uuid().optional(),assetIds:contentAssetIds.optional(),
+});
+export type ContentUpdateInput=z.infer<typeof contentUpdateSchema>;
+export const contentListQuerySchema=z.strictObject({
+  clientId:z.uuid().optional(),ownerId:z.uuid().optional(),status:contentStatusSchema.optional(),
+  platform:contentPlatformSchema.optional(),start:z.iso.datetime({offset:true}).optional(),
+  end:z.iso.datetime({offset:true}).optional(),q:z.string().trim().max(100).optional(),
+  limit:z.coerce.number().int().min(1).max(100).default(50),cursor:z.uuid().optional(),
+}).refine(x=>!x.start||!x.end||x.start<x.end,{message:"Invalid date range"});
+export type ContentListQuery=z.infer<typeof contentListQuerySchema>;
+export const contentVersionSchema=z.strictObject({version:z.number().int().positive()});
+export const contentPublishSchema=z.strictObject({
+  version:z.number().int().positive(),publishedUrl:z.url().startsWith("https://").max(1000).nullable().optional(),
+});

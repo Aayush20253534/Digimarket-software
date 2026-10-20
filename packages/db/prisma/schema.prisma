@@ -110,6 +110,34 @@ enum RecurrenceFrequency {
   WEEKLY
   MONTHLY
 }
+enum ContentStatus {
+  IDEA
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  CANCELLED
+}
+enum ContentPlatform {
+  INSTAGRAM
+  FACEBOOK
+  LINKEDIN
+  YOUTUBE
+  GOOGLE_BUSINESS
+  WEBSITE
+  OTHER
+}
+enum ContentFormat {
+  REEL
+  POST
+  STORY
+  CAROUSEL
+  VIDEO
+  BLOG
+  OTHER
+}
 enum ProjectStatus {
   PLANNED
   ACTIVE
@@ -169,6 +197,7 @@ model Organization {
   assets Asset[]
   assetUploadIntents AssetUploadIntent[]
   projects Project[]
+  contentPosts ContentPost[]
   tasks Task[]
   taskRecurrences TaskRecurrence[]
 }
@@ -207,6 +236,9 @@ model User {
   assetIntentsCreated AssetUploadIntent[] @relation("AssetIntentCreator")
   projectsCreated Project[] @relation("ProjectCreator")
   projectMemberships ProjectMember[]
+  contentCreated ContentPost[] @relation("ContentCreator")
+  contentOwned ContentPost[] @relation("ContentOwner")
+  contentPublished ContentPost[] @relation("ContentPublisher")
   tasksCreated Task[] @relation("TaskCreator")
   assignedTasks TaskAssignment[]
   taskComments TaskComment[]
@@ -381,6 +413,7 @@ model ApprovalRequest {
   decision         ApprovalDecision?
   financeEntry     FinancialTransaction?
   projectDeliverable ProjectDeliverable? @relation("DeliverableCurrentApproval")
+  contentPost ContentPost? @relation("ContentCurrentApproval")
   @@index([organizationId, status, createdAt])
   @@index([organizationId, requesterId, createdAt])
 }
@@ -530,6 +563,7 @@ model Client {
   assets Asset[]
   assetUploadIntents AssetUploadIntent[]
   projects Project[]
+  contentPosts ContentPost[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
 }
@@ -601,6 +635,7 @@ model Asset {
   client Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
   uploadIntent AssetUploadIntent @relation(fields: [uploadIntentId], references: [id], onDelete: Restrict)
   projectDeliverables ProjectDeliverable[]
+  contentPostAssets ContentPostAsset[]
   @@index([organizationId,status,createdAt])
   @@index([organizationId,clientId,createdAt])
   @@index([organizationId,filename])
@@ -629,6 +664,7 @@ model Project {
   deliverables ProjectDeliverable[]
   tasks Task[]
   taskRecurrences TaskRecurrence[]
+  contentPosts ContentPost[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,clientId,createdAt])
 }
@@ -768,4 +804,63 @@ model TaskRecurrence {
   occurrences Task[]
   @@index([enabled,nextRunAt])
   @@index([organizationId,createdAt])
+}
+
+// Module 12: client-specific content workflow with immutable snapshots per revision.
+model ContentPost {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  projectId String? @db.Uuid
+  createdById String @db.Uuid
+  ownerId String @db.Uuid
+  publishedById String? @db.Uuid
+  approvalRequestId String? @unique @db.Uuid
+  title String @db.VarChar(180)
+  caption String @db.Text
+  hashtags String[] @default([])
+  platform ContentPlatform
+  format ContentFormat
+  status ContentStatus @default(IDEA)
+  publishAt DateTime? @db.Timestamptz(6)
+  publishedAt DateTime? @db.Timestamptz(6)
+  publishedUrl String? @db.VarChar(1000)
+  version Int @default(1)
+  revision Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  project Project? @relation(fields:[projectId],references:[id],onDelete:Restrict)
+  creator User @relation("ContentCreator",fields:[createdById],references:[id],onDelete:Restrict)
+  owner User @relation("ContentOwner",fields:[ownerId],references:[id],onDelete:Restrict)
+  publisher User? @relation("ContentPublisher",fields:[publishedById],references:[id],onDelete:Restrict)
+  approvalRequest ApprovalRequest? @relation("ContentCurrentApproval",fields:[approvalRequestId],references:[id],onDelete:Restrict)
+  assets ContentPostAsset[]
+  revisions ContentPostRevision[]
+  @@index([organizationId,publishAt,status])
+  @@index([organizationId,clientId,publishAt])
+  @@index([organizationId,ownerId,status])
+}
+
+model ContentPostAsset {
+  postId String @db.Uuid
+  assetId String @db.Uuid
+  sortOrder Int @default(0)
+  post ContentPost @relation(fields:[postId],references:[id],onDelete:Cascade)
+  asset Asset @relation(fields:[assetId],references:[id],onDelete:Restrict)
+  @@id([postId,assetId])
+  @@index([assetId])
+}
+
+model ContentPostRevision {
+  id String @id @default(uuid()) @db.Uuid
+  postId String @db.Uuid
+  revision Int
+  snapshot Json
+  actorId String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  post ContentPost @relation(fields:[postId],references:[id],onDelete:Restrict)
+  @@unique([postId,revision])
+  @@index([postId,createdAt])
 }
