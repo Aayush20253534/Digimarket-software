@@ -1,11 +1,11 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, Download, Plus, RefreshCw, Upload } from "lucide-react";
+import { Download, Plus, RefreshCw, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError, type StaffUser } from "@/lib/api";
-import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
+import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
 type Stage="NEW"|"CONTACTED"|"QUALIFIED"|"PROPOSAL"|"WON"|"LOST";
 const stages:Stage[]=["NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"];
@@ -206,8 +206,8 @@ export default function LeadsPage(){
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Lead register" description="Latest leads first. Search and filter are scoped to your organization.">
-         <div className="flex flex-wrap gap-2">
+       <Card title="Lead register" description="Live agency prospects and assigned follow-ups.">
+         <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search business, contact, city, phone"/>
            <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
@@ -218,7 +218,7 @@ export default function LeadsPage(){
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>setDescending(x=>!x)}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading&&<Spinner label="Loading leads…"/>}
-          {!loading&&!items.length&&<EmptyState icon={BriefcaseBusiness} title="No leads found" description="Add the agency's first prospect, or adjust your search."/>}
+          {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
             <thead><tr><th>Business / contact</th><th>Phone</th><th>Location</th><th>Stage</th><th>Assigned to</th><th>Follow-up</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
