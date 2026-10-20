@@ -76,7 +76,7 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByText("All changes saved")).toBeVisible({timeout:20000});
   await page.reload();
   await expect(page.getByRole("textbox", { name: "Note title" })).toHaveValue("CI note for design review");
-  await expect(page.getByRole("textbox", { name: "Typed notes" })).toContainText("Approve");
+  await expect(page.getByRole("textbox", { name: "Typed notes" })).toHaveValue(/Approve/);
   await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
   await page.getByRole("button", { name: "Preview" }).click();
   await expect(page.getByText("Approve", {exact:false}).first()).toBeVisible();
@@ -84,6 +84,20 @@ test("login, first password change, MFA, admin user management and employee perm
   page.once("dialog", dialog=>void dialog.accept());
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("No saved notes. Create one to begin.")).toBeVisible();
+  // Phase 8: small/mobile/tablet/desktop overflow and functional navigation gates.
+  for(const width of [320,375,390,768,1024,1440]){
+    await page.setViewportSize({width,height:850});
+    for(const route of ["notes","finance","billing","settings"]){
+      await page.goto("/app/"+route);
+      await expect(page.locator(".aw-workspace")).toHaveAttribute("data-restyled","true");
+      const sizes=await page.evaluate(()=>({
+        content:document.documentElement.scrollWidth,
+        viewport:document.documentElement.clientWidth,
+      }));
+      expect(sizes.content,"No page overflow for "+route+" at "+width+"px").toBeLessThanOrEqual(sizes.viewport+1);
+    }
+  }
+  await page.setViewportSize({width:1280,height:800});
   await page.goto("/app/dashboard");
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
 

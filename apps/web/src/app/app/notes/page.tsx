@@ -85,8 +85,8 @@ export default function NotesPage(){
    setSaveState("conflict");setError(explanation(e));return false;
   }finally{inFlight.current=false;}
  },[request]);
- const open=useCallback(async(id:string)=>{
-  if(selectedRef.current===id)return;
+ const open=useCallback(async(id:string,force=false)=>{
+  if(selectedRef.current===id&&!force)return;
   if(inFlight.current)return;
   if(dirty.current&&!await flush())return;
   setActionBusy(true);setError("");
@@ -198,7 +198,7 @@ export default function NotesPage(){
       </span>
       <div className="aw-notes-actions">
        <button type="button" onClick={()=>void flush()} disabled={saveState==="saved"||saveState==="saving"||saveState==="conflict"}><Save size={16}/> Save</button>
-       <button type="button" onClick={()=>void open(selected)} disabled={saveState!=="saved"} aria-label="Reload note"><RefreshCw size={16}/></button>
+       <button type="button" onClick={()=>void open(selected,true)} disabled={saveState!=="saved"} aria-label="Reload note"><RefreshCw size={16}/></button>
        <button type="button" className="danger" onClick={()=>void remove()} disabled={actionBusy||saveState==="saving"}><Trash2 size={16}/> Delete</button>
       </div>
      </div>
