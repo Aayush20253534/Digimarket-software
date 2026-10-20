@@ -56,6 +56,33 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading", { name: /Welcome,/ })).toBeVisible();
   await expect(page.getByText("Authenticated", { exact: true })).toBeVisible();
+  // Phase 3: shell controls must remain usable without altering any API state.
+  await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-collapsed", "true");
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-collapsed", "false");
+  await expect(page.getByRole("link", { name: "Search workspace" })).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  const drawer = page.getByRole("dialog", { name: "Workspace mobile navigation" });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole("link", { name: "Leads CRM" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).not.toBeVisible();
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeFocused();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  await drawer.getByRole("link", { name: "Overview" }).click();
+  await expect(drawer).not.toBeVisible();
+  await expect(page).toHaveURL(/\/app\/dashboard/);
+  const mobileWidth = await page.evaluate(() => ({
+    full: document.documentElement.scrollWidth,
+    viewport: document.documentElement.clientWidth
+  }));
+  expect(mobileWidth.full).toBeLessThanOrEqual(mobileWidth.viewport + 1);
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   await page.getByRole("link", { name: "Approvals" }).first().click();
   await expect(page.getByRole("heading", { name: "Approval workflows" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Approval policy configuration" })).toBeVisible();
