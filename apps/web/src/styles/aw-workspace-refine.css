@@ -57,3 +57,32 @@
 .aw-report-empty{padding:25px;border:1px dashed #68467c;border-radius:14px;color:#bfa6d0}
 @media(max-width:1100px){.aw-report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.aw-report-grid{grid-template-columns:1fr}.aw-report-toolbar{padding:17px}.aw-report-dates{width:100%}.aw-report-dates label{flex:1;min-width:135px}.aw-report-dates input{min-width:0;max-width:none;width:100%}.aw-report-refresh{width:100%;justify-content:center}}
+
+/* Private Drive folder-browser elements */
+.aw-drive-breadcrumb{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-bottom:17px;padding:12px 14px;border:1px solid #513566;border-radius:13px;background:#21142e;color:#d8c2e8;font-size:.81rem}
+.aw-drive-breadcrumb button{display:flex;align-items:center;gap:8px;min-height:30px;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.aw-drive-breadcrumb button:hover{color:white}
+.aw-drive-crumb{display:flex;align-items:center;gap:7px}
+.aw-drive-create{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;color:#b987e0}
+.aw-drive-create .field{flex:1;min-width:175px;max-width:350px}
+.aw-drive-create label{display:flex;align-items:center;gap:6px;font-size:.75rem}
+.aw-drive-create input[type=color],.aw-drive-folder-tools input[type=color]{height:36px;width:36px;min-width:36px;border:1px solid #66447f;border-radius:8px;background:transparent;cursor:pointer}
+.aw-drive-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:13px;padding:5px 0 16px}
+.aw-drive-folder{position:relative;border:1px solid #604374;background:linear-gradient(145deg,#2a1b3c,#1b1229);border-radius:15px;min-height:100px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.aw-drive-folder:hover{border-color:#a267c5;background:#342148}
+.aw-drive-folder-open{display:flex;align-items:center;gap:11px;width:100%;padding:17px 13px 10px;color:#f9eeff;text-align:left}
+.aw-drive-folder-open span{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:.86rem;font-weight:750}
+.aw-drive-folder-tools{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:4px 9px 8px}
+.aw-drive-folder-tools button{height:32px;width:32px;display:grid;place-items:center;color:#d4a9eb;border-radius:9px}
+.aw-drive-folder-tools button:hover{background:#503264}
+.aw-drive-folder-tools input[type=color]{height:28px;width:28px;min-width:28px}
+.aw-drive-rename{padding:11px;display:flex;gap:7px;flex-wrap:wrap}
+.aw-drive-rename .field{min-width:0;flex:1}
+.aw-drive-files{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}
+.aw-drive-files>button{color:#f5e8ff;background:#271833;border:1px solid #5e426f;border-radius:13px}
+.aw-drive-files>button:hover{background:#3a2550;border-color:#a771d0}
+.aw-finance-tabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#20152d;border:1px solid #573770;border-radius:15px;padding:6px;width:fit-content;max-width:100%}
+.aw-finance-tabs button{display:flex;align-items:center;justify-content:center;gap:9px;color:#c6b4d7;border-radius:10px;padding:11px 17px;min-height:43px;font-size:.83rem;font-weight:700}
+.aw-finance-tabs button.active{background:linear-gradient(110deg,#7136b8,#ae47d2);color:#fff;box-shadow:0 4px 15px #9b43e030}
+.aw-finance-tabs button:not(.active):hover{color:white;background:#382548}
+@media(max-width:520px){.aw-drive-folders{grid-template-columns:repeat(2,minmax(0,1fr))}.aw-drive-folder-open{padding:12px 8px}.aw-drive-folder-open span{font-size:.76rem}.aw-drive-files{grid-template-columns:1fr}}

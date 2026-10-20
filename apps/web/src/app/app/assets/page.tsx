@@ -1,6 +1,6 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Archive, ChevronRight, Download, File, Folder, FolderPlus, Home, Palette, Pencil, RefreshCw, Upload } from "lucide-react";
+import { Archive, ChevronRight, Download, File, FileStack, Folder, FolderPlus, Home, Palette, Pencil, RefreshCw, Upload } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
