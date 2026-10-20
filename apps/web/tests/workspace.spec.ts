@@ -332,8 +332,10 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Tasks" }).click();
   await expect(page.getByRole("heading", { name: "Tasks & recurring work" })).toBeVisible();
   await page.getByRole("button", { name: "Assign employees" }).click();
-  await page.getByRole("checkbox", { name: "Demo CI Employee" }).check();
-  await expect(page.getByRole("checkbox", { name: "Demo CI Employee" })).toBeChecked();
+  const availableEmployee=page.locator(".aw-team-option input[type=checkbox]").first();
+  await expect(availableEmployee).toBeVisible();
+  await availableEmployee.check();
+  await expect(availableEmployee).toBeChecked();
   await page.getByRole("button", { name: /Done · 1 selected/ }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
