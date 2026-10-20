@@ -78,6 +78,7 @@ test("login, first password change, MFA, admin user management and employee perm
       { id: "00000000-0000-4000-8000-000000000044", name: "Delayed example project", status: "ACTIVE",
         dueOn: "2000-02-02T00:00:00.000Z", client: {businessName:"Test client"} }
     ], nextCursor: null } }) }));
+  await expect(page.getByRole("button", { name: "Refresh priorities" })).toBeEnabled();
   await page.getByRole("button", { name: "Refresh priorities" }).click();
   await expect(page.getByTestId("pending-task-count")).toHaveText("2");
   await expect(page.getByTestId("overdue-item-count")).toHaveText("2");
