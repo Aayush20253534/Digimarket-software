@@ -238,8 +238,8 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByLabel("Category", { exact: true }).last().selectOption("FINANCE");
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.getByText("Routing policy saved.")).toBeVisible();
-  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income & expenses" }).click();
-  await expect(page.getByRole("heading", { name: "Income & expenses" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income, expenses & billing" }).click();
+  await expect(page.getByRole("heading", { name: "Income, expenses & billing" })).toBeVisible();
   await page.getByLabel("Category name").fill("Rapido");
   await page.getByRole("button", { name: "Add category" }).click();
   await expect(page.getByText("Category created for the whole agency.")).toBeVisible();
@@ -328,8 +328,8 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("link", { name: "Team & accounts" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Files & assets" })).toHaveCount(0);
-  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income & expenses" }).click();
-  await expect(page.getByRole("heading", { name: "Income & expenses" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Income, expenses & billing" }).click();
+  await expect(page.getByRole("heading", { name: "Income, expenses & billing" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Agency totals" })).toHaveCount(0);
   await expect(page.getByLabel("Category name")).toHaveCount(0);
   await page.getByLabel("Entry type").selectOption("INCOME");
