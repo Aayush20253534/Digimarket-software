@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, CalendarClock, Clock3, FolderKanban, ListOrdered, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowRight, CalendarClock, Clock3, ListOrdered, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWBadge, AWNotice } from "@/components/aw-ui";
 import { AWPanel } from "@/components/aw-data-patterns";
