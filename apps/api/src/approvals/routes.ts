@@ -37,7 +37,7 @@ export function registerApprovalRoutes(app: Express, authService: AuthService) {
     res.json({data:await approvals.policy(actor(res),category,input)});
   });
   app.get(base+"/approvals",authenticate,async (req,res)=>{
-    const view=parse(z.enum(["mine","queue"]),req.query.view??"mine");
+    const view=parse(z.enum(["mine","queue","history"]),req.query.view??"mine");
     res.set("Cache-Control","no-store");
     res.json({data:await approvals.list(actor(res),view)});
   });

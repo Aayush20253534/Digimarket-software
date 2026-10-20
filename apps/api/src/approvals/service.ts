@@ -59,9 +59,9 @@ export class ApprovalService {
     });
   }
 
-  async list(actor: Principal, view: "mine" | "queue") {
+  async list(actor: Principal, view: "mine" | "queue" | "history") {
     grant(actor,"approvals.read");
-    if(view==="queue") grant(actor,"approvals.decide");
+    if(view==="queue"||view==="history") grant(actor,"approvals.decide");
     const reviewers = actor.permissions.has("projects.review") ?
       await this.db.projectDeliverable.findMany({
         where:{project:{organizationId:actor.organizationId,
@@ -70,14 +70,16 @@ export class ApprovalService {
       }) : [];
     return this.db.approvalRequest.findMany({
       where:{organizationId:actor.organizationId,
-        ...(view==="queue"?{OR:[
+        ...(view!=="mine"?{OR:[
           {referenceType:null},{referenceType:{notIn:["PROJECT_DELIVERABLE","CONTENT_POST"]}},
           {referenceType:"PROJECT_DELIVERABLE",referenceId:{in:reviewers.map(row=>row.id)}},
           ...(actor.permissions.has("content.approve")?[{referenceType:"CONTENT_POST"}]:[]),
         ]}:{}),
         ...(view==="mine"
         ? {requesterId:actor.userId}
-        : {status:"PENDING" as const,requesterId:{not:actor.userId},approverRoleKeys:{hasSome:actor.roles}})},
+        : {status:view==="history"?{not:"PENDING" as const}:"PENDING" as const,
+           requesterId:{not:actor.userId},approverRoleKeys:{hasSome:actor.roles},
+           ...(view==="history"?{decision:{is:{actorId:actor.userId}}}:{})}},
       include:{policy:{select:{category:true,name:true}},requester:{select:{displayName:true}},
         decision:{select:{outcome:true,reason:true,createdAt:true,actor:{select:{displayName:true}}}}},
       orderBy:{createdAt:"desc"},take:100,

@@ -18,36 +18,59 @@ export class InsightsService{
  constructor(private readonly db:PrismaClient){}
  async search(a:Principal,q:string){
   requireGrant(a,"search.read");
-  const org=a.organizationId,match={contains:q,mode:"insensitive" as const};
+  const org=a.organizationId,me=a.userId,match={contains:q,mode:"insensitive" as const};
+  const url=(module:string,id:string)=>"/app/"+module+"?focus="+encodeURIComponent(id);
   const parts:Promise<SearchHit[]>[]=[];
+  // Personal-only index: creator, assignee, or owner. Broader module permissions
+  // must never turn search into an organization-wide directory.
   if(can(a,"leads.read"))parts.push(this.db.lead.findMany({
-    where:{organizationId:org,businessName:match},orderBy:{updatedAt:"desc"},take:8,
-    select:{id:true,businessName:true,status:true},
-  }).then(rows=>rows.map(x=>({kind:"lead",id:x.id,title:x.businessName,detail:"Lead · "+x.status,href:"/app/leads"}))));
+   where:{organizationId:org,businessName:match,OR:[{createdById:me},{assignedToId:me}]},
+   take:8,orderBy:{updatedAt:"desc"},select:{id:true,businessName:true,status:true},
+  }).then(rows=>rows.map(x=>({kind:"lead",id:x.id,title:x.businessName,detail:"Lead · "+x.status,href:url("leads",x.id)}))));
   if(can(a,"clients.read"))parts.push(this.db.client.findMany({
-    where:{organizationId:org,businessName:match},orderBy:{updatedAt:"desc"},take:8,
-    select:{id:true,businessName:true,status:true},
-  }).then(rows=>rows.map(x=>({kind:"client",id:x.id,title:x.businessName,detail:"Client · "+x.status,href:"/app/clients"}))));
+   where:{organizationId:org,createdById:me,businessName:match},take:8,orderBy:{updatedAt:"desc"},
+   select:{id:true,businessName:true,status:true},
+  }).then(rows=>rows.map(x=>({kind:"client",id:x.id,title:x.businessName,detail:"Client · "+x.status,href:url("clients",x.id)}))));
   if(can(a,"projects.read"))parts.push(this.db.project.findMany({
-    where:{organizationId:org,name:match,...projectScope(a)},take:8,orderBy:{updatedAt:"desc"},
-    select:{id:true,name:true,status:true},
-  }).then(rows=>rows.map(x=>({kind:"project",id:x.id,title:x.name,detail:"Project · "+x.status,href:"/app/projects"}))));
+   where:{organizationId:org,name:match,OR:[{createdById:me},{members:{some:{userId:me}}}]},
+   take:8,orderBy:{updatedAt:"desc"},select:{id:true,name:true,status:true},
+  }).then(rows=>rows.map(x=>({kind:"project",id:x.id,title:x.name,detail:"Project · "+x.status,href:url("projects",x.id)}))));
   if(can(a,"tasks.read"))parts.push(this.db.task.findMany({
-    where:{organizationId:org,title:match,...taskScope(a)},take:8,orderBy:{updatedAt:"desc"},
-    select:{id:true,title:true,status:true},
-  }).then(rows=>rows.map(x=>({kind:"task",id:x.id,title:x.title,detail:"Task · "+x.status,href:"/app/tasks"}))));
+   where:{organizationId:org,title:match,OR:[{createdById:me},{assignees:{some:{userId:me}}}]},
+   take:8,orderBy:{updatedAt:"desc"},select:{id:true,title:true,status:true},
+  }).then(rows=>rows.map(x=>({kind:"task",id:x.id,title:x.title,detail:"Task · "+x.status,href:url("tasks",x.id)}))));
   if(can(a,"content.read"))parts.push(this.db.contentPost.findMany({
-    where:{organizationId:org,title:match,...contentScope(a)},take:8,orderBy:{updatedAt:"desc"},
-    select:{id:true,title:true,status:true},
-  }).then(rows=>rows.map(x=>({kind:"content",id:x.id,title:x.title,detail:"Content · "+x.status,href:"/app/content"}))));
+   where:{organizationId:org,title:match,OR:[{createdById:me},{ownerId:me}]},
+   take:8,orderBy:{updatedAt:"desc"},select:{id:true,title:true,status:true},
+  }).then(rows=>rows.map(x=>({kind:"content",id:x.id,title:x.title,detail:"Content · "+x.status,href:url("content",x.id)}))));
   if(can(a,"invoices.read"))parts.push(this.db.invoice.findMany({
-    where:{organizationId:org,status:"ISSUED",
-      OR:[{number:match},{client:{businessName:match}}]},take:8,orderBy:{updatedAt:"desc"},
-    select:{id:true,number:true,status:true,client:{select:{businessName:true}}},
+   where:{organizationId:org,createdById:me,OR:[{number:match},{client:{businessName:match}}]},
+   take:8,orderBy:{updatedAt:"desc"},select:{id:true,number:true,client:{select:{businessName:true}}},
   }).then(rows=>rows.map(x=>({kind:"invoice",id:x.id,title:x.number??"Invoice",
-    detail:"Invoice · "+x.client.businessName,href:"/app/billing"}))));
+   detail:"Invoice · "+x.client.businessName,href:url("billing",x.id)}))));
+  if(can(a,"assets.read"))parts.push(this.db.asset.findMany({
+   where:{organizationId:org,uploadedById:me,status:"ACTIVE",filename:match,
+    publicId:{not:{startsWith:"digimarket/"+org+"/finance/"}},
+    ...(can(a,"clients.read")?{}:{clientId:null})},
+   take:8,orderBy:{createdAt:"desc"},select:{id:true,filename:true,contentType:true},
+  }).then(rows=>rows.map(x=>({kind:"file",id:x.id,title:x.filename,detail:"File · "+x.contentType,href:url("assets",x.id)}))));
+  if(can(a,"finance.entry.read.own"))parts.push(this.db.financialTransaction.findMany({
+   where:{organizationId:org,enteredById:me,OR:[{merchantOrSource:match},{description:match},{category:{name:match}}]},
+   take:8,orderBy:{createdAt:"desc"},select:{id:true,kind:true,status:true,merchantOrSource:true,category:{select:{name:true}}},
+  }).then(rows=>rows.map(x=>({kind:"finance",id:x.id,title:x.merchantOrSource||x.category.name,
+   detail:x.kind+" · "+x.status,href:url("finance",x.id)}))));
+  if(can(a,"approvals.read"))parts.push(this.db.approvalRequest.findMany({
+   where:{organizationId:org,requesterId:me,OR:[{title:match},{description:match}]},
+   take:8,orderBy:{createdAt:"desc"},select:{id:true,title:true,status:true},
+  }).then(rows=>rows.map(x=>({kind:"approval",id:x.id,title:x.title,detail:"Approval · "+x.status,href:url("approvals",x.id)}))));
+  if(!a.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN"))
+   parts.push(this.db.personalNote.findMany({
+    where:{organizationId:org,ownerId:me,deletedAt:null,OR:[{title:match},{body:match}]},
+    take:8,orderBy:{updatedAt:"desc"},select:{id:true,title:true},
+   }).then(rows=>rows.map(x=>({kind:"note",id:x.id,title:x.title,detail:"Private note",
+    href:"/app/notes?note="+encodeURIComponent(x.id)}))));
   const grouped=await Promise.all(parts);
-  return {query:q,items:grouped.flat().slice(0,40)};
+  return {query:q,items:grouped.flat().slice(0,70)};
  }
  async report(a:Principal,from:string,to:string){
   requireGrant(a,"reports.business.read");
@@ -101,7 +124,7 @@ export class InsightsService{
       organizationId:org,status:"POSTED",occurredOn:{gte:start,lte:end}},
       _sum:{amount:true}});
     sections.cashLedger={currency:"INR",posted:sums.map(v=>({
-      kind:v.kind,amount:v._sum.amount?.toFixed(4)??"0.0000"}))};
+      kind:v.kind,amount:v._sum.amount?.toFixed(2)??"0.00"}))};
   })());
   await Promise.all(work);
   return {from,to,asOf:new Date().toISOString(),sections,

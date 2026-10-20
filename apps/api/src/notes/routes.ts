@@ -91,6 +91,13 @@ export function registerNotesRoutes(app:Express,auth:AuthService){
   if(!updated.count)throw new AuthError(404,"NOT_FOUND","Note not found");
   res.json({data:{restored:true}});
  });
+ // A permanent deletion can only purge a note already in the owner's Trash.
+ app.delete(path+"/:id/permanent",authenticate,async(req,res)=>{
+  const p=actor(res),id=checked(uuid,req.params.id);
+  const removed=await db.personalNote.deleteMany({where:{id,...scope(p),deletedAt:{not:null}}});
+  if(!removed.count)throw new AuthError(404,"NOT_FOUND","Trashed note not found");
+  res.status(204).end();
+ });
  app.get(path,authenticate,async(req,res)=>{
   const p=actor(res);res.set("Cache-Control","no-store");
   const deleted=req.query.trash==="true";
