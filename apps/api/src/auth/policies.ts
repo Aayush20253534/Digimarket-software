@@ -9,7 +9,7 @@ const admin = [
   "users.read", "users.create", "users.update", "users.reset", "teams.read", "teams.manage",
   "leads.read", "leads.create", "leads.edit", "leads.assign", "leads.convert", "leads.bulk", "leads.duplicates.review",
   "clients.read", "clients.create", "clients.edit", "finance.entry.create",
-  "finance.entry.read.own", "finance.read.all", "finance.category.manage", "finance.approve", "projects.create", "projects.assign", "projects.read",
+  "finance.entry.read.own", "finance.read.all", "finance.category.manage", "finance.approve", "invoices.read", "payments.read", "projects.create", "projects.assign", "projects.read",
   "projects.update", "projects.deliverables.write", "projects.review", "tasks.create", "tasks.read", "tasks.manage", "tasks.recurrence.manage", "tasks.comment", "tasks.update.own", "content.read", "content.manage", "content.publish", "content.create",
   "content.edit", "content.approve", "profitability.read", "profitability.manage", "founders.read", "founders.edit", "organization.settings.manage", "assets.upload", "assets.read", "assets.delete",
 ] as const;

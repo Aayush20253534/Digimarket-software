@@ -82,7 +82,7 @@ export default function LoginPage() {
     ? "Use the login ID and password issued by your administrator."
     : "Change your temporary password to keep your account secure.";
 
-  return <main className="aw-theme flex min-h-[100svh] items-center justify-center overflow-x-clip bg-[#09070E]">
+  return <main className="aw-theme aw-auth-compact flex min-h-[100svh] items-center justify-center overflow-x-clip bg-[#09070E]">
     <a href="#auth-form-heading" className="aw-skip-link">Skip to sign in</a>
     <aside className="aw-auth-side hidden" aria-hidden="true">
       <Link href="/" aria-label="Back to AmplifyWorld homepage" className="relative z-[2] self-start">
@@ -115,31 +115,31 @@ export default function LoginPage() {
       </div>
     </aside>
 
-    <section className="relative flex w-full min-h-[100svh] flex-col items-center justify-center px-4 py-5 sm:px-8">
+    <section className="aw-auth-compact-section relative flex w-full min-h-[100svh] flex-col items-center justify-center px-4 py-3 sm:px-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_45%_45%_at_90%_5%,rgba(164,41,222,.13),transparent)]" aria-hidden="true"/>
-      <div className="relative z-[1] w-full max-w-[430px]">
-        <div className="mb-7 flex items-center justify-between gap-3 lg:hidden">
+      <div className="relative z-[1] w-full max-w-[408px]">
+        <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
           <Link href="/" className="min-w-0" aria-label="AmplifyWorld Workspace homepage"><BrandLogo compact workspace/></Link>
           <Link href="/" className="inline-flex shrink-0 items-center gap-1 text-xs text-[#DAB0F9]"><ArrowLeft size={15} aria-hidden="true"/> Home</Link>
         </div>
         <div className="aw-auth-form-panel">
-          <div className="mb-6 flex items-center justify-between gap-4">
+          <div className="mb-3 flex items-center justify-between gap-4">
             <div className="aw-auth-icon">
               {step === "credentials" ? <LockKeyhole size={23} aria-hidden="true" />
                 : <KeyRound size={23} aria-hidden="true" />}
             </div>
             <span className="aw-auth-secure-chip"><ShieldCheck size={14} aria-hidden="true"/> Secure access</span>
           </div>
-          <p className="aw-eyebrow mb-3">AMPLIFYWORLD WORKSPACE</p>
+          <p className="aw-eyebrow mb-2">AMPLIFYWORLD WORKSPACE</p>
           <h2 id="auth-form-heading" className="aw-auth-heading" tabIndex={-1}>{stepTitle}</h2>
-          <p className="aw-auth-message mt-3">{stepDescription}</p>
+          <p className="aw-auth-message mt-2">{stepDescription}</p>
 
-          <div className="mt-5 space-y-3" aria-live="polite">
+          <div className="mt-3 space-y-2" aria-live="polite">
             {error && <AWNotice tone="error">{error}</AWNotice>}
             {notice && <AWNotice tone="success">{notice}</AWNotice>}
           </div>
 
-          {step === "credentials" && <form onSubmit={submitCredentials} className="mt-7 space-y-5">
+          {step === "credentials" && <form onSubmit={submitCredentials} className="mt-4 space-y-3">
             <AWFormField id="login-id" label="Login ID">
               <AWInput id="login-id" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                 required minLength={3} maxLength={80} value={loginId} onChange={(event) => setLoginId(event.target.value)} placeholder="your-login-id" />
@@ -158,7 +158,7 @@ export default function LoginPage() {
             <AWButton type="submit" className="w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}<ArrowRight size={17} aria-hidden="true"/></AWButton>
           </form>}
 
-          {step === "change" && <form onSubmit={submitChange} className="mt-7 space-y-5">
+          {step === "change" && <form onSubmit={submitChange} className="mt-4 space-y-3">
             <AWNotice tone="info">You&apos;re using a temporary password. Choose a new one to continue.</AWNotice>
             <AWFormField id="new-password" label="New password" help="At least 12 characters. Use a password you do not use elsewhere.">
               <div className="relative">
@@ -180,14 +180,14 @@ export default function LoginPage() {
             className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#CE9DEF] hover:text-white">
             <ArrowLeft size={16} aria-hidden="true"/> Start over
           </button>}
-          <div className="mt-7 border-t border-[#392747] pt-5">
+          <div className="mt-4 border-t border-[#392747] pt-3">
             <p className="flex items-start gap-2 text-xs leading-6 text-[#A99BB9]">
               <LockKeyhole size={15} className="mt-1 shrink-0" aria-hidden="true"/>
               No public registration. Contact your administrator for access.
             </p>
           </div>
         </div>
-        <p className="mt-6 text-center text-xs text-[#9182A5]">AmplifyWorld Workspace · Private by design</p>
+        <p className="mt-3 text-center text-xs text-[#9182A5]">AmplifyWorld Workspace · Private by design</p>
       </div>
     </section>
   </main>;

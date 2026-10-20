@@ -14,6 +14,12 @@ test("public AmplifyWorld homepage and login have no viewport overflow", async (
     await expect(page.getByLabel("Login ID")).toBeVisible();
     const loginBounds = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
     expect(loginBounds.scroll, "Login document overflow at " + width).toBeLessThanOrEqual(loginBounds.view + 1);
+    if(width>=1024){
+      const dimensions=await page.evaluate(()=>({
+        height:document.documentElement.scrollHeight,viewport:document.documentElement.clientHeight,
+      }));
+      expect(dimensions.height,"Desktop login should fit one screen at "+width).toBeLessThanOrEqual(dimensions.viewport+1);
+    }
   }
 });
 

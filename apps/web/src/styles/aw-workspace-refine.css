@@ -195,3 +195,9 @@
 .aw-directory-modal-content form>.sm\:col-span-2{display:flex;justify-content:flex-end;padding-top:6px}
 @media(max-width:640px){.aw-directory-modal-content form>.sm\:col-span-2 .btn-primary{width:100%}}
 .aw-directory-details-portal{position:fixed!important;inset:0!important;z-index:10021!important}\n
+/* Admin-only finance editing without clipping under the workspace sidebar. */
+.aw-finance-admin-overlay{position:fixed;z-index:10500;inset:0;display:grid;place-items:center;background:rgba(3,2,9,.82);padding:16px;overflow:auto}
+.aw-finance-admin-modal{width:min(650px,100%);max-height:90dvh;overflow:auto;border:1px solid #715089;border-radius:18px;background:#1c1128;color:#f6ecff;padding:22px;box-shadow:0 25px 80px #0009}
+.aw-finance-admin-modal h2{font-size:1.2rem;font-weight:750}.aw-finance-admin-modal p{color:#c3afd3;margin:7px 0 17px}
+.aw-finance-admin-modal label{color:#f2e7fc}.aw-finance-admin-modal .field{background:#10091b;color:#fff;border:1px solid #73548f}
+.aw-finance-admin-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}

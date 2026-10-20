@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
-import type { FinanceCategoryInput, FinanceEntryInput, FinanceKind } from "@digimarket/contracts";
+import type { FinanceCategoryInput, FinanceEntryInput, FinanceEntryAdminEdit, FinanceKind } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 
@@ -57,6 +57,112 @@ export class FinanceService {
         action:"finance.category_status",entityType:"FinancialCategory",entityId:id,
         afterRedacted:{active}}});
       return {id,active};
+    });
+  }
+
+  private administrator(actor:Principal){
+    if(!actor.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN"))throw forbidden();
+    need(actor,"finance.category.manage");
+    need(actor,"finance.read.all");
+  }
+
+  async renameCategory(actor:Principal,id:string,name:string){
+    this.administrator(actor);
+    const normalizedName=normalize(name);
+    try{
+      return await this.db.$transaction(async tx=>{
+        const updated=await tx.financialCategory.updateMany({
+          where:{id,organizationId:actor.organizationId},
+          data:{name:name.trim(),normalizedName},
+        });
+        if(updated.count!==1)throw new AuthError(404,"NOT_FOUND","Category not found");
+        const row=await tx.financialCategory.findUniqueOrThrow({where:{id}});
+        await tx.auditLog.create({data:{
+          organizationId:actor.organizationId,actorId:actor.userId,
+          action:"finance.category_renamed",entityType:"FinancialCategory",entityId:id,
+          afterRedacted:{name:row.name},
+        }});
+        return {id:row.id,name:row.name,kind:row.kind,active:row.active};
+      });
+    }catch(error){
+      if((error as {code?:string}).code==="P2002")throw duplicate();
+      throw error;
+    }
+  }
+
+  async removeCategory(actor:Principal,id:string){
+    this.administrator(actor);
+    return this.db.$transaction(async tx=>{
+      const row=await tx.financialCategory.findFirst({where:{id,organizationId:actor.organizationId}});
+      if(!row)throw new AuthError(404,"NOT_FOUND","Category not found");
+      const [entries,payments]=await Promise.all([
+        tx.financialTransaction.count({where:{categoryId:id,organizationId:actor.organizationId}}),
+        tx.payment.count({where:{categoryId:id,organizationId:actor.organizationId}}),
+      ]);
+      if(entries||payments){
+        await tx.financialCategory.update({where:{id},data:{active:false}});
+      }else{
+        await tx.financialCategory.delete({where:{id}});
+      }
+      await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
+        action:entries||payments?"finance.category_archived":"finance.category_deleted",
+        entityType:"FinancialCategory",entityId:id,
+        afterRedacted:{hasHistoricalReferences:!!(entries||payments)},
+      }});
+      return {id,archived:!!(entries||payments)};
+    });
+  }
+
+  async editExpense(actor:Principal,id:string,input:FinanceEntryAdminEdit){
+    this.administrator(actor);
+    const amount=new Prisma.Decimal(input.amount);
+    if(!amount.isFinite()||amount.lte(0))throw invalid("Amount must be greater than zero");
+    return this.db.$transaction(async tx=>{
+      const entry=await tx.financialTransaction.findFirst({
+        where:{id,organizationId:actor.organizationId,kind:"EXPENSE"},
+        include:{verifiedPayment:{select:{id:true}}},
+      });
+      if(!entry)throw new AuthError(404,"NOT_FOUND","Expense not found");
+      if(entry.status==="CANCELLED"||entry.verifiedPayment)
+        throw new AuthError(409,"FINANCE_IMMUTABLE","Cancelled or reconciled expenses cannot be edited");
+      const category=await tx.financialCategory.findFirst({
+        where:{id:input.categoryId,organizationId:actor.organizationId,kind:"EXPENSE",active:true},
+      });
+      if(!category)throw invalid("Choose an active expense category in this organization");
+      const updated=await tx.financialTransaction.update({where:{id},data:{
+        categoryId:category.id,amount,occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
+        method:input.method,merchantOrSource:input.merchantOrSource,description:input.description,
+      }});
+      await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
+        action:"finance.expense_edited",entityType:"FinancialTransaction",entityId:id,
+        beforeRedacted:{amount:entry.amount.toFixed(4),categoryId:entry.categoryId,status:entry.status},
+        afterRedacted:{amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status},
+      }});
+      return {id,amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status};
+    });
+  }
+
+  async removeExpense(actor:Principal,id:string){
+    this.administrator(actor);
+    return this.db.$transaction(async tx=>{
+      const entry=await tx.financialTransaction.findFirst({
+        where:{id,organizationId:actor.organizationId,kind:"EXPENSE"},
+        include:{verifiedPayment:{select:{id:true}}},
+      });
+      if(!entry)throw new AuthError(404,"NOT_FOUND","Expense not found");
+      if(entry.status==="CANCELLED")throw new AuthError(409,"ALREADY_CANCELLED","Expense already cancelled");
+      if(entry.verifiedPayment)throw new AuthError(409,"FINANCE_IMMUTABLE","Reconciled expense cannot be cancelled");
+      await tx.financialTransaction.update({where:{id},data:{status:"CANCELLED",postedAt:null}});
+      await tx.approvalRequest.updateMany({
+        where:{id:entry.approvalRequestId,organizationId:actor.organizationId,status:"PENDING"},
+        data:{status:"CANCELLED",decidedAt:new Date()},
+      });
+      await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
+        action:"finance.expense_cancelled",entityType:"FinancialTransaction",entityId:id,
+        beforeRedacted:{status:entry.status,amount:entry.amount.toFixed(4)},
+        afterRedacted:{status:"CANCELLED"},
+      }});
+      return {id,status:"CANCELLED" as const};
     });
   }
 

@@ -106,7 +106,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     // even when older role-permission rows still contain legacy grants.
     const operationalPrefixes = [
       "/notes", "/leads", "/assets", "/asset-folders", "/content",
-      "/finance", "/billing", "/invoices", "/payments", "/search",
+      "/search",
     ];
     app.use("/api/v1", async (request,response,next)=>{
       const protectedOperation=operationalPrefixes.some(prefix=>request.path===prefix||request.path.startsWith(prefix+"/"));

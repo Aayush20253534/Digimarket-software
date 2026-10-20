@@ -41,7 +41,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
-  for(const label of ["My notes","Global search","Leads CRM","Content calendar","Files & assets","Income, expenses & billing"])
+  for(const label of ["My notes","Global search","Leads CRM","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
@@ -52,6 +52,21 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
   await page.goto("/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval workflows"})).toBeVisible();
+  await page.goto("/app/finance");
+  await expect(page.getByRole("heading",{name:"Income, expenses & billing"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
+  await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
+  await page.getByRole("button",{name:"Add category"}).click();
+  await expect(page.getByText("CI Admin Category",{exact:true}).last()).toBeVisible();
+  await page.getByRole("button",{name:"Edit"}).last().click();
+  await expect(page.getByRole("dialog",{name:"Edit finance category"})).toBeVisible();
+  await page.getByLabel("Category name",{exact:true}).last().fill("CI Admin Category Updated");
+  await page.getByRole("button",{name:"Save changes"}).click();
+  await expect(page.getByText("CI Admin Category Updated",{exact:true}).last()).toBeVisible();
+  await page.getByRole("tab",{name:"Invoices & payments"}).click();
+  await expect(page.getByRole("tab",{name:"Invoices & payments"})).toHaveAttribute("aria-selected","true");
+  await page.getByRole("tab",{name:"Income & expenses"}).click();
+  await page.goto("/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval policy configuration"})).toBeVisible();
   await page.getByRole("button",{name:"Save policy"}).click();
   await expect(page.getByText("Routing policy saved.")).toBeVisible();

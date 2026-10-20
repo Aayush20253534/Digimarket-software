@@ -35,9 +35,15 @@ export default function FinancePage(){
   const canBilling=!!session?.identity.permissions.some(p=>p==="invoices.read"||p==="payments.read");
   const [section,setSection]=useState<"ledger"|"billing">("ledger");
   const canManage=!!session?.identity.permissions.includes("finance.category.manage");
+  const adminFinance=!!session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&canManage;
   const canCreate=!!session?.identity.permissions.includes("finance.entry.create");
   const canReadOwn=!!session?.identity.permissions.includes("finance.entry.read.own");
   const [view,setView]=useState<View>("mine");
+  useEffect(()=>{if(adminFinance)setView("all");},[adminFinance]);
+  const [editingCategory,setEditingCategory]=useState<Category|null>(null);
+  const [editedCategoryName,setEditedCategoryName]=useState("");
+  const [editingExpense,setEditingExpense]=useState<Entry|null>(null);
+  const [expenseEdit,setExpenseEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",merchantOrSource:"",description:""});
   const [categories,setCategories]=useState<Category[]>([]);
   const [entries,setEntries]=useState<Entry[]>([]);
   const [totals,setTotals]=useState<Totals>(zero);
@@ -127,6 +133,50 @@ export default function FinancePage(){
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
+  async function saveCategoryEdit(e:FormEvent){
+    e.preventDefault();if(!editingCategory)return;
+    setBusy(true);setError("");setSuccess("");
+    try{
+      await request("/finance/categories/"+editingCategory.id,{method:"PUT",body:{name:editedCategoryName}});
+      setEditingCategory(null);setSuccess("Category renamed. Historical entries remain linked.");
+      await reload();
+    }catch(e){setError(readable(e));}finally{setBusy(false);}
+  }
+  async function deleteCategory(c:Category){
+    if(!window.confirm("Delete "+c.name+"? Categories already used in finance or payments will be archived to preserve historical records."))return;
+    setBusy(true);setError("");setSuccess("");
+    try{
+      const result=await request<{archived:boolean}>("/finance/categories/"+c.id,{method:"DELETE"});
+      setSuccess(result.archived?"Category archived because financial history references it.":"Unused category permanently deleted.");
+      await reload();
+    }catch(e){setError(readable(e));}finally{setBusy(false);}
+  }
+  function beginExpenseEdit(row:Entry){
+    setEditingExpense(row);setError("");
+    setExpenseEdit({categoryId:categories.find(c=>c.kind==="EXPENSE"&&c.name===row.category.name)?.id??(
+      categories.find(c=>c.kind==="EXPENSE"&&c.active)?.id??""),
+      amount:row.amount,occurredOn:row.occurredOn,method:row.method,
+      merchantOrSource:row.merchantOrSource??"",description:row.description??""});
+  }
+  async function saveExpense(e:FormEvent){
+    e.preventDefault();if(!editingExpense)return;
+    setBusy(true);setError("");setSuccess("");
+    try{
+      await request("/finance/entries/"+editingExpense.id,{method:"PUT",body:expenseEdit});
+      setEditingExpense(null);setSuccess("Expense updated with an audit record.");
+      await reload();
+    }catch(e){setError(readable(e));}finally{setBusy(false);}
+  }
+  async function deleteExpense(row:Entry){
+    if(!window.confirm("Cancel "+money(row.amount)+" recorded by "+row.enteredBy.displayName+"? This action excludes the expense from totals, preserves its audit trail and cannot be undone."))return;
+    setBusy(true);setError("");setSuccess("");
+    try{
+      await request("/finance/entries/"+row.id,{method:"DELETE"});
+      setSuccess("Expense cancelled and excluded from finance totals. The audit record remains.");
+      await reload();
+    }catch(e){setError(readable(e));}finally{setBusy(false);}
+  }
+
   async function showReceipt(id:string){
     setBusy(true);setError("");
     try{
@@ -227,7 +277,11 @@ export default function FinancePage(){
         </form>}
         <div className="mt-5 space-y-2">{categories.length?categories.map(c=><div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
           <div><p className="text-sm font-semibold">{c.name}</p><p className="text-xs text-slate-500">{c.kind} · {c.active?"Active":"Inactive"}</p></div>
-          {canManage&&<button type="button" className="btn-secondary text-xs" onClick={()=>void toggleCategory(c)} disabled={busy}>{c.active?"Disable":"Enable"}</button>}
+          {canManage&&<div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary text-xs" onClick={()=>void toggleCategory(c)} disabled={busy}>{c.active?"Disable":"Enable"}</button>
+            {adminFinance&&<><button type="button" className="btn-secondary text-xs" onClick={()=>{setEditingCategory(c);setEditedCategoryName(c.name);}} disabled={busy}>Edit</button>
+            <button type="button" className="btn-secondary text-xs" onClick={()=>void deleteCategory(c)} disabled={busy}>Delete</button></>}
+          </div>}
         </div>):<EmptyState title="No categories yet" description="An administrator can add expense and income categories." icon={Wallet}/>}</div>
       </Card>
     </div>
@@ -247,8 +301,53 @@ export default function FinancePage(){
             <td className="py-3">{row.receiptAssetId?
               <button type="button" className="btn-secondary" disabled={busy} aria-label={"View receipt for "+row.occurredOn}
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
-            <td className="py-3"><Link href="/app/approvals" className="text-indigo-600 underline">Approvals</Link></td>
+            <td className="py-3"><div className="flex items-center gap-2">
+              <Link href="/app/approvals" className="underline">Approvals</Link>
+              {adminFinance&&row.kind==="EXPENSE"&&row.status!=="CANCELLED"&&<>
+                <button type="button" className="btn-secondary text-xs" disabled={busy}
+                  onClick={()=>beginExpenseEdit(row)} aria-label={"Edit expense "+row.id}>Edit</button>
+                <button type="button" className="btn-secondary text-xs" disabled={busy}
+                  onClick={()=>void deleteExpense(row)} aria-label={"Delete expense "+row.id}>Delete</button>
+              </>}
+            </div></td>
           </tr>)}</tbody></table></div>}
     </Card>
+    {adminFinance&&editingCategory&&<div className="aw-finance-admin-overlay" role="presentation">
+      <div className="aw-finance-admin-modal" role="dialog" aria-modal="true" aria-label="Edit finance category">
+        <h2>Edit category</h2><p>Rename this category without modifying historical transactions.</p>
+        <form onSubmit={e=>void saveCategoryEdit(e)}>
+          <FormField id="finance-edit-category-name" label="Category name">
+            <input id="finance-edit-category-name" autoFocus className="field" required minLength={2} maxLength={120}
+              value={editedCategoryName} onChange={e=>setEditedCategoryName(e.target.value)}/></FormField>
+          <div className="aw-finance-admin-actions"><button type="button" className="btn-secondary" onClick={()=>setEditingCategory(null)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>Save changes</button></div>
+        </form>
+      </div>
+    </div>}
+    {adminFinance&&editingExpense&&<div className="aw-finance-admin-overlay" role="presentation">
+      <div className="aw-finance-admin-modal" role="dialog" aria-modal="true" aria-label="Edit expense">
+        <h2>Edit expense</h2><p>Submitted by {editingExpense.enteredBy.displayName}. Changes are audited.</p>
+        <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>void saveExpense(e)}>
+          <FormField id="admin-expense-category" label="Expense category"><select id="admin-expense-category" className="field" required value={expenseEdit.categoryId}
+            onChange={e=>setExpenseEdit(v=>({...v,categoryId:e.target.value}))}>
+            {categories.filter(c=>c.kind==="EXPENSE"&&(c.active||c.name===editingExpense.category.name)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select></FormField>
+          <FormField id="admin-expense-amount" label="Amount (INR)"><input id="admin-expense-amount" className="field" inputMode="decimal" required
+            pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" value={expenseEdit.amount}
+            onChange={e=>setExpenseEdit(v=>({...v,amount:e.target.value}))}/></FormField>
+          <FormField id="admin-expense-date" label="Date"><input id="admin-expense-date" type="date" className="field" required
+            value={expenseEdit.occurredOn} onChange={e=>setExpenseEdit(v=>({...v,occurredOn:e.target.value}))}/></FormField>
+          <FormField id="admin-expense-method" label="Payment method"><select id="admin-expense-method" className="field" value={expenseEdit.method}
+            onChange={e=>setExpenseEdit(v=>({...v,method:e.target.value}))}>{modes.map(m=><option key={m} value={m}>{m}</option>)}</select></FormField>
+          <div className="sm:col-span-2"><FormField id="admin-expense-payee" label="Merchant / payee">
+            <input id="admin-expense-payee" className="field" maxLength={160} value={expenseEdit.merchantOrSource}
+              onChange={e=>setExpenseEdit(v=>({...v,merchantOrSource:e.target.value}))}/></FormField></div>
+          <div className="sm:col-span-2"><FormField id="admin-expense-desc" label="Notes"><textarea id="admin-expense-desc" className="field" maxLength={2000}
+              value={expenseEdit.description} onChange={e=>setExpenseEdit(v=>({...v,description:e.target.value}))}/></FormField></div>
+          <div className="sm:col-span-2 aw-finance-admin-actions"><button type="button" className="btn-secondary" onClick={()=>setEditingExpense(null)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy||!expenseEdit.categoryId}>Save expense</button></div>
+        </form>
+      </div>
+    </div>}
   </div>;
 }

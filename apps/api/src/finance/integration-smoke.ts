@@ -96,5 +96,37 @@ try{
   assert.ok(csv.includes('"1000.0000"'));
   assert.equal((await finance.exportCsv(stranger,"all")).csv.split("\r\n").length,2);
   assert.ok((await db.auditLog.count({where:{organizationId:org.id,entityType:"FinancialTransaction"}}))>=4);
-  console.info("Module 6 PASS: decimal reconciliation, policy posting, finance grants, tenant isolation, idempotency, category lifecycle, immutable results, CSV.");
+  // Admin-only finance lifecycle must never be available to employees or a foreign organization.
+  await assert.rejects(()=>finance.renameCategory(staff,exp.id,"Renamed"),
+    (error:{status?:number})=>error.status===403);
+  await assert.rejects(()=>finance.removeCategory(staff,exp.id),
+    (error:{status?:number})=>error.status===403);
+  await assert.rejects(()=>finance.removeExpense(staff,pending.id),
+    (error:{status?:number})=>error.status===403);
+  await assert.rejects(()=>finance.removeExpense(stranger,pending.id),
+    (error:{status?:number})=>error.status===404);
+  const renamed=await finance.renameCategory(manager,exp.id,"Agency Transport");
+  assert.equal(renamed.name,"Agency Transport");
+  const unused=await finance.addCategory(manager,{kind:"EXPENSE",name:"Disposable Expense"});
+  assert.equal((await finance.removeCategory(manager,unused.id)).archived,false);
+  assert.equal((await db.financialCategory.findUnique({where:{id:unused.id}})),null);
+  assert.equal((await finance.removeCategory(manager,exp.id)).archived,true);
+  assert.equal((await db.financialCategory.findUniqueOrThrow({where:{id:exp.id}})).active,false);
+  const editCategory=await finance.addCategory(manager,{kind:"EXPENSE",name:"New Expense Category"});
+  await assert.rejects(()=>finance.editExpense(staff,pending.id,{
+    categoryId:editCategory.id,amount:"199.50",occurredOn:"2026-10-18",
+    method:"CARD",merchantOrSource:"Updated",description:"Admin correction",
+  }), (error:{status?:number})=>error.status===403);
+  const updated=await finance.editExpense(manager,pending.id,{
+    categoryId:editCategory.id,amount:"199.50",occurredOn:"2026-10-18",
+    method:"CARD",merchantOrSource:"Updated",description:"Admin correction",
+  });
+  assert.equal(updated.amount,"199.5000");
+  assert.equal((await finance.totals(manager,"all")).postedExpense,"199.5000");
+  assert.equal((await finance.removeExpense(manager,pending.id)).status,"CANCELLED");
+  assert.equal((await finance.totals(manager,"all")).postedExpense,"0.0000");
+  await assert.rejects(()=>finance.removeExpense(manager,pending.id),
+    (error:{status?:number})=>error.status===409);
+  assert.ok((await db.auditLog.count({where:{organizationId:org.id,action:"finance.expense_cancelled"}}))===1);
+  console.info("Module 6 PASS: admin category rename/unused delete/referenced archive, other-user expense edits/cancellation, audit and tenant isolation.");
 }finally{await db.$disconnect();}

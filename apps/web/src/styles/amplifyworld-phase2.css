@@ -53,3 +53,15 @@
  .aw-auth-form-panel {border-radius:20px;}
 }
 @media(prefers-reduced-motion:reduce){.aw-feature-card{transition:none}.aw-feature-card:hover{transform:none}}
+
+/* Fits common laptop heights without suppressing scrolling for accessibility. */
+.aw-auth-compact .aw-auth-form-panel{padding:clamp(16px,2vw,27px);border-radius:20px}
+.aw-auth-compact .aw-auth-icon{height:40px;width:40px;border-radius:12px}
+.aw-auth-compact .aw-auth-heading{font-size:clamp(1.5rem,2vw,1.9rem)}
+.aw-auth-compact .aw-auth-message{line-height:1.45}
+@media(min-width:1024px) and (min-height:620px){
+ .aw-auth-compact{height:100svh;overflow:hidden}
+ .aw-auth-compact-section{height:100svh;min-height:0;overflow:hidden}
+ .aw-auth-compact .aw-auth-side{height:100svh;min-height:0}
+}
+@media(max-height:619px){.aw-auth-compact-section{min-height:100svh;height:auto}}

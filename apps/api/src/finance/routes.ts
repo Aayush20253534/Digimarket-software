@@ -1,7 +1,7 @@
 import type { Express,Request,Response,NextFunction } from "express";
 import { z } from "zod";
 import {
-  financeCategoryInputSchema,financeCategoryStatusSchema,financeEntryInputSchema,financeViewSchema,
+  financeCategoryInputSchema,financeCategoryStatusSchema,financeCategoryEditSchema,financeEntryAdminEditSchema,financeEntryInputSchema,financeViewSchema,
 } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
@@ -49,6 +49,22 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   app.put("/api/v1/finance/categories/:id/status",authenticate,async(req,res)=>{
     const id=parse(z.uuid(),req.params.id),body=parse(financeCategoryStatusSchema,req.body);
     res.json({data:await finance.setCategoryActive(actor(res),id,body.active)});
+  });
+  app.put("/api/v1/finance/categories/:id",authenticate,async(req,res)=>{
+    const id=parse(z.uuid(),req.params.id),body=parse(financeCategoryEditSchema,req.body);
+    res.json({data:await finance.renameCategory(actor(res),id,body.name)});
+  });
+  app.delete("/api/v1/finance/categories/:id",authenticate,async(req,res)=>{
+    const id=parse(z.uuid(),req.params.id);
+    res.json({data:await finance.removeCategory(actor(res),id)});
+  });
+  app.put("/api/v1/finance/entries/:id",authenticate,async(req,res)=>{
+    const id=parse(z.uuid(),req.params.id),body=parse(financeEntryAdminEditSchema,req.body);
+    res.json({data:await finance.editExpense(actor(res),id,body)});
+  });
+  app.delete("/api/v1/finance/entries/:id",authenticate,async(req,res)=>{
+    const id=parse(z.uuid(),req.params.id);
+    res.json({data:await finance.removeExpense(actor(res),id)});
   });
   app.get("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");

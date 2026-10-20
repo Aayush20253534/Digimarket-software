@@ -65,6 +65,15 @@ export const financeEntryInputSchema = z.strictObject({
   receiptAssetId: z.uuid().nullable().optional(),
 });
 export type FinanceEntryInput = z.infer<typeof financeEntryInputSchema>;
+// Financial administration stays role-protected and audited. No arbitrary status edits.
+export const financeCategoryEditSchema=z.strictObject({name:z.string().trim().min(2).max(120)});
+export const financeEntryAdminEditSchema=z.strictObject({
+  categoryId:z.uuid(),amount:financeEntryInputSchema.shape.amount,
+  occurredOn:z.iso.date(),method:financeEntryInputSchema.shape.method,
+  merchantOrSource:z.string().trim().max(160),description:z.string().trim().max(2000),
+});
+export type FinanceEntryAdminEdit=z.infer<typeof financeEntryAdminEditSchema>;
+
 export const financeCategoryStatusSchema = z.strictObject({active:z.boolean()});
 export const financeViewSchema = z.enum(["mine","all"]);
 

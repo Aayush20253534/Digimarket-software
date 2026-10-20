@@ -66,6 +66,8 @@ const noteMetadataPattern=/^notes\/[0-9a-fA-F-]{36}\/metadata$/;
 const noteRestorePattern=/^notes\/[0-9a-fA-F-]{36}\/restore$/;
 const notificationReadPattern=/^notifications\/[0-9a-fA-F-]{36}\/read$/;
 const founderDetailPattern=/^founders\/[0-9a-fA-F-]{36}$/;
+const financeCategoryDetailPattern = /^finance\/categories\/[0-9a-fA-F-]{36}$/;
+const financeEntryDetailPattern = /^finance\/entries\/[0-9a-fA-F-]{36}$/;
 const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/status$/;
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
@@ -138,6 +140,7 @@ function permitted(path: string, method: string): boolean {
   if (leadDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (leadAssignPattern.test(path)) return method === "PUT";
   if (leadNotesPattern.test(path)||leadDuplicateReviewPattern.test(path)) return method === "POST";
+  if (financeCategoryDetailPattern.test(path)||financeEntryDetailPattern.test(path)) return ["PUT","DELETE"].includes(method);
   if (financeCategoryStatusPattern.test(path)) return method === "PUT";
   if (policyPattern.test(path)) return method === "PUT";
   if (approvalPattern.test(path)) return method === "GET";
