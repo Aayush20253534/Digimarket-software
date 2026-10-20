@@ -18,11 +18,11 @@ export default function SearchPage(){
  };
  useEffect(()=>{setResults([]);setSubmitted("");},[session?.identity.userId]);
  if(!session)return <Spinner label="Checking search access…"/>;
- if(!can)return <Notice kind="error">Global search permission required.</Notice>;
+ if(!can)return <Notice kind="error">Personal search permission required.</Notice>;
  return <div className="space-y-6">
-  <PageHeader eyebrow="Across your workspace" title="Global search"
-   description="Search leads, clients, projects, tasks, content and invoices you are permitted to access. Private notes, files and financial details are never indexed here."/>
-  <Card title="Find a business or work item">
+  <PageHeader eyebrow="Private workspace index" title="My workspace search"
+   description="Find your own or assigned leads, clients, projects, tasks, content, invoices, files, notes, finance entries and approvals. Results are scoped to the signed-in user."/>
+  <Card title="Find one of your records">
    <form onSubmit={e=>void search(e)} className="flex flex-wrap gap-3">
     <label className="flex-1"><span className="sr-only">Search workspace</span>
      <input autoFocus className="field w-full" required minLength={2} maxLength={100} value={q}
@@ -31,7 +31,7 @@ export default function SearchPage(){
    </form>
   </Card>
   {error&&<Notice kind="error">{error}</Notice>}
-  {submitted&&<Card title={"Results for "+submitted} description="Results are permission-filtered by the API, not by the browser.">
+  {submitted&&<Card title={"Results for "+submitted} description="The backend enforces user ownership, assignment and module permissions.">
    {!results.length?<EmptyState title="No matching records" description="Try another title or business name."/>:
     <div className="space-y-2">{results.map(x=><Link key={x.kind+x.id} href={x.href}
      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 hover:border-indigo-300">

@@ -201,7 +201,10 @@ export default function NotesPage(){
   if(!session||initialized.current)return;
   initialized.current=true;
   void request<{items:NoteSummary[];limited:boolean}>("/notes")
-   .then(result=>{setList(result.items);if(result.items[0])void open(result.items[0].id);})
+   .then(result=>{setList(result.items);if(result.items[0]){
+     const focus=new URLSearchParams(window.location.search).get("note");
+     void open(focus&&result.items.some(n=>n.id===focus)?focus:result.items[0].id);
+    }})
    .catch(e=>setError(explanation(e))).finally(()=>setLoadState("ready"));
  },[session,request,open]);
  useEffect(()=>{
@@ -257,7 +260,7 @@ export default function NotesPage(){
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
  const remove=async()=>{
-  if(!selected||!window.confirm("Permanently delete this note?"))return;
+  if(!selected||!window.confirm("Move this note to Trash? You can restore it until you permanently delete it from Trash."))return;
   if(inFlight.current)return;
   setActionBusy(true);setError("");
   try{
@@ -414,6 +417,15 @@ export default function NotesPage(){
     setList(v=>v.map(n=>n.id===selected?{...n,notebookId:saved.notebookId}:n));
   }catch(e){setError(explanation(e));}
  };
+ const permanentlyDeleteNote=async(id:string)=>{
+  if(!window.confirm("Permanently delete this note from Trash? This cannot be undone."))return;
+  setActionBusy(true);setError("");
+  try{
+   await request("/notes/"+id+"/permanent",{method:"DELETE"});
+   if(selectedRef.current===id){selectedRef.current=null;setSelected(null);dirty.current=false;draftRef.current=blank;setDraft(blank);}
+   await listNotes();
+  }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
+ };
  const restoreNote=async(id:string)=>{
   try{await request("/notes/"+id+"/restore",{method:"POST"});await listNotes();setSelected(null);selectedRef.current=null;}
   catch(e){setError(explanation(e));}
@@ -484,7 +496,10 @@ export default function NotesPage(){
          points={stroke.points.map(pt=>(pt[0]*900)+","+(pt[1]*520)).join(" ")}/>)}</svg></div>
        <span><strong>{n.title}</strong><small>{new Date(n.updatedAt).toLocaleString()}</small></span>
       </button>
-      {collection==="trash"?<button type="button" onClick={()=>void restoreNote(n.id)} aria-label={"Restore "+n.title}>Restore</button>:
+      {collection==="trash"?<div className="aw-notes-trash-actions">
+        <button type="button" disabled={actionBusy} onClick={()=>void restoreNote(n.id)} aria-label={"Restore "+n.title}>Restore</button>
+        <button type="button" disabled={actionBusy} className="danger" onClick={()=>void permanentlyDeleteNote(n.id)} aria-label={"Permanently delete "+n.title}><Trash2 size={15}/></button>
+       </div>:
        <button type="button" aria-label={(n.starred?"Unstar ":"Star ")+n.title} onClick={()=>void toggleStar(n)}><Star size={15} fill={n.starred?"#b26cfa":"none"}/></button>}
      </div>)}
    </div>
@@ -562,7 +577,7 @@ export default function NotesPage(){
        </select>
      </label>
      <button type="button" aria-label="Reload note" onClick={()=>void open(selected,true)} disabled={saveState!=="saved"}><RefreshCw size={16}/> Reload</button>
-     <button type="button" className="danger" onClick={()=>void remove()} disabled={actionBusy||saveState==="saving"}><Trash2 size={16}/> Delete</button>
+     <button type="button" className="danger" onClick={()=>void remove()} disabled={actionBusy||saveState==="saving"}><Trash2 size={16}/> Move to Trash</button>
     </div>
    </>}
   </main>

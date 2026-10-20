@@ -141,8 +141,8 @@ export default function TeamAccounts() {
         </div>
         <button type="button" className="btn-secondary" onClick={() => { setLoading(true); void reload(); }} disabled={loading}><RefreshCw className="h-4 w-4" />Refresh</button>
       </div>
-      {loading ? <Spinner label="Loading team…" /> : !team.length ? <EmptyState icon={Users} title={search ? "No matching accounts" : "No employee records"} description={search ? "Change the search filter to see other accounts." : "Create the first employee account using the button above."} /> : <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px] text-left text-sm">
+      {loading ? <Spinner label="Loading team…" /> : !team.length ? <EmptyState icon={Users} title={search ? "No matching accounts" : "No employee records"} description={search ? "Change the search filter to see other accounts." : "Create the first employee account using the button above."} /> : <div className="aw-team-table-scroll" role="region" aria-label="Team directory" tabIndex={0}>
+        <table className="aw-team-table">
           <thead><tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <th scope="col" className="pb-3 pr-4">Person</th><th scope="col" className="pb-3 pr-4">Role</th><th scope="col" className="pb-3 pr-4">Status</th><th scope="col" className="pb-3">Actions</th>
           </tr></thead>
@@ -152,7 +152,7 @@ export default function TeamAccounts() {
               {roles.map((r) => <option key={r} value={r}>{r}</option>)}
             </select> : <span className="text-slate-700">{user.roles.join(", ")}</span>}</td>
             <td className="py-4 pr-4"><StatusBadge status={user.status} /></td>
-            <td className="py-4">{user.id !== session.user.id && user.status !== "DISABLED" && !user.roles.includes("SUPER_ADMIN") ? <div className="flex flex-wrap gap-2">
+            <td className="py-4">{user.id !== session.user.id && user.status !== "DISABLED" && !user.roles.includes("SUPER_ADMIN") ? <div className="aw-team-row-actions">
               {canReset && <button disabled={busy} className="btn-secondary text-xs" onClick={() => void reset(user)}><KeyRound className="h-3.5 w-3.5" aria-hidden="true" />Reset</button>}
               {canDisable && <button disabled={busy} className="btn-danger text-xs" onClick={() => void disable(user)}><UserRoundX className="h-3.5 w-3.5" aria-hidden="true" />Disable</button>}
             </div> : <span className="text-xs text-slate-400">{user.id === session.user.id ? "Your account" : "Restricted"}</span>}</td>
@@ -160,7 +160,7 @@ export default function TeamAccounts() {
         </table>
       </div>}
     </Card>
-    <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+    <div className="aw-team-security-note">
       <Shield className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" aria-hidden="true" />
       <p><strong className="text-slate-900">Access is server-enforced.</strong> This interface displays actions based on permissions, but the Express API independently validates every operation. Your temporary passwords are never retrievable from the database.</p>
     </div>

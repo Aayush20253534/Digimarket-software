@@ -20,7 +20,7 @@ const errorText=(error:unknown)=>error instanceof ApiError?error.message:"The op
 
 export default function ApprovalsPage() {
   const {session,request}=useAuth();
-  const [view,setView]=useState<"mine"|"queue">("mine");
+  const [view,setView]=useState<"mine"|"queue"|"history">("mine");
   const [items,setItems]=useState<Approval[]>([]);
   const [policies,setPolicies]=useState<Policy[]>([]);
   const [loading,setLoading]=useState(true);
@@ -45,7 +45,7 @@ export default function ApprovalsPage() {
     setLoading(true);
     try {
       const [requests,rules]=await Promise.all([
-        request<Approval[]>("/approvals?view="+(view==="queue"&&canDecide?"queue":"mine")),
+        request<Approval[]>("/approvals?view="+(view!=="mine"&&canDecide?view:"mine")),
         request<Policy[]>("/approval-policies"),
       ]);
       setItems(requests);setPolicies(rules);setError("");
@@ -99,9 +99,9 @@ export default function ApprovalsPage() {
   const activePolicies=policies.filter(p=>p.active);
   return <div data-aw-module="approvals" className="aw-module-root space-y-7">
     <PageHeader eyebrow="Operations" title="Approval workflows"
-      description="Submit requests, review your decision queue and inspect recorded outcomes. Approving does not post financial transactions."
+      description="Submit requests, review pending decisions and inspect recorded outcomes. Approving a finance request posts its associated financial entry."
       actions={<button className="btn-secondary" onClick={()=>void reload()} disabled={loading||busy}><RefreshCw className="h-4 w-4"/>Refresh</button>}/>
-    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Review workflows</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="mine"?"My requests":"Decision queue"}</span></div>}
+    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Review workflows</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="mine"?"My requests":view==="queue"?"Decision queue":"Decision history"}</span></div>}
     {error&&<Notice kind="error">{error}</Notice>}
     {success&&<Notice kind="success">{success}</Notice>}
     {canSubmit&&<Card title="New approval request" description="An active category policy is required before requests can be submitted.">
@@ -126,12 +126,12 @@ export default function ApprovalsPage() {
     </Card>}
     <div className="flex gap-2" role="group" aria-label="Approval view">
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My requests</button>
-      {canDecide&&<button className={view==="queue"?"btn-primary":"btn-secondary"} onClick={()=>setView("queue")}>Decision queue</button>}
+      {canDecide&&<><button className={view==="queue"?"btn-primary":"btn-secondary"} onClick={()=>setView("queue")}>Decision queue</button><button className={view==="history"?"btn-primary":"btn-secondary"} onClick={()=>setView("history")}>Decision history</button></>}
     </div>
-    <Card title={view==="mine"?"My approval requests":"Requests awaiting my decision"}>
+    <Card title={view==="mine"?"My approval requests":view==="queue"?"Requests awaiting my decision":"My past decisions"}>
       {loading?<Spinner label="Loading approval records…"/>:items.length===0?
-        <EmptyState icon={Clock3} title="No requests here" description={view==="mine"?"Your submitted requests will appear here.":"No pending requests match your approver roles."}/>:
-        <div className="space-y-4">{items.map(item=><article key={item.id} className="aw-approval-row rounded-xl border border-slate-200 p-4">
+        <EmptyState icon={Clock3} title="No requests here" description={view==="mine"?"Your submitted requests will appear here.":view==="queue"?"No pending requests match your approver roles.":"No approved, rejected or cancelled decisions yet."}/>:
+        <div className="space-y-4">{items.map(item=><article key={item.id} id={"approval-"+item.id} className="aw-approval-row rounded-xl border border-slate-200 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-slate-500">{item.policy.name} · {item.requester.displayName} · {new Date(item.createdAt).toLocaleString()}</p>
             <h3 className="mt-1 font-semibold">{item.title}</h3></div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{item.status}</span></div>
