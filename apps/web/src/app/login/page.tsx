@@ -202,7 +202,7 @@ export default function LoginPage() {
                   className="pr-12" minLength={12} maxLength={128} value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)} />
                 <button type="button" className="absolute inset-y-1 right-1 grid w-10 place-items-center rounded-lg text-[#BCACCD] hover:bg-[#312040]"
-                  aria-label={showNewPassword ? "Hide new password" : "Show new password"} aria-pressed={showNewPassword}
+                  aria-label={showNewPassword ? "Conceal replacement credential" : "Reveal replacement credential"} aria-pressed={showNewPassword}
                   onClick={() => setShowNewPassword((value) => !value)}>
                   {showNewPassword ? <EyeOff size={18} aria-hidden="true"/> : <Eye size={18} aria-hidden="true"/>}
                 </button>
