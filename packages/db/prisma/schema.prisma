@@ -489,6 +489,8 @@ model FinancialTransaction {
   enteredById       String @db.Uuid
   categoryId        String @db.Uuid
   approvalRequestId String @unique @db.Uuid
+  receiptAssetId String? @db.Uuid
+  receiptAsset Asset? @relation("FinanceReceipt",fields:[receiptAssetId],references:[id],onDelete:Restrict)
   idempotencyKey    String @db.Uuid
   kind              FinanceKind
   amount            Decimal @db.Decimal(19,4)
@@ -508,6 +510,7 @@ model FinancialTransaction {
   costAllocationVersion Int @default(0)
   costAllocations CostAllocation[]
   @@unique([organizationId, idempotencyKey])
+  @@index([organizationId,receiptAssetId])
   @@index([organizationId, status, kind, occurredOn])
   @@index([organizationId, enteredById, createdAt])
 }
@@ -701,6 +704,7 @@ model Asset {
   uploadIntent AssetUploadIntent @relation(fields: [uploadIntentId], references: [id], onDelete: Restrict)
   projectDeliverables ProjectDeliverable[]
   contentPostAssets ContentPostAsset[]
+  financeReceipts FinancialTransaction[] @relation("FinanceReceipt")
   @@index([organizationId,status,createdAt])
   @@index([organizationId,folderId,status,createdAt])
   @@index([organizationId,clientId,createdAt])

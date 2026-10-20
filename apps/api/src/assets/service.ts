@@ -26,10 +26,12 @@ export class AssetService {
    if(found.clientId&&!a.permissions.has("clients.read"))throw missing();
    return found;
  }
- async intent(a:Principal,input:AssetIntentInput){
-   deny(a,"assets.upload");deny(a,"assets.read");
+ async intent(a:Principal,input:AssetIntentInput,financeProof=false){
+   if(financeProof){deny(a,"finance.entry.create");if(input.clientId)throw new AuthError(422,"VALIDATION_ERROR","Finance proofs cannot be client-shared");}
+   else {deny(a,"assets.upload");deny(a,"assets.read");}
    const type=validateMedia(input.contentType,input.bytes);
-   const clientId=await this.client(a,input.clientId);
+   if(financeProof&&type.kind==="video")throw new AuthError(422,"VALIDATION_ERROR","Only images and PDFs are accepted as finance proof");
+   const clientId=financeProof?null:await this.client(a,input.clientId);
    const id=randomUUID();
    const publicId="digimarket/"+a.organizationId+"/"+id+(type.kind==="raw"?".pdf":"");
    // The provider is configured before creating any database record.
@@ -43,8 +45,9 @@ export class AssetService {
    }});
    return {intentId:id,expiresAt,resourceType:type.kind,...options};
  }
- async confirm(a:Principal,intentId:string,providerAssetId:string){
-   deny(a,"assets.upload");deny(a,"assets.read");
+ async confirm(a:Principal,intentId:string,providerAssetId:string,financeProof=false){
+   if(financeProof)deny(a,"finance.entry.create");
+   else {deny(a,"assets.upload");deny(a,"assets.read");}
    const intent=await this.db.assetUploadIntent.findFirst({where:{
      id:intentId,organizationId:a.organizationId,createdById:a.userId,
    }});
@@ -52,6 +55,7 @@ export class AssetService {
    if(intent.status!=="PENDING"||intent.expiresAt<=new Date())throw expired();
    if(intent.clientId)await this.client(a,intent.clientId);
    const info=validateMedia(intent.contentType,intent.expectedBytes);
+   if(financeProof&&(intent.clientId||info.kind==="video"))throw new AuthError(422,"VALIDATION_ERROR","Invalid finance proof");
    const verified=await this.provider.inspect(intent.publicId,info.kind);
    if(verified.asset_id!==providerAssetId||verified.public_id!==intent.publicId||
       verified.resource_type!==info.kind||verified.type!=="authenticated"||
@@ -114,6 +118,18 @@ export class AssetService {
    await this.db.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
      action:"assets.download_authorized",entityType:"Asset",entityId:item.id}});
    return {url,expiresAt:new Date(Date.now()+120_000)};
+ }
+ async financeDownload(a:Principal,transactionId:string){
+   if(!a.permissions.has("finance.entry.read.own")&&!a.permissions.has("finance.read.all"))throw forbidden();
+   const row=await this.db.financialTransaction.findFirst({where:{
+      id:transactionId,organizationId:a.organizationId,
+      ...(a.permissions.has("finance.read.all")?{}:{enteredById:a.userId})},
+      select:{receiptAssetId:true}});
+   if(!row?.receiptAssetId)throw new AuthError(404,"NOT_FOUND","No receipt for this entry");
+   const asset=await this.db.asset.findFirst({where:{id:row.receiptAssetId,organizationId:a.organizationId,status:"ACTIVE"}});
+   if(!asset)throw new AuthError(404,"NOT_FOUND","Receipt no longer available");
+   return {url:this.provider.download(asset.publicId,resource(asset.resourceType),asset.format),
+     expiresAt:new Date(Date.now()+120000)};
  }
  async link(a:Principal,id:string,version:number,clientId:string|null){
    deny(a,"assets.upload");

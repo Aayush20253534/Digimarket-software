@@ -7,6 +7,8 @@ const endpoints: Record<string, string[]> = {
   "health": ["GET"],
   "notes": ["GET","POST"],
   "asset-folders": ["GET","POST"],
+  "finance/proof-intent": ["POST"],
+  "finance/proof-confirm": ["POST"],
   "search": ["GET"],
   "reports/overview": ["GET"],
   "notifications": ["GET"],
@@ -57,6 +59,7 @@ const endpoints: Record<string, string[]> = {
   "leads/export": ["GET"],
 };
 const folderDetailPattern=/^asset-folders\/[0-9a-fA-F-]{36}$/;
+const financeProofPattern=/^finance\/entries\/[0-9a-fA-F-]{36}\/proof$/;
 const assetOrganizePattern=/^assets\/[0-9a-fA-F-]{36}\/organize$/;
 const noteDetailPattern=/^notes\/[0-9a-fA-F-]{36}$/;
 const notificationReadPattern=/^notifications\/[0-9a-fA-F-]{36}\/read$/;
@@ -96,6 +99,7 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(financeProofPattern.test(path))return method==="GET";
   if(folderDetailPattern.test(path))return ["PUT","DELETE"].includes(method);
   if(assetOrganizePattern.test(path))return method==="POST";
   if(noteDetailPattern.test(path))return ["GET","PUT","DELETE"].includes(method);
