@@ -81,6 +81,12 @@ jobs:
           test "$ORIGINAL" = "$RESTORED"
           test -s "${RUNNER_TEMP}/release-rehearsal.age.sha256"
           echo "PASS encrypted-backup restore with matching permission catalog"
+      - name: Generate ephemeral regression-test auth credentials
+        shell: bash
+        run: |
+          echo "JWT_ACCESS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "JWT_CHALLENGE_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "MFA_ENCRYPTION_KEY_BASE64=$(openssl rand -base64 32 | tr -d '\n')" >> "$GITHUB_ENV"
       - name: Repo E2E regression with independent Postgres
         run: |
           pnpm --filter @digimarket/api exec tsx src/auth/integration-smoke.ts
