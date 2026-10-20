@@ -86,7 +86,10 @@ export function AWActionCenter() {
     ]);
     const errors:string[]=[];
     const sources=["Tasks","Projects","Content","Invoices"];
-    const [tasks,projects,content,invoices]=results.map(r=>r.status==="fulfilled"?r.value.records:[]);
+    const tasks=results[0].status==="fulfilled"?results[0].value.records:[];
+    const projects=results[1].status==="fulfilled"?results[1].value.records:[];
+    const content=results[2].status==="fulfilled"?results[2].value.records:[];
+    const invoices=results[3].status==="fulfilled"?results[3].value.records:[];
     const partialSources:string[]=[];
     results.forEach((result,i)=>{
       if(result.status==="rejected")errors.push(sources[i]+" could not be loaded");
