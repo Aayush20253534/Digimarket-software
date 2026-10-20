@@ -71,7 +71,7 @@ export async function reconcileInvoices(db:PrismaClient,now=new Date()){
  const invoices=await db.invoice.findMany({where:{status:"ISSUED"},
   select:{id:true,organizationId:true,paidTotal:true,
     allocations:{where:{payment:{status:"VERIFIED"}},select:{amount:true}}},
-  },orderBy:{updatedAt:"desc"},take:150});
+  orderBy:{updatedAt:"desc"},take:150});
  const bad=invoices.filter(x=>!x.allocations.reduce((s,v)=>s.plus(v.amount),new Prisma.Decimal(0)).eq(x.paidTotal));
  if(!bad.length)return {checked:invoices.length,discrepancies:0};
  const orgs=[...new Set(bad.map(x=>x.organizationId))];
