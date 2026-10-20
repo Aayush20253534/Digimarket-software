@@ -108,7 +108,7 @@ test("login, first password change, MFA, admin user management and employee perm
     await page.setViewportSize({width,height:850});
     for(const route of ["notes","leads","clients","finance","billing","settings"]){
       await page.goto("/app/"+route);
-      await expect(page.locator(".aw-workspace")).toHaveAttribute("data-restyled","true");
+      await expect(page.locator(".aw-workspace")).toHaveAttribute(route==="leads"||route==="clients"?"data-workstream":"data-restyled","true");
       const sizes=await page.evaluate(()=>({
         content:document.documentElement.scrollWidth,
         viewport:document.documentElement.clientWidth,
