@@ -58,7 +58,7 @@ export class ProfitabilityService{
     const projects=input.allocations.filter(x=>x.projectId);
     if(projects.length){
       const found=await tx.project.findMany({where:{organizationId:a.organizationId,
-        id:{in:projects.map(x=>x.projectId!)}}},select:{id:true,clientId:true}});
+        id:{in:projects.map(x=>x.projectId!)}},select:{id:true,clientId:true}});
       if(projects.some(x=>!found.some(p=>p.id===x.projectId&&p.clientId===x.clientId)))
         throw invalid("Linked project must belong to the same client");
     }
