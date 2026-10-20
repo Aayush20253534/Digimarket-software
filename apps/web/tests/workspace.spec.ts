@@ -129,7 +129,10 @@ test("login, first password change, MFA, admin user management and employee perm
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
   await page.locator("#new-businessName").fill("Cafe Demo Lead Other");
   await page.locator("#new-phone").fill("98765 43210");
+  const createdDuplicateLead=page.waitForResponse(response =>
+    response.url().endsWith("/api/v1/leads") && response.request().method()==="POST" && response.status()===201);
   await page.getByRole("button", { name: "Create lead" }).click();
+  await createdDuplicateLead;
   await page.getByRole("button", { name: "Load suspected duplicates" }).click();
   await expect(page.getByText("PHONE_MATCH")).toBeVisible();
   await page.getByRole("button", { name: "Confirm match" }).click();
