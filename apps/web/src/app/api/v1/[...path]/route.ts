@@ -301,7 +301,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   try {
     const response = await fetch(url, {
       method: request.method, headers, body,
-      cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(12000),
+      cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(folderArchivePattern.test(path)?55000:12000),
     });
     // A new web deployment can point at a stale Render API. Its fallback 404
     // includes meta.requestId, unlike an actual missing note. Report the

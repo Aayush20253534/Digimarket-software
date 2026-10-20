@@ -1,6 +1,6 @@
 "use client";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Archive, ChevronRight, Download, File, FileStack, Folder, FolderPlus, Home, Palette, Pencil, RefreshCw, Upload } from "lucide-react";
+import { Archive, ChevronRight, Download, File, FileStack, Folder, FolderPlus, Home, Palette, Pencil, RefreshCw, Trash2, Upload } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
@@ -95,6 +95,14 @@ export default function AssetsPage(){
    setBusy(true);setError("");
    try{await request("/asset-folders",{method:"POST",body:{name:newFolderName.trim(),color:newFolderColor,parentId:folderId}});
     setNewFolderName("");await load();setMessage("Folder created.");}catch(e){setError(errText(e));}finally{setBusy(false);}
+ }
+ async function deleteFolder(folder:FolderItem){
+   if(!window.confirm("Delete empty folder '"+folder.name+"'? Files are never deleted by this action."))return;
+   setBusy(true);setError("");
+   try{
+    await request("/asset-folders/"+folder.id,{method:"DELETE"});
+    setMessage("Empty folder deleted.");await load();
+   }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function renameFolder(folder:FolderItem,updates:{name?:string;color?:string}){
    setBusy(true);setError("");
@@ -197,6 +205,8 @@ export default function AssetsPage(){
             <div className="aw-drive-folder-tools">
              <button type="button" aria-label={"Download "+folder.name+" as ZIP"} title="Download folder ZIP"
                disabled={busy} onClick={()=>void downloadFolder(folder)}><Download size={15}/></button>
+             {canArchive&&<button type="button" disabled={busy} title="Delete empty folder"
+                 aria-label={"Delete empty folder "+folder.name} onClick={()=>void deleteFolder(folder)}><Trash2 size={15}/></button>}
              {canUpload&&<>
              <button type="button" aria-label={"Rename "+folder.name} title="Rename folder"
                onClick={()=>setRenaming(renaming===folder.id?null:folder.id)}><Pencil size={15}/></button>
