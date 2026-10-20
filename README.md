@@ -134,3 +134,6 @@ The `/app/profitability` dashboard separates issued invoices, verified collectio
 
 ## Module 17 release engineering
 Production release configuration is included in [Render Blueprint](render.yaml), [Vercel build settings](apps/web/vercel.json), [production environment template](.env.production.example), [encrypted database recovery script](scripts/db-recovery.mjs) and the [Module 17 release runbook](docs/28-MODULE-17-PRODUCTION.md). The API has DB readiness and token-protected worker/outbox health, while CI rehearses encrypted PostgreSQL backup and restore in a disposable database. Render auto-deployment remains disabled until operators validate live credentials, external backups, DNS, MFA and release checks. **This is deployable configuration, not proof of a live public deployment.**
+
+## Render Free first sign-in
+Open the Render API root (`/` or `/endpoint`) to see the service overview, then use the Vercel frontend's `/login` page to sign in. On a new empty database, Render Free can provision the initial admin from temporary `BOOTSTRAP_ORG_NAME`, `BOOTSTRAP_ADMIN_LOGIN`, and `BOOTSTRAP_ADMIN_PASSWORD` environment variables on startup. **Remove these three secrets after successful setup.** See [Render Free administrator setup and endpoints](docs/29-RENDER-FREE-FIRST-LOGIN.md).

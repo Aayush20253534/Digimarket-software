@@ -6,6 +6,17 @@ import { createApp } from "./app";
 describe("Express API foundation", () => {
   const app = createApp();
 
+  it("describes the deployed API on root, /endpoint and /api/v1 without exposing secrets", async () => {
+    for (const path of ["/", "/endpoint", "/api/v1"]) {
+      const response = await request(app).get(path);
+      expect(response.status).toBe(200);
+      expect(response.body.data.status).toBe("online");
+      expect(response.body.data.routes.login).toBe("POST /api/v1/auth/login");
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(JSON.stringify(response.body)).not.toContain("DATABASE_URL");
+    }
+  });
+
   it("serves the versioned API health contract", async () => {
     const response = await request(app).get("/api/v1/health");
     expect(response.status).toBe(200);

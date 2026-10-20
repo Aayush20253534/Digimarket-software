@@ -40,6 +40,24 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     });next();
   });
 
+  // Public discovery for the Render service URL. Never expose user or provider data.
+  app.get(["/", "/endpoint", "/api/v1"], (_request, response) => {
+    response.set("Cache-Control", "no-store");
+    response.json({
+      data: {
+        name: "DigiMarket API",
+        status: "online",
+        version: "v1",
+        routes: {
+          health: "GET /api/v1/health",
+          readiness: "GET /api/v1/ready",
+          login: "POST /api/v1/auth/login",
+        },
+        note: "Interactive sign-in is on the Vercel frontend at /login. Accounts must be provisioned by an administrator.",
+      },
+    });
+  });
+
   app.get("/api/v1/health", (_request, response) => {
     response.set("Cache-Control", "no-store");
     response.status(200).json(apiHealthSchema.parse({

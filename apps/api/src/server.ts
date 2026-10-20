@@ -4,6 +4,7 @@ import { createDatabaseClient } from "@digimarket/db";
 import { AuthService } from "./auth/service";
 import { loadAuthConfig } from "./auth/crypto";
 import { validateProductionApiConfig } from "./runtime/production";
+import { bootstrapIfConfigured } from "./auth/bootstrap";
 
 validateProductionApiConfig(process.env);
 if(process.env.NODE_ENV==="production"&&!process.env.DATABASE_URL)
@@ -21,20 +22,42 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "http://localhost:30
 // Fail closed if database mode is enabled but JWT/MFA secrets are missing.
 const database = process.env.DATABASE_URL ? createDatabaseClient() : null;
 const authService = database ? new AuthService(database, loadAuthConfig()) : undefined;
-const server = createApp(allowedOrigins, authService).listen(rawPort, "0.0.0.0", () => {
-  console.info(`DigiMarket API listening on port ${rawPort}`);
-});
-
-function shutdown(signal: string) {
-  console.info(`Received ${signal}; closing HTTP server`);
-  server.close(async (error) => {
-    if (database) await database.$disconnect();
-    if (error) {
-      console.error("Shutdown error", error);
-      process.exitCode = 1;
+async function startServer() {
+  // Render Free has no interactive shell or pre-deploy hook.
+  // Optional temporary BOOTSTRAP_* secrets initialize only an empty database.
+  if (database) {
+    const result = await bootstrapIfConfigured(database);
+    if (result === "created") {
+      console.info("Initial administrator created; remove BOOTSTRAP_* secrets after first successful login.");
+    } else if (result === "already_initialized") {
+      console.info("Organization already initialized; bootstrap credentials were ignored. Remove BOOTSTRAP_* secrets.");
     }
+  }
+  const server = createApp(allowedOrigins, authService).listen(rawPort, "0.0.0.0", () => {
+    console.info(`DigiMarket API listening on port ${rawPort}`);
   });
+
+  let closing = false;
+  function shutdown(signal: string) {
+    if (closing) return;
+    closing = true;
+    console.info(`Received ${signal}; closing HTTP server`);
+    server.close(async (error) => {
+      if (database) await database.$disconnect();
+      if (error) {
+        console.error("Shutdown error", error instanceof Error ? error.name : "UNKNOWN");
+        process.exitCode = 1;
+      }
+    });
+  }
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+void startServer().catch(async (error: unknown) => {
+  // Provider error descriptions can carry DSNs, so print only the error class.
+  console.error("API startup failed:", error instanceof Error ? error.name : "UNKNOWN");
+  process.exitCode = 1;
+  if (database) await database.$disconnect();
+});

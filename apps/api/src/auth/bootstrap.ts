@@ -1,17 +1,17 @@
 import "dotenv/config";
-import { createDatabaseClient } from "@digimarket/db";
+import { createDatabaseClient, type PrismaClient } from "@digimarket/db";
 import { permissionCatalog } from "@digimarket/db/permissions";
 import { hashPassword } from "./crypto";
 import { SYSTEM_ROLES, systemRoleGrants } from "./policies";
 
-export async function bootstrapFirstAdmin() {
-  const orgName = process.env.BOOTSTRAP_ORG_NAME?.trim();
-  const loginId = process.env.BOOTSTRAP_ADMIN_LOGIN?.trim().toLowerCase();
-  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "";
+export async function bootstrapFirstAdmin(env: NodeJS.ProcessEnv = process.env, existingDatabase?: PrismaClient) {
+  const orgName = env.BOOTSTRAP_ORG_NAME?.trim();
+  const loginId = env.BOOTSTRAP_ADMIN_LOGIN?.trim().toLowerCase();
+  const password = env.BOOTSTRAP_ADMIN_PASSWORD ?? "";
   if (!orgName || !loginId || !/^[a-z0-9_.-]{3,80}$/.test(loginId) || password.length < 12 || password.length > 128) {
     throw new Error("Bootstrap requires organization name, valid login ID and password of 12–128 characters in cloud secrets");
   }
-  const db = createDatabaseClient();
+  const db = existingDatabase ?? createDatabaseClient();
   try {
     const passwordHash = await hashPassword(password);
     return await db.$transaction(async (tx) => {
@@ -40,8 +40,26 @@ export async function bootstrapFirstAdmin() {
       return { organizationId: organization.id, adminLoginId: loginId };
     });
   } finally {
-    await db.$disconnect();
+    if (!existingDatabase) await db.$disconnect();
   }
+}
+
+/**
+ * One-time bootstrap for hosts without shell access (including Render Free).
+ * No HTTP setup route, no default password, and existing tenants are never modified.
+ * Remove the three temporary BOOTSTRAP_* variables after first successful login.
+ */
+export async function bootstrapIfConfigured(db: PrismaClient, env: NodeJS.ProcessEnv = process.env) {
+  const names = ["BOOTSTRAP_ORG_NAME", "BOOTSTRAP_ADMIN_LOGIN", "BOOTSTRAP_ADMIN_PASSWORD"] as const;
+  const present = names.filter((name) => Boolean(env[name]?.trim()));
+  if (present.length === 0) return "not_configured" as const;
+  if (present.length !== names.length) {
+    throw new Error("Provide all three temporary BOOTSTRAP_* values or remove all of them");
+  }
+  // Avoid rerunning a one-time bootstrap on free-host restarts or redeploys.
+  if (await db.organization.count() > 0) return "already_initialized" as const;
+  await bootstrapFirstAdmin(env, db);
+  return "created" as const;
 }
 
 if (process.argv[1]?.endsWith("bootstrap.ts")) {
