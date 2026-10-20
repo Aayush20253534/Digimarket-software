@@ -42,6 +42,7 @@ export default function AssetsPage(){
  const [filterClient,setFilterClient]=useState("");
  const [cursor,setCursor]=useState<string|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
+ const [legacySort,setLegacySort]=useState(false);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -97,10 +98,15 @@ export default function AssetsPage(){
      if(filterClient)q.set("clientId",filterClient);
      if(cursor)q.set("cursor",cursor);
      q.set("folderId",folderId??"root");
-     const [result,folderList]=await Promise.all([
-       request<Listing>("/assets?"+q.toString()),
-       request<{folders:FolderItem[]}>("/asset-folders?parentId="+(folderId??"root"))
-     ]);
+     const folderRequest=request<{folders:FolderItem[]}>("/asset-folders?parentId="+(folderId??"root"));
+     let result:Listing;
+     try{result=await request<Listing>("/assets?"+q.toString());setLegacySort(false);}
+     catch(e){
+      if(!(e instanceof ApiError)||e.status!==422)throw e;
+      q.delete("sort");q.delete("direction");
+      result=await request<Listing>("/assets?"+q.toString());setLegacySort(true);
+     }
+     const folderList=await folderRequest;
      setItems(result.items);setFolders(folderList.folders);setNextCursor(result.nextCursor);setError("");
    }catch(e){setError(errText(e));}finally{setLoading(false);}
  },[canRead,request,filter,search,filterClient,cursor,folderId,sort,reverse]);
@@ -326,7 +332,7 @@ export default function AssetsPage(){
    <button type="button" className="aw-drive-icon-button" aria-label="Reverse sort" title="Reverse sort" onClick={()=>{setReverse(x=>!x);setCursor(null);setSelectedIds([]);}}><ArrowUpDown size={17}/></button>
    <div className="aw-drive-view-switch"><button type="button" aria-label="Grid view" aria-pressed={view==="grid"} onClick={()=>setView("grid")}><Grid2X2 size={18}/></button><button type="button" aria-label="List view" aria-pressed={view==="list"} onClick={()=>setView("list")}><List size={18}/></button></div>
   </div>
-  <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files.</p>
+  <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files. {legacySort?"Sorting is limited to this page until the API updates.":""}</p>
   <nav className="aw-drive-path" aria-label="Folder path">
    {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>goTo(trail.length-1)}><ArrowLeft size={17}/></button>}
    <button type="button" onClick={()=>goTo(0)}><Home size={17}/> My Drive</button>
