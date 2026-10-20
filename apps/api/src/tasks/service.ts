@@ -8,7 +8,9 @@ const notFound=()=>new AuthError(404,"NOT_FOUND","Task not found");
 const conflict=()=>new AuthError(409,"VERSION_CONFLICT","Task changed; reload");
 const clean=(s?:string)=>s?.trim()||null;
 const date=(s?:string|null)=>s?new Date(s):null;
-const manager=(a:Principal)=>a.permissions.has("tasks.manage");
+const adminRole=(a:Principal)=>a.roles.some(r=>r==="SUPER_ADMIN"||r==="ADMIN");
+const requireAdministrator=(a:Principal)=>{if(!adminRole(a))throw forbidden();};
+const manager=(a:Principal)=>adminRole(a)&&a.permissions.has("tasks.manage");
 const own=(a:Principal):Prisma.TaskWhereInput=>({OR:[
   {createdById:a.userId},{assignees:{some:{userId:a.userId}}}
 ]});
@@ -74,12 +76,12 @@ export class TasksService {
     }});
   }
   async team(a:Principal){
-    need(a,"tasks.create");
+    requireAdministrator(a);need(a,"tasks.create");
     return this.db.user.findMany({where:{organizationId:a.organizationId,status:"ACTIVE"},
       select:{id:true,displayName:true},take:500,orderBy:{displayName:"asc"}});
   }
   async create(a:Principal,input:TaskCreateInput){
-    need(a,"tasks.create");need(a,"tasks.read");
+    requireAdministrator(a);need(a,"tasks.create");need(a,"tasks.read");
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
     return this.db.$transaction(async tx=>{
       const t=await tx.task.create({data:{
@@ -124,7 +126,7 @@ export class TasksService {
     });
   }
   async assign(a:Principal,id:string,version:number,assigneeIds:string[]){
-    need(a,"tasks.manage");
+    requireAdministrator(a);need(a,"tasks.manage");
     const existing=await this.allowed(a,id);
     await this.ensureAssignment(a,existing.projectId,assigneeIds);
     return this.db.$transaction(async tx=>{
@@ -171,7 +173,7 @@ export class TasksService {
     });
   }
   async createRecurrence(a:Principal,input:TaskRecurrenceCreateInput){
-    need(a,"tasks.recurrence.manage");need(a,"tasks.read");
+    requireAdministrator(a);need(a,"tasks.recurrence.manage");need(a,"tasks.read");
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
     try{new Intl.DateTimeFormat("en-US",{timeZone:input.timezone});}
     catch{throw invalid("Invalid IANA timezone");}
@@ -190,12 +192,12 @@ export class TasksService {
     });
   }
   async listRecurrences(a:Principal){
-    need(a,"tasks.recurrence.manage");
+    requireAdministrator(a);need(a,"tasks.recurrence.manage");
     return this.db.taskRecurrence.findMany({where:{organizationId:a.organizationId},
       orderBy:{createdAt:"desc"},take:200});
   }
   async toggleRecurrence(a:Principal,id:string,version:number,enabled:boolean){
-    need(a,"tasks.recurrence.manage");
+    requireAdministrator(a);need(a,"tasks.recurrence.manage");
     return this.db.$transaction(async tx=>{
       const count=await tx.taskRecurrence.updateMany({
         where:{id,organizationId:a.organizationId,version},

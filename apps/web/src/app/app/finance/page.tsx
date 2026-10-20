@@ -183,7 +183,9 @@ export default function FinancePage(){
         <p className="mt-2 text-xs text-slate-500">{view==="all"?"Organization":"Your entries"} · {totals.currency}</p>
       </Card>)}
     </div>
-    {!financeReady&&<Notice>To submit finance entries, an administrator must activate the FINANCE policy in <Link className="underline" href="/app/approvals">Approval workflows</Link>.</Notice>}
+    {!financeReady&&<div className="aw-finance-policy-warning" role="status">
+    <span aria-hidden="true">i</span><p>To submit finance entries, an administrator must activate the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
+   </div>}
     <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       {canCreate&&<Card title="New income or expense" description="Every submission enters the approval queue. Amounts are stored with four decimal places, not floating-point math.">
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>

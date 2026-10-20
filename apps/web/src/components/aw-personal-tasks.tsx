@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarClock, CheckCircle2, ClipboardList, NotebookPen, RefreshCw } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, ClipboardList, NotebookPen, RefreshCw, BriefcaseBusiness, Users, Wallet } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWNotice, AWStatusBadge } from "@/components/aw-ui";
 type Task={id:string;title:string;description:string|null;status:string;dueAt:string|null;project:{name:string}|null;assignees:{userId:string}[]};
@@ -50,6 +50,15 @@ export function AWPersonalTasks(){
   {error&&<AWNotice tone="error">{error}</AWNotice>}
   {partial&&<AWNotice tone="info">Additional records exist beyond the loaded pages. Open Tasks to see more.</AWNotice>}
   {!allowed&&<AWNotice tone="info">Your account does not have task access.</AWNotice>}
+  <section className="aw-personal-quick" aria-label="Quick access"><h2>Quick access</h2>
+   <div className="aw-personal-quick-grid">{[
+    {title:"Leads CRM",desc:"Sales pipeline",href:"/app/leads",permits:["leads.read"],icon:BriefcaseBusiness,tone:"purple"},
+    {title:"Clients",desc:"Relationships",href:"/app/clients",permits:["clients.read"],icon:Users,tone:"pink"},
+    {title:"Income & expenses",desc:"Financial entries",href:"/app/finance",permits:["finance.entry.read.own","finance.read.all"],icon:Wallet,tone:"cyan"},
+    {title:"Tasks",desc:"My assigned work",href:"/app/tasks",permits:["tasks.read"],icon:ClipboardList,tone:"orange"}
+   ].filter(x=>x.permits.some(p=>session?.identity.permissions.includes(p))).map(({title,desc,href,icon:Icon,tone})=>
+    <Link key={href} href={href} className={"aw-personal-shortcut aw-personal-shortcut-"+tone}>
+      <Icon size={19}/><span><strong>{title}</strong><small>{desc}</small></span><ArrowRight size={16}/></Link>)}</div></section>
   <div className="aw-personal-task-grid">{lists.map(group=><section key={group.test} data-testid={group.test} className={"aw-personal-task-section aw-personal-"+group.tone}>
     <div className="aw-personal-task-heading"><span className="aw-personal-task-icon"><group.icon size={20}/></span>
      <h2>{group.title}</h2><strong className="aw-personal-task-count">{loaded?group.rows.length:"…"}</strong></div>

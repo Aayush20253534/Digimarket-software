@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
- Bell, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CheckSquare2,
+ BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CheckSquare2,
  FileStack, FolderKanban, LayoutDashboard, NotebookPen, Search, Settings2,
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
@@ -13,8 +13,7 @@ const sections:readonly Group[]=[
   {label:"Overview",href:"/app/dashboard",icon:LayoutDashboard},
   {label:"My notes",href:"/app/notes",icon:NotebookPen},
   {label:"Global search",href:"/app/search",icon:Search,permits:["search.read"]},
-  {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]},
-  {label:"Notifications",href:"/app/notifications",icon:Bell,permits:["notifications.read"]}
+  {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
  {title:"Relationships",items:[
   {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
@@ -28,7 +27,6 @@ const sections:readonly Group[]=[
   {label:"Approvals",href:"/app/approvals",icon:CheckSquare2,permits:["approvals.read"]}
  ]},
  {title:"Finance",items:[
-  {label:"Client profitability",href:"/app/profitability",icon:ChartNoAxesCombined,permits:["profitability.read"]},
   {label:"Income, expenses & billing",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all","invoices.read","payments.read"]}
  ]},
  {title:"Administration",items:[

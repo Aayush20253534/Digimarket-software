@@ -29,8 +29,9 @@ const initialSchedule={title:"",description:"",priority:"MEDIUM" as Priority,pro
 export default function TasksPage(){
  const {session,request}=useAuth();
  const grants=session?.identity.permissions??[];
- const canRead=grants.includes("tasks.read"),canCreate=grants.includes("tasks.create");
- const canManage=grants.includes("tasks.manage"),canRepeat=grants.includes("tasks.recurrence.manage");
+ const isAdmin=!!session?.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN");
+ const canRead=grants.includes("tasks.read"),canCreate=isAdmin&&grants.includes("tasks.create");
+ const canManage=isAdmin&&grants.includes("tasks.manage"),canRepeat=isAdmin&&grants.includes("tasks.recurrence.manage");
  const canWrite=grants.includes("tasks.update.own")||canManage;
  const [view,setView]=useState<"mine"|"team">("mine");
  const [tasks,setTasks]=useState<Task[]>([]);
