@@ -292,6 +292,22 @@ test("login, first password change, MFA, admin user management and employee perm
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Files & assets" }).click();
   await expect(page.getByRole("heading", { name: "Files & assets" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Secure upload" })).toBeVisible();
+  // Persistent folders, private ZIP downloads and empty-folder deletion.
+  await page.getByRole("textbox", { name: "New folder name" }).fill("CI Campaign Artwork");
+  await page.getByRole("button", { name: "Create folder" }).click();
+  await expect(page.getByRole("button", { name: "CI Campaign Artwork", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Rename CI Campaign Artwork" }).click();
+  await page.getByRole("textbox", { name: "Rename folder" }).fill("CI Brand Designs");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("button", { name: "CI Brand Designs", exact: true })).toBeVisible();
+  const archive=page.waitForResponse(response=>response.url().includes("/asset-folders/")
+    && response.url().endsWith("/download")&&response.status()===200);
+  await page.getByRole("button", { name: "Download CI Brand Designs as ZIP" }).click();
+  const zip=await archive;
+  expect(zip.headers()["content-type"]).toContain("application/zip");
+  page.once("dialog", dialog=>void dialog.accept());
+  await page.getByRole("button", { name: "Delete empty folder CI Brand Designs" }).click();
+  await expect(page.getByRole("button", { name: "CI Brand Designs", exact: true })).toHaveCount(0);
   await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Leads CRM" }).click();
   await expect(page.getByRole("heading", { name: "Leads CRM" })).toBeVisible();
   await page.locator("#new-businessName").fill("Cafe Demo Lead Other");
@@ -313,6 +329,12 @@ test("login, first password change, MFA, admin user management and employee perm
   expect(generatedPassword.length).toBeGreaterThanOrEqual(12);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByText("Demo CI Employee")).toBeVisible();
+  await page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("link", { name: "Tasks" }).click();
+  await expect(page.getByRole("heading", { name: "Tasks & recurring work" })).toBeVisible();
+  await page.getByRole("button", { name: "Assign employees" }).click();
+  await page.getByRole("checkbox", { name: "Demo CI Employee" }).check();
+  await expect(page.getByRole("checkbox", { name: "Demo CI Employee" })).toBeChecked();
+  await page.getByRole("button", { name: /Done · 1 selected/ }).click();
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
 
