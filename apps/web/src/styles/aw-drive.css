@@ -47,3 +47,5 @@
 .aw-drive-preview-media{object-fit:contain;max-width:100%;max-height:calc(100dvh - 130px)}.aw-drive-preview-pdf{width:95%;height:calc(100dvh - 155px);border:0}
 @media(max-width:700px){.aw-drive-toolbar{gap:7px}.aw-drive-search{flex-basis:100%}.aw-drive-select{flex:1;max-width:none;min-width:0}.aw-drive-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aw-drive-list .aw-drive-file-type{display:none}}
 @media(max-width:380px){.aw-drive-tile-grid,.aw-drive-items.aw-drive-grid{grid-template-columns:minmax(0,1fr)}.aw-drive-folder-tile{min-height:54px}.aw-drive-heading h1{font-size:1.55rem}}
+
+.aw-drive-storage-label{font-size:.72rem;color:#baa4c9;line-height:1.5;margin-top:-9px}
