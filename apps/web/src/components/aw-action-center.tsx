@@ -85,6 +85,8 @@ export function AWActionCenter() {
   },[session,request,canTasks,canProjects,canTeam]);
 
   useEffect(()=>{void load();},[load,run]);
+  useEffect(()=>{const timer=window.setInterval(()=>setClock(Date.now()),60_000);
+    return ()=>window.clearInterval(timer);},[]);
   const currentTime=clock,today=localDateKey(new Date(currentTime));
   const pending=useMemo(()=>feed?.tasks.filter(x=>!taskClosed.has(x.status)).sort(compareByDue)??[],[feed]);
   const overdue=useMemo(()=>{
