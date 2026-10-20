@@ -288,6 +288,19 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       method: request.method, headers, body,
       cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(12000),
     });
+    // A new web deployment can point at a stale Render API. Its fallback 404
+    // includes meta.requestId, unlike an actual missing note. Report the
+    // deployment mismatch instead of misleading users with "Route not found".
+    if (response.status===404 && (path==="notes" || noteDetailPattern.test(path))) {
+      const payload=await response.clone().json().catch(()=>null) as
+        {error?:{code?:string;message?:string};meta?:{requestId?:string}} | null;
+      if(payload?.error?.code==="NOT_FOUND" && payload.error.message==="Route not found"
+        && typeof payload.meta?.requestId==="string"){
+        return NextResponse.json({error:{code:"NOTES_API_NOT_DEPLOYED",
+          message:"Notes is not available on the deployed API. Deploy the latest main branch on Render and apply the database migrations."}},
+          {status:503,headers:{"Cache-Control":"no-store"}});
+      }
+    }
     const responseHeaders = new Headers({ "Cache-Control": "no-store" });
     const contentType = response.headers.get("content-type");
     if (contentType?.startsWith("application/json")) responseHeaders.set("content-type", "application/json");

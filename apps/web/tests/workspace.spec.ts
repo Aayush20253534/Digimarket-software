@@ -130,16 +130,36 @@ test("login, first password change, MFA, admin user management and employee perm
       { id: "00000000-0000-4000-8000-000000000044", name: "Delayed example project", status: "ACTIVE",
         dueOn: "2000-02-02T00:00:00.000Z", client: {businessName:"Test client"} }
     ], nextCursor: null } }) }));
+  const mockContent = "**/api/v1/content?*";
+  const mockInvoices = "**/api/v1/invoices?*";
+  await page.route(mockContent, route => route.fulfill({ status:200, contentType:"application/json",
+    body:JSON.stringify({data:{items:[
+      {id:"00000000-0000-4000-8000-000000000045",title:"Missed social media launch",
+       status:"SCHEDULED",publishAt:"2001-04-01T09:00:00.000Z"},
+      {id:"00000000-0000-4000-8000-000000000046",title:"Published social post",
+       status:"PUBLISHED",publishAt:"2001-03-01T09:00:00.000Z"}
+    ],nextCursor:null}}) }));
+  await page.route(mockInvoices, route => route.fulfill({ status:200, contentType:"application/json",
+    body:JSON.stringify({data:{items:[
+      {id:"00000000-0000-4000-8000-000000000047",number:"INV-OVERDUE-1",
+       status:"ISSUED",balance:"4500.00",dueOn:"2001-02-01T00:00:00.000Z"},
+      {id:"00000000-0000-4000-8000-000000000048",number:"INV-PAID",
+       status:"ISSUED",balance:"0.00",dueOn:"2001-02-01T00:00:00.000Z"}
+    ],nextCursor:null}}) }));
   await expect(page.getByRole("button", { name: "Refresh priorities" })).toBeEnabled();
   await page.getByRole("button", { name: "Refresh priorities" }).click();
   await expect(page.getByTestId("pending-task-count")).toHaveText("2");
-  await expect(page.getByTestId("overdue-item-count")).toHaveText("2");
+  await expect(page.getByTestId("overdue-item-count")).toHaveText("4");
+  await expect(page.getByText("Missed social media launch")).toBeVisible();
+  await expect(page.getByText("INV-OVERDUE-1")).toBeVisible();
   await expect(page.getByText("Urgent overdue design").first()).toBeVisible();
   await expect(page.getByText("Delayed example project")).toBeVisible();
   await expect(page.getByLabel("Task number 1")).toBeVisible();
   await expect(page.locator(".aw-action-number").first()).toHaveCSS("color", "rgb(255, 192, 138)");
   await page.unroute(mockTasks);
   await page.unroute(mockProjects);
+  await page.unroute(mockContent);
+  await page.unroute(mockInvoices);
 
 
   // Phase 4: the overview is driven by the signed-in user's real permissions.
