@@ -86,3 +86,15 @@
 .aw-finance-tabs button.active{background:linear-gradient(110deg,#7136b8,#ae47d2);color:#fff;box-shadow:0 4px 15px #9b43e030}
 .aw-finance-tabs button:not(.active):hover{color:white;background:#382548}
 @media(max-width:520px){.aw-drive-folders{grid-template-columns:repeat(2,minmax(0,1fr))}.aw-drive-folder-open{padding:12px 8px}.aw-drive-folder-open span{font-size:.76rem}.aw-drive-files{grid-template-columns:1fr}}
+
+/* Table-first directories: sticky headers, robust horizontal scrolling and form drawers. */
+.aw-directory-layout{grid-template-columns:minmax(0,1fr)!important}
+.aw-register-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.aw-register-table thead{position:sticky;top:0;z-index:2}
+.aw-register-table tbody tr:focus-within{outline:2px solid #cf8cf3;outline-offset:-2px}
+.aw-register-page{font-size:.79rem;color:#c7abd9;white-space:nowrap;align-self:center}
+.aw-register-drawer{position:fixed;inset:0;z-index:220;background:#090610ed;backdrop-filter:blur(7px);display:flex;flex-direction:column;align-items:center;overflow-y:auto;padding:clamp(10px,4vw,35px)}
+.aw-register-drawer-head{width:min(100%,740px);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;background:#2a193a;border:1px solid #76528b;border-radius:17px 17px 0 0;color:#f9e9ff}
+.aw-register-drawer > section{width:min(100%,740px);border-radius:0 0 17px 17px}
+.aw-module-root .aw-register-drawer .field{min-width:0}
+@media(max-width:390px){.aw-register-drawer-head{padding:10px}.aw-register-drawer{padding:8px}.aw-register-page{font-size:.7rem}}
