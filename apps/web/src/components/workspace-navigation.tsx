@@ -12,7 +12,7 @@ const sections:readonly Group[]=[
  {title:"Workspace",items:[
   {label:"Overview",href:"/app/dashboard",icon:LayoutDashboard},
   {label:"My notes",operational:true,href:"/app/notes",icon:NotebookPen},
-  {label:"Global search",operational:true,href:"/app/search",icon:Search,permits:["search.read"]},
+  {label:"My search",operational:true,href:"/app/search",icon:Search,permits:["search.read"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
  {title:"Relationships",items:[
