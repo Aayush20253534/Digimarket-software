@@ -233,3 +233,11 @@
 .aw-notes-trash-actions{display:flex;align-items:center;gap:5px}.aw-notes-trash-actions button{min-width:34px}
 .aw-notes-trash-actions button.danger{color:#ff9cae}
 @media(max-width:650px){.aw-finance-register,.aw-team-table{font-size:.79rem}.aw-finance-register td,.aw-team-table td{padding:12px 10px}.aw-team-security-note{padding:14px}.aw-cash-ledger-line strong{font-size:1.3rem}}
+
+/* Cohesive compact workspace: equivalent to an ~80% UI density on desktop, keeping phone tap targets usable. */
+@media(min-width:900px){
+ .aw-workspace{zoom:.8;width:125%;min-height:125dvh}
+}
+.aw-required-star{color:#ff647c!important;font-weight:900;font-size:1.13em}
+.aw-optional-label{color:#a995b9!important;font-weight:500;font-size:.82em}
+.aw-finance-register tr[id^="finance-"]:target{outline:2px solid #d78dff;outline-offset:-2px;background:#49315b!important}
