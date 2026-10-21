@@ -41,9 +41,14 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
-  for(const label of ["My notes","Global search","Leads CRM","Content calendar","Files & assets"])
+  for(const label of ["My notes","Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
+  await page.goto("/app/leads");
+  await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
+  await expect(page.getByRole("table",{name:"Leads directory"})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:"Past deadline"})).toHaveCount(0);
   await page.goto("/app/notes");
