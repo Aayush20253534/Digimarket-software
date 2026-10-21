@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
+import { founderPolicy, isFounder } from "../approvals/founder";
 import type { FinanceCategoryInput, FinanceEntryInput, FinanceEntryAdminEdit, FinanceKind } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
@@ -216,16 +217,17 @@ export class FinanceService {
 
   async submit(actor:Principal,input:FinanceEntryInput){
     need(actor,"finance.entry.create");
-    need(actor,"approvals.submit");
+    const founder=isFounder(actor);
+    if(!founder)need(actor,"approvals.submit");
     const amount=new Prisma.Decimal(input.amount);
     if(!amount.isFinite()||amount.lte(0))throw invalid("Amount must be greater than zero");
     const [category,policy,organization]=await Promise.all([
       this.db.financialCategory.findFirst({where:{id:input.categoryId,organizationId:actor.organizationId,kind:input.kind,active:true}}),
-      this.db.approvalPolicy.findUnique({where:{organizationId_category:{organizationId:actor.organizationId,category:"FINANCE"}}}),
+      founder?Promise.resolve(null):this.db.approvalPolicy.findUnique({where:{organizationId_category:{organizationId:actor.organizationId,category:"FINANCE"}}}),
       this.db.organization.findUnique({where:{id:actor.organizationId},select:{defaultCurrency:true}}),
     ]);
     if(!category)throw invalid("Select an active category belonging to this workspace and type");
-    if(!policy?.active||!policy.approverRoleKeys.length)throw invalid("An administrator must activate a FINANCE approval policy");
+    if(!founder&&(!policy?.active||!policy.approverRoleKeys.length))throw invalid("An administrator must activate a FINANCE approval policy");
     if(!organization||organization.defaultCurrency!=="INR")throw invalid("This finance module currently supports INR workspaces only");
     if(input.receiptAssetId){
       const proof=await this.db.asset.findFirst({where:{
@@ -238,11 +240,14 @@ export class FinanceService {
     }
     try{
       return await this.db.$transaction(async tx=>{
+        const appliedPolicy=founder?await founderPolicy(tx,actor.organizationId,"FINANCE"):policy!;
+        const now=new Date();
         const approval=await tx.approvalRequest.create({data:{
-          organizationId:actor.organizationId,policyId:policy.id,requesterId:actor.userId,
+          organizationId:actor.organizationId,policyId:appliedPolicy.id,requesterId:actor.userId,
           title:(input.kind==="EXPENSE"?"Expense: ":"Income: ")+category.name,
           description:input.description?.trim() || (input.merchantOrSource?.trim()||category.name),
-          referenceType:"FINANCE_ENTRY",approverRoleKeys:policy.approverRoleKeys,
+          referenceType:"FINANCE_ENTRY",approverRoleKeys:appliedPolicy.approverRoleKeys,
+          ...(founder?{status:"APPROVED" as const,decidedAt:now}:{}),
         }});
         const entry=await tx.financialTransaction.create({data:{
           organizationId:actor.organizationId,enteredById:actor.userId,
@@ -253,15 +258,20 @@ export class FinanceService {
           merchantOrSource:input.merchantOrSource?.trim()||null,
           method:input.method,description:input.description?.trim()||null,
           receiptAssetId:input.receiptAssetId??null,
+          ...(founder?{status:"POSTED" as const,postedAt:now}:{}),
         }});
         await tx.approvalRequest.update({where:{id:approval.id},data:{referenceId:entry.id}});
+        if(founder)await tx.approvalDecision.create({data:{
+          requestId:approval.id,actorId:actor.userId,outcome:"APPROVED",
+          reason:"Founder entry posted automatically without review",
+        }});
         await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
-          action:"finance.submitted",entityType:"FinancialTransaction",entityId:entry.id,
+          action:founder?"finance.founder_posted":"finance.submitted",entityType:"FinancialTransaction",entityId:entry.id,
           afterRedacted:{kind:entry.kind,status:entry.status,currency:entry.currencyCode}}});
         await tx.outboxEvent.create({data:{
-          organizationId:actor.organizationId,eventKey:"finance.submitted."+entry.id,
-          kind:"finance.submitted",aggregateType:"FinancialTransaction",aggregateId:entry.id,
-          payloadMinimal:{transactionId:entry.id,approvalId:approval.id},
+          organizationId:actor.organizationId,eventKey:(founder?"finance.resolved.":"finance.submitted.")+entry.id,
+          kind:founder?"finance.resolved":"finance.submitted",aggregateType:"FinancialTransaction",aggregateId:entry.id,
+          payloadMinimal:founder?{transactionId:entry.id,outcome:"APPROVED"}:{transactionId:entry.id,approvalId:approval.id},
         }});
         return this.present(entry);
       });

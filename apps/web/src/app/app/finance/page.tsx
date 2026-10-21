@@ -33,6 +33,7 @@ function money(value:string){
 function readable(error:unknown){return error instanceof ApiError?error.message:"Could not complete the finance operation.";}
 export default function FinancePage(){
   const {session,request}=useAuth();
+  const isFounder=!!session?.identity.roles.includes("FOUNDER");
   const canAll=!!session?.identity.permissions.includes("finance.read.all");
   const canManage=!!session?.identity.permissions.includes("finance.category.manage");
   const adminFinance=!!session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&canManage;
@@ -144,13 +145,13 @@ export default function FinancePage(){
        const proof=await request<{id:string}>("/finance/proof-confirm",{method:"POST",body:{intentId:intent.intentId,assetId:payload.asset_id}});
        receiptAssetId=proof.id;
       }
-      setUploadStatus("Submitting transaction for approval…");
-      await request("/finance/entries",{method:"POST",body:{
+      setUploadStatus(isFounder?"Recording transaction…":"Submitting transaction for approval…");
+      const saved=await request<{status:string}>("/finance/entries",{method:"POST",body:{
         kind,categoryId,amount:amount.trim(),occurredOn,method,
         merchantOrSource:source.trim(),description:description.trim(),
         idempotencyKey:crypto.randomUUID(),receiptAssetId,
       }});
-      setSuccess("Entry submitted for finance approval. Pending amounts are not included in posted totals.");
+      setSuccess(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals.");
       setAmount("");setSource("");setDescription("");setReceipt(null);
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
@@ -240,7 +241,7 @@ export default function FinancePage(){
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
   return <div className="aw-finance-page space-y-7">
     <PageHeader eyebrow="Financial operations" title="Income & expenses"
-      description="All financial records are submitted for approval. Only posted entries count towards net income."
+      description={isFounder?"Your income and expenses post immediately without approval.":"Entries are submitted for approval. Only posted entries count towards net income."}
       actions={<div className="flex flex-wrap gap-2">
         <button className="btn-secondary" type="button" disabled={busy} onClick={()=>void exportCsv()}><Download className="h-4 w-4"/>Export CSV</button>
         <button className="btn-secondary" type="button" disabled={loading} onClick={()=>void reload()}><RefreshCw className="h-4 w-4"/>Refresh</button>
@@ -263,11 +264,11 @@ export default function FinancePage(){
         <p className="mt-2 text-xs text-slate-500">{view==="all"?"Organization":"Your entries"} · {totals.currency}</p>
       </Card>)}
     </div>
-    {!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
+    {!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}
     <div className="aw-finance-panels grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-      {canCreate&&<Card title="New income or expense" description="Every submission enters the approval queue. Amounts are stored with four decimal places, not floating-point math.">
+      {canCreate&&<Card title="New income or expense" description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
         <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
           <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" value={kind} onChange={e=>setKind(e.target.value as Kind)}>
             <option value="EXPENSE">Expense</option><option value="INCOME">Income</option></select></FormField>
@@ -293,8 +294,8 @@ export default function FinancePage(){
             {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
             {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
           </div>
-          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||!financeReady} title={!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
-            <Plus className="h-4 w-4"/>{busy?"Submitting…":"Submit for approval"}</button></div>
+          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
+            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?"Save entry":"Submit for approval"}</button></div>
         </form>
       </Card>}
       <Card title="Expense and income categories" description="Company-wide categories are set by administrators. Old entries retain their category when it is deactivated.">
