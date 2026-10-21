@@ -383,3 +383,51 @@ body:has(.aw-workspace){background:#09070e}
 @media(max-width:399px){
   .aw-finance-summary-grid > section > p:last-child{display:none!important}
 }
+
+
+/* Compact mobile Overview and personal tasks */
+@media(max-width:639px){
+  .aw-personal-dashboard,.aw-dashboard{min-width:0;max-width:100%}
+  .aw-personal-dashboard.space-y-6 > :not([hidden]) ~ :not([hidden]),
+  .aw-dashboard.space-y-7 > :not([hidden]) ~ :not([hidden]){margin-top:14px}
+  .aw-dashboard-hero{gap:10px;padding:0}
+  .aw-dashboard-title{font-size:clamp(1.48rem,5.5vw,1.8rem);margin-top:4px;line-height:1.18}
+  .aw-dashboard-subtitle{font-size:.77rem;line-height:1.45;margin-top:5px}
+  .aw-dashboard-refresh{min-height:38px;padding:7px 10px;gap:6px;font-size:.74rem}
+  .aw-personal-quick > h2{margin-bottom:7px}
+  .aw-personal-quick-grid{gap:8px}
+  .aw-personal-shortcut{min-height:59px;min-width:0;gap:8px;padding:9px 10px;border-radius:11px}
+  .aw-personal-shortcut > svg:last-child{display:none}
+  .aw-personal-shortcut strong{font-size:.75rem;line-height:1.23}
+  .aw-personal-shortcut small{font-size:.67rem;line-height:1.25;margin-top:2px}
+  .aw-personal-task-grid{gap:11px}
+  .aw-personal-task-section{padding:11px 12px;border-radius:14px}
+  .aw-personal-task-heading{gap:8px;margin-bottom:9px}
+  .aw-personal-task-icon{width:32px;height:32px;border-radius:9px}
+  .aw-personal-task-heading h2{font-size:.91rem}
+  .aw-personal-task-count{font-size:1.1rem}
+  .aw-personal-task-list{gap:7px}
+  .aw-personal-task-item{padding:8px 9px;gap:8px}
+  .aw-personal-task-index{min-width:27px;height:27px;border-radius:7px}
+  .aw-personal-task-item .aw-status-badge{margin-top:5px}
+  .aw-action-status{padding:12px 6px}
+  .aw-stat-grid{gap:8px}
+  .aw-stat{padding:11px}
+  .aw-summary-item{padding:10px}
+  .aw-panel{padding:12px}
+  .aw-dashboard-main-grid{gap:13px}
+  .aw-quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .aw-quick-link{min-height:68px;min-width:0;padding:8px;gap:6px;align-items:flex-start}
+  .aw-quick-icon{width:28px;height:28px;border-radius:8px}
+  .aw-quick-link > svg:last-child{display:none}
+  .aw-quick-link > span.min-w-0{min-width:0;flex:1}
+  .aw-quick-link strong{font-size:.7rem;line-height:1.35}
+  .aw-quick-link small{display:none}
+}
+@media(max-width:359px){
+  .aw-quick-grid{grid-template-columns:1fr}
+  .aw-quick-link{min-height:51px}
+  .aw-personal-shortcut{padding:7px 8px;gap:6px}
+  .aw-personal-shortcut strong{font-size:.7rem}
+  .aw-personal-shortcut small{font-size:.61rem}
+}

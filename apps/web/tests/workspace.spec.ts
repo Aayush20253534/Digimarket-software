@@ -269,10 +269,22 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Agency totals"})).toHaveCount(0);
-  for(const width of [320,375,390,768,1024,1366]){
+  for(const width of [320,360,375,390,430,768,1024,1366,1440]){
     await page.setViewportSize({width,height:812});
     await page.goto("/app/dashboard");
     expect(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2)).toBe(false);
+    if(width<=430){
+      const cards=page.locator(".aw-personal-shortcut");
+      if(await cards.count()){
+        const first=await cards.first().evaluate(el=>({height:el.getBoundingClientRect().height,padding:parseFloat(getComputedStyle(el).paddingTop)}));
+        expect(first.height,"Quick access must remain compact on phones").toBeLessThanOrEqual(95);
+        expect(first.padding,"Quick access padding should be reduced for phones").toBeLessThanOrEqual(11);
+        const columns=await page.locator(".aw-personal-quick-grid").evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(" ").length);
+        expect(columns,"Personal quick access should use two columns on phones").toBe(2);
+      }
+      const headingSize=await page.locator(".aw-dashboard-title").evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+      expect(headingSize,"Mobile Overview heading must not dominate the screen").toBeLessThanOrEqual(30);
+    }
     if(width<=390){
       const nav=await page.locator(".aw-work-topbar").evaluate(el=>{
         const box=el.getBoundingClientRect();
