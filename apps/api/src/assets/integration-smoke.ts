@@ -119,6 +119,20 @@ try{
    ()=>svc.intent(financeUploader,{filename:"oversized-receipt.pdf",contentType:"application/pdf",bytes:10_000_001},true),
    (error:{status?:number})=>error.status===422,
  );
+ // PDF confirmation must create a persistent, authorized asset in its chosen folder.
+ const pdfFolder=await db.assetFolder.create({data:{
+   organizationId:a.id,createdById:owner.id,name:"PDF proposals",parentId:null,
+ }});
+ const pdfIntent=await svc.intent(admin,{filename:"proposal.pdf",contentType:"application/pdf",bytes:4096});
+ uploadMock(pdfIntent.params.public_id,"raw","pdf",4096,"pdf-cloudinary-asset-id");
+ const pdfAsset=await svc.confirm(admin,pdfIntent.intentId,"pdf-cloudinary-asset-id",false,pdfFolder.id);
+ assert.equal(pdfAsset.format,"pdf");
+ assert.equal(pdfAsset.folderId,pdfFolder.id);
+ assert.equal(pdfAsset.providerAssetId,"pdf-cloudinary-asset-id");
+ assert.equal((await svc.list(admin,{limit:30,status:"ACTIVE",folderId:pdfFolder.id})).items[0]?.id,pdfAsset.id);
+ assert.ok((await svc.download(admin,pdfAsset.id)).url.includes("/raw/download"));
+ await assert.rejects(()=>svc.confirm(admin,pdfIntent.intentId,"pdf-cloudinary-asset-id"),
+   (e:{status?:number})=>e.status===409);
  const expiredIntent=await svc.intent(admin,{filename:"Expired.pdf",contentType:"application/pdf",bytes:250});
  await db.assetUploadIntent.update({where:{id:expiredIntent.intentId},data:{expiresAt:new Date(Date.now()-5000)}});
  uploadMock(expiredIntent.params.public_id,"raw","pdf",250,"expired-provider-id");

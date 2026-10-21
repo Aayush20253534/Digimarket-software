@@ -27,6 +27,27 @@ function environment():Config{
  }
  return {cloudName,apiKey,apiSecret};
 }
+// Cloudinary RAW resources store the extension in public_id and commonly omit
+// `format` from Admin API metadata. Infer PDF only from the returned RAW public ID;
+// all other identity, delivery type, and byte-count checks remain mandatory.
+export function parseCloudinaryResource(payload:unknown,resourceType:AssetType):ProviderResource{
+ if(!payload||typeof payload!=="object"||Array.isArray(payload))
+   throw new AuthError(502,"STORAGE_RESPONSE_INVALID","Cloudinary returned incomplete upload metadata");
+ const asset=payload as Partial<ProviderResource>;
+ const format=resourceType==="raw"&&(asset.format==null||asset.format==="")&&
+   typeof asset.public_id==="string"&&/\.pdf$/i.test(asset.public_id)
+   ?"pdf":asset.format;
+ if(typeof asset.asset_id!=="string"||!asset.asset_id||
+    typeof asset.public_id!=="string"||!asset.public_id||
+    typeof asset.resource_type!=="string"||typeof asset.type!=="string"||
+    typeof format!=="string"||!format||
+    typeof asset.bytes!=="number"||!Number.isSafeInteger(asset.bytes)||asset.bytes<=0){
+   throw new AuthError(502,"STORAGE_RESPONSE_INVALID","Cloudinary returned incomplete upload metadata");
+ }
+ return {asset_id:asset.asset_id,public_id:asset.public_id,resource_type:asset.resource_type,
+   type:asset.type,format,bytes:asset.bytes,
+   ...(typeof asset.created_at==="string"?{created_at:asset.created_at}:{})};
+}
 export class CloudinaryAssetProvider implements AssetProvider {
  uploadOptions(publicId:string,resourceType:AssetType,formats:string[]):UploadOptions {
    const {cloudName,apiKey,apiSecret}=environment();
@@ -51,13 +72,7 @@ export class CloudinaryAssetProvider implements AssetProvider {
      throw new AuthError(502,"STORAGE_UNAVAILABLE","Cannot confirm the Cloudinary upload");
    }
    if(!response.ok)throw new AuthError(422,"UPLOAD_NOT_FOUND","Cloudinary asset could not be verified");
-   const asset=await response.json() as Partial<ProviderResource>;
-   if(typeof asset.asset_id!=="string"||typeof asset.public_id!=="string"||
-      typeof asset.resource_type!=="string"||typeof asset.type!=="string"||
-      typeof asset.format!=="string"||typeof asset.bytes!=="number"){
-      throw new AuthError(502,"STORAGE_RESPONSE_INVALID","Cloudinary returned incomplete upload metadata");
-   }
-   return asset as ProviderResource;
+   return parseCloudinaryResource(await response.json(),resourceType);
  }
  download(publicId:string,resourceType:AssetType,format:string):string{
    const {cloudName,apiKey,apiSecret}=environment();
