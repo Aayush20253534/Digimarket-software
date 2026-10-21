@@ -141,6 +141,17 @@ export default function AssetsPage(){
    void request<{items:Client[]}>("/clients?limit=100&status=ACTIVE").then(data=>setClients(data.items)).catch(()=>{});
  },[canClients,request]);
  const open=(asset:Asset)=>{setSelected(asset);setEditedName(asset.filename);setDestination(asset.folderId??"");setLinkClient(asset.clientId??"");};
+ useEffect(()=>{
+  if(!canRead)return;
+  const focus=new URLSearchParams(window.location.search).get("focus");
+  if(!focus||!/^[0-9a-f-]{36}$/i.test(focus))return;
+  let active=true;
+  void request<Asset>("/assets/"+focus).then(asset=>{
+    if(active){setSelected(asset);setEditedName(asset.filename);setDestination(asset.folderId??"");setLinkClient(asset.clientId??"");setDetailsOpen(true);}
+  }).catch(()=>{});
+  return()=>{active=false;};
+ },[canRead,request]);
+
  const navigateTrail=(next:FolderItem[],push=true)=>{
   setTrail(next);setCursor(null);setNextCursor(null);setSelected(null);setSelectedIds([]);setContext(null);
   const url=new URL(window.location.href);

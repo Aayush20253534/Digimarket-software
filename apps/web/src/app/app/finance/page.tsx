@@ -85,6 +85,13 @@ export default function FinancePage(){
     }catch(e){setError(readable(e));}finally{setLoading(false);}
   },[request,view,canReadOwn,canAll]);
   useEffect(()=>{void reload();},[reload]);
+  useEffect(()=>{
+    const id=new URLSearchParams(window.location.search).get("focus");
+    if(!id||!entries.some(entry=>entry.id===id))return;
+    const frame=window.requestAnimationFrame(()=>document.getElementById("finance-"+id)?.scrollIntoView({block:"center",behavior:"smooth"}));
+    return ()=>window.cancelAnimationFrame(frame);
+  },[entries]);
+
   async function submit(e:FormEvent){
     e.preventDefault();setBusy(true);setError("");setSuccess("");
     try{
@@ -282,7 +289,7 @@ export default function FinancePage(){
         <div className="aw-finance-register-scroll" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
             {["Date","Type","Category","Source","Amount","Status","Entered by","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
-          </tr></thead><tbody>{entries.map(row=><tr key={row.id} id={"finance-"+row.id}>
+          </tr></thead><tbody>{entries.map(row=><tr key={row.id} id={"finance-"+row.id} className={typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("focus")===row.id?"aw-register-selected":""}>
             <td className="py-3 pr-4">{row.occurredOn}</td>
             <td><span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>{row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>} {row.kind==="INCOME"?"Income":"Expense"}</span></td>
             <td className="py-3 pr-4">{row.category.name}</td>

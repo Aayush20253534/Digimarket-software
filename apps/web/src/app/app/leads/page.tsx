@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Plus, RefreshCw, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
@@ -92,9 +92,16 @@ export default function LeadsPage(){
  },[canRead,request,stage,search,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
+ const focusedRef=useRef(false);
  const open=async(id:string)=>{
    setError("");try{
-     const detail=await request<Detail>("/leads/"+id);
+     useEffect(()=>{
+  if(focusedRef.current||!canRead)return;
+  const id=new URLSearchParams(window.location.search).get("focus");
+  if(!id||!/^[0-9a-f-]{36}$/i.test(id))return;
+  focusedRef.current=true;void open(id);
+ },[canRead]);
+ const detail=await request<Detail>("/leads/"+id);
      setSelected(detail);setEditStage(detail.status);setOwner(detail.assignedToId??"");
      setFollowup(detail.nextFollowUpAt?new Date(detail.nextFollowUpAt).toISOString().slice(0,16):"");
      setNote("");

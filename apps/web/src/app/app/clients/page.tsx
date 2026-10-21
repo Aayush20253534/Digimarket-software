@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -72,6 +72,7 @@ export default function ClientsPage(){
    }catch(e){setError(readable(e));}finally{setLoading(false);}
  },[canRead,request,search,filter,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
+ const focusedRef=useRef(false);
  const open=async(id:string)=>{
    try{
      const data=await request<Detail>("/clients/"+id);
@@ -79,6 +80,12 @@ export default function ClientsPage(){
      setError("");
    }catch(e){setError(readable(e));}
  };
+ useEffect(()=>{
+  if(focusedRef.current||!canRead)return;
+  const id=new URLSearchParams(window.location.search).get("focus");
+  if(!id||!/^[0-9a-f-]{36}$/i.test(id))return;
+  focusedRef.current=true;void open(id);
+ },[canRead]);
  async function create(e:FormEvent){
    e.preventDefault();setBusy(true);setError("");setMessage("");
    try{
