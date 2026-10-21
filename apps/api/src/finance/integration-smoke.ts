@@ -183,5 +183,17 @@ try{
   await assert.rejects(()=>finance.removeExpense(manager,pending.id),
     (error:{status?:number})=>error.status===409);
   assert.ok((await db.auditLog.count({where:{organizationId:org.id,action:"finance.expense_cancelled"}}))===1);
+  // Verify admin-only income cancellation without destroying its approval history.
+  await assert.rejects(()=>finance.removeEntry(staff,income.id),(e:{status?:number})=>e.status===403);
+  await assert.rejects(()=>finance.removeEntry(stranger,income.id),(e:{status?:number})=>e.status===404);
+  const cancelledIncome=await finance.removeEntry(manager,income.id);
+  assert.equal(cancelledIncome.kind,"INCOME");
+  assert.equal(cancelledIncome.status,"CANCELLED");
+  assert.equal((await finance.totals(manager,"all")).postedIncome,"0.0000");
+  assert.equal((await finance.entries(manager,"all")).find(x=>x.id===income.id)?.status,"CANCELLED");
+  assert.equal((await db.approvalDecision.count({where:{requestId:income.approvalRequestId}})),1);
+  assert.equal((await db.auditLog.count({where:{organizationId:org.id,action:"finance.income_cancelled",entityId:income.id}})),1);
+  await assert.rejects(()=>finance.removeEntry(manager,income.id),(e:{status?:number})=>e.status===409);
+  await assert.rejects(()=>finance.editEntry(manager,income.id,incomeEdit),(e:{status?:number})=>e.status===409);
   console.info("Module 6 PASS: admin category rename/unused delete/referenced archive, other-user expense edits/cancellation, audit and tenant isolation.");
 }finally{await db.$disconnect();}
