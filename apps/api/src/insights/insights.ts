@@ -24,23 +24,23 @@ export class InsightsService{
   // Personal-only index: creator, assignee, or owner. Broader module permissions
   // must never turn search into an organization-wide directory.
   if(can(a,"leads.read"))parts.push(this.db.lead.findMany({
-   where:{organizationId:org,businessName:match,OR:[{createdById:me},{assignedToId:me}]},
+   where:{organizationId:org,OR:[{createdById:me},{assignedToId:me}],AND:[{OR:[{businessName:match},{contactName:match},{phone:match},{businessType:match},{location:match},{source:match},{websiteUrl:match},{instagramUrl:match}]}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,businessName:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"lead",id:x.id,title:x.businessName,detail:"Lead · "+x.status,href:url("leads",x.id)}))));
   if(can(a,"clients.read"))parts.push(this.db.client.findMany({
-   where:{organizationId:org,createdById:me,businessName:match},take:8,orderBy:{updatedAt:"desc"},
+   where:{organizationId:org,createdById:me,OR:[{businessName:match},{businessType:match},{phone:match},{email:match},{location:match},{websiteUrl:match},{instagramUrl:match},{facebookUrl:match},{notes:match}]},take:8,orderBy:{updatedAt:"desc"},
    select:{id:true,businessName:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"client",id:x.id,title:x.businessName,detail:"Client · "+x.status,href:url("clients",x.id)}))));
   if(can(a,"projects.read"))parts.push(this.db.project.findMany({
-   where:{organizationId:org,name:match,OR:[{createdById:me},{members:{some:{userId:me}}}]},
+   where:{organizationId:org,OR:[{createdById:me},{members:{some:{userId:me}}}],AND:[{OR:[{name:match},{description:match}]}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,name:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"project",id:x.id,title:x.name,detail:"Project · "+x.status,href:url("projects",x.id)}))));
   if(can(a,"tasks.read"))parts.push(this.db.task.findMany({
-   where:{organizationId:org,title:match,OR:[{createdById:me},{assignees:{some:{userId:me}}}]},
+   where:{organizationId:org,OR:[{createdById:me},{assignees:{some:{userId:me}}}],AND:[{OR:[{title:match},{description:match}]}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,title:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"task",id:x.id,title:x.title,detail:"Task · "+x.status,href:url("tasks",x.id)}))));
   if(can(a,"content.read"))parts.push(this.db.contentPost.findMany({
-   where:{organizationId:org,title:match,OR:[{createdById:me},{ownerId:me}]},
+   where:{organizationId:org,OR:[{createdById:me},{ownerId:me}],AND:[{OR:[{title:match},{caption:match}]}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,title:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"content",id:x.id,title:x.title,detail:"Content · "+x.status,href:url("content",x.id)}))));
   if(can(a,"assets.read"))parts.push(this.db.asset.findMany({
