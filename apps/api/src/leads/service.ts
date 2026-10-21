@@ -26,8 +26,7 @@ type Tx=Prisma.TransactionClient;
 export class LeadsService {
  constructor(private readonly db:PrismaClient){}
  private canEdit(a:Principal,r:{assignedToId:string|null;createdById:string}){
-   return a.permissions.has("leads.edit") ||
-      (a.permissions.has("leads.edit.own")&&(r.assignedToId===a.userId||r.createdById===a.userId));
+   return a.permissions.has("leads.edit") || a.permissions.has("leads.edit.own");
  }
  private async find(a:Principal,id:string){
    deny(a,"leads.read");
@@ -38,16 +37,12 @@ export class LeadsService {
  private async addIn(tx:Tx,a:Principal,input:LeadCreateInput,importKey?:string){
    const normalizedPhone=phone(input.phone);
    const r=await tx.lead.create({data:{
-     organizationId:a.organizationId,businessName:input.businessName.trim(),
-     normalizedBusinessName:clean(input.businessName),contactName:urlOrNull(input.contactName),
-     phone:urlOrNull(input.phone),normalizedPhone,
-     businessType:urlOrNull(input.businessType),location:urlOrNull(input.location),
-     websiteUrl:urlOrNull(input.websiteUrl),instagramUrl:urlOrNull(input.instagramUrl),
-     source:urlOrNull(input.source),nextFollowUpAt:follow(input.nextFollowUpAt),
+     organizationId:a.organizationId,businessName:"Lead "+normalizedPhone,
+     normalizedBusinessName:"lead "+normalizedPhone,contactName:null,
+     phone:input.phone.trim(),normalizedPhone,
      createdById:a.userId,importKey:importKey??null,
    }});
-   await tx.leadActivity.create({data:{leadId:r.id,actorId:a.userId,kind:"CREATED",
-     note:input.note?.trim()||null}});
+   await tx.leadActivity.create({data:{leadId:r.id,actorId:a.userId,kind:"CREATED"}});
    await this.flagDuplicates(tx,a.organizationId,r.id,r.normalizedPhone,r.normalizedBusinessName);
    await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
      action:"leads.created",entityType:"Lead",entityId:r.id,
@@ -73,8 +68,34 @@ export class LeadsService {
  }
  async create(a:Principal,input:LeadCreateInput){
    deny(a,"leads.create");
+   const normalized=phone(input.phone)!;
+   const existing=await this.db.lead.findFirst({where:{organizationId:a.organizationId,normalizedPhone:normalized}});
+   if(existing)throw new AuthError(409,"LEAD_ALREADY_EXISTS","This phone number already belongs to a lead");
    return this.db.$transaction(tx=>this.addIn(tx,a,input));
  }
+ // Run only for authenticated Meta webhooks. No message contents are stored.
+ async ingestWhatsApp(organizationId:string,createdById:string,rawPhone:string){
+   const normalized=phone(rawPhone);
+   if(!normalized)throw invalid("WhatsApp sender phone is required");
+   const user=await this.db.user.findFirst({where:{id:createdById,organizationId,status:"ACTIVE"},select:{id:true}});
+   if(!user)throw new AuthError(503,"WHATSAPP_CONFIG_INVALID","WhatsApp integration actor is not configured");
+   const actor:Principal={userId:createdById,organizationId,sessionId:"whatsapp",
+     roles:["FOUNDER"],permissions:new Set(["leads.create"])};
+   return this.db.$transaction(async tx=>{
+     // One sender can trigger concurrent Meta deliveries; serialize by tenant and phone.
+     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId+":"+normalized},0))`;
+     const previous=await tx.lead.findFirst({where:{organizationId,normalizedPhone:normalized}});
+     if(previous)return {id:previous.id,created:false};
+     const client=await tx.client.findFirst({where:{organizationId,OR:[
+       {phone:"+"+normalized},{phone:normalized},
+     ]},select:{id:true}});
+     if(client)return {id:client.id,created:false};
+     const lead=await this.addIn(tx,actor,{phone:"+"+normalized});
+     await tx.lead.update({where:{id:lead.id},data:{source:"WHATSAPP"}});
+     return {id:lead.id,created:true};
+   });
+ }
+
  async list(a:Principal,input:LeadListQuery){
    deny(a,"leads.read");
    const where:Prisma.LeadWhereInput={
@@ -116,30 +137,47 @@ export class LeadsService {
  async update(a:Principal,id:string,input:LeadUpdateInput){
    const current=await this.find(a,id);
    if(!this.canEdit(a,current))throw forbidden();
-   const {version,...changes}=input;
+   const {version,stageNote,...changes}=input;
+   const stageChanged=changes.status!==undefined&&changes.status!==current.status;
+   if(current.status==="APPROVED"&&stageChanged)
+     throw new AuthError(409,"ALREADY_APPROVED","Approved leads cannot return to the lead pipeline");
+   if(changes.status==="APPROVED"&&!a.permissions.has("leads.convert"))throw forbidden();
+   if(Object.keys(changes).length===0&&!stageNote?.trim())throw invalid("No changes provided");
    const data:Prisma.LeadUpdateManyMutationInput={version:{increment:1}};
    if(changes.businessName!==undefined){
-     data.businessName=changes.businessName;
-     data.normalizedBusinessName=clean(changes.businessName);
+     const name=changes.businessName.trim()||"Lead "+current.normalizedPhone;
+     data.businessName=name;data.normalizedBusinessName=clean(name);
    }
    if(changes.contactName!==undefined)data.contactName=urlOrNull(changes.contactName);
-   if(changes.phone!==undefined){data.phone=urlOrNull(changes.phone);data.normalizedPhone=phone(changes.phone);}
    if(changes.businessType!==undefined)data.businessType=urlOrNull(changes.businessType);
-   if(changes.location!==undefined)data.location=urlOrNull(changes.location);
-   if(changes.source!==undefined)data.source=urlOrNull(changes.source);
-   if(changes.websiteUrl!==undefined)data.websiteUrl=urlOrNull(changes.websiteUrl);
-   if(changes.instagramUrl!==undefined)data.instagramUrl=urlOrNull(changes.instagramUrl);
-   if(changes.nextFollowUpAt!==undefined)data.nextFollowUpAt=follow(changes.nextFollowUpAt);
    if(changes.status!==undefined)data.status=changes.status;
-   if(Object.keys(changes).length===0)throw invalid("At least one change is required");
    return this.db.$transaction(async tx=>{
-     const ok=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,version},data});
-     if(ok.count!==1)throw clash();
+     const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,version},data});
+     if(changedCount.count!==1)throw clash();
      const changed=await tx.lead.findUniqueOrThrow({where:{id}});
-     const kind=changes.status!==undefined?"STAGE_CHANGED":
-       changes.nextFollowUpAt!==undefined?"FOLLOW_UP_SET":"DETAILS_UPDATED";
-     await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,kind,
+     await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,
+       kind:stageChanged?"STAGE_CHANGED":stageNote?.trim()?"NOTE":"DETAILS_UPDATED",
+       note:stageNote?.trim()||null,
        metadata:{fromStatus:current.status,toStatus:changed.status,version:changed.version}}});
+     if(changes.status==="APPROVED"){
+       const existing=await tx.client.findUnique({where:{sourceLeadId:id}});
+       if(!existing){
+         const client=await tx.client.create({data:{
+           organizationId:a.organizationId,sourceLeadId:id,createdById:a.userId,
+           businessName:changed.businessName,businessType:changed.businessType,
+           phone:changed.phone,
+           ...(changed.contactName?{contacts:{create:{
+             name:changed.contactName,phone:changed.phone,isPrimary:true,
+           }}}:{}),
+         }});
+         await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+           action:"leads.converted_to_client",entityType:"Lead",entityId:id,
+           afterRedacted:{clientId:client.id}}});
+         await tx.outboxEvent.create({data:{organizationId:a.organizationId,
+           eventKey:"lead-converted:"+id,kind:"lead.converted",
+           aggregateType:"Client",aggregateId:client.id,payloadMinimal:{leadId:id,clientId:client.id}}});
+       }
+     }
      await this.flagDuplicates(tx,a.organizationId,id,changed.normalizedPhone,changed.normalizedBusinessName);
      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
        action:"leads.updated",entityType:"Lead",entityId:id,
@@ -147,6 +185,7 @@ export class LeadsService {
      return changed;
    });
  }
+
  async assign(a:Principal,id:string,version:number,assignedToId:string|null){
    deny(a,"leads.assign");
    await this.find(a,id);
