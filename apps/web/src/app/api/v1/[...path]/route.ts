@@ -64,6 +64,7 @@ const noteDetailPattern=/^notes\/[0-9a-fA-F-]{36}$/;
 const notebookDetailPattern=/^notes\/notebooks\/[0-9a-fA-F-]{36}$/;
 const noteMetadataPattern=/^notes\/[0-9a-fA-F-]{36}\/metadata$/;
 const noteRestorePattern=/^notes\/[0-9a-fA-F-]{36}\/restore$/;
+const notePermanentPattern=/^notes\/[0-9a-fA-F-]{36}\/permanent$/;
 const notificationReadPattern=/^notifications\/[0-9a-fA-F-]{36}\/read$/;
 const founderDetailPattern=/^founders\/[0-9a-fA-F-]{36}$/;
 const financeCategoryDetailPattern = /^finance\/categories\/[0-9a-fA-F-]{36}$/;
@@ -111,6 +112,7 @@ function permitted(path: string, method: string): boolean {
   if(notebookDetailPattern.test(path))return ["PUT","DELETE"].includes(method);
   if(noteMetadataPattern.test(path))return method==="PUT";
   if(noteRestorePattern.test(path))return method==="POST";
+  if(notePermanentPattern.test(path))return method==="DELETE";
   if(notificationReadPattern.test(path))return method==="POST";
   if(founderDetailPattern.test(path))return method==="PUT";
   if(profitExpensePattern.test(path))return method==="PUT";
@@ -205,7 +207,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const url = new URL("/api/v1/" + path, base);
   if (path === "approvals" || ["finance/entries","finance/summary","finance/export"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");
-    if (view === "mine" || view === "queue") url.searchParams.set("view", view);
+    if (view && (path==="approvals"?["mine","queue","history"]:["mine","all"]).includes(view)) url.searchParams.set("view", view);
   }
   if(noteDetailPattern.test(path)&&request.method==="DELETE"){
     const version=request.nextUrl.searchParams.get("version");
@@ -232,7 +234,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if(parentId!==null)url.searchParams.set("parentId",parentId);
   }
   if (path === "assets") {
-    for (const key of ["q","clientId","status","cursor","limit","folderId"]) {
+    for (const key of ["q","clientId","status","cursor","limit","folderId","sort","direction"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
