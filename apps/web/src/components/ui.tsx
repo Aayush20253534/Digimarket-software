@@ -47,8 +47,8 @@ export function Notice({ children, kind = "info" }: { children: ReactNode; kind?
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const classes = status === "ACTIVE" ? "bg-emerald-50 text-emerald-700"
-    : status === "DISABLED" ? "bg-red-50 text-red-700"
+  const classes = ["ACTIVE","APPROVED"].includes(status) ? "bg-emerald-50 text-emerald-700"
+    : ["DISABLED","REJECTED"].includes(status) ? "bg-red-50 text-red-700"
     : "bg-amber-50 text-amber-700";
   return <span className={"inline-flex rounded-full px-2.5 py-1 text-xs font-semibold " + classes}>{status.replaceAll("_", " ")}</span>;
 }
