@@ -30,7 +30,7 @@ export class LeadsService {
  }
  private async find(a:Principal,id:string){
    deny(a,"leads.read");
-   const r=await this.db.lead.findFirst({where:{id,organizationId:a.organizationId}});
+   const r=await this.db.lead.findFirst({where:{id,organizationId:a.organizationId,deletedAt:null}});
    if(!r)throw missing();
    return r;
  }
@@ -57,7 +57,7 @@ export class LeadsService {
  private async flagDuplicates(tx:Tx,org:string,id:string,normalizedPhone:string|null,normalizedBusinessName:string){
    const clauses:Prisma.LeadWhereInput[]=[{normalizedBusinessName}];
    if(normalizedPhone)clauses.push({normalizedPhone});
-   const others=await tx.lead.findMany({where:{organizationId:org,id:{not:id},OR:clauses},
+   const others=await tx.lead.findMany({where:{organizationId:org,deletedAt:null,id:{not:id},OR:clauses},
      select:{id:true,normalizedPhone:true,normalizedBusinessName:true},take:100});
    if(others.length){
      await tx.leadDuplicateCandidate.createMany({data:others.map(o=>({
@@ -65,6 +65,35 @@ export class LeadsService {
        reason:normalizedPhone&&o.normalizedPhone===normalizedPhone?"PHONE_MATCH":"BUSINESS_MATCH",
      })),skipDuplicates:true});
    }
+ }
+ async metrics(a:Principal){
+   deny(a,"leads.read");
+   const where={organizationId:a.organizationId,deletedAt:null};
+   const [total,pending,meetingProcess,approved,rejected,converted]=await Promise.all([
+     this.db.lead.count({where}),
+     this.db.lead.count({where:{...where,status:"PENDING"}}),
+     this.db.lead.count({where:{...where,status:"MEETING_PROCESS"}}),
+     this.db.lead.count({where:{...where,status:"APPROVED"}}),
+     this.db.lead.count({where:{...where,status:"REJECTED"}}),
+     this.db.client.count({where:{organizationId:a.organizationId,
+       sourceLead:{deletedAt:null,status:"APPROVED"}}}),
+   ]);
+   return {total,pending,meetingProcess,approved,rejected,converted,
+     conversionRatePercent:total?Math.round(converted/total*10000)/100:0};
+ }
+ async delete(a:Principal,id:string,version:number){
+   if(!a.roles.some(role=>role==="FOUNDER"||role==="ADMIN"||role==="SUPER_ADMIN"))throw forbidden();
+   await this.find(a,id);
+   return this.db.$transaction(async tx=>{
+     const change=await tx.lead.updateMany({where:{
+       id,organizationId:a.organizationId,deletedAt:null,version,
+     },data:{deletedAt:new Date(),deletedById:a.userId,version:{increment:1}}});
+     if(change.count!==1)throw clash();
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.deleted",entityType:"Lead",entityId:id,
+       afterRedacted:{softDeleted:true}}});
+     return {id,deleted:true};
+   });
  }
  async assignees(a:Principal){
    deny(a,"leads.assign");
@@ -104,7 +133,7 @@ export class LeadsService {
  async list(a:Principal,input:LeadListQuery){
    deny(a,"leads.read");
    const where:Prisma.LeadWhereInput={
-     organizationId:a.organizationId,
+     organizationId:a.organizationId,deletedAt:null,
      ...(input.stage?{status:input.stage}:{}),
      ...(input.assignedToId?{assignedToId:input.assignedToId}:{}),
      ...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},
@@ -157,7 +186,7 @@ export class LeadsService {
    if(changes.businessType!==undefined)data.businessType=urlOrNull(changes.businessType);
    if(changes.status!==undefined)data.status=changes.status;
    return this.db.$transaction(async tx=>{
-     const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,version},data});
+     const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null,version},data});
      if(changedCount.count!==1)throw clash();
      const changed=await tx.lead.findUniqueOrThrow({where:{id}});
      await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,
@@ -200,7 +229,7 @@ export class LeadsService {
      if(!owner)throw invalid("Assignee must be an active staff member in this workspace");
    }
    return this.db.$transaction(async tx=>{
-     const changed=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,version},
+     const changed=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null,version},
        data:{assignedToId,version:{increment:1}}});
      if(changed.count!==1)throw clash();
      await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,kind:"OWNER_ASSIGNED",
@@ -222,7 +251,7 @@ export class LeadsService {
  }
  async duplicates(a:Principal){
    deny(a,"leads.duplicates.review");
-   return this.db.leadDuplicateCandidate.findMany({where:{organizationId:a.organizationId},
+   return this.db.leadDuplicateCandidate.findMany({where:{organizationId:a.organizationId,lead:{deletedAt:null},candidate:{deletedAt:null}},
      orderBy:{createdAt:"desc"},take:100,
      include:{lead:{select:{id:true,businessName:true,phone:true}},
        candidate:{select:{id:true,businessName:true,phone:true}}}});
@@ -261,7 +290,7 @@ export class LeadsService {
  async export(a:Principal){
    deny(a,"leads.bulk");
    deny(a,"leads.read");
-   const rows=await this.db.lead.findMany({where:{organizationId:a.organizationId},
+   const rows=await this.db.lead.findMany({where:{organizationId:a.organizationId,deletedAt:null},
      orderBy:{createdAt:"desc"},take:5001,
      include:{assignee:{select:{loginId:true}}}});
    if(rows.length>5000)throw invalid("Export limit is 5,000 rows");
