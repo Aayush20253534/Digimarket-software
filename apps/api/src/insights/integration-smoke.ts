@@ -38,7 +38,7 @@ try{
  const client=await db.client.create({data:{organizationId:org.id,createdById:manager.id,businessName:"Sunrise Coffee"}});
  await db.client.create({data:{organizationId:foreignOrg.id,createdById:outsider.id,businessName:"Sunrise Hidden Foreign"}});
  const lead=await db.lead.create({data:{organizationId:org.id,createdById:manager.id,
-  businessName:"Sunrise Lead",normalizedBusinessName:"sunrise lead",status:"NEW",
+  businessName:"Sunrise Lead",normalizedBusinessName:"sunrise lead",status:"PENDING",
   assignedToId:worker.id,nextFollowUpAt:before}});
  const hiddenProject=await db.project.create({data:{organizationId:org.id,clientId:client.id,
   createdById:manager.id,name:"Sunrise Project Hidden",status:"ACTIVE"}});

@@ -10,7 +10,7 @@ export async function sweepAlerts(db:PrismaClient,now=new Date()){
   db.task.findMany({where:{dueAt:{lt:now},status:{notIn:["DONE","CANCELLED"]}},
     orderBy:{dueAt:"asc"},take:100,select:{id:true,organizationId:true,createdById:true,
       assignees:{select:{userId:true}}}}),
-  db.lead.findMany({where:{nextFollowUpAt:{lt:now},status:{notIn:["WON","LOST"]}},
+  db.lead.findMany({where:{deletedAt:null,nextFollowUpAt:{lt:now},status:{in:["PENDING","MEETING_PROCESS"]}},
     orderBy:{nextFollowUpAt:"asc"},take:100,
     select:{id:true,organizationId:true,assignedToId:true,createdById:true}}),
   db.invoice.findMany({where:{status:"ISSUED",dueOn:{lt:today}},
