@@ -58,6 +58,10 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
     const id=parse(z.uuid(),req.params.id);
     res.json({data:await finance.removeCategory(actor(res),id)});
   });
+  app.get("/api/v1/finance/assignees",authenticate,async(_req,res)=>{
+    res.set("Cache-Control","no-store");
+    res.json({data:await finance.assignees(actor(res))});
+  });
   app.put("/api/v1/finance/entries/:id",authenticate,async(req,res)=>{
     const id=parse(z.uuid(),req.params.id),body=parse(financeEntryAdminEditSchema,req.body);
     res.json({data:await finance.editExpense(actor(res),id,body)});

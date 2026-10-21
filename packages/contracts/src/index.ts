@@ -71,6 +71,8 @@ export const financeEntryAdminEditSchema=z.strictObject({
   categoryId:z.uuid(),amount:financeEntryInputSchema.shape.amount,
   occurredOn:z.iso.date(),method:financeEntryInputSchema.shape.method,
   merchantOrSource:z.string().trim().max(160),description:z.string().trim().max(2000),
+  // Optional for compatibility with existing edit callers. Only admins may change it.
+  enteredById:z.uuid().optional(),
 });
 export type FinanceEntryAdminEdit=z.infer<typeof financeEntryAdminEditSchema>;
 

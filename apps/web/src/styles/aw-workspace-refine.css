@@ -234,9 +234,19 @@
 .aw-notes-trash-actions button.danger{color:#ff9cae}
 @media(max-width:650px){.aw-finance-register,.aw-team-table{font-size:.79rem}.aw-finance-register td,.aw-team-table td{padding:12px 10px}.aw-team-security-note{padding:14px}.aw-cash-ledger-line strong{font-size:1.3rem}}
 
-/* Cohesive compact workspace: equivalent to an ~80% UI density on desktop, keeping phone tap targets usable. */
-@media(min-width:900px){
- .aw-workspace{zoom:.75;width:133.333333%;min-height:133.333333dvh}
+/* Keep the workspace within the viewport. Scaling the entire layout with
+   zoom plus >100% width produced a document-wide horizontal scrollbar. */
+.aw-workspace,.aw-work-main,.aw-work-content,.aw-work-content-width{min-width:0;max-width:100%}
+.aw-report-page,.aw-report-toolbar,.aw-report-grid{min-width:0;max-width:100%}
+.aw-report-dates{max-width:100%;min-width:0;justify-content:flex-end}
+@media(max-width:1250px){
+ .aw-report-toolbar{align-items:stretch}
+ .aw-report-dates{justify-content:flex-start}
+}
+@media(max-width:680px){
+ .aw-report-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .aw-report-dates label{min-width:0}
+ .aw-report-dates .aw-report-refresh{grid-column:1/-1}
 }
 .aw-required-star{color:#ff647c!important;font-weight:900;font-size:1.13em}
 .aw-optional-label{color:#a995b9!important;font-weight:500;font-size:.82em}

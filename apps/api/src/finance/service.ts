@@ -113,6 +113,15 @@ export class FinanceService {
     });
   }
 
+  async assignees(actor:Principal){
+    this.administrator(actor);
+    return this.db.user.findMany({
+      where:{organizationId:actor.organizationId,status:"ACTIVE"},
+      orderBy:[{displayName:"asc"},{id:"asc"}],
+      select:{id:true,displayName:true,loginId:true},take:1000,
+    });
+  }
+
   async editExpense(actor:Principal,id:string,input:FinanceEntryAdminEdit){
     this.administrator(actor);
     const amount=new Prisma.Decimal(input.amount);
@@ -126,19 +135,32 @@ export class FinanceService {
       if(entry.status==="CANCELLED"||entry.verifiedPayment)
         throw new AuthError(409,"FINANCE_IMMUTABLE","Cancelled or reconciled expenses cannot be edited");
       const category=await tx.financialCategory.findFirst({
-        where:{id:input.categoryId,organizationId:actor.organizationId,kind:"EXPENSE",active:true},
+        where:{id:input.categoryId,organizationId:actor.organizationId,kind:"EXPENSE",
+          ...(input.categoryId===entry.categoryId?{}:{active:true})},
       });
       if(!category)throw invalid("Choose an active expense category in this organization");
+      const assignedUserId=input.enteredById??entry.enteredById;
+      if(assignedUserId!==entry.enteredById){
+        const assignedUser=await tx.user.findFirst({where:{
+          id:assignedUserId,organizationId:actor.organizationId,status:"ACTIVE",
+        },select:{id:true}});
+        if(!assignedUser)throw invalid("Assigned user must be an active member of this organization");
+      }
       const updated=await tx.financialTransaction.update({where:{id},data:{
         categoryId:category.id,amount,occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
         method:input.method,merchantOrSource:input.merchantOrSource,description:input.description,
+        enteredById:assignedUserId,
       }});
       await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
         action:"finance.expense_edited",entityType:"FinancialTransaction",entityId:id,
-        beforeRedacted:{amount:entry.amount.toFixed(4),categoryId:entry.categoryId,status:entry.status},
-        afterRedacted:{amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status},
+        beforeRedacted:{amount:entry.amount.toFixed(4),categoryId:entry.categoryId,status:entry.status,
+          assignedUserId:entry.enteredById},
+        afterRedacted:{amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status,
+          assignedUserId:updated.enteredById},
       }});
-      return {id,amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status};
+      // ApprovalRequest.requesterId remains immutable as the original submitter.
+      return {id,amount:updated.amount.toFixed(4),categoryId:updated.categoryId,
+        status:updated.status,enteredById:updated.enteredById};
     });
   }
 
@@ -232,9 +254,12 @@ export class FinanceService {
   async entries(actor:Principal,view:View){
     const rows=await this.db.financialTransaction.findMany({
       where:this.scope(actor,view),orderBy:{createdAt:"desc"},take:200,
-      include:{category:{select:{name:true}},enteredBy:{select:{displayName:true,loginId:true}}},
+      include:{category:{select:{id:true,name:true,active:true}},
+        enteredBy:{select:{displayName:true,loginId:true}},
+        approvalRequest:{select:{requester:{select:{displayName:true}}}}},
     });
-    return rows.map(r=>({...this.present(r),category:r.category,enteredBy:r.enteredBy}));
+    return rows.map(r=>({...this.present(r),category:r.category,
+      enteredBy:r.enteredBy,submittedBy:r.approvalRequest.requester}));
   }
 
   async totals(actor:Principal,view:View){
