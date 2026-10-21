@@ -178,10 +178,24 @@ export default function NotesPage(){
    setSaveState("conflict");setError(explanation(e));return false;
   }finally{inFlight.current=false;}
  },[request]);
+ // Name a note before switching pages, opening another note, or leaving the editor.
+ const ensureSavedForSwitch=useCallback(async():Promise<boolean>=>{
+  if(!selectedRef.current)return true;
+  const current=draftRef.current;
+  const hasContent=current.body.trim().length>0||parseStrokes(current.strokes).length>0||
+    parsePages(current.pages).some(page=>parseStrokes(page.strokes).length>0);
+  if(hasContent&&(!current.title.trim()||current.title.trim()==="Untitled")){
+   const name=window.prompt("Save this note with a name before switching:",current.title==="Untitled"?"":current.title);
+   if(!name?.trim())return false;
+   const next={...draftRef.current,title:name.trim().slice(0,180)};
+   draftRef.current=next;setDraft(next);dirty.current=true;setSaveState("unsaved");
+  }
+  return await flush();
+ },[flush]);
  const open=useCallback(async(id:string,force=false)=>{
   if(selectedRef.current===id&&!force)return;
   if(inFlight.current)return;
-  if(dirty.current&&!await flush())return;
+  if(!await ensureSavedForSwitch())return;
   setActionBusy(true);setError("");
   try{
    const note=await request<Note>("/notes/"+id);
@@ -193,18 +207,19 @@ export default function NotesPage(){
    setActivePage(0);setPaper(pages[0]?.paper??"dotted");
    const next={title:note.title,body:note.body,strokes:pages[0]?.strokes??note.strokes,pages:note.pages??"[]"};
    dirty.current=false;draftRef.current=next;setDraft(next);setSaveState("saved");
+   setMode(note.body.trim()&&!parseStrokes(note.strokes).length?"typed":"handwritten");
    setDrawing(null);drawingRef.current=null;
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
- },[request,flush]);
+ },[request,ensureSavedForSwitch]);
  const initialized=useRef(false);
  useEffect(()=>{
   if(!session||initialized.current)return;
   initialized.current=true;
   void request<{items:NoteSummary[];limited:boolean}>("/notes")
-   .then(result=>{setList(result.items);if(result.items[0]){
+   .then(result=>{setList(result.items);
      const focus=new URLSearchParams(window.location.search).get("note");
-     void open(focus&&result.items.some(n=>n.id===focus)?focus:result.items[0].id);
-    }})
+     if(focus&&result.items.some(n=>n.id===focus))void open(focus);
+   })
    .catch(e=>setError(explanation(e))).finally(()=>setLoadState("ready"));
  },[session,request,open]);
  useEffect(()=>{
@@ -225,9 +240,9 @@ export default function NotesPage(){
   const el=canvasRef.current,ctx=el?.getContext("2d");
   if(ctx)draw(ctx,[...(erasing??parseStrokes(draft.strokes)),...(drawing?[drawing]:[])]);
  },[draft.strokes,drawing,erasing]);
- const create=async()=>{
+ const create=async(kind:"handwritten"|"typed")=>{
   if(inFlight.current)return;
-  if(dirty.current&&!await flush())return;
+  if(!await ensureSavedForSwitch())return;
   setActionBusy(true);setError("");
   try{
    // Old Notes APIs validate fields strictly and reject the modern 'pages' key.
@@ -238,7 +253,7 @@ export default function NotesPage(){
    setModernNotesApi(pagesSupported.current);
    await listNotes();
    selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
-   draftRef.current=blank;setDraft(blank);setActivePage(0);setPaper("dotted");dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];history.current=[];
+   setMode(kind);draftRef.current=blank;setDraft(blank);setActivePage(0);setPaper("dotted");dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];history.current=[];
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
  const saveConflictCopy=async()=>{
@@ -267,7 +282,6 @@ export default function NotesPage(){
    await request("/notes/"+selected+"?version="+versionRef.current,{method:"DELETE"});
    selectedRef.current=null;setSelected(null);dirty.current=false;draftRef.current=blank;setDraft(blank);
    const data=await request<{items:NoteSummary[]}>("/notes");setList(data.items);
-   if(data.items.length)await open(data.items[0].id);
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
  const moveListedNote=async(note:NoteSummary)=>{
@@ -282,6 +296,29 @@ export default function NotesPage(){
    await listNotes();
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
+ const closeEditor=async()=>{
+  if(!await ensureSavedForSwitch())return;
+  selectedRef.current=null;setSelected(null);dirty.current=false;draftRef.current=blank;setDraft(blank);
+  setSaveState("saved");setLibraryOpen(false);setInspectorOpen(false);setExpanded(false);
+  await listNotes();
+ };
+ useEffect(()=>{
+  const onNavigate=(event:MouseEvent)=>{
+   if(!selectedRef.current)return;
+   const element=event.target;if(!(element instanceof Element))return;
+   const anchor=element.closest("a[href]");if(!anchor)return;
+   const destination=new URL(anchor.getAttribute("href")||"",window.location.href);
+   if(destination.origin!==window.location.origin||destination.pathname===window.location.pathname)return;
+   const saved=draftRef.current;
+   if(!dirty.current&&saved.title.trim()!=="Untitled")return;
+   if(!dirty.current&&!saved.body.trim()&&!parseStrokes(saved.strokes).length)return;
+   event.preventDefault();event.stopPropagation();
+   void ensureSavedForSwitch().then(ok=>{if(ok)window.location.assign(destination.href);});
+  };
+  const warn=(event:BeforeUnloadEvent)=>{if(dirty.current){event.preventDefault();event.returnValue="";}};
+  document.addEventListener("click",onNavigate,true);window.addEventListener("beforeunload",warn);
+  return()=>{document.removeEventListener("click",onNavigate,true);window.removeEventListener("beforeunload",warn);};
+ },[ensureSavedForSwitch]);
  const mark=(e:PointerEvent<HTMLCanvasElement>)=>{
   const rect=e.currentTarget.getBoundingClientRect();
   return [Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),
@@ -373,27 +410,31 @@ export default function NotesPage(){
  };
  const pages=parsePages(draft.pages);
  const pageCount=Math.max(1,pages.length);
- const changePage=(target:number)=>{
+ const changePage=async(target:number)=>{
   if(target<0||target>=pageCount||target===activePage)return;
+  if(!await ensureSavedForSwitch())return;
   const targetPage=pages[target];if(!targetPage)return;
   history.current=[];redoStack.current=[];setActivePage(target);setPaper(targetPage.paper);
   setEdited({...draftRef.current,strokes:targetPage.strokes});
  };
- const addPage=()=>{
+ const addPage=async()=>{
+  if(!await ensureSavedForSwitch())return;
   const records=pages.length?pages:[{id:"page-1",strokes:draft.strokes,paper}];
   const next={id:"page-"+Date.now(),strokes:"[]",paper};
   setActivePage(records.length);history.current=[];redoStack.current=[];
   setEdited({...draftRef.current,strokes:"[]",pages:JSON.stringify([...records,next])});
  };
- const duplicatePage=()=>{
+ const duplicatePage=async()=>{
+  if(!await ensureSavedForSwitch())return;
   const records=pages.length?pages:[{id:"page-1",strokes:draft.strokes,paper}];
   const next={...records[activePage],id:"page-"+Date.now()};
   records.splice(activePage+1,0,next);
   setActivePage(activePage+1);history.current=[];redoStack.current=[];
   setEdited({...draftRef.current,strokes:next.strokes,pages:JSON.stringify(records)});
  };
- const deletePage=()=>{
+ const deletePage=async()=>{
   if(pageCount===1||!window.confirm("Delete the current page?"))return;
+  if(!await ensureSavedForSwitch())return;
   const records=pages.filter((_,i)=>i!==activePage);
   const target=Math.min(activePage,records.length-1);setActivePage(target);setPaper(records[target].paper);
   history.current=[];redoStack.current=[];
@@ -480,7 +521,7 @@ export default function NotesPage(){
    <div className="aw-studio-library-body">
     <label className="aw-studio-search"><Search size={17}/><input aria-label="Search notes" value={noteQuery}
        onChange={event=>setNoteQuery(event.target.value)} placeholder="Search notes…"/></label>
-    <button className="aw-studio-new" type="button" onClick={()=>void create()} disabled={actionBusy}><FilePlus2 size={18}/> New note</button>
+    <button className="aw-studio-new" type="button" onClick={()=>void closeEditor()} disabled={actionBusy}><FilePlus2 size={18}/> New note / Choose type</button>
     <div className="aw-studio-collections">
      {(["all","recent","starred","trash"] as const).map(c=><button key={c} type="button" className={collection===c&&!notebookFilter?"selected":""}
       onClick={()=>{setCollection(c);setNotebookFilter(null);}}>
@@ -522,6 +563,7 @@ export default function NotesPage(){
   <main className="aw-studio-main">
    <header className="aw-studio-header">
     <div className="aw-studio-header-name">
+     {selected&&<button type="button" className="aw-notes-home-button" onClick={()=>void closeEditor()} aria-label="Back to notes home"><ChevronLeft size={18}/> Notes</button>}
      <button type="button" className="aw-studio-mobile-menu" aria-label="Open notes library" onClick={()=>setLibraryOpen(x=>!x)}><BookOpen size={20}/></button>
      {selected?<input id="aw-note-title" aria-label="Note title" maxLength={180} value={draft.title}
        onChange={e=>setEdited({...draftRef.current,title:e.target.value})} placeholder="Untitled note"/>:
@@ -544,7 +586,16 @@ export default function NotesPage(){
    </header>
    {!modernNotesApi&&<AWNotice tone="error">The Notes API on Render is outdated. Single-page notes can still be saved, but notebooks and multi-page persistence require deploying the latest backend.</AWNotice>}
    {error&&<AWNotice tone="error">{error} {saveState==="conflict"&&"Unsaved work remains here."}</AWNotice>}
-   {!selected?<div className="aw-notes-empty"><NotebookPen size={36}/><p>Choose a saved note or create a new one.</p></div>:<>
+   {!selected?<div className="aw-notes-home" aria-label="Choose a note type">
+     <NotebookPen size={35}/>
+     <h2>Start a new note</h2>
+     <p>Choose the editor first. Existing notes stay in your library until you explicitly open one.</p>
+     <div className="aw-notes-create-choices">
+      <button type="button" disabled={actionBusy} onClick={()=>void create("handwritten")}><PenLine size={25}/><strong>Drawn note</strong><span>Write, sketch, mark up pages</span></button>
+      <button type="button" disabled={actionBusy} onClick={()=>void create("typed")}><Type size={25}/><strong>Typed note</strong><span>Write and format text</span></button>
+     </div>
+     {list.filter(n=>!n.deletedAt).length>0&&<p className="aw-notes-home-library">Saved notes are listed on the left. Select one to open it.</p>}
+    </div>:<>
     <div className="aw-studio-modebar">
      <div className="aw-studio-mode-switch" role="group" aria-label="Note mode">
       <button type="button" aria-pressed={mode==="handwritten"} onClick={()=>setMode("handwritten")}><PenLine size={18}/> Handwritten Note</button>
