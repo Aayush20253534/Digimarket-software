@@ -195,5 +195,43 @@ try{
   assert.equal((await db.auditLog.count({where:{organizationId:org.id,action:"finance.income_cancelled",entityId:income.id}})),1);
   await assert.rejects(()=>finance.removeEntry(manager,income.id),(e:{status?:number})=>e.status===409);
   await assert.rejects(()=>finance.editEntry(manager,income.id,incomeEdit),(e:{status?:number})=>e.status===409);
+  
+  // A founder can post direct finance entries without any FINANCE approval policy.
+  const directOrg=await db.organization.create({data:{name:"Founder Finance CI"}});
+  const founderUser=await db.user.create({data:{
+    organizationId:directOrg.id,loginId:"founder-finance",displayName:"Founder",status:"ACTIVE",
+  }});
+  const newStaff=await db.user.create({data:{
+    organizationId:directOrg.id,loginId:"finance-new-staff",displayName:"Staff",status:"ACTIVE",
+  }});
+  const founder=principal(founderUser.id,directOrg.id,["FOUNDER"],[
+    "finance.entry.create","finance.entry.read.own","finance.read.all",
+  ]);
+  const regular=principal(newStaff.id,directOrg.id,["EMPLOYEE"],staffKeys);
+  const fExpense=await db.financialCategory.create({data:{
+    organizationId:directOrg.id,kind:"EXPENSE",name:"Founder expense",normalizedName:"founder expense",
+  }});
+  const fIncome=await db.financialCategory.create({data:{
+    organizationId:directOrg.id,kind:"INCOME",name:"Founder income",normalizedName:"founder income",
+  }});
+  const directInput={kind:"EXPENSE" as const,categoryId:fExpense.id,amount:"21.0000",
+    occurredOn:"2026-10-19",method:"CASH" as const,idempotencyKey:randomUUID()};
+  const postedExpense=await finance.submit(founder,directInput);
+  assert.equal(postedExpense.status,"POSTED");assert.ok(postedExpense.postedAt);
+  const postedIncome=await finance.submit(founder,{...directInput,kind:"INCOME",categoryId:fIncome.id,
+    amount:"71.0000",idempotencyKey:randomUUID()});
+  assert.equal(postedIncome.status,"POSTED");
+  assert.equal((await finance.totals(founder,"mine")).postedNet,"50.0000");
+  const approval=await db.approvalRequest.findUniqueOrThrow({where:{id:postedExpense.approvalRequestId}});
+  assert.equal(approval.status,"APPROVED");
+  assert.equal((await db.approvalDecision.findUniqueOrThrow({where:{requestId:approval.id}})).outcome,"APPROVED");
+  assert.equal((await db.approvalPolicy.findUniqueOrThrow({where:{organizationId_category:{
+    organizationId:directOrg.id,category:"FINANCE",
+  }}})).active,false);
+  await assert.rejects(()=>finance.submit(regular,{
+    ...directInput,idempotencyKey:randomUUID(),
+  }),(e:{status?:number})=>e.status===422);
+  await assert.rejects(()=>finance.submit(founder,directInput),(e:{status?:number})=>e.status===409);
+  assert.equal((await finance.entries(founder,"mine")).length,2);
   console.info("Module 6 PASS: admin category rename/unused delete/referenced archive, other-user expense edits/cancellation, audit and tenant isolation.");
 }finally{await db.$disconnect();}

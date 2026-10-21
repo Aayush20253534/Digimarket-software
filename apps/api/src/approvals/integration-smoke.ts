@@ -55,5 +55,26 @@ try {
   assert.equal((await svc.decide(administrator,submitted.id,{outcome:"REJECTED",reason:"Budget pending"})).status,"REJECTED");
   await assert.rejects(()=>svc.submit(employee,{category:"GENERAL",title:"Blocked request",description:"Policy is no longer active"}),(error:{status?:number})=>error.status===422);
   assert.equal((await db.auditLog.count({where:{organizationId:org.id,entityType:"ApprovalRequest"}})),6);
+  
+  const founderUser=await db.user.create({data:{
+    organizationId:org.id,loginId:"approval-founder",displayName:"Founder",status:"ACTIVE",
+  }});
+  const founder=principal(founderUser.id,org.id,["FOUNDER"],["approvals.read","approvals.submit"]);
+  const automaticallyApproved=await svc.submit(founder,{
+    category:"GENERAL",title:"Founder decision",description:"Founder authorization",
+  });
+  assert.equal(automaticallyApproved.status,"APPROVED");
+  assert.ok(automaticallyApproved.decidedAt);
+  assert.equal((await db.approvalDecision.findUniqueOrThrow({where:{
+    requestId:automaticallyApproved.id,
+  }})).outcome,"APPROVED");
+  assert.equal((await svc.list(administrator,"queue")).some(x=>x.id===automaticallyApproved.id),false);
+  const noPolicy=await svc.submit(founder,{
+    category:"CONTENT",title:"Direct submission",description:"No active review policy",
+  });
+  assert.equal(noPolicy.status,"APPROVED");
+  assert.equal((await db.approvalPolicy.findUniqueOrThrow({where:{organizationId_category:{
+    organizationId:org.id,category:"CONTENT",
+  }}})).active,false);
   console.info("Module 5 integration PASS: policy, tenant isolation, authorization, snapshot routing, atomic decision, no self approval, cancellation and audit/outbox.");
 } finally { await db.$disconnect(); }
