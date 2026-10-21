@@ -75,5 +75,39 @@ try{
  const next=await crm.list(founder,{limit:1,cursor:pagination.nextCursor!});
  assert.notEqual(next.items[0].id,pagination.items[0].id);
  assert.ok((await crm.export(founder)).csv.includes("919999887766"));
+
+ // Rejection is a non-converted outcome and remains in the rate denominator.
+ const rejectedDraft=await crm.create(employee,{phone:"919555001122"});
+ const rejected=await crm.update(employee,rejectedDraft.id,{version:rejectedDraft.version,
+   status:"REJECTED",stageNote:"Not interested after the meeting"});
+ assert.equal(rejected.status,"REJECTED");
+ assert.equal((await crm.detail(founder,rejected.id)).activities[0]?.note,"Not interested after the meeting");
+ assert.equal(await db.client.count({where:{sourceLeadId:rejected.id}}),0);
+ const beforeDelete=await crm.metrics(founder);
+ assert.equal(beforeDelete.rejected,1);
+ assert.equal(beforeDelete.converted,1);
+ assert.equal(beforeDelete.approved,1);
+ assert.equal(beforeDelete.conversionRatePercent,Math.round(10000/beforeDelete.total)/100);
+ const admin=actor(owner.id,org.id,["ADMIN"],grants);
+ await assert.rejects(()=>crm.delete(employee,rejected.id,rejected.version),fail(403));
+ await assert.rejects(()=>crm.delete(admin,rejected.id,rejected.version-1),fail(409));
+ assert.deepEqual(await crm.delete(admin,rejected.id,rejected.version),{id:rejected.id,deleted:true});
+ await assert.rejects(()=>crm.detail(founder,rejected.id),fail(404));
+ await assert.rejects(()=>crm.delete(admin,rejected.id,rejected.version+1),fail(404));
+ assert.equal((await crm.list(founder,{limit:50})).items.some(x=>x.id===rejected.id),false);
+ assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919555001122")).created,false);
+ await assert.rejects(()=>crm.create(founder,{phone:"919555001122"}),fail(409));
+ const afterDelete=await crm.metrics(founder);
+ assert.equal(afterDelete.rejected,0);
+ assert.equal(afterDelete.total,beforeDelete.total-1);
+ assert.equal(afterDelete.converted,1);
+ // A founder may remove an approved lead without deleting a client, FK or history.
+ const removedApproved=await crm.delete(founder,approved.id,approved.version);
+ assert.equal(removedApproved.deleted,true);
+ assert.equal((await db.client.findUniqueOrThrow({where:{sourceLeadId:approved.id}})).id,client.id);
+ assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);
+ assert.equal((await crm.metrics(founder)).converted,0);
+ assert.ok((await db.auditLog.count({where:{organizationId:org.id,action:"leads.deleted"}}))>=2);
+
  console.info("Module 7 PASS: phone-only lead, shared editing, atomic Approved conversion, history, webhook dedupe, tenant isolation and import.");
 }finally{await db.$disconnect();}
