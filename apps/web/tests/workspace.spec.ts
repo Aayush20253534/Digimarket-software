@@ -70,6 +70,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     element=>Number.parseFloat(getComputedStyle(element).zoom)
   );
   expect(desktopZoom,"Desktop workspace must use 75% visual scaling").toBe(0.75);
+  const pageBackground=await page.evaluate(()=>getComputedStyle(document.body).backgroundColor);
+  expect(pageBackground,"Reports must never expose a white body beneath the scaled layout")
+    .toBe("rgb(9, 7, 14)");
   const desktopBounds=await page.evaluate(()=>({
     doc:document.documentElement.scrollWidth,
     client:document.documentElement.clientWidth,
@@ -83,7 +86,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   );
   expect(mobileZoom,"Mobile/tablet touch scaling remains unmodified").toBe(1);
   await page.setViewportSize({width:1366,height:768});
+  const assigneeResponse=page.waitForResponse(response=>
+    response.url().includes("/api/v1/finance/assignees") && response.request().method()==="GET");
   await page.goto("/app/finance");
+  expect((await assigneeResponse).status(),"Finance gateway must forward assignee lookups").toBe(200);
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
