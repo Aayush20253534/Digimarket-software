@@ -236,7 +236,7 @@
 
 /* Cohesive compact workspace: equivalent to an ~80% UI density on desktop, keeping phone tap targets usable. */
 @media(min-width:900px){
- .aw-workspace{zoom:.8;width:125%;min-height:125dvh}
+ .aw-workspace{zoom:.75;width:133.333333%;min-height:133.333333dvh}
 }
 .aw-required-star{color:#ff647c!important;font-weight:900;font-size:1.13em}
 .aw-optional-label{color:#a995b9!important;font-weight:500;font-size:.82em}
