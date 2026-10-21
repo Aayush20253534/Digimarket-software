@@ -94,6 +94,14 @@ export default function ApprovalsPage() {
     setPolicyRoles(selected?.approverRoleKeys??["SUPER_ADMIN","ADMIN"]);
     setPolicyActive(selected?.active??true);
   }
+  useEffect(()=>{
+   const id=new URLSearchParams(window.location.search).get("focus");
+   if(!id||!items.some(x=>x.id===id))return;
+   const frame=window.requestAnimationFrame(()=>{
+    const node=document.getElementById("approval-"+id);node?.classList.add("aw-register-selected");node?.scrollIntoView({block:"center",behavior:"smooth"});
+   });
+   return()=>window.cancelAnimationFrame(frame);
+  },[items]);
   if(!session)return <Spinner label="Loading your permissions…" />;
   if(!canRead)return <div className="space-y-4"><PageHeader title="Access denied" description="Approval requests are restricted."/><Notice kind="error">Your role cannot view approvals.</Notice></div>;
   const activePolicies=policies.filter(p=>p.active);

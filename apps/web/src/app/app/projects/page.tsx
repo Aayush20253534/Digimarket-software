@@ -82,6 +82,11 @@ export default function ProjectsPage(){
       }else setAssets([]);
     }catch(e){setError(message(e));}
   },[request,canAssets]);
+  useEffect(()=>{
+   if(!canRead)return;
+   const id=new URLSearchParams(window.location.search).get("focus");
+   if(id&&/^[0-9a-f-]{36}$/i.test(id))void open(id);
+  },[canRead,open]);
   const grouped=useMemo(()=>states.map(stage=>({stage,items:projects.filter(p=>p.status===stage)})),[projects]);
   async function mutate(action:()=>Promise<unknown>,confirmation:string,reopen=true){
     setBusy(true);setError("");setNotice("");

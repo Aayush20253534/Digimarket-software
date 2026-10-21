@@ -94,6 +94,11 @@ export default function ContentPage(){
   }catch(e){setError(errorMessage(e));}
  },[request]);
  useEffect(()=>{
+  if(!canRead)return;
+  const id=new URLSearchParams(window.location.search).get("focus");
+  if(id&&/^[0-9a-f-]{36}$/i.test(id))void open(id);
+ },[canRead,open]);
+ useEffect(()=>{
   if(!canAssets||!draft.clientId){setAssets([]);return;}
   void request<List<Asset>>("/assets?status=ACTIVE&limit=100&clientId="+draft.clientId)
    .then(x=>setAssets(x.items)).catch(()=>setAssets([]));
