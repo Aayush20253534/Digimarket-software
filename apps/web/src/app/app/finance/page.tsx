@@ -42,8 +42,8 @@ export default function FinancePage(){
   useEffect(()=>{if(canAll)setView("all");},[canAll]);
   const [editingCategory,setEditingCategory]=useState<Category|null>(null);
   const [editedCategoryName,setEditedCategoryName]=useState("");
-  const [editingExpense,setEditingExpense]=useState<Entry|null>(null);
-  const [expenseEdit,setExpenseEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",
+  const [editingEntry,setEditingEntry]=useState<Entry|null>(null);
+  const [entryEdit,setEntryEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",
     merchantOrSource:"",description:"",enteredById:""});
   const [assignees,setAssignees]=useState<Assignee[]>([]);
   const [assigneesError,setAssigneesError]=useState("");
@@ -175,19 +175,19 @@ export default function FinancePage(){
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
-  function beginExpenseEdit(row:Entry){
-    setEditingExpense(row);setError("");
-    setExpenseEdit({categoryId:row.category.id,
+  function beginEntryEdit(row:Entry){
+    setEditingEntry(row);setError("");
+    setEntryEdit({categoryId:row.category.id,
       amount:row.amount,occurredOn:row.occurredOn,method:row.method,
       merchantOrSource:row.merchantOrSource??"",description:row.description??"",
       enteredById:row.enteredById});
   }
-  async function saveExpense(e:FormEvent){
-    e.preventDefault();if(!editingExpense)return;
+  async function saveEntry(e:FormEvent){
+    e.preventDefault();if(!editingEntry)return;
     setBusy(true);setError("");setSuccess("");
     try{
-      await request("/finance/entries/"+editingExpense.id,{method:"PUT",body:expenseEdit});
-      setEditingExpense(null);setSuccess("Expense updated and assigned user saved with an audit record.");
+      await request("/finance/entries/"+editingEntry.id,{method:"PUT",body:entryEdit});
+      setEditingEntry(null);setSuccess("Finance entry updated and assigned user saved with an audit record.");
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
@@ -319,11 +319,11 @@ export default function FinancePage(){
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
               <Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>
-              {adminFinance&&row.kind==="EXPENSE"&&row.status!=="CANCELLED"&&<>
+              {adminFinance&&row.status!=="CANCELLED"&&<>
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
-                  onClick={()=>beginExpenseEdit(row)} aria-label={"Edit expense "+row.id}>Edit</button>
-                <button type="button" className="btn-secondary text-xs" disabled={busy}
-                  onClick={()=>void deleteExpense(row)} aria-label={"Delete expense "+row.id}>Delete</button>
+                  onClick={()=>beginEntryEdit(row)} aria-label={"Edit "+row.kind.toLowerCase()+" "+row.id}>Edit</button>
+                {row.kind==="EXPENSE"&&<button type="button" className="btn-secondary text-xs" disabled={busy}
+                  onClick={()=>void deleteExpense(row)} aria-label={"Delete expense "+row.id}>Delete</button>}
               </>}
             </div></td>
           </tr>)}</tbody></table></div>}
@@ -340,39 +340,39 @@ export default function FinancePage(){
         </form>
       </div>
     </div>}
-    {adminFinance&&editingExpense&&<div className="aw-finance-admin-overlay" role="presentation">
-      <div className="aw-finance-admin-modal" role="dialog" aria-modal="true" aria-label="Edit expense">
-        <h2>Edit expense</h2><p>Originally submitted by {editingExpense.submittedBy?.displayName??editingExpense.enteredBy.displayName}.
-          You can edit or assign this expense to any active member of the company. The original approval requester remains recorded.</p>
+    {adminFinance&&editingEntry&&<div className="aw-finance-admin-overlay" role="presentation">
+      <div className="aw-finance-admin-modal" role="dialog" aria-modal="true" aria-label={"Edit "+editingEntry.kind.toLowerCase()}>
+        <h2>Edit {editingEntry.kind.toLowerCase()}</h2><p>Originally submitted by {editingEntry.submittedBy?.displayName??editingEntry.enteredBy.displayName}.
+          Edit this {editingEntry.kind.toLowerCase()} entry or assign it to an active member of the company. The original approval requester remains recorded.</p>
         {assigneesError&&<Notice kind="error">{assigneesError}</Notice>}
-        <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>void saveExpense(e)}>
-          <FormField id="admin-expense-category" label="Expense category"><select id="admin-expense-category" className="field" required value={expenseEdit.categoryId}
-            onChange={e=>setExpenseEdit(v=>({...v,categoryId:e.target.value}))}>
-            {categories.filter(c=>c.kind==="EXPENSE"&&(c.active||c.id===editingExpense.category.id)).map(c=>
+        <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>void saveEntry(e)}>
+          <FormField id="admin-expense-category" label={editingEntry.kind==="INCOME"?"Income category":"Expense category"}><select id="admin-expense-category" className="field" required value={entryEdit.categoryId}
+            onChange={e=>setEntryEdit(v=>({...v,categoryId:e.target.value}))}>
+            {categories.filter(c=>c.kind===editingEntry.kind&&(c.active||c.id===editingEntry.category.id)).map(c=>
               <option key={c.id} value={c.id}>{c.name}{!c.active?" (archived)":""}</option>)}
           </select></FormField>
-          <FormField id="admin-expense-assignee" label="Assign expense to">
-            <select id="admin-expense-assignee" className="field" required value={expenseEdit.enteredById}
-              onChange={e=>setExpenseEdit(v=>({...v,enteredById:e.target.value}))}>
-              {!assignees.some(user=>user.id===editingExpense.enteredById)&&
-                <option value={editingExpense.enteredById}>{editingExpense.enteredBy.displayName} (current)</option>}
+          <FormField id="admin-expense-assignee" label={"Assign "+editingEntry.kind.toLowerCase()+" to"}>
+            <select id="admin-expense-assignee" className="field" required value={entryEdit.enteredById}
+              onChange={e=>setEntryEdit(v=>({...v,enteredById:e.target.value}))}>
+              {!assignees.some(user=>user.id===editingEntry.enteredById)&&
+                <option value={editingEntry.enteredById}>{editingEntry.enteredBy.displayName} (current)</option>}
               {assignees.map(user=><option key={user.id} value={user.id}>{user.displayName} ({user.loginId})</option>)}
             </select>
           </FormField>
           <FormField id="admin-expense-amount" label="Amount (INR)"><input id="admin-expense-amount" className="field" inputMode="decimal" required
-            pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" value={expenseEdit.amount}
-            onChange={e=>setExpenseEdit(v=>({...v,amount:e.target.value}))}/></FormField>
+            pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" value={entryEdit.amount}
+            onChange={e=>setEntryEdit(v=>({...v,amount:e.target.value}))}/></FormField>
           <FormField id="admin-expense-date" label="Date"><input id="admin-expense-date" type="date" className="field" required
-            value={expenseEdit.occurredOn} onChange={e=>setExpenseEdit(v=>({...v,occurredOn:e.target.value}))}/></FormField>
-          <FormField id="admin-expense-method" label="Payment method"><select id="admin-expense-method" className="field" value={expenseEdit.method}
-            onChange={e=>setExpenseEdit(v=>({...v,method:e.target.value}))}>{modes.map(m=><option key={m} value={m}>{m}</option>)}</select></FormField>
+            value={entryEdit.occurredOn} onChange={e=>setEntryEdit(v=>({...v,occurredOn:e.target.value}))}/></FormField>
+          <FormField id="admin-expense-method" label="Payment method"><select id="admin-expense-method" className="field" value={entryEdit.method}
+            onChange={e=>setEntryEdit(v=>({...v,method:e.target.value}))}>{modes.map(m=><option key={m} value={m}>{m}</option>)}</select></FormField>
           <div className="sm:col-span-2"><FormField id="admin-expense-payee" label="Merchant / payee">
-            <input id="admin-expense-payee" className="field" maxLength={160} value={expenseEdit.merchantOrSource}
-              onChange={e=>setExpenseEdit(v=>({...v,merchantOrSource:e.target.value}))}/></FormField></div>
+            <input id="admin-expense-payee" className="field" maxLength={160} value={entryEdit.merchantOrSource}
+              onChange={e=>setEntryEdit(v=>({...v,merchantOrSource:e.target.value}))}/></FormField></div>
           <div className="sm:col-span-2"><FormField id="admin-expense-desc" label="Notes"><textarea id="admin-expense-desc" className="field" maxLength={2000}
-              value={expenseEdit.description} onChange={e=>setExpenseEdit(v=>({...v,description:e.target.value}))}/></FormField></div>
-          <div className="sm:col-span-2 aw-finance-admin-actions"><button type="button" className="btn-secondary" onClick={()=>setEditingExpense(null)}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={busy||!expenseEdit.categoryId||!expenseEdit.enteredById}>Save expense</button></div>
+              value={entryEdit.description} onChange={e=>setEntryEdit(v=>({...v,description:e.target.value}))}/></FormField></div>
+          <div className="sm:col-span-2 aw-finance-admin-actions"><button type="button" className="btn-secondary" onClick={()=>setEditingEntry(null)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy||!entryEdit.categoryId||!entryEdit.enteredById}>Save {editingEntry.kind.toLowerCase()}</button></div>
         </form>
       </div>
     </div>}
