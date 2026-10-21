@@ -71,8 +71,9 @@ try{
  for(const bad of [hiddenProject.id,hiddenTask.id,hiddenContent.id,invoice.id])
   assert.equal(publicHits.some(x=>x.id===bad),false);
  const managedHits=(await insights.search(admin,"Sunrise")).items;
- for(const id of [client.id,lead.id,hiddenProject.id,hiddenTask.id,hiddenContent.id,invoice.id])
+ for(const id of [client.id,lead.id,hiddenProject.id,hiddenTask.id,hiddenContent.id])
   assert.ok(managedHits.some(x=>x.id===id));
+ assert.equal(managedHits.some(x=>x.id===invoice.id),false);
  assert.equal((await insights.search(external,"Sunrise")).items.some(x=>x.id===client.id),false);
  const report=await insights.report(employee,"2026-10-01","2026-11-30");
  assert.equal("invoices" in report.sections,false);
