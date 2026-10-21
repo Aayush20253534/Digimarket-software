@@ -29,6 +29,7 @@ const endpoints: Record<string, string[]> = {
   "approvals": ["GET", "POST"],
   "finance/categories": ["GET", "POST"],
   "finance/entries": ["GET", "POST"],
+  "finance/assignees": ["GET"],
   "finance/summary": ["GET"],
   "finance/export": ["GET"],
   "leads": ["GET","POST"],
@@ -316,13 +317,17 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     // A new web deployment can point at a stale Render API. Its fallback 404
     // includes meta.requestId, unlike an actual missing note. Report the
     // deployment mismatch instead of misleading users with "Route not found".
-    if (response.status===404 && (path==="notes" || noteDetailPattern.test(path))) {
+    if (response.status===404 && (path==="notes" || noteDetailPattern.test(path)
+      || path==="finance/assignees" || financeEntryDetailPattern.test(path))) {
       const payload=await response.clone().json().catch(()=>null) as
         {error?:{code?:string;message?:string};meta?:{requestId?:string}} | null;
       if(payload?.error?.code==="NOT_FOUND" && payload.error.message==="Route not found"
         && typeof payload.meta?.requestId==="string"){
-        return NextResponse.json({error:{code:"NOTES_API_NOT_DEPLOYED",
-          message:"Notes is not available on the deployed API. Deploy the latest main branch on Render and apply the database migrations."}},
+        const financePath=path.startsWith("finance/");
+        return NextResponse.json({error:{code:financePath?"FINANCE_API_NOT_DEPLOYED":"NOTES_API_NOT_DEPLOYED",
+          message:financePath
+            ?"Finance administration routes are missing from the deployed API. Check the Render deployment version."
+            :"Notes is not available on the deployed API. Deploy the latest main branch on Render and apply the database migrations."}},
           {status:503,headers:{"Cache-Control":"no-store"}});
       }
     }

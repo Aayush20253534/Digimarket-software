@@ -175,28 +175,43 @@ export class FinanceService {
     return this.editEntry(actor,id,input);
   }
 
-  async removeExpense(actor:Principal,id:string){
+  async removeEntry(actor:Principal,id:string){
     this.administrator(actor);
     return this.db.$transaction(async tx=>{
       const entry=await tx.financialTransaction.findFirst({
-        where:{id,organizationId:actor.organizationId,kind:"EXPENSE"},
+        where:{id,organizationId:actor.organizationId},
         include:{verifiedPayment:{select:{id:true}}},
       });
-      if(!entry)throw new AuthError(404,"NOT_FOUND","Expense not found");
-      if(entry.status==="CANCELLED")throw new AuthError(409,"ALREADY_CANCELLED","Expense already cancelled");
-      if(entry.verifiedPayment)throw new AuthError(409,"FINANCE_IMMUTABLE","Reconciled expense cannot be cancelled");
-      await tx.financialTransaction.update({where:{id},data:{status:"CANCELLED",postedAt:null}});
+      if(!entry)throw new AuthError(404,"NOT_FOUND","Financial entry not found");
+      if(entry.status==="CANCELLED")throw new AuthError(409,"ALREADY_CANCELLED","Financial entry already cancelled");
+      if(entry.verifiedPayment)throw new AuthError(409,"FINANCE_IMMUTABLE","Reconciled entries cannot be cancelled");
+      await tx.financialTransaction.update({
+        where:{id},data:{status:"CANCELLED",postedAt:null},
+      });
+      // Pending approvals must not subsequently post cancelled finance entries.
       await tx.approvalRequest.updateMany({
         where:{id:entry.approvalRequestId,organizationId:actor.organizationId,status:"PENDING"},
         data:{status:"CANCELLED",decidedAt:new Date()},
       });
-      await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
-        action:"finance.expense_cancelled",entityType:"FinancialTransaction",entityId:id,
-        beforeRedacted:{status:entry.status,amount:entry.amount.toFixed(4)},
-        afterRedacted:{status:"CANCELLED"},
+      await tx.auditLog.create({data:{
+        organizationId:actor.organizationId,actorId:actor.userId,
+        action:entry.kind==="INCOME"?"finance.income_cancelled":"finance.expense_cancelled",
+        entityType:"FinancialTransaction",entityId:id,
+        beforeRedacted:{kind:entry.kind,status:entry.status,amount:entry.amount.toFixed(4)},
+        afterRedacted:{kind:entry.kind,status:"CANCELLED"},
       }});
-      return {id,status:"CANCELLED" as const};
+      return {id,kind:entry.kind,status:"CANCELLED" as const};
     });
+  }
+
+  // Retain the expense-specific service for older integrations.
+  async removeExpense(actor:Principal,id:string){
+    this.administrator(actor);
+    const entry=await this.db.financialTransaction.findFirst({
+      where:{id,organizationId:actor.organizationId,kind:"EXPENSE"},select:{id:true},
+    });
+    if(!entry)throw new AuthError(404,"NOT_FOUND","Expense not found");
+    return this.removeEntry(actor,id);
   }
 
   async submit(actor:Principal,input:FinanceEntryInput){

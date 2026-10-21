@@ -68,7 +68,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.delete("/api/v1/finance/entries/:id",authenticate,async(req,res)=>{
     const id=parse(z.uuid(),req.params.id);
-    res.json({data:await finance.removeExpense(actor(res),id)});
+    res.json({data:await finance.removeEntry(actor(res),id)});
   });
   app.get("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");

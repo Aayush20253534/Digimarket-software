@@ -265,6 +265,12 @@
     zoom:.75;
     width:100%;
     max-width:100%;
-    min-height:100svh;
+    /* CSS zoom scales the visual box too. Compensate the viewport height. */
+    min-height:133.3334svh;
   }
+  .aw-workspace .aw-work-main{min-height:133.3334svh}
+  .aw-workspace .aw-work-content{min-height:calc(133.3334svh - 72px)}
 }
+/* If a scaled page ends before the viewport, never reveal the public light theme. */
+body:has(> #__next .aw-workspace),
+body:has(.aw-workspace){background:#09070e}
