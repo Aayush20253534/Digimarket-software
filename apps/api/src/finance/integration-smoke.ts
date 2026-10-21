@@ -218,9 +218,9 @@ try{
     occurredOn:"2026-10-19",method:"CASH" as const,idempotencyKey:randomUUID()};
   const postedExpense=await finance.submit(founder,directInput);
   assert.equal(postedExpense.status,"POSTED");assert.ok(postedExpense.postedAt);
-  const postedIncome=await finance.submit(founder,{...directInput,kind:"INCOME",categoryId:fIncome.id,
+  const founderPostedIncome=await finance.submit(founder,{...directInput,kind:"INCOME",categoryId:fIncome.id,
     amount:"71.0000",idempotencyKey:randomUUID()});
-  assert.equal(postedIncome.status,"POSTED");
+  assert.equal(founderPostedIncome.status,"POSTED");
   assert.equal((await finance.totals(founder,"mine")).postedNet,"50.0000");
   const approval=await db.approvalRequest.findUniqueOrThrow({where:{id:postedExpense.approvalRequestId}});
   assert.equal(approval.status,"APPROVED");

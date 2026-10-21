@@ -110,5 +110,25 @@ try{
  assert.equal((await content.list(lead,{limit:20,start:"2026-12-01T00:00:00Z",end:"2026-12-02T00:00:00Z"})).items.length,1);
  assert.equal((await db.outboxEvent.count({where:{organizationId:org.id,kind:"content.published"}})),1);
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,entityType:"ContentPost"}}))>=8);
+
+ const founderOrg=await db.organization.create({data:{name:"Founder Content CI"}});
+ const founderUser=await db.user.create({data:{organizationId:founderOrg.id,
+  loginId:"content-founder",displayName:"Founder",status:"ACTIVE"}});
+ const founder=actor(founderUser.id,founderOrg.id,full,["FOUNDER"]);
+ const fClient=await db.client.create({data:{
+  organizationId:founderOrg.id,createdById:founderUser.id,businessName:"Founder client",
+ }});
+ const fPost=await content.create(founder,createInput(fClient.id));
+ const fDraft=await content.update(founder,fPost.id,{version:fPost.version,caption:"Approved without queue"});
+ const result=await content.submit(founder,fPost.id,fDraft.version);
+ assert.equal(result.status,"APPROVED");
+ const fApproval=await db.approvalRequest.findUniqueOrThrow({where:{id:result.approvalId}});
+ assert.equal(fApproval.status,"APPROVED");
+ assert.equal((await db.approvalDecision.findUniqueOrThrow({where:{requestId:fApproval.id}})).outcome,"APPROVED");
+ assert.equal((await content.detail(founder,fPost.id)).status,"APPROVED");
+ assert.equal((await approvals.list(founder,"queue")).length,0);
+ assert.equal((await db.approvalPolicy.findUniqueOrThrow({where:{
+  organizationId_category:{organizationId:founderOrg.id,category:"CONTENT"},
+ }})).active,false);
  console.info("Module 12 PASS: organization/owner scoping, assets, immutable revisions, review ACL and rejection, reapproval, scheduling, manual publish, audit and outbox.");
 }finally{await db.$disconnect();}

@@ -113,5 +113,27 @@ try{
   assert.equal(await db.approvalDecision.count({where:{requestId:{in:[submission.approvalId,second.approvalId]}}}),2);
   assert.ok((await db.auditLog.count({where:{organizationId:org.id,entityType:"ProjectDeliverable"}}))>=4);
   assert.ok((await db.outboxEvent.count({where:{organizationId:org.id,kind:"projects.deliverable_resolved"}}))>=2);
+
+  // Founder deliverables move directly from DRAFT to APPROVED without a reviewer or policy.
+  const founderOrg=await db.organization.create({data:{name:"Founder Project CI"}});
+  const founderUser=await db.user.create({data:{
+    organizationId:founderOrg.id,loginId:"project-founder",displayName:"Founder",status:"ACTIVE",
+  }});
+  const founder=principal(founderUser.id,founderOrg.id,permissions,["FOUNDER"]);
+  const fClient=await db.client.create({data:{
+    organizationId:founderOrg.id,createdById:founderUser.id,businessName:"Founder client",
+  }});
+  const fProject=await projects.create(founder,{clientId:fClient.id,name:"Founder launch"});
+  const fDeliverable=await projects.deliverable(founder,fProject.id,{title:"Founder deliverable"});
+  const fDecision=await projects.submit(founder,fProject.id,fDeliverable.id,fDeliverable.version);
+  assert.equal(fDecision.status,"APPROVED");
+  assert.equal((await projects.detail(founder,fProject.id)).deliverables[0].status,"APPROVED");
+  const fApproval=await db.approvalRequest.findUniqueOrThrow({where:{id:fDecision.approvalId}});
+  assert.equal(fApproval.status,"APPROVED");
+  assert.equal((await db.approvalDecision.findUniqueOrThrow({where:{requestId:fApproval.id}})).outcome,"APPROVED");
+  assert.equal((await approvals.list(founder,"queue")).length,0);
+  assert.equal((await db.approvalPolicy.findUniqueOrThrow({where:{
+    organizationId_category:{organizationId:founderOrg.id,category:"DELIVERABLE"},
+  }})).active,false);
   console.info("Module 10 PASS: project/client isolation, membership, roles, milestones, asset scope, review rejection/revision/approval, atomic states, versions, audit/outbox.");
 }finally{await db.$disconnect();}

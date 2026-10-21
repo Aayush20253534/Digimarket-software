@@ -116,5 +116,39 @@ try{
  assert.equal(await db.payment.count({where:{organizationId:a.id,status:"VERIFIED"}}),2);
  assert.ok((await db.outboxEvent.count({where:{organizationId:a.id,kind:"payments.verified"}}))===2);
  assert.ok((await db.auditLog.count({where:{organizationId:a.id,entityType:"Invoice"}}))>=5);
+
+ const founderOrg=await db.organization.create({data:{name:"Founder Billing CI"}});
+ const founderUser=await db.user.create({data:{
+  organizationId:founderOrg.id,loginId:"billing-founder",displayName:"Founder",status:"ACTIVE",
+ }});
+ const founder=principal(founderUser.id,founderOrg.id,all,["FOUNDER"]);
+ const fClient=await db.client.create({data:{
+  organizationId:founderOrg.id,createdById:founderUser.id,businessName:"Founder client",
+ }});
+ const fCategory=await db.financialCategory.create({data:{
+  organizationId:founderOrg.id,kind:"INCOME",name:"Founder settlement",normalizedName:"founder settlement",
+ }});
+ const fDraft=await billing.create(founder,{...draftInput,clientId:fClient.id});
+ await billing.issue(founder,fDraft.id,fDraft.version);
+ const founderPaymentKey=randomUUID();
+ const fPayment=await billing.record(founder,{
+  clientId:fClient.id,categoryId:fCategory.id,amount:"30.0000",
+  receivedOn:"2026-10-20",method:"UPI",reference:"founder-"+randomUUID(),
+  idempotencyKey:founderPaymentKey,allocations:[{invoiceId:fDraft.id,amount:"30.0000"}],
+ });
+ assert.equal(fPayment.status,"VERIFIED");assert.ok(fPayment.ledgerEntryId);
+ assert.equal((await billing.detail(founder,fDraft.id)).paidTotal.toFixed(4),"30.0000");
+ assert.equal((await finance.totals(founder,"all")).postedIncome,"30.0000");
+ const fLedger=await db.financialTransaction.findUniqueOrThrow({where:{id:fPayment.ledgerEntryId!}});
+ assert.equal(fLedger.status,"POSTED");
+ assert.equal((await db.approvalRequest.findUniqueOrThrow({where:{id:fLedger.approvalRequestId}})).status,"APPROVED");
+ assert.equal((await db.approvalPolicy.findUniqueOrThrow({where:{
+  organizationId_category:{organizationId:founderOrg.id,category:"FINANCE"},
+ }})).active,false);
+ await assert.rejects(()=>billing.record(founder,{
+  clientId:fClient.id,categoryId:fCategory.id,amount:"30.0000",
+  receivedOn:"2026-10-20",method:"UPI",reference:"founder-"+randomUUID(),
+  idempotencyKey:founderPaymentKey,allocations:[{invoiceId:fDraft.id,amount:"30.0000"}],
+ }),fail(409));
  console.info("Module 13 PASS: invoice numbering, PDF, locked issue, cross-org, partial allocations, ledger once, self-verification, idempotency, void, overdue and recurring drafts");
 }finally{await db.$disconnect();}
