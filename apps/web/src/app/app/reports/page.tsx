@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {Activity,ArrowUpRight,BarChart3,CalendarDays,ChartNoAxesCombined,RefreshCcw,ShieldCheck,TrendingUp,Users,Wallet} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
@@ -18,15 +18,21 @@ export default function ReportsPage(){
  const can=!!session?.identity.permissions.includes("reports.business.read");
  const [from,setFrom]=useState(first),[to,setTo]=useState(today),[report,setReport]=useState<Report|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
+ const reportSequence=useRef(0);
  const load=useCallback(async()=>{
+  const sequence=++reportSequence.current;
   if(!can)return;
   if(from>to){setError("The start date must be before the end date.");return;}
   setBusy(true);setError("");
-  try{setReport(await request<Report>("/reports/overview?"+new URLSearchParams({from,to})));}
-  catch(e){setError(e instanceof ApiError?e.message:"Report unavailable");}
-  finally{setBusy(false);}
+  try{
+   const next=await request<Report>("/reports/overview?"+new URLSearchParams({from,to}));
+   if(sequence===reportSequence.current)setReport(next);
+  }
+  catch(e){if(sequence===reportSequence.current)
+   setError(e instanceof ApiError?e.message:"Report unavailable");}
+  finally{if(sequence===reportSequence.current)setBusy(false);}
  },[can,request,from,to]);
- useEffect(()=>{void load();},[load]);
+ useEffect(()=>{void load();return()=>{reportSequence.current+=1;};},[load]);
  if(!session)return <Spinner label="Checking reporting permissions…"/>;
  if(!can)return <Notice kind="error">Business reporting permission required.</Notice>;
  const cards=Object.entries(report?.sections??{}).filter(([key])=>key!=="invoices");

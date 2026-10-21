@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Download, FileImage, Plus, RefreshCw, Wallet } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner } from "@/components/ui";
@@ -52,6 +52,8 @@ export default function FinancePage(){
   const [totals,setTotals]=useState<Totals>(zero);
   const [financeReady,setFinanceReady]=useState(false);
   const [loading,setLoading]=useState(true);
+  const reloadSequence=useRef(0);
+  const [hasLoadedEntries,setHasLoadedEntries]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [success,setSuccess]=useState("");
@@ -70,26 +72,38 @@ export default function FinancePage(){
   useEffect(()=>{if(!selected.some(c=>c.id===categoryId))setCategoryId(selected[0]?.id??"");},[selected,categoryId]);
 
   const reload=useCallback(async()=>{
+    const sequence=++reloadSequence.current;
     if(!canReadOwn&&!canAll){setLoading(false);return;}
     setLoading(true);
-    try{
-      const target=view==="all"&&canAll?"all":"mine";
-      const [ledger,sums]=await Promise.all([
-        request<Entry[]>("/finance/entries?view="+target),
-        request<Totals>("/finance/summary?view="+target),
-      ]);
-      setEntries(ledger);setTotals(sums);
-      // A failed policy request must not blank the financial register.
-      const [cats,policies]=await Promise.allSettled([
-        request<Category[]>("/finance/categories"),
-        request<FinancePolicy[]>("/approval-policies"),
-      ]);
-      if(cats.status==="fulfilled")setCategories(cats.value);
-      if(policies.status==="fulfilled")setFinanceReady(policies.value.some(p=>p.category==="FINANCE"&&p.active));
-      setError("");
-    }catch(e){setError(readable(e));}finally{setLoading(false);}
+    const target=view==="all"&&canAll?"all":"mine";
+    // Treat the ledger and summary independently: an unavailable summary must
+    // never make saved transactions disappear from the register on refresh.
+    const [ledger,sums,cats,policies]=await Promise.allSettled([
+      request<Entry[]>("/finance/entries?view="+target),
+      request<Totals>("/finance/summary?view="+target),
+      request<Category[]>("/finance/categories"),
+      request<FinancePolicy[]>("/approval-policies"),
+    ]);
+    if(sequence!==reloadSequence.current)return;
+    if(ledger.status==="fulfilled"){
+      setEntries(ledger.value);
+      setHasLoadedEntries(true);
+    }
+    if(sums.status==="fulfilled")setTotals(sums.value);
+    if(cats.status==="fulfilled")setCategories(cats.value);
+    if(policies.status==="fulfilled")setFinanceReady(policies.value.some(
+      p=>p.category==="FINANCE"&&p.active));
+    const problems=[
+      ...(ledger.status==="rejected"?["Financial register could not be refreshed: "+readable(ledger.reason)]:[]),
+      ...(sums.status==="rejected"?["Financial totals could not be refreshed: "+readable(sums.reason)]:[]),
+    ];
+    setError(problems.join(" "));
+    setLoading(false);
   },[request,view,canReadOwn,canAll]);
-  useEffect(()=>{void reload();},[reload]);
+  useEffect(()=>{
+    void reload();
+    return()=>{reloadSequence.current+=1;};
+  },[reload]);
   useEffect(()=>{
     if(!adminFinance)return;
     let active=true;
@@ -191,12 +205,14 @@ export default function FinancePage(){
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
-  async function deleteExpense(row:Entry){
-    if(!window.confirm("Cancel "+money(row.amount)+" recorded by "+row.enteredBy.displayName+"? This action excludes the expense from totals, preserves its audit trail and cannot be undone."))return;
+  async function deleteEntry(row:Entry){
+    if(!window.confirm("Cancel "+row.kind.toLowerCase()+" "+money(row.amount)+" assigned to "+row.enteredBy.displayName+"? This removes it from posted or pending totals while preserving the approval and audit history. This cannot be undone."))return;
     setBusy(true);setError("");setSuccess("");
     try{
       await request("/finance/entries/"+row.id,{method:"DELETE"});
-      setSuccess("Expense cancelled and excluded from finance totals. The audit record remains.");
+      setSuccess(row.kind==="INCOME"
+        ?"Income cancelled and excluded from finance totals. Audit history retained."
+        :"Expense cancelled and excluded from finance totals. Audit history retained.");
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
@@ -300,7 +316,9 @@ export default function FinancePage(){
       </Card>
     </div>
     <Card title={view==="all"?"Agency financial register":"My financial register"} description="Saved records, including pending, posted, rejected and cancelled entries. Latest 200 shown; CSV export includes up to 5,000.">
-      {loading?<Spinner label="Loading financial entries…"/>:!entries.length?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
+      {loading&&!hasLoadedEntries?<Spinner label="Loading financial entries…"/>:
+        !entries.length&&!error?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
+        !entries.length?<Notice kind="error">The financial register could not be loaded. Saved entries have not been deleted. Retry Refresh.</Notice>:
         <div className="aw-finance-register-scroll" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
             {["Date","Type","Category","Source","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
@@ -322,8 +340,8 @@ export default function FinancePage(){
               {adminFinance&&row.status!=="CANCELLED"&&<>
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
                   onClick={()=>beginEntryEdit(row)} aria-label={"Edit "+row.kind.toLowerCase()+" "+row.id}>Edit</button>
-                {row.kind==="EXPENSE"&&<button type="button" className="btn-secondary text-xs" disabled={busy}
-                  onClick={()=>void deleteExpense(row)} aria-label={"Delete expense "+row.id}>Delete</button>}
+                <button type="button" className="btn-secondary text-xs" disabled={busy}
+                  onClick={()=>void deleteEntry(row)} aria-label={"Delete "+row.kind.toLowerCase()+" "+row.id}>Delete</button>
               </>}
             </div></td>
           </tr>)}</tbody></table></div>}
