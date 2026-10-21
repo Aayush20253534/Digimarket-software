@@ -53,7 +53,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval workflows"})).toBeVisible();
   await page.goto("/app/finance");
-  await expect(page.getByRole("heading",{name:"Income, expenses & billing"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
   await page.getByRole("button",{name:"Add category"}).click();
@@ -63,9 +63,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Category name",{exact:true}).last().fill("CI Admin Category Updated");
   await page.getByRole("button",{name:"Save changes"}).click();
   await expect(page.getByText("CI Admin Category Updated",{exact:true}).last()).toBeVisible();
-  await page.getByRole("tab",{name:"Invoices & payments"}).click();
-  await expect(page.getByRole("tab",{name:"Invoices & payments"})).toHaveAttribute("aria-selected","true");
-  await page.getByRole("tab",{name:"Income & expenses"}).click();
+  await expect(page.getByRole("link",{name:"Invoices & payments"})).toHaveCount(0);
   await page.goto("/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval policy configuration"})).toBeVisible();
   await page.getByRole("button",{name:"Save policy"}).click();
@@ -82,7 +80,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
   await page.goto("/app/notes");
-  await page.getByRole("button",{name:"New note",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Drawn note"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Typed note"})).toBeVisible();
+  await page.getByRole("button",{name:/Drawn note/}).click();
   await page.getByRole("textbox",{name:"Note title"}).fill("CI Notes Studio");
   const canvas=page.locator("canvas.aw-notes-canvas");
   await expect(canvas).toBeVisible();
@@ -98,6 +98,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByLabel("Zoom percentage")).toHaveText("125%");
   await page.getByRole("button",{name:"Add page"}).click();
   await expect(page.getByLabel("Page number")).toHaveText("2 / 2");
+  await page.getByRole("button",{name:"Toggle tool settings"}).click();
   await expect(page.getByRole("region",{name:"Note pages"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Open note page 1"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Open note page 2"})).toBeVisible();
@@ -111,6 +112,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Handwritten Note"}).click();
   await expect(page.getByText("Saved",{exact:true})).toBeVisible({timeout:30000});
   await page.reload();
+  await expect(page.getByRole("button",{name:/Drawn note/})).toBeVisible();
+  await page.locator(".aw-studio-note-open").filter({hasText:"CI Notes Studio"}).click();
   await expect(page.getByRole("textbox",{name:"Note title"})).toHaveValue("CI Notes Studio");
   await expect(page.getByLabel("Page number")).toHaveText("1 / 2");
   await page.getByRole("button",{name:"Typed Note",exact:true}).click();
@@ -208,7 +211,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("link",{name:"Team & accounts"})).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
   await page.goto("/app/finance");
-  await expect(page.getByRole("heading",{name:"Income, expenses & billing"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Agency totals"})).toHaveCount(0);
   for(const width of [320,375,768,1024,1366]){
     await page.setViewportSize({width,height:812});await page.goto("/app/dashboard");

@@ -166,7 +166,7 @@ export default function ClientsPage(){
        {canCreate&&creating&&<DirectoryModal title="Add client" description="Create a client profile directly without converting a lead." onClose={()=>{if(!busy)setCreating(false);}}>
          <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
            {editableFields.map(([key,label])=><FormField key={key} id={"new-client-"+key} label={<>{label}{key!=="websiteUrl"&&key!=="instagramUrl"?<span className="aw-required-star" aria-label="required"> *</span>:<span className="aw-optional-label"> (optional)</span>}</>}>
-             <input id={"new-client-"+key} className="field" autoFocus={key==="businessName"} required={key!=="websiteUrl"&&key!=="instagramUrl"}
+             <input id={"new-client-"+key} aria-label={label} className="field" autoFocus={key==="businessName"} required={key!=="websiteUrl"&&key!=="instagramUrl"}
                type={key==="email"?"email":key.endsWith("Url")?"url":"text"}
                value={createDraft[key]} onChange={e=>setCreateDraft(v=>({...v,[key]:e.target.value}))}/>
            </FormField>)}
