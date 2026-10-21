@@ -24,7 +24,7 @@ export class InsightsService{
   // Personal-only index: creator, assignee, or owner. Broader module permissions
   // must never turn search into an organization-wide directory.
   if(can(a,"leads.read"))parts.push(this.db.lead.findMany({
-   where:{organizationId:org,OR:[{createdById:me},{assignedToId:me}],AND:[{OR:[{businessName:match},{contactName:match},{phone:match},{businessType:match},{location:match},{source:match},{websiteUrl:match},{instagramUrl:match}]}]},
+   where:{organizationId:org,deletedAt:null,OR:[{createdById:me},{assignedToId:me}],AND:[{OR:[{businessName:match},{contactName:match},{phone:match},{businessType:match},{location:match},{source:match},{websiteUrl:match},{instagramUrl:match}]}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,businessName:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"lead",id:x.id,title:x.businessName,detail:"Lead · "+x.status,href:url("leads",x.id)}))));
   if(can(a,"clients.read"))parts.push(this.db.client.findMany({
@@ -84,12 +84,20 @@ export class InsightsService{
   const sections:Record<string,unknown>={};
   const work:Promise<void>[]=[];
   if(can(a,"leads.read"))work.push((async()=>{
-    const [created,converted,overdue]=await Promise.all([
-      this.db.lead.count({where:{organizationId:org,createdAt:{gte:start,lte:end}}}),
-      this.db.lead.count({where:{organizationId:org,status:"WON",updatedAt:{gte:start,lte:end}}}),
-      this.db.lead.count({where:{organizationId:org,nextFollowUpAt:{lt:new Date()},
-        status:{notIn:["WON","LOST"]}}}),
-    ]);sections.leads={created,wonCurrently:converted,overdueFollowUps:overdue};
+    const scope={organizationId:org,deletedAt:null,createdAt:{gte:start,lte:end}};
+    const [created,converted,rejected,approved,pending,meetingProcess,overdue]=await Promise.all([
+      this.db.lead.count({where:scope}),
+      this.db.client.count({where:{organizationId:org,sourceLead:{...scope,status:"APPROVED"}}}),
+      this.db.lead.count({where:{...scope,status:"REJECTED"}}),
+      this.db.lead.count({where:{...scope,status:"APPROVED"}}),
+      this.db.lead.count({where:{...scope,status:"PENDING"}}),
+      this.db.lead.count({where:{...scope,status:"MEETING_PROCESS"}}),
+      this.db.lead.count({where:{organizationId:org,deletedAt:null,nextFollowUpAt:{lt:new Date()},
+        status:{in:["PENDING","MEETING_PROCESS"]}}}),
+    ]);
+    sections.leads={created,converted,approved,rejected,pending,meetingProcess,
+      conversionRatePercent:created?Math.round(converted/created*10000)/100:0,
+      overdueFollowUps:overdue};
   })());
   if(can(a,"clients.read"))work.push(this.db.client.count({where:{organizationId:org,status:"ACTIVE"}})
     .then(count=>{sections.clients={active:count};}));
@@ -135,6 +143,7 @@ export class InsightsService{
   return {from,to,asOf:new Date().toISOString(),sections,
     definitions:{
       period:"UTC dates, inclusive",
+      leadConversion:"Approved leads with linked clients divided by all non-deleted leads created in the selected period; rejected leads are included in the denominator",
       overdue:"Current outstanding records, not a historical snapshot",
       payments:"Verified receipts are included in the posted cash ledger only; invoices are not revenue",
       access:"Only permitted modules and record-level scopes are included",

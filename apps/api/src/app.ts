@@ -108,18 +108,21 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     // Governance accounts do not gain operational access through direct API URLs,
     // even when older role-permission rows still contain legacy grants.
     const operationalPrefixes = [
-      "/notes", "/leads", "/assets", "/asset-folders", "/content",
+      "/notes", "/assets", "/asset-folders", "/content",
       "/search",
     ];
     app.use("/api/v1", async (request,response,next)=>{
       const protectedOperation=operationalPrefixes.some(prefix=>request.path===prefix||request.path.startsWith(prefix+"/"));
-      if(!protectedOperation)return next();
+      const leadOperation=request.path==="/leads"||request.path.startsWith("/leads/");
+      if(!protectedOperation&&!leadOperation)return next();
       const bearer=request.get("authorization");
       if(!bearer?.startsWith("Bearer "))return next();
       try{
         const principal=await authService.authenticate(bearer.slice(7));
         if(principal.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")){
-          return response.status(403).json({error:{code:"ADMIN_OPERATION_RESTRICTED",message:"Operational modules are not available to administrator accounts"}});
+          if(leadOperation&&(request.method==="GET"||request.method==="DELETE"))return next();
+          if(!leadOperation)return response.status(403).json({error:{code:"ADMIN_OPERATION_RESTRICTED",message:"Operational modules are not available to administrator accounts"}});
+          return response.status(403).json({error:{code:"ADMIN_OPERATION_RESTRICTED",message:"Administrators may view and delete leads but cannot submit operational changes"}});
         }
         next();
       }catch(error){next(error);}

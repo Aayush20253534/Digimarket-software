@@ -16,7 +16,7 @@ const sections:readonly Group[]=[
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
  {title:"Relationships",items:[
-  {label:"Leads CRM",operational:true,href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
+  {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]}
  ]},
  {title:"Delivery",items:[
