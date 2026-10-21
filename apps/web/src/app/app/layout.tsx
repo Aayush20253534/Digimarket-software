@@ -140,7 +140,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <main id="workspace-content" className="aw-work-content">
     <div className="aw-work-content-width">
      {signOutError&&<div className="mb-5"><AWNotice tone="error">{signOutError}</AWNotice></div>}
-     {isAdmin&&["/app/notes","/app/search","/app/leads","/app/content","/app/assets"].some(p=>pathname===p||pathname.startsWith(p+"/"))?<AWNotice tone="error">This operational module is not available to administrator accounts.</AWNotice>:children}
+     {isAdmin&&["/app/notes","/app/search","/app/content","/app/assets"].some(p=>pathname===p||pathname.startsWith(p+"/"))?<AWNotice tone="error">This operational module is not available to administrator accounts.</AWNotice>:children}
     </div>
    </main>
   </div>
