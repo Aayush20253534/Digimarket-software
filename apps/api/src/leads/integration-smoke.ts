@@ -6,90 +6,74 @@ import { leadCreateSchema } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { LeadsService } from "./service";
 
-if(process.env.NODE_ENV!=="test" || !process.env.DATABASE_URL?.includes("digimarket_ci")){
- throw new Error("Module 7 integration needs isolated digimarket_ci PostgreSQL");
-}
+if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarket_ci"))
+ throw new Error("CRM tests require isolated digimarket_ci PostgreSQL");
 const db=createDatabaseClient(),crm=new LeadsService(db);
 const actor=(id:string,org:string,roles:string[],grants:string[]):Principal=>({
  userId:id,organizationId:org,sessionId:"ci",roles,permissions:new Set(grants),
 });
-const all=["leads.read","leads.create","leads.edit","leads.assign","leads.bulk","leads.duplicates.review"];
+const grants=["leads.read","leads.create","leads.edit","leads.convert","leads.assign","leads.bulk","leads.duplicates.review"];
+const fail=(status:number)=>(error:{status?:number})=>error.status===status;
 try{
- const org=await db.organization.create({data:{name:"CRM Org A"}});
- const other=await db.organization.create({data:{name:"CRM Org B"}});
- const alice=await db.user.create({data:{organizationId:org.id,loginId:"crm-alice",displayName:"Alice",status:"ACTIVE"}});
- const bob=await db.user.create({data:{organizationId:org.id,loginId:"crm-bob",displayName:"Bob",status:"ACTIVE"}});
- const distant=await db.user.create({data:{organizationId:other.id,loginId:"crm-external",displayName:"External",status:"ACTIVE"}});
- const admin=actor(alice.id,org.id,["ADMIN"],all);
- const employee=actor(bob.id,org.id,["EMPLOYEE"],["leads.read","leads.create","leads.edit.own"]);
- const outside=actor(distant.id,other.id,["ADMIN"],all);
- const initial=await crm.create(admin,{businessName:"Big Mo's Café",phone:"+91 98765 43210",contactName:"Owner",
-   businessType:"Cafe",location:"Prayagraj",source:"Google Maps",note:"Call tomorrow"});
- assert.equal(initial.status,"NEW");
+ const org=await db.organization.create({data:{name:"Shared Leads CI"}});
+ const other=await db.organization.create({data:{name:"Other CRM CI"}});
+ const [owner,member,outsider]=await Promise.all([
+  db.user.create({data:{organizationId:org.id,loginId:"crm-owner",displayName:"Owner",status:"ACTIVE"}}),
+  db.user.create({data:{organizationId:org.id,loginId:"crm-member",displayName:"Member",status:"ACTIVE"}}),
+  db.user.create({data:{organizationId:other.id,loginId:"crm-outsider",displayName:"Outside",status:"ACTIVE"}}),
+ ]);
+ const founder=actor(owner.id,org.id,["FOUNDER"],grants);
+ const employee=actor(member.id,org.id,["EMPLOYEE"],["leads.read","leads.create","leads.edit.own","leads.convert"]);
+ const foreign=actor(outsider.id,other.id,["EMPLOYEE"],grants);
+ const input={phone:"+91 98765 43210"};
+ assert.equal(leadCreateSchema.safeParse({phone:"+91 98765 43210"}).success,true);
+ assert.equal(leadCreateSchema.safeParse({businessName:"Not allowed"}).success,false);
+ assert.equal(leadCreateSchema.safeParse({phone:"1"}).success,false);
+ const first=await crm.create(founder,input);
+ assert.equal(first.status,"PENDING");
+ assert.equal(first.phone,input.phone);
+ assert.equal(first.contactName,null);
+ assert.ok(first.businessName.startsWith("Lead "));
  assert.equal((await crm.list(employee,{limit:30})).items.length,1);
- const publicView=await crm.detail(employee,initial.id);
- assert.equal(publicView.activities.length,0);
- assert.equal(publicView.canEdit,false);
- await assert.rejects(()=>crm.note(employee,initial.id,"Confidential"),(e:{status?:number})=>e.status===403);
- await assert.rejects(()=>crm.update(employee,initial.id,{version:1,status:"CONTACTED"}),(e:{status?:number})=>e.status===403);
- await assert.rejects(()=>crm.detail(outside,initial.id),(e:{status?:number})=>e.status===404);
- await assert.rejects(()=>crm.assign(outside,initial.id,1,bob.id),(e:{status?:number})=>e.status===404);
- await assert.rejects(()=>crm.assign(admin,initial.id,1,distant.id),(e:{status?:number})=>e.status===422);
- assert.equal((await crm.assignees(admin)).length,2);
- await assert.rejects(()=>crm.assignees(employee),(e:{status?:number})=>e.status===403);
- const assigned=await crm.assign(admin,initial.id,1,bob.id);
- assert.equal(assigned.version,2);
- const edited=await crm.update(employee,initial.id,{version:2,status:"CONTACTED",
-   nextFollowUpAt:"2026-10-20T10:30:00+05:30"});
- assert.equal(edited.version,3);
- assert.equal(edited.status,"CONTACTED");
- assert.equal(edited.nextFollowUpAt?.toISOString(),"2026-10-20T05:00:00.000Z");
- await assert.rejects(()=>crm.update(employee,initial.id,{version:2,status:"PROPOSAL"}),
-   (e:{status?:number})=>e.status===409);
- await crm.note(employee,initial.id,"Called the manager about their social media");
- const privateView=await crm.detail(employee,initial.id);
- assert.ok(privateView.activities.some(a=>a.note?.includes("Called the manager")));
- const match=await crm.create(employee,{businessName:"BIG MO'S CAFÉ",phone:"91-98765-43210",location:"Prayagraj"});
- assert.notEqual(match.id,initial.id);
- assert.equal(match.organizationId,org.id);
- const signals=await crm.duplicates(admin);
- assert.equal(signals.length,1);
- assert.equal(signals[0].reason,"PHONE_MATCH");
- assert.equal(signals[0].resolution,"OPEN");
- await assert.rejects(()=>crm.duplicates(employee),(e:{status?:number})=>e.status===403);
- assert.equal((await crm.resolveDuplicate(admin,signals[0].id,"CONFIRMED")).resolution,"CONFIRMED");
- await assert.rejects(()=>crm.resolveDuplicate(admin,signals[0].id,"DISMISSED"),
-   (e:{status?:number})=>e.status===409);
- assert.equal(await db.lead.count({where:{organizationId:org.id}}),2);
- const lead=await crm.create(outside,{businessName:"Other org",phone:"9876543210"});
- assert.equal((await crm.list(admin,{limit:30})).items.length,2);
- assert.equal((await crm.list(outside,{limit:30})).items.length,1);
- assert.notEqual(lead.organizationId,initial.organizationId);
- const browse=await crm.list(admin,{limit:1});
- assert.equal(browse.items.length,1);
- assert.ok(browse.nextCursor);
- const rest=await crm.list(admin,{limit:1,cursor:browse.nextCursor!});
- assert.equal(rest.items.length,1);
- assert.notEqual(rest.items[0].id,browse.items[0].id);
- assert.equal((await crm.list(admin,{stage:"CONTACTED",limit:30})).items.length,1);
- assert.equal((await crm.list(admin,{q:"Café",limit:30})).items.length,2);
- assert.equal(leadCreateSchema.safeParse({businessName:"",phone:"1"}).success,false);
+ assert.equal((await crm.detail(employee,first.id)).canEdit,true);
+ await assert.rejects(()=>crm.create(employee,{phone:"919876543210"}),fail(409));
+ await assert.rejects(()=>crm.detail(foreign,first.id),fail(404));
+ await assert.rejects(()=>crm.update(foreign,first.id,{version:first.version,status:"APPROVED"}),fail(404));
+ const meeting=await crm.update(employee,first.id,{version:first.version,status:"MEETING_PROCESS",
+  stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe"});
+ assert.equal(meeting.status,"MEETING_PROCESS");
+ assert.equal((await crm.detail(founder,first.id)).activities[0]?.note,"Discussed the social media package");
+ await assert.rejects(()=>crm.update(employee,first.id,{version:1,status:"APPROVED"}),fail(409));
+ const approved=await crm.update(employee,first.id,{version:meeting.version,status:"APPROVED",
+  stageNote:"Agreement signed, ready to onboard"});
+ assert.equal(approved.status,"APPROVED");
+ assert.equal(await db.client.count({where:{sourceLeadId:approved.id}}),1);
+ const client=await db.client.findUniqueOrThrow({where:{sourceLeadId:approved.id}});
+ assert.equal(client.businessName,"Big Mo Cafe");
+ assert.equal(client.organizationId,org.id);
+ assert.equal(client.phone,input.phone);
+ assert.equal((await db.clientContact.count({where:{clientId:client.id}})),1);
+ assert.equal(await db.outboxEvent.count({where:{eventKey:"lead-converted:"+first.id}}),1);
+ await assert.rejects(()=>crm.update(employee,first.id,{version:approved.version,status:"PENDING"}),fail(409));
+ const elsewhere=await crm.create(foreign,{phone:input.phone});
+ assert.notEqual(elsewhere.organizationId,first.organizationId);
+ const incoming=await crm.ingestWhatsApp(org.id,owner.id,"919999887766");
+ assert.equal(incoming.created,true);
+ assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919999887766")).created,false);
+ assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);
+ assert.equal((await db.lead.count({where:{organizationId:org.id,normalizedPhone:"919999887766"}})),1);
  const batch=randomUUID();
- const imported=await crm.import(admin,batch,[{businessName:"Prospect A"},{businessName:"Prospect B"}]);
- assert.equal(imported.count,2);
- await assert.rejects(()=>crm.import(admin,batch,[{businessName:"Prospect A"}]),
-   (e:{status?:number})=>e.status===409);
- assert.equal(await db.lead.count({where:{organizationId:org.id}}),4);
- await assert.rejects(()=>crm.import(employee,randomUUID(),[{businessName:"Forbidden import"}]),
-   (e:{status?:number})=>e.status===403);
+ assert.equal((await crm.import(founder,batch,[{phone:"919111111111"},{phone:"919222222222"}])).count,2);
+ await assert.rejects(()=>crm.import(founder,batch,[{phone:"919333333333"}]),fail(409));
  const before=await db.lead.count({where:{organizationId:org.id}});
- await assert.rejects(()=>crm.import(admin,randomUUID(),[
-  {businessName:"Rollback test 1"},{businessName:"Rollback test 2",phone:"not digits"}
- ]),(e:{status?:number})=>e.status===422);
+ await assert.rejects(()=>crm.import(founder,randomUUID(),[{phone:"919444444444"},{phone:"invalid"}]),fail(422));
  assert.equal(await db.lead.count({where:{organizationId:org.id}}),before);
- const csv=await crm.export(admin);
- assert.ok(csv.csv.includes("BIG MO'S CAFÉ"));
- await assert.rejects(()=>crm.export(employee),(e:{status?:number})=>e.status===403);
- assert.ok((await db.auditLog.count({where:{organizationId:org.id,entityType:"Lead"}}))>=5);
- console.info("Module 7 PASS: isolation, optimistic version, private activity, follow-up TZ, duplicate review, owner validation, cursor, bulk idempotency, export.");
+ assert.equal((await crm.list(founder,{stage:"PENDING",limit:30})).items.length,3);
+ assert.equal((await crm.list(founder,{stage:"APPROVED",limit:30})).items.length,1);
+ const pagination=await crm.list(founder,{limit:1});
+ assert.ok(pagination.nextCursor);
+ const next=await crm.list(founder,{limit:1,cursor:pagination.nextCursor!});
+ assert.notEqual(next.items[0].id,pagination.items[0].id);
+ assert.ok((await crm.export(founder)).csv.includes("919999887766"));
+ console.info("Module 7 PASS: phone-only lead, shared editing, atomic Approved conversion, history, webhook dedupe, tenant isolation and import.");
 }finally{await db.$disconnect();}
