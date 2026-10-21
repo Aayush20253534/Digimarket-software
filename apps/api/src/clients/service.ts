@@ -8,7 +8,6 @@ import { AuthError, forbidden, invalid } from "../auth/errors";
 const deny=(a:Principal,permission:string)=>{if(!a.permissions.has(permission))throw forbidden();};
 const missing=()=>new AuthError(404,"NOT_FOUND","Client not found");
 const conflict=()=>new AuthError(409,"VERSION_CONFLICT","Client changed; refresh before editing");
-const converted=()=>new AuthError(409,"ALREADY_CONVERTED","This lead already has a client record");
 const optional=(value?:string)=>value?.trim()||null;
 const privateFields=["businessName","businessType","phone","email","location","websiteUrl","instagramUrl","facebookUrl","notes"] as const;
 
@@ -48,6 +47,7 @@ export class ClientsService {
        sourceLead:{select:{id:true,businessName:true,status:true}}}});
  }
  async create(_a:Principal,_input:ClientCreateInput):Promise<never>{
+   void _a;void _input;
    throw new AuthError(405,"LEAD_APPROVAL_REQUIRED","Approve a lead to create a client");
  }
 
@@ -104,6 +104,7 @@ export class ClientsService {
    });
  }
  async convert(_a:Principal,_leadId:string,_version:number):Promise<never>{
+   void _a;void _leadId;void _version;
    throw new AuthError(405,"AUTO_CONVERSION_ONLY","Clients are created when the lead is Approved");
  }
 }

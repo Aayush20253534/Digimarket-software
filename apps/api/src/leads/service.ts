@@ -25,6 +25,7 @@ type Tx=Prisma.TransactionClient;
 export class LeadsService {
  constructor(private readonly db:PrismaClient){}
  private canEdit(a:Principal,_r:{assignedToId:string|null;createdById:string}){
+   void _r;
    return a.permissions.has("leads.edit") || a.permissions.has("leads.edit.own");
  }
  private async find(a:Principal,id:string){
@@ -82,7 +83,7 @@ export class LeadsService {
      roles:["FOUNDER"],permissions:new Set(["leads.create"])};
    return this.db.$transaction(async tx=>{
      // One sender can trigger concurrent Meta deliveries; serialize by tenant and phone.
-     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId+":"+normalized},0))`;
+     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId+":"+normalized},0))`;
      const previous=await tx.lead.findFirst({where:{organizationId,normalizedPhone:normalized}});
      if(previous)return {id:previous.id,created:false};
      const client=await tx.client.findFirst({where:{organizationId,OR:[
