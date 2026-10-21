@@ -95,13 +95,7 @@ export default function LeadsPage(){
  const focusedRef=useRef(false);
  const open=async(id:string)=>{
    setError("");try{
-     useEffect(()=>{
-  if(focusedRef.current||!canRead)return;
-  const id=new URLSearchParams(window.location.search).get("focus");
-  if(!id||!/^[0-9a-f-]{36}$/i.test(id))return;
-  focusedRef.current=true;void open(id);
- },[canRead]);
- const detail=await request<Detail>("/leads/"+id);
+     const detail=await request<Detail>("/leads/"+id);
      setSelected(detail);setEditStage(detail.status);setOwner(detail.assignedToId??"");
      setFollowup(detail.nextFollowUpAt?new Date(detail.nextFollowUpAt).toISOString().slice(0,16):"");
      setNote("");
@@ -110,6 +104,12 @@ export default function LeadsPage(){
        websiteUrl:detail.websiteUrl??"",instagramUrl:detail.instagramUrl??""});
    }catch(e){setError(errText(e));}
  };
+ useEffect(()=>{
+  if(focusedRef.current||!canRead)return;
+  const id=new URLSearchParams(window.location.search).get("focus");
+  if(!id||!/^[0-9a-f-]{36}$/i.test(id))return;
+  focusedRef.current=true;void open(id);
+ },[canRead]);
  async function convert(){
    if(!selected)return;setBusy(true);setError("");setMessage("");
    try{
