@@ -209,6 +209,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     const view = request.nextUrl.searchParams.get("view");
     if (view && (path==="approvals"?["mine","queue","history"]:["mine","all"]).includes(view)) url.searchParams.set("view", view);
   }
+  if(path==="notes"&&request.nextUrl.searchParams.get("trash")==="true")url.searchParams.set("trash","true");
   if(noteDetailPattern.test(path)&&request.method==="DELETE"){
     const version=request.nextUrl.searchParams.get("version");
     if(version!==null)url.searchParams.set("version",version);
