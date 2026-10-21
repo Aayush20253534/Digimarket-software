@@ -1,16 +1,16 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Plus, RefreshCw, Upload } from "lucide-react";
+import { Download, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryModal } from "@/components/directory-modal";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
-type Stage="PENDING"|"MEETING_PROCESS"|"APPROVED";
-const stages:Stage[]=["PENDING","MEETING_PROCESS","APPROVED"];
-const stageLabel=(s:Stage)=>s==="MEETING_PROCESS"?"Meeting Process":s==="APPROVED"?"Approved":"Pending";
+type Stage="PENDING"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
+const stages:Stage[]=["PENDING","MEETING_PROCESS","APPROVED","REJECTED"];
+const stageLabel=(s:Stage)=>s==="MEETING_PROCESS"?"Meeting Process":s==="APPROVED"?"Approved":s==="REJECTED"?"Rejected":"Pending";
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
  status:Stage;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
@@ -20,6 +20,7 @@ type Duplicate={id:string;reason:string;resolution:string;lead:{id:string;busine
  candidate:{id:string;businessName:string;phone:string|null}};
 type Detail=Lead&{activities:Activity[];duplicates:Duplicate[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null};
+type Metrics={total:number;pending:number;meetingProcess:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type NewLead={phone:string};
 const blank:NewLead={phone:""};
 const errText=(e:unknown)=>e instanceof ApiError?e.message:"Lead request failed.";
@@ -42,11 +43,14 @@ const headers:Record<string,string>={phone:"phone",phone_number:"phone",mobile:"
 export default function LeadsPage(){
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("leads.read");
- const canCreate=!!session?.identity.permissions.includes("leads.create");
- const canAssign=!!session?.identity.permissions.includes("leads.assign");
- const canBulk=!!session?.identity.permissions.includes("leads.bulk");
- const canReview=!!session?.identity.permissions.includes("leads.duplicates.review");
+ const isAdmin=!!session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN");
+ const canDelete=!!session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN"||role==="FOUNDER");
+ const canCreate=!isAdmin&&!!session?.identity.permissions.includes("leads.create");
+ const canAssign=!isAdmin&&!!session?.identity.permissions.includes("leads.assign");
+ const canBulk=!isAdmin&&!!session?.identity.permissions.includes("leads.bulk");
+ const canReview=!isAdmin&&!!session?.identity.permissions.includes("leads.duplicates.review");
  const [items,setItems]=useState<Lead[]>([]);
+ const [metrics,setMetrics]=useState<Metrics|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [legacySort,setLegacySort]=useState(false);
  const [cursor,setCursor]=useState<string|null>(null);
@@ -86,6 +90,7 @@ export default function LeadsPage(){
       result=await request<Page>("/leads?"+q);setLegacySort(true);
      }
      setItems(result.items);setNextCursor(result.nextCursor);setError("");
+     request<Metrics>("/leads/metrics").then(setMetrics).catch(()=>{});
    }catch(e){setError(errText(e));}finally{setLoading(false);}
  },[canRead,request,stage,search,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
@@ -119,7 +124,18 @@ export default function LeadsPage(){
    try{
      await request("/leads/"+selected.id,{method:"PUT",body:{...updating,status:editStage,
        stageNote,version:selected.version}});
-     setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":"Shared lead and status note saved.");await open(selected.id);await load();
+     setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":"Shared lead and status note saved.");await open(selected.id);await load();
+   }catch(e){setError(errText(e));}finally{setBusy(false);}
+ }
+ async function deleteLead(){
+   if(!selected||!canDelete)return;
+   if(!window.confirm("Delete this lead from the shared CRM? Its history remains archived and any converted client is preserved."))return;
+   setBusy(true);setError("");setMessage("");
+   try{
+     await request("/leads/"+selected.id,{method:"DELETE",body:{version:selected.version}});
+     setSelected(null);setCursor(null);setHistory([]);
+     setMessage("Lead removed from the active CRM. Linked clients are preserved.");
+     await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function assign(e:FormEvent){
@@ -203,6 +219,16 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
+   {metrics&&<section aria-label="Lead conversion metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+     {([["Total leads",metrics.total],["Approved clients",metrics.converted],
+       ["Rejected",metrics.rejected],["Pending",metrics.pending],
+       ["Conversion rate",metrics.conversionRatePercent+"%"]] as const).map(([label,value])=>
+       <div key={label} className="rounded-xl border border-slate-200/15 p-3">
+         <p className="text-xs text-slate-500">{label}</p>
+         <p className="mt-1 text-xl font-semibold">{value}</p>
+       </div>)}
+     <p className="col-span-full text-xs text-slate-500">Conversion = linked clients from approved leads ÷ all non-deleted leads. Rejected leads remain in the denominator.</p>
+   </section>}
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage||"All stages"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
@@ -255,7 +281,7 @@ export default function LeadsPage(){
          <div className="space-y-5">
            <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · {selected.source||"No source"}</p>
            {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href="/app/clients">client record</Link>.</p>}
-           {selected.canEdit?<form onSubmit={edit} className="space-y-3">
+           {selected.canEdit&&!isAdmin?<form onSubmit={edit} className="space-y-3">
              {(["contactName","businessName","businessType"] as const).map(k=>
                <FormField key={k} id={"edit-"+k} label={k==="contactName"?"Contact name":k==="businessName"?"Business name":"Business type"}>
                  <input id={"edit-"+k} className="field" maxLength={k==="businessName"?180:k==="contactName"?160:120}
@@ -270,18 +296,24 @@ export default function LeadsPage(){
              </FormField>
              <button className="btn-primary" type="submit" disabled={busy}>Save details and stage</button>
            </form>:<p className="text-sm text-slate-600">Basic lead details are shared; editing and private activity require assignment or permission.</p>}
+           {canDelete&&<div className="border-t border-slate-200/20 pt-4">
+             <button type="button" className="btn-secondary" disabled={busy} onClick={()=>void deleteLead()}>
+               <Trash2 className="mr-2 inline h-4 w-4"/>Delete lead
+             </button>
+             <p className="mt-2 text-xs text-slate-500">Removes this lead from the active list. An approved client and audit history are retained.</p>
+           </div>}
            {canAssign&&<form className="space-y-2 border-t pt-4" onSubmit={assign}>
              <FormField id="lead-owner" label="Assigned owner"><select id="lead-owner" className="field" value={owner} onChange={e=>setOwner(e.target.value)}>
                <option value="">Unassigned</option>{staff.filter(u=>u.status==="ACTIVE").map(u=><option key={u.id} value={u.id}>{u.displayName} ({u.loginId})</option>)}
              </select></FormField>
              <button className="btn-secondary" type="submit" disabled={busy}>Update owner</button>
            </form>}
-           {selected.canEdit&&<form className="space-y-2 border-t pt-4" onSubmit={saveNote}>
+           {selected.canEdit&&!isAdmin&&<form className="space-y-2 border-t pt-4" onSubmit={saveNote}>
              <FormField id="activity-note" label="Activity note"><textarea id="activity-note" className="field min-h-20" required maxLength={2000}
                value={note} onChange={e=>setNote(e.target.value)}/></FormField>
              <button className="btn-secondary" type="submit" disabled={busy||!note.trim()}>Add note</button>
            </form>}
-           {selected.canEdit&&<div className="border-t pt-4">
+           {selected.canEdit&&!isAdmin&&<div className="border-t pt-4">
              <h3 className="font-semibold">Activity timeline</h3>
              <div className="mt-3 space-y-2">{selected.activities.map(a=><div key={a.id} className="rounded-lg bg-slate-50 p-3 text-xs">
                <p className="font-semibold">{a.kind.replaceAll("_"," ")} · {a.actor.displayName}</p>
