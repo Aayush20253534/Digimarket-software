@@ -33,6 +33,7 @@ const endpoints: Record<string, string[]> = {
   "finance/summary": ["GET"],
   "finance/export": ["GET"],
   "leads": ["GET","POST"],
+  "leads/metrics": ["GET"],
   "clients": ["GET","POST"],
   "assets": ["GET"],
   "projects": ["GET","POST"],
@@ -140,7 +141,7 @@ function permitted(path: string, method: string): boolean {
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (clientChildrenPattern.test(path)) return method === "POST";
   if (clientConvertPattern.test(path)) return method === "POST";
-  if (leadDetailPattern.test(path)) return ["GET","PUT"].includes(method);
+  if (leadDetailPattern.test(path)) return ["GET","PUT","DELETE"].includes(method);
   if (leadAssignPattern.test(path)) return method === "PUT";
   if (leadNotesPattern.test(path)||leadDuplicateReviewPattern.test(path)) return method === "POST";
   if (financeCategoryDetailPattern.test(path)||financeEntryDetailPattern.test(path)) return ["PUT","DELETE"].includes(method);
