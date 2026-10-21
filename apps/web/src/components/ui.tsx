@@ -46,11 +46,14 @@ export function Notice({ children, kind = "info" }: { children: ReactNode; kind?
   </div>;
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, rectangular = false }: { status: string; rectangular?: boolean }) {
   const classes = ["ACTIVE","APPROVED"].includes(status) ? "bg-emerald-50 text-emerald-700"
     : ["DISABLED","REJECTED"].includes(status) ? "bg-red-50 text-red-700"
     : "bg-amber-50 text-amber-700";
-  return <span className={"inline-flex rounded-full px-2.5 py-1 text-xs font-semibold " + classes}>{status.replaceAll("_", " ")}</span>;
+  // The lead register's subtitle rule excludes .aw-status-badge; use it only for
+  // rectangular badges so other modules retain their existing pill appearance.
+  const shape = rectangular ? "aw-status-badge inline-flex w-fit max-w-full items-center rounded-md" : "inline-flex rounded-full";
+  return <span className={shape + " px-2.5 py-1 text-xs font-semibold " + classes}>{status.replaceAll("_", " ")}</span>;
 }
 
 export function FormField({ label, id, children, help }: { label: ReactNode; id: string; children: ReactNode; help?: string }) {
