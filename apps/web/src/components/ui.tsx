@@ -53,7 +53,7 @@ export function StatusBadge({ status }: { status: string }) {
   return <span className={"inline-flex rounded-full px-2.5 py-1 text-xs font-semibold " + classes}>{status.replaceAll("_", " ")}</span>;
 }
 
-export function FormField({ label, id, children, help }: { label: string; id: string; children: ReactNode; help?: string }) {
+export function FormField({ label, id, children, help }: { label: ReactNode; id: string; children: ReactNode; help?: string }) {
   return <div className="space-y-1.5">
     <label htmlFor={id} className="block text-sm font-semibold text-slate-700">{label}</label>
     {children}
