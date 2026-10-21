@@ -81,6 +81,9 @@ enum LeadStage {
   PROPOSAL
   WON
   LOST
+  PENDING
+  MEETING_PROCESS
+  APPROVED
 }
 enum LeadActivityKind {
   CREATED
@@ -528,7 +531,7 @@ model Lead {
   websiteUrl        String?     @db.VarChar(500)
   instagramUrl      String?     @db.VarChar(500)
   source            String?     @db.VarChar(120)
-  status            LeadStage   @default(NEW)
+  status            LeadStage   @default(PENDING)
   assignedToId      String?     @db.Uuid
   createdById       String      @db.Uuid
   nextFollowUpAt    DateTime?   @db.Timestamptz(6)

@@ -21,7 +21,7 @@ const founder = [
   "tasks.read", "tasks.update.own", "content.read", "content.manage", "content.publish", "content.create", "content.edit", "content.approve",
   "invoices.read", "invoices.draft", "invoices.manage", "invoices.issue", "payments.read", "payments.record", "payments.verify", "profitability.read", "profitability.manage", "founders.read", "founders.edit", "assets.upload", "assets.read",
 ] as const;
-const employee = ["notifications.read","search.read","founders.read", "approvals.read", "approvals.submit", "leads.read", "leads.create", "leads.edit.own", "clients.read", "finance.entry.create", "finance.entry.read.own", "projects.read", "projects.deliverables.write", "tasks.read", "tasks.comment", "tasks.update.own"] as const;
+const employee = ["notifications.read","search.read","founders.read", "approvals.read", "approvals.submit", "leads.read", "leads.create", "leads.edit.own", "leads.convert", "clients.read", "clients.edit", "finance.entry.create", "finance.entry.read.own", "projects.read", "projects.deliverables.write", "tasks.read", "tasks.comment", "tasks.update.own"] as const;
 export const systemRoleGrants: Record<SystemRole, readonly string[]> = {
   SUPER_ADMIN: permissionCatalog.map(([key]) => key),
   ADMIN: admin,

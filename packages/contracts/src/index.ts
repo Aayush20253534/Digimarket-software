@@ -79,30 +79,27 @@ export type FinanceEntryAdminEdit=z.infer<typeof financeEntryAdminEditSchema>;
 export const financeCategoryStatusSchema = z.strictObject({active:z.boolean()});
 export const financeViewSchema = z.enum(["mine","all"]);
 
-export const leadStageSchema = z.enum(["NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"]);
+// A phone number is all that is required to create a prospect.
+export const leadStageSchema = z.enum(["PENDING","MEETING_PROCESS","APPROVED"]);
 export const leadCreateSchema = z.strictObject({
-  businessName: z.string().trim().min(2).max(180),
-  contactName: z.string().trim().max(160).optional(),
-  phone: z.string().trim().max(40).optional(),
-  businessType: z.string().trim().max(120).optional(),
-  location: z.string().trim().max(240).optional(),
-  websiteUrl: z.union([z.url({protocol:/^https?$/}).max(500),z.literal("")]).optional(),
-  instagramUrl: z.union([z.url({protocol:/^https?$/}).max(500),z.literal("")]).optional(),
-  source: z.string().trim().max(120).optional(),
-  nextFollowUpAt: z.union([z.iso.datetime({offset:true}),z.literal("")]).optional(),
-  note: z.string().trim().max(2000).optional(),
+ phone:z.string().trim().min(7).max(40),
 });
 export type LeadCreateInput = z.infer<typeof leadCreateSchema>;
-export const leadUpdateSchema = leadCreateSchema.omit({note:true}).partial().extend({
-  version:z.number().int().min(1),status:leadStageSchema.optional(),
-}).strict();
+export const leadUpdateSchema = z.strictObject({
+ version:z.number().int().min(1),
+ contactName:z.string().trim().max(160).optional(),
+ businessName:z.string().trim().max(180).optional(),
+ businessType:z.string().trim().max(120).optional(),
+ status:leadStageSchema.optional(),
+ stageNote:z.string().trim().max(2000).optional(),
+});
 export type LeadUpdateInput = z.infer<typeof leadUpdateSchema>;
 export const leadAssignSchema = z.strictObject({version:z.number().int().min(1),assignedToId:z.uuid().nullable()});
 export const leadNoteSchema = z.strictObject({note:z.string().trim().min(1).max(2000)});
 export const leadDuplicateReviewSchema = z.strictObject({resolution:z.enum(["CONFIRMED","DISMISSED"])});
 export const leadListQuerySchema = z.strictObject({
   stage:leadStageSchema.optional(),
-  sort:z.enum(["businessName","contactName","location","status","nextFollowUpAt"]).optional(),
+  sort:z.enum(["businessName","contactName","status","createdAt"]).optional(),
   direction:z.enum(["asc","desc"]).optional(),
   assignedToId:z.uuid().optional(),
   q:z.string().trim().max(100).optional(),
