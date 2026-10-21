@@ -130,6 +130,15 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Starred"}).click();
   await expect(page.getByRole("button",{name:"Unstar CI Notes Studio"})).toBeVisible();
 
+  // Trash is recoverable; permanent deletion is routed through the authenticated web gateway.
+  page.once("dialog",dialog=>void dialog.accept());
+  await page.getByRole("button",{name:"Move CI Notes Studio to Trash"}).click();
+  await page.getByRole("button",{name:"Trash",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Permanently delete CI Notes Studio"})).toBeVisible();
+  page.once("dialog",dialog=>void dialog.accept());
+  await page.getByRole("button",{name:"Permanently delete CI Notes Studio"}).click();
+  await expect(page.getByRole("button",{name:"Permanently delete CI Notes Studio"})).toHaveCount(0);
+
   await page.goto("/app/assets");
   await expect(page.getByRole("heading",{name:"My Drive"})).toBeVisible();
   await page.getByRole("button",{name:"New",exact:true}).click();
@@ -137,6 +146,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("textbox",{name:"New folder name"}).fill("CI Campaign Artwork");
   await page.getByRole("button",{name:"Create folder"}).click();
   await expect(page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true})).toBeVisible();
+
+  await page.getByRole("button",{name:"List view"}).click();
+  await expect(page.locator(".aw-drive-folders-list")).toBeVisible();
+  await page.getByRole("button",{name:"Grid view"}).click();
+  await expect(page.locator(".aw-drive-folders-grid")).toBeVisible();
   await page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true}).click();
   await page.getByRole("button",{name:"Go back"}).click();
   await expect(page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true})).toBeVisible();
