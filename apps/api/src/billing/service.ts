@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import type { Principal } from "../auth/service";
+import { founderPolicy, isFounder } from "../approvals/founder";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 import type { InvoiceDraftInput,InvoiceEditInput,InvoiceListInput,PaymentRecordInput,BillingScheduleInput } from "@digimarket/contracts";
 import {calculateLines,D,dated,out} from "./math";
@@ -158,6 +159,64 @@ export class BillingService{
   for(const i of invoices){
     const portion=D(input.allocations.find(x=>x.invoiceId===i.id)!.amount);
     if(portion.gt(i.total.minus(i.paidTotal)))throw invalid("Allocation exceeds invoice balance");
+  }
+  // Founders record and settle a verified payment atomically. Other roles
+  // retain the two-person verification workflow.
+  if(isFounder(a)){
+   try{return await retry(()=>this.db.$transaction(async tx=>{
+    const now=new Date();
+    const payment=await tx.payment.create({data:{
+     organizationId:a.organizationId,clientId:input.clientId,recordedById:a.userId,
+     verifiedById:a.userId,verifiedAt:now,status:"VERIFIED",
+     categoryId:category.id,idempotencyKey:input.idempotencyKey,
+     amount:amount.toFixed(4),receivedOn:dated(input.receivedOn),method:input.method,
+     reference:input.reference,allocations:{create:input.allocations.map(x=>({
+      invoiceId:x.invoiceId,amount:x.amount,
+     }))},
+    }});
+    for(const allocation of input.allocations){
+     const invoice=await tx.invoice.findFirst({where:{
+      id:allocation.invoiceId,organizationId:a.organizationId,
+      clientId:input.clientId,status:"ISSUED",
+     }});
+     const portion=D(allocation.amount);
+     if(!invoice||portion.gt(invoice.total.minus(invoice.paidTotal)))
+      throw invalid("Invoice has insufficient outstanding balance");
+     const changed=await tx.invoice.updateMany({where:{
+      id:invoice.id,organizationId:a.organizationId,status:"ISSUED",version:invoice.version,
+     },data:{paidTotal:{increment:portion},version:{increment:1}}});
+     if(changed.count!==1)throw clash();
+    }
+    const policy=await founderPolicy(tx,a.organizationId,"FINANCE");
+    const approval=await tx.approvalRequest.create({data:{
+     organizationId:a.organizationId,policyId:policy.id,requesterId:a.userId,
+     title:"Founder client payment",description:"Direct invoice settlement",
+     referenceType:"FINANCE_ENTRY",status:"APPROVED",decidedAt:now,
+     approverRoleKeys:policy.approverRoleKeys,
+    }});
+    await tx.approvalDecision.create({data:{
+     requestId:approval.id,actorId:a.userId,outcome:"APPROVED",
+     reason:"Founder payment posted without separate verification",
+    }});
+    const ledger=await tx.financialTransaction.create({data:{
+     organizationId:a.organizationId,enteredById:a.userId,categoryId:category.id,
+     approvalRequestId:approval.id,idempotencyKey:input.idempotencyKey,kind:"INCOME",
+     amount:amount.toFixed(4),currencyCode:payment.currencyCode,
+     occurredOn:dated(input.receivedOn),method:input.method,
+     merchantOrSource:"Client invoice settlement",description:"Founder payment "+payment.id,
+     status:"POSTED",postedAt:now,
+    }});
+    await tx.approvalRequest.update({where:{id:approval.id},data:{referenceId:ledger.id}});
+    await tx.payment.update({where:{id:payment.id},data:{ledgerEntryId:ledger.id,version:{increment:1}}});
+    await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+     action:"payments.founder_recorded_and_posted",entityType:"Payment",entityId:payment.id,
+     afterRedacted:{status:"VERIFIED",ledgerId:ledger.id}}});
+    await tx.outboxEvent.create({data:{organizationId:a.organizationId,
+     eventKey:"payment.verified."+payment.id,kind:"payments.verified",
+     aggregateType:"Payment",aggregateId:payment.id,
+     payloadMinimal:{paymentId:payment.id,ledgerId:ledger.id}}});
+    return tx.payment.findUniqueOrThrow({where:{id:payment.id}});
+   },serial));}catch(e){if((e as {code?:string}).code==="P2002")throw duplicate();throw e;}
   }
   try{return await this.db.$transaction(async tx=>{
    const p=await tx.payment.create({data:{organizationId:a.organizationId,clientId:input.clientId,
