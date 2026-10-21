@@ -113,6 +113,34 @@ try{
   assert.equal((await finance.removeCategory(manager,exp.id)).archived,true);
   assert.equal((await db.financialCategory.findUniqueOrThrow({where:{id:exp.id}})).active,false);
   const editCategory=await finance.addCategory(manager,{kind:"EXPENSE",name:"New Expense Category"});
+  // Only finance administrators may enumerate active colleagues or transfer an expense.
+  assert.ok((await finance.assignees(manager)).some(x=>x.id===employee.id));
+  assert.equal((await finance.assignees(manager)).some(x=>x.id===outsider.id),false);
+  await assert.rejects(()=>finance.assignees(staff),(error:{status?:number})=>error.status===403);
+  const disabled=await db.user.create({data:{organizationId:org.id,loginId:"fin-disabled",
+    displayName:"Disabled member",status:"DISABLED"}});
+  assert.equal((await finance.assignees(manager)).some(x=>x.id===disabled.id),false);
+  const originalSubmittedBy=(await db.approvalRequest.findUniqueOrThrow({
+    where:{id:pending.approvalRequestId},select:{requesterId:true}})).requesterId;
+  const ownerEdit={categoryId:exp.id,amount:"150.2545",occurredOn:"2026-10-19",
+    method:"UPI" as const,merchantOrSource:"Rapido",description:"Owner reassignment"};
+  await assert.rejects(()=>finance.editExpense(manager,pending.id,{...ownerEdit,enteredById:outsider.id}),
+    (error:{status?:number})=>error.status===422);
+  await assert.rejects(()=>finance.editExpense(manager,pending.id,{...ownerEdit,enteredById:disabled.id}),
+    (error:{status?:number})=>error.status===422);
+  assert.equal((await finance.editExpense(manager,pending.id,{...ownerEdit,enteredById:admin.id})).enteredById,admin.id);
+  assert.ok((await finance.entries(manager,"mine")).some(x=>x.id===pending.id));
+  assert.equal((await finance.entries(staff,"mine")).some(x=>x.id===pending.id),false);
+  const moved=(await finance.entries(manager,"mine")).find(x=>x.id===pending.id);
+  assert.equal(moved?.submittedBy.displayName,employee.displayName);
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({
+    where:{id:pending.approvalRequestId},select:{requesterId:true}})).requesterId,originalSubmittedBy);
+  assert.equal((await finance.totals(manager,"all")).postedExpense,"150.2545");
+  assert.equal((await finance.editExpense(manager,pending.id,{...ownerEdit,enteredById:employee.id})).enteredById,employee.id);
+  assert.ok((await finance.entries(staff,"mine")).some(x=>x.id===pending.id));
+  assert.ok((await db.auditLog.count({
+    where:{organizationId:org.id,action:"finance.expense_edited",entityId:pending.id}
+  }))>=2);
   await assert.rejects(()=>finance.editExpense(staff,pending.id,{
     categoryId:editCategory.id,amount:"199.50",occurredOn:"2026-10-18",
     method:"CARD",merchantOrSource:"Updated",description:"Admin correction",

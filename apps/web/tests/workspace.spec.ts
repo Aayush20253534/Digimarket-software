@@ -52,6 +52,19 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
   await page.goto("/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval workflows"})).toBeVisible();
+  // Reporting must fit the document viewport. Overflow belongs to inner tables only.
+  for(const width of [1440,1024,768,390]){
+    await page.setViewportSize({width,height:800});
+    await page.goto("/app/reports");
+    await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
+    const bounds=await page.evaluate(()=>({
+      documentWidth:document.documentElement.scrollWidth,
+      viewportWidth:document.documentElement.clientWidth,
+    }));
+    expect(bounds.documentWidth,"Reports should not overflow at "+width+"px")
+      .toBeLessThanOrEqual(bounds.viewportWidth+1);
+  }
+  await page.setViewportSize({width:1366,height:768});
   await page.goto("/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();

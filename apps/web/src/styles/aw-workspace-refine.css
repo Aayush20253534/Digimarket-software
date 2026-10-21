@@ -251,3 +251,8 @@
 .aw-required-star{color:#ff647c!important;font-weight:900;font-size:1.13em}
 .aw-optional-label{color:#a995b9!important;font-weight:500;font-size:.82em}
 .aw-finance-register tr[id^="finance-"]:target{outline:2px solid #d78dff;outline-offset:-2px;background:#49315b!important}
+
+/* Expense attribution: current assignee and immutable original submitter. */
+.aw-finance-original-submitter{display:block;margin-top:4px;color:#b9a6c8;font-size:.69rem;white-space:normal}
+.aw-finance-register td:nth-child(7){min-width:145px}
+.aw-finance-admin-modal .field{min-width:0;width:100%}
