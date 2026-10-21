@@ -2,9 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BriefcaseBusiness, Plus, RefreshCw } from "lucide-react";
+import { BriefcaseBusiness, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
-import { DirectoryModal, DirectoryDetailsPortal } from "@/components/directory-modal";
+import { DirectoryDetailsPortal } from "@/components/directory-modal";
 import { ApiError } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
@@ -21,9 +21,8 @@ type Editable={businessName:string;businessType:string;phone:string;email:string
 const clean:Editable={businessName:"",businessType:"",phone:"",email:"",location:"",
  websiteUrl:"",instagramUrl:"",facebookUrl:"",notes:""};
 const editableFields=[
- ["businessName","Business name"],["businessType","Business type"],["phone","Business phone"],
- ["email","Business email"],["location","Address / location"],["websiteUrl","Website URL"],
- ["instagramUrl","Instagram URL"],["facebookUrl","Facebook URL"],["notes","Internal notes"],
+ ["businessName","Business name"],["businessType","Business type"],
+ ["phone","Phone"],["notes","Client notes"],
 ] as const;
 const readable=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Client request failed";
 function fromClient(c:Client):Editable {
@@ -32,13 +31,10 @@ function fromClient(c:Client):Editable {
 export default function ClientsPage(){
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("clients.read");
- const canCreate=!!session?.identity.permissions.includes("clients.create");
  const canEdit=!!session?.identity.permissions.includes("clients.edit");
  const [rows,setRows]=useState<Client[]>([]);
  const [selected,setSelected]=useState<Detail|null>(null);
  const [draft,setDraft]=useState<Editable>(clean);
- const [createDraft,setCreateDraft]=useState<Editable>(clean);
- const [creating,setCreating]=useState(false);
  const [status,setStatus]=useState<Status>("ACTIVE");
  const [filter,setFilter]=useState("");
  const [search,setSearch]=useState("");
@@ -86,20 +82,11 @@ export default function ClientsPage(){
   if(!id||!/^[0-9a-f-]{36}$/i.test(id))return;
   focusedRef.current=true;void open(id);
  },[canRead]);
- async function create(e:FormEvent){
-   e.preventDefault();setBusy(true);setError("");setMessage("");
-   try{
-     const client=await request<Client>("/clients",{method:"POST",body:createDraft});
-     setCreateDraft(clean);setCreating(false);setCursor(null);setHistory([]);
-     setMessage("Client created. No billing or credentials have been inferred.");
-     await load();await open(client.id);
-   }catch(e){setError(readable(e));}finally{setBusy(false);}
- }
  async function save(e:FormEvent){
    e.preventDefault();if(!selected)return;
    setBusy(true);setError("");setMessage("");
    try{
-     await request("/clients/"+selected.id,{method:"PUT",body:{...draft,status,version:selected.version}});
+     await request("/clients/"+selected.id,{method:"PUT",body:{businessName:draft.businessName,businessType:draft.businessType,phone:draft.phone,notes:draft.notes,status,version:selected.version}});
      await open(selected.id);await load();setMessage("Client profile updated.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
@@ -129,9 +116,8 @@ export default function ClientsPage(){
  if(!canRead)return <><PageHeader title="Clients access denied"/><Notice kind="error">Your account cannot view client records.</Notice></>;
  return <div data-aw-module="clients" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Agency relationships" title="Clients"
-     description="Organization-wide client profiles, contacts and active services. Won leads may be converted from Leads CRM."
-     actions={<div className="flex flex-wrap gap-2">{canCreate&&<button className="btn-primary" type="button" aria-expanded={creating} onClick={()=>setCreating(v=>!v)}><Plus size={16}/>{creating?"Hide client form":"Add client"}</button>}<button type="button" className="btn-secondary" onClick={()=>void load()}>
-       <RefreshCw className="h-4 w-4" aria-hidden="true"/>Refresh</button></div>}/>
+     description="Shared clients are created automatically when a lead reaches Approved. Manual client creation is disabled."
+     actions={<div className="flex flex-wrap gap-2"><Link className="btn-secondary" href="/app/leads">View leads</Link><button type="button" className="btn-secondary" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Client relationships</span><span className="aw-module-count">{rows.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{filter||"All statuses"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
@@ -149,7 +135,7 @@ export default function ClientsPage(){
  </select><button type="button" className="btn-secondary" aria-label="Reverse client sort" onClick={()=>{setDescending(x=>!x);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading&&<Spinner label="Loading clients…"/>}
-          {!loading&&!rows.length&&<p className="aw-directory-empty-line"><BriefcaseBusiness size={16}/> No matching clients. Add a client or convert a won lead.</p>}
+          {!loading&&!rows.length&&<p className="aw-directory-empty-line"><BriefcaseBusiness size={16}/> No matching clients. Approve a lead to add it here.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Clients directory">
             <thead><tr><th>Business</th><th>Type</th><th>Phone</th><th>Email</th><th>Location</th><th>Status</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(c=><tr key={c.id} className={"aw-client-row cursor-pointer "+(selected?.id===c.id?"aw-register-selected":"")} onClick={()=>void open(c.id)} onKeyDown={e=>{if(e.key==="Enter")void open(c.id);}} tabIndex={0}>
@@ -163,19 +149,6 @@ export default function ClientsPage(){
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
-       {canCreate&&creating&&<DirectoryModal title="Add client" description="Create a client profile directly without converting a lead." onClose={()=>{if(!busy)setCreating(false);}}>
-         <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
-           {editableFields.map(([key,label])=><FormField key={key} id={"new-client-"+key} label={<>{label}{key!=="websiteUrl"&&key!=="instagramUrl"?<span className="aw-required-star" aria-label="required"> *</span>:<span className="aw-optional-label"> (optional)</span>}</>}>
-             <input id={"new-client-"+key} aria-label={label} className="field" autoFocus={key==="businessName"} required={key!=="websiteUrl"&&key!=="instagramUrl"}
-               type={key==="email"?"email":key.endsWith("Url")?"url":"text"}
-               value={createDraft[key]} onChange={e=>setCreateDraft(v=>({...v,[key]:e.target.value}))}/>
-           </FormField>)}
-           <div className="sm:col-span-2 aw-directory-modal-actions">
-             <button className="btn-secondary" type="button" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button>
-             <button className="btn-primary" disabled={busy} type="submit">Create client</button>
-           </div>
-         </form>
-       </DirectoryModal>}
      </div>
      {selected&&<DirectoryDetailsPortal onClose={()=>setSelected(null)}>
        <div className="aw-directory-details-panel">

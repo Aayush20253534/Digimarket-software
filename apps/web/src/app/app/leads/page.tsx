@@ -8,8 +8,9 @@ import { DirectoryModal } from "@/components/directory-modal";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
-type Stage="NEW"|"CONTACTED"|"QUALIFIED"|"PROPOSAL"|"WON"|"LOST";
-const stages:Stage[]=["NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"];
+type Stage="PENDING"|"MEETING_PROCESS"|"APPROVED";
+const stages:Stage[]=["PENDING","MEETING_PROCESS","APPROVED"];
+const stageLabel=(s:Stage)=>s==="MEETING_PROCESS"?"Meeting Process":s==="APPROVED"?"Approved":"Pending";
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
  status:Stage;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
@@ -19,8 +20,8 @@ type Duplicate={id:string;reason:string;resolution:string;lead:{id:string;busine
  candidate:{id:string;businessName:string;phone:string|null}};
 type Detail=Lead&{activities:Activity[];duplicates:Duplicate[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null};
-type NewLead={businessName:string;contactName:string;phone:string;businessType:string;location:string;websiteUrl:string;instagramUrl:string;source:string;note:string};
-const blank:NewLead={businessName:"",contactName:"",phone:"",businessType:"",location:"",websiteUrl:"",instagramUrl:"",source:"",note:""};
+type NewLead={phone:string};
+const blank:NewLead={phone:""};
 const errText=(e:unknown)=>e instanceof ApiError?e.message:"Lead request failed.";
 function fmt(date:string|null){return date?new Date(date).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"Not set";}
 function decodeCSV(text:string){
@@ -36,14 +37,11 @@ function decodeCSV(text:string){
  row.push(field);if(row.some(x=>x.trim()))rows.push(row);
  return rows;
 }
-const formKeys=["businessName","contactName","phone","businessType","location","websiteUrl","instagramUrl","source"] as const;
-const headers:Record<string,string>={business_name:"businessName",contact_name:"contactName",business_type:"businessType",
- website_url:"websiteUrl",instagram_url:"instagramUrl",businessName:"businessName",contactName:"contactName",
- businessType:"businessType",websiteUrl:"websiteUrl",instagramUrl:"instagramUrl",phone:"phone",location:"location",source:"source"};
+const formKeys=["phone"] as const;
+const headers:Record<string,string>={phone:"phone",phone_number:"phone",mobile:"phone"};
 export default function LeadsPage(){
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("leads.read");
- const canConvert=!!session?.identity.permissions.includes("leads.convert")&&!!session?.identity.permissions.includes("clients.create");
  const canCreate=!!session?.identity.permissions.includes("leads.create");
  const canAssign=!!session?.identity.permissions.includes("leads.assign");
  const canBulk=!!session?.identity.permissions.includes("leads.bulk");
@@ -55,7 +53,7 @@ export default function LeadsPage(){
  const [stage,setStage]=useState("");
  const [search,setSearch]=useState("");
  const [history,setHistory]=useState<string[]>([]);
- const [sortBy,setSortBy]=useState<"businessName"|"contactName"|"location"|"status"|"nextFollowUpAt">("businessName"),[descending,setDescending]=useState(false);
+ const [sortBy,setSortBy]=useState<"businessName"|"contactName"|"status"|"createdAt">("createdAt"),[descending,setDescending]=useState(false);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -63,8 +61,8 @@ export default function LeadsPage(){
  const [created,setCreated]=useState<NewLead>(blank);
  const [creating,setCreating]=useState(false);
  const [selected,setSelected]=useState<Detail|null>(null);
- const [editStage,setEditStage]=useState<Stage>("NEW");
- const [followup,setFollowup]=useState("");
+ const [editStage,setEditStage]=useState<Stage>("PENDING");
+ const [stageNote,setStageNote]=useState("");
  const [owner,setOwner]=useState("");
  const [note,setNote]=useState("");
  const [staff,setStaff]=useState<StaffUser[]>([]);
@@ -72,7 +70,7 @@ export default function LeadsPage(){
  const [csvRows,setCsvRows]=useState<NewLead[]>([]);
  const [batchId,setBatchId]=useState<string>("");
  const [csvError,setCsvError]=useState("");
- const [updating,setUpdating]=useState({businessName:"",contactName:"",phone:"",businessType:"",location:"",source:"",websiteUrl:"",instagramUrl:""});
+ const [updating,setUpdating]=useState({businessName:"",contactName:"",businessType:""});
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
    setLoading(true);
@@ -97,11 +95,9 @@ export default function LeadsPage(){
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
      setSelected(detail);setEditStage(detail.status);setOwner(detail.assignedToId??"");
-     setFollowup(detail.nextFollowUpAt?new Date(detail.nextFollowUpAt).toISOString().slice(0,16):"");
-     setNote("");
-     setUpdating({businessName:detail.businessName,contactName:detail.contactName??"",phone:detail.phone??"",
-       businessType:detail.businessType??"",location:detail.location??"",source:detail.source??"",
-       websiteUrl:detail.websiteUrl??"",instagramUrl:detail.instagramUrl??""});
+     setNote("");setStageNote("");
+     setUpdating({businessName:detail.businessName.startsWith("Lead ")? "":detail.businessName,
+       contactName:detail.contactName??"",businessType:detail.businessType??""});
    }catch(e){setError(errText(e));}
  };
  useEffect(()=>{
@@ -110,20 +106,11 @@ export default function LeadsPage(){
   if(!id||!/^[0-9a-f-]{36}$/i.test(id))return;
   focusedRef.current=true;void open(id);
  },[canRead]);
- async function convert(){
-   if(!selected)return;setBusy(true);setError("");setMessage("");
-   try{
-     const client=await request<{id:string}>("/leads/"+selected.id+"/convert",{method:"POST",body:{version:selected.version}});
-     setMessage("Won lead converted into a client. The record is now linked in Clients.");
-     await open(selected.id);await load();
-     if(!client.id)throw new Error("Client conversion did not return an ID");
-   }catch(e){setError(errText(e));}finally{setBusy(false);}
- }
  async function create(e:FormEvent){
    e.preventDefault();setBusy(true);setError("");setMessage("");
    try{
      const data=await request<Lead>("/leads",{method:"POST",body:created});
-     setCreated(blank);setCreating(false);setMessage("Lead created. Potential duplicates will be flagged for human review.");
+     setCreated(blank);setCreating(false);setMessage("Phone-only lead created in the shared Pending list.");
      setCursor(null);await load();await open(data.id);
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
@@ -131,8 +118,8 @@ export default function LeadsPage(){
    e.preventDefault();if(!selected)return;setBusy(true);setError("");
    try{
      await request("/leads/"+selected.id,{method:"PUT",body:{...updating,status:editStage,
-       nextFollowUpAt:followup?new Date(followup).toISOString():"",version:selected.version}});
-     setMessage("Lead updated and activity recorded.");await open(selected.id);await load();
+       stageNote,version:selected.version}});
+     setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":"Shared lead and status note saved.");await open(selected.id);await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function assign(e:FormEvent){
@@ -171,7 +158,7 @@ export default function LeadsPage(){
      if(rows.length<2)throw new Error("Provide CSV headers and at least one lead");
      if(rows.length>51)throw new Error("Import up to 50 leads per batch");
      const header=rows[0].map(x=>headers[x.trim().replace(/^\uFEFF/,"")]??"");
-     if(!header.includes("businessName"))throw new Error("CSV needs business_name or businessName header");
+     if(!header.includes("phone"))throw new Error("CSV needs a phone column");
      const data=rows.slice(1).map(columns=>{
        const obj:NewLead={...blank};
        for(let i=0;i<header.length;i++){
@@ -180,7 +167,7 @@ export default function LeadsPage(){
        }
        return obj;
      });
-     if(data.some(r=>!r.businessName||r.businessName.length<2))throw new Error("Every lead needs a business name");
+     if(data.some(r=>r.phone.replace(/\D/g,"").length<7))throw new Error("Every lead needs a valid phone number");
      setCsvRows(data);setBatchId(crypto.randomUUID());
    }catch(e){setCsvError(e instanceof Error?e.message:"Invalid CSV");setCsvRows([]);}
  }
@@ -209,7 +196,7 @@ export default function LeadsPage(){
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
-     description="Shared agency prospects, ownership, pipeline stages and follow-ups. Won leads can be converted to client records by authorized staff."
+     description="Every number enters Pending. Add names later, record meeting notes and approve to create a client automatically."
      actions={<div className="flex flex-wrap gap-2">
        {canCreate&&<button className="btn-primary" type="button" onClick={()=>setCreating(x=>!x)} aria-expanded={creating}>
         <Plus className="h-4 w-4"/>{creating?"Hide lead form":"Add lead"}</button>}
@@ -224,9 +211,9 @@ export default function LeadsPage(){
        <Card title="Lead register" description="Live agency prospects and assigned follow-ups.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
-             onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search business, contact, city, phone"/>
+             onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
            <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
-             <option value="">All stages</option>{stages.map(x=><option key={x}>{x}</option>)}
+             <option value="">All stages</option>{stages.map(x=><option key={x}>{stageLabel(x)}</option>)}
            </select>
 <select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setCursor(null);setHistory([]);}}>
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="location">Location</option><option value="status">Stage</option><option value="nextFollowUpAt">Follow-up</option>
@@ -235,11 +222,11 @@ export default function LeadsPage(){
          {loading&&<Spinner label="Loading leads…"/>}
           {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
-            <thead><tr><th>Business / contact</th><th>Phone</th><th>Location</th><th>Stage</th><th>Assigned to</th><th>Follow-up</th><th>Details</th></tr></thead>
+            <thead><tr><th>Phone</th><th>Contact / business</th><th>Business type</th><th>Stage</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
-             <td><strong>{l.businessName}</strong><span>{l.contactName||"No contact"}</span></td>
-             <td>{l.phone||"—"}</td><td>{l.location||"—"}</td><td><StatusBadge status={l.status}/></td>
-             <td>{l.assignee?.displayName||"Unassigned"}</td><td>{fmt(l.nextFollowUpAt)}</td>
+             <td><strong>{l.phone||"—"}</strong></td>
+             <td>{l.contactName||"Name pending"}<span>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</span></td>
+             <td>{l.businessType||"Not recorded"}</td><td><StatusBadge status={l.status}/></td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
             </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
@@ -247,21 +234,18 @@ export default function LeadsPage(){
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
-       {canCreate&&creating&&<DirectoryModal title="Create a lead" description="Add a prospect to the CRM. Notes are saved to their private activity timeline." onClose={()=>{if(!busy)setCreating(false);}}>
-         <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
-           {([
-             ["businessName","Business name",true],["contactName","Contact name",true],
-             ["phone","Phone",true],["businessType","Business type",true],
-             ["location","City / location",true],["source","Source",true],
-             ["websiteUrl","Website URL",false],["instagramUrl","Instagram URL",false],
-             ["note","First note",true],
-           ] as const).map(([field,label,required])=><FormField key={field} id={"new-"+field} label={<>{label}{required?<span className="aw-required-star" aria-label="required"> *</span>:<span className="aw-optional-label"> (optional)</span>}</>}>
-             <input id={"new-"+field} aria-label={label} className="field" autoFocus={field==="businessName"} required={required} type={field.endsWith("Url")?"url":field==="phone"?"tel":"text"} maxLength={field==="note"?2000:500}
-               value={created[field]} onChange={e=>setCreated(v=>({...v,[field]:e.target.value}))}/>
-           </FormField>)}
-           <div className="sm:col-span-2 aw-directory-modal-actions">
+       {canCreate&&creating&&<DirectoryModal title="Add phone-only lead"
+         description="Enter the WhatsApp or contact number. Other details can be filled after your conversation."
+         onClose={()=>{if(!busy)setCreating(false);}}>
+         <form onSubmit={create} className="space-y-3">
+           <FormField id="new-lead-phone" label="Phone number">
+             <input id="new-lead-phone" aria-label="Phone number" className="field" type="tel"
+               autoFocus required minLength={7} maxLength={40} placeholder="+91 98765 43210"
+               value={created.phone} onChange={e=>setCreated({phone:e.target.value})}/>
+           </FormField>
+           <div className="aw-directory-modal-actions">
              <button className="btn-secondary" type="button" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button>
-             <button className="btn-primary" disabled={busy} type="submit">Create lead</button>
+             <button className="btn-primary" type="submit" disabled={busy}>Add to Pending</button>
            </div>
          </form>
        </DirectoryModal>}
@@ -270,20 +254,20 @@ export default function LeadsPage(){
        {selected?<Card title={"Lead: "+selected.businessName} description={"Version "+selected.version+" · "+selected.status}>
          <div className="space-y-5">
            <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · {selected.source||"No source"}</p>
-           {canConvert&&selected.status==="WON"&&<div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-             <p className="mb-2 text-xs text-indigo-800">Create one linked client profile from this won lead. Repeat conversions are rejected.</p>
-             <button className="btn-primary" type="button" disabled={busy} onClick={()=>void convert()}>Convert to client</button>
-             <Link href="/app/clients" className="ml-3 text-sm text-indigo-700 underline">View clients</Link>
-           </div>}
+           {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href="/app/clients">client record</Link>.</p>}
            {selected.canEdit?<form onSubmit={edit} className="space-y-3">
-             {(["businessName","contactName","phone","businessType","location","source","websiteUrl","instagramUrl"] as const).map(k=>
-               <FormField key={k} id={"edit-"+k} label={"Edit "+k.replace(/([A-Z])/g," $1")}>
-                 <input id={"edit-"+k} className="field" value={updating[k]} onChange={e=>setUpdating(v=>({...v,[k]:e.target.value}))}/>
+             {(["contactName","businessName","businessType"] as const).map(k=>
+               <FormField key={k} id={"edit-"+k} label={k==="contactName"?"Contact name":k==="businessName"?"Business name":"Business type"}>
+                 <input id={"edit-"+k} className="field" maxLength={k==="businessName"?180:k==="contactName"?160:120}
+                   value={updating[k]} onChange={e=>setUpdating(v=>({...v,[k]:e.target.value}))}/>
                </FormField>)}
-             <FormField id="edit-stage" label="Stage"><select id="edit-stage" className="field" value={editStage}
-               onChange={e=>setEditStage(e.target.value as Stage)}>{stages.map(x=><option key={x}>{x}</option>)}</select></FormField>
-             <FormField id="edit-follow" label="Next follow-up"><input id="edit-follow" type="datetime-local" className="field" value={followup}
-               onChange={e=>setFollowup(e.target.value)}/></FormField>
+             <FormField id="edit-stage" label="Lead status"><select id="edit-stage" className="field" value={editStage} disabled={selected.status==="APPROVED"}
+               onChange={e=>setEditStage(e.target.value as Stage)}>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}</select></FormField>
+             <FormField id="lead-status-note" label={"Note for "+stageLabel(editStage)}>
+               <textarea id="lead-status-note" className="field min-h-20" maxLength={2000}
+                 placeholder="Call summary, meeting outcome, or reason for approval"
+                 value={stageNote} onChange={e=>setStageNote(e.target.value)}/>
+             </FormField>
              <button className="btn-primary" type="submit" disabled={busy}>Save details and stage</button>
            </form>:<p className="text-sm text-slate-600">Basic lead details are shared; editing and private activity require assignment or permission.</p>}
            {canAssign&&<form className="space-y-2 border-t pt-4" onSubmit={assign}>
@@ -318,7 +302,7 @@ export default function LeadsPage(){
            </div>}
          </div>)}</div>
        </Card>}
-       {canBulk&&<Card title="CSV import" description="Upload up to 50 prospects per batch. Requires business_name column. All rows validate before insertion.">
+       {canBulk&&<Card title="CSV import" description="Upload up to 50 phone numbers per batch. CSV requires a phone column.">
          <label htmlFor="lead-import-file" className="block text-sm font-semibold">Select CSV</label>
          <input id="lead-import-file" type="file" accept=".csv,text/csv" onChange={e=>void readCSV(e.target.files?.[0])}
            className="mt-2 block w-full text-sm"/>
