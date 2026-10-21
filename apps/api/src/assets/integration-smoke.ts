@@ -98,6 +98,17 @@ try{
  assert.equal(archived.status,"ARCHIVED");
  await assert.rejects(()=>svc.download(admin,actual.id),(e:{status?:number})=>e.status===410);
  assert.equal((await svc.list(admin,{limit:30,status:"ARCHIVED"})).items.length,1);
+ // A 50 MB PDF must reach the signed RAW upload flow, not fail at the app limit.
+ const maximumPdf=await svc.intent(admin,{
+   filename:"agency-proposal.pdf",contentType:"application/pdf",bytes:50_000_000,
+ });
+ assert.equal(maximumPdf.resourceType,"raw");
+ assert.ok(maximumPdf.uploadUrl.endsWith("/raw/upload"));
+ assert.equal(maximumPdf.params.allowed_formats,"pdf");
+ await assert.rejects(
+   ()=>svc.intent(admin,{filename:"too-large.pdf",contentType:"application/pdf",bytes:50_000_001}),
+   (error:{status?:number})=>error.status===422,
+ );
  const expiredIntent=await svc.intent(admin,{filename:"Expired.pdf",contentType:"application/pdf",bytes:250});
  await db.assetUploadIntent.update({where:{id:expiredIntent.intentId},data:{expiresAt:new Date(Date.now()-5000)}});
  uploadMock(expiredIntent.params.public_id,"raw","pdf",250,"expired-provider-id");

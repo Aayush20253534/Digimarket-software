@@ -14,7 +14,7 @@ type Client={id:string;businessName:string};
 type Intent={intentId:string;expiresAt:string;uploadUrl:string;
  params:Record<string,string>;resourceType:string};
 const accepted=["image/jpeg","image/pjpeg","image/jfif","image/png","image/gif","image/webp","image/avif","image/bmp","image/tiff","image/heic","image/heif","video/mp4","video/quicktime","video/webm","application/pdf"];
-const imageExtMime:Record<string,string>={jpg:"image/jpeg",jpeg:"image/jpeg",jfif:"image/jpeg",png:"image/png",gif:"image/gif",webp:"image/webp",avif:"image/avif",bmp:"image/bmp",tif:"image/tiff",tiff:"image/tiff",heic:"image/heic",heif:"image/heif"};
+const imageExtMime:Record<string,string>={pdf:"application/pdf",jpg:"image/jpeg",jpeg:"image/jpeg",jfif:"image/jpeg",png:"image/png",gif:"image/gif",webp:"image/webp",avif:"image/avif",bmp:"image/bmp",tif:"image/tiff",tiff:"image/tiff",heic:"image/heic",heif:"image/heif"};
 function fileMime(file:File){return accepted.includes(file.type)?file.type:imageExtMime[file.name.split(".").pop()?.toLowerCase()??""]??file.type;}
 const errText=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Asset operation failed";
 const prettyBytes=(n:number)=>n>=1_000_000?(n/1_000_000).toFixed(1)+" MB":(n/1000).toFixed(0)+" KB";
@@ -232,6 +232,8 @@ export default function AssetsPage(){
    if(!accepted.includes(contentType))throw new Error("Unsupported file format: "+file.name);
    if(!file.size)throw new Error("Empty file: "+file.name);
    if(contentType.startsWith("image/")&&file.size>10_000_000)throw new Error("Images must not exceed 10 MB: "+file.name);
+   if(contentType==="application/pdf"&&file.size>50_000_000)throw new Error("PDFs must not exceed 50 MB: "+file.name);
+   if(contentType.startsWith("video/")&&file.size>100_000_000)throw new Error("Videos must not exceed 100 MB: "+file.name);
    setUploadProgress("Authorizing "+index+" of "+total+": "+file.name);
    const intent=await request<Intent>("/assets/upload-intent",{method:"POST",body:{
     filename:file.name,contentType,bytes:file.size,clientId:clientId||null}});
@@ -255,7 +257,10 @@ export default function AssetsPage(){
          const body=JSON.parse(xhr.responseText) as {error?:{message?:string}};
          detail=body.error?.message?.slice(0,250)??"";
        }catch{/* An HTML or empty response still includes its HTTP status. */}
-       reject(new Error("Storage rejected "+file.name+" (HTTP "+xhr.status+")"+(detail?": "+detail:"")));
+       const limitHint=contentType==="application/pdf"&&file.size>10_000_000&&
+         (xhr.status===413||/file.{0,20}(size|large|big)|exceeds|limit/i.test(detail))
+         ?" Cloudinary may enforce a smaller raw-file limit than this app's 50 MB PDF limit. Check your Cloudinary plan.":"";
+       reject(new Error("Storage rejected "+file.name+" (HTTP "+xhr.status+")"+(detail?": "+detail:"")+limitHint));
        return;
      }
      try{resolve(JSON.parse(xhr.responseText) as {asset_id?:string});}
@@ -309,7 +314,7 @@ export default function AssetsPage(){
    finally{setBusy(false);setUploadProgress("");await load();}
  }
  function queueFiles(chosen:FileList|File[]){
-  const raw=Array.from(chosen),next=raw.filter(f=>accepted.includes(f.type)).slice(0,10);
+  const raw=Array.from(chosen),next=raw.filter(f=>accepted.includes(fileMime(f))).slice(0,10);
   if(raw.length!==next.length)setError("Only the first 10 supported image, video or PDF files can be uploaded per batch.");
   if(!next.length){setError("Choose JPEG, PNG, WebP, MP4, MOV, WebM or PDF files.");return;}
   setFiles(next);setUploadDialog(true);setNewMenu(false);
@@ -521,9 +526,9 @@ export default function AssetsPage(){
    <div className="aw-drive-modal-head"><h2>Upload files</h2><button type="button" aria-label="Close upload" disabled={busy} onClick={()=>setUploadDialog(false)}><X size={18}/></button></div>
    <form className="aw-drive-modal-form" onSubmit={e=>void upload(e)}>
     <FormField id="asset-file" label="Choose image, video or PDF files"><input ref={fileInput} id="asset-file" className="field" type="file" accept={accepted.join(",")+",.jpg,.jpeg,.jfif,.tif,.tiff,.heic,.heif"} multiple
-      onChange={e=>setFiles(Array.from(e.target.files??[]).slice(0,10))}/></FormField>
+      onChange={e=>queueFiles(e.target.files??[])}/></FormField>
     {canClients&&<FormField id="asset-client" label="Associate with client (optional)"><select className="field" id="asset-client" value={clientId} onChange={e=>setClientId(e.target.value)}><option value="">General agency asset</option>{clients.map(c=><option value={c.id} key={c.id}>{c.businessName}</option>)}</select></FormField>}
-    <p>{files.length} file(s) queued. Maximum 10 per batch.</p>
+    <p>{files.length} file(s) queued. Maximum 10 per batch. Per-file limits: images 10 MB, PDFs 50 MB, videos 100 MB. Your Cloudinary storage plan may impose lower limits.</p>
     {uploadProgress&&<p role="status">{uploadProgress}</p>}
     <div className="aw-drive-modal-actions"><button type="button" disabled={busy} onClick={()=>setUploadDialog(false)}>Cancel</button><button className="btn-primary" type="submit" disabled={busy||!files.length}><Upload size={16}/> Upload and verify</button></div>
    </form></div></div>}

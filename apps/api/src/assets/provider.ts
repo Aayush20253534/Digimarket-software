@@ -90,7 +90,7 @@ export const MEDIA_TYPES:Record<string,{kind:AssetType;format:string;maxBytes:nu
  "video/mp4":{kind:"video",format:"mp4",maxBytes:100_000_000},
  "video/quicktime":{kind:"video",format:"mov",maxBytes:100_000_000},
  "video/webm":{kind:"video",format:"webm",maxBytes:100_000_000},
- "application/pdf":{kind:"raw",format:"pdf",maxBytes:10_000_000},
+ "application/pdf":{kind:"raw",format:"pdf",maxBytes:50_000_000},
 };
 export function validateMedia(contentType:string,bytes:number){
  const kind=MEDIA_TYPES[contentType];
