@@ -51,8 +51,8 @@ export class InsightsService{
   }).then(rows=>rows.map(x=>({kind:"file",id:x.id,title:x.filename,detail:"File · "+x.contentType,href:url("assets",x.id)}))));
   // Finance search recognizes INR formatted amounts and checks the user's access.
   if(can(a,"finance.entry.read.own")||can(a,"finance.read.all")){
-   const normalized=q.trim().replace(/^[₹\\s]+/,"").replace(/,/g,"");
-   const amount=/^\\d{1,15}(?:\\.\\d{1,4})?$/.test(normalized)?new Prisma.Decimal(normalized):null;
+   const normalized=q.trim().replace(/^[₹\s]+/,"").replace(/,/g,"");
+   const amount=/^\d{1,15}(?:\.\d{1,4})?$/.test(normalized)?new Prisma.Decimal(normalized):null;
    parts.push(this.db.financialTransaction.findMany({
     where:{organizationId:org,...(can(a,"finance.read.all")?{}:{enteredById:me}),
      OR:[{merchantOrSource:match},{description:match},{category:{name:match}},...(amount?[{amount}]:[])]},
