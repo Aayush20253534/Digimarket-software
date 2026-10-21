@@ -83,7 +83,7 @@ export class LeadsService {
      roles:["FOUNDER"],permissions:new Set(["leads.create"])};
    return this.db.$transaction(async tx=>{
      // One sender can trigger concurrent Meta deliveries; serialize by tenant and phone.
-     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId+":"+normalized},0))`;
+     await tx.$queryRaw`SELECT 1 AS acquired FROM (SELECT pg_advisory_xact_lock(hashtextextended(${organizationId+":"+normalized},0))) AS lock_row`;
      const previous=await tx.lead.findFirst({where:{organizationId,normalizedPhone:normalized}});
      if(previous)return {id:previous.id,created:false};
      const client=await tx.client.findFirst({where:{organizationId,OR:[
