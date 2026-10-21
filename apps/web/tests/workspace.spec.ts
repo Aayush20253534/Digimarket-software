@@ -65,6 +65,24 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
       .toBeLessThanOrEqual(bounds.viewportWidth+1);
   }
   await page.setViewportSize({width:1366,height:768});
+  await page.goto("/app/reports");
+  const desktopZoom=await page.locator(".aw-workspace").evaluate(
+    element=>Number.parseFloat(getComputedStyle(element).zoom)
+  );
+  expect(desktopZoom,"Desktop workspace must use 75% visual scaling").toBe(0.75);
+  const desktopBounds=await page.evaluate(()=>({
+    doc:document.documentElement.scrollWidth,
+    client:document.documentElement.clientWidth,
+  }));
+  expect(desktopBounds.doc,"Scaled workspace must not create document overflow")
+    .toBeLessThanOrEqual(desktopBounds.client+1);
+  await page.setViewportSize({width:768,height:800});
+  await page.reload();
+  const mobileZoom=await page.locator(".aw-workspace").evaluate(
+    element=>Number.parseFloat(getComputedStyle(element).zoom)
+  );
+  expect(mobileZoom,"Mobile/tablet touch scaling remains unmodified").toBe(1);
+  await page.setViewportSize({width:1366,height:768});
   await page.goto("/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();

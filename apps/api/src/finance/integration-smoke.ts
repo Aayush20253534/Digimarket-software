@@ -78,6 +78,33 @@ try{
   await approvals.decide(manager,income.approvalRequestId,{outcome:"APPROVED"});
   const postedIncome=(await finance.totals(manager,"all")).postedIncome;
   assert.equal(postedIncome,"1000.0000");
+  // Admin can correct income submitted by another user. Never alter the original
+  // approval requester, and never permit wrong-category or cross-org reassignment.
+  const incomeEdit={categoryId:inc.id,amount:"1234.50",occurredOn:"2026-10-18",
+    method:"CARD" as const,merchantOrSource:"Corrected client payment",description:"Income correction"};
+  await assert.rejects(()=>finance.editEntry(staff,income.id,incomeEdit),
+    (error:{status?:number})=>error.status===403);
+  await assert.rejects(()=>finance.editEntry(stranger,income.id,incomeEdit),
+    (error:{status?:number})=>error.status===404);
+  await assert.rejects(()=>finance.editEntry(manager,income.id,{...incomeEdit,categoryId:exp.id}),
+    (error:{status?:number})=>error.status===422);
+  await assert.rejects(()=>finance.editEntry(manager,income.id,{...incomeEdit,enteredById:outsider.id}),
+    (error:{status?:number})=>error.status===422);
+  const adjustedIncome=await finance.editEntry(manager,income.id,{...incomeEdit,enteredById:admin.id});
+  assert.equal(adjustedIncome.amount,"1234.5000");
+  assert.equal(adjustedIncome.enteredById,admin.id);
+  assert.equal((await finance.totals(manager,"all")).postedIncome,"1234.5000");
+  const reassignedIncome=(await finance.entries(manager,"mine")).find(row=>row.id===income.id);
+  assert.equal(reassignedIncome?.submittedBy.displayName,employee.displayName);
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({where:{id:income.approvalRequestId}})).requesterId,employee.id);
+  assert.equal((await db.auditLog.count({where:{entityId:income.id,action:"finance.income_edited"}})),1);
+  await finance.editEntry(manager,income.id,{
+    ...incomeEdit,amount:"1000.0000",occurredOn:"2026-10-19",
+    merchantOrSource:"Client payment",enteredById:employee.id,
+  });
+  assert.equal((await finance.totals(manager,"all")).postedIncome,"1000.0000");
+  assert.ok((await finance.entries(staff,"mine")).some(row=>row.id===income.id));
+
   const rejected=await finance.submit(staff,{...input,idempotencyKey:randomUUID(),amount:"23.50"});
   await approvals.decide(manager,rejected.approvalRequestId,{outcome:"REJECTED",reason:"Missing receipt"});
   const cancelled=await finance.submit(staff,{...input,idempotencyKey:randomUUID(),amount:"11"});
