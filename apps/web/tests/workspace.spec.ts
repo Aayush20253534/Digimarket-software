@@ -194,6 +194,19 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Grid view"}).click();
   await expect(page.locator(".aw-drive-folders-grid")).toBeVisible();
   await page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true}).click();
+  await expect(page.locator(".aw-drive-crumb")).toHaveCount(1);
+  await expect(page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true})).toHaveCount(0);
+  // Direct links and refresh retain a single valid breadcrumb.
+  await page.reload();
+  await expect(page.locator(".aw-drive-crumb")).toHaveCount(1);
+  const savedTrail=await page.evaluate(()=>window.history.state?.awDriveTrail);
+  expect(savedTrail).toHaveLength(1);
+  // Old builds could save repeated IDs into the URL; repair them on load.
+  await page.goto("/app/assets?folders="+encodeURIComponent(JSON.stringify([...savedTrail,...savedTrail])));
+  await expect(page.locator(".aw-drive-crumb")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true}).click();
+  await expect(page.locator(".aw-drive-crumb")).toHaveCount(1);
   await page.getByRole("button",{name:"Go back"}).click();
   await expect(page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"More actions for folder CI Campaign Artwork"}).click();

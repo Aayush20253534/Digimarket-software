@@ -18,6 +18,25 @@ const imageExtMime:Record<string,string>={pdf:"application/pdf",jpg:"image/jpeg"
 function fileMime(file:File){return accepted.includes(file.type)?file.type:imageExtMime[file.name.split(".").pop()?.toLowerCase()??""]??file.type;}
 const errText=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Asset operation failed";
 const prettyBytes=(n:number)=>n>=1_000_000?(n/1_000_000).toFixed(1)+" MB":(n/1000).toFixed(0)+" KB";
+const folderUuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Browser history and bookmarked URLs are untrusted: a trail must be a real ancestry,
+// not a list of repeated IDs (or unrelated folders) that can grow forever.
+function parseFolderTrail(value:unknown):FolderItem[]|null{
+ if(!Array.isArray(value)||value.length>30)return null;
+ const result:FolderItem[]=[],seen=new Set<string>();
+ for(const entry of value){
+  if(!entry||typeof entry!=="object")return null;
+  const folder=entry as Partial<FolderItem>;
+  if(typeof folder.id!=="string"||!folderUuid.test(folder.id)||seen.has(folder.id)||
+    typeof folder.name!=="string"||!folder.name.trim()||folder.name.length>120||
+    folder.parentId!==(result.length?result[result.length-1].id:null))return null;
+  seen.add(folder.id);
+  result.push({id:folder.id,name:folder.name,parentId:folder.parentId,
+   color:typeof folder.color==="string"&&/^#[0-9a-f]{6}$/i.test(folder.color)?folder.color:"#A56CE4",
+   version:typeof folder.version==="number"&&Number.isSafeInteger(folder.version)&&folder.version>0?folder.version:1});
+ }
+ return result;
+}
 
 export default function AssetsPage(){
  const {session,request}=useAuth();
@@ -29,6 +48,8 @@ export default function AssetsPage(){
  const [imagePreviews,setImagePreviews]=useState<Record<string,string>>({});
  const [trail,setTrail]=useState<FolderItem[]>([]);
  const folderId=trail.length?trail[trail.length-1].id:null;
+ const activeFolderRef=useRef<string|null>(null);
+ const loadSequence=useRef(0);
  const [folders,setFolders]=useState<FolderItem[]>([]);
  const [newFolderName,setNewFolderName]=useState("");
  const [newFolderColor,setNewFolderColor]=useState("#A56CE4");
@@ -96,6 +117,10 @@ export default function AssetsPage(){
  const visibleFolders=useMemo(()=>folders.filter(x=>x.name.toLowerCase().includes(search.trim().toLowerCase())),[folders,search]);
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
+   // Mutations may call an older render's load callback. Never let it fetch a
+   // previous folder after navigation (or overwrite the newly opened folder).
+   if(activeFolderRef.current!==folderId)return;
+   const sequence=++loadSequence.current;
    setLoading(true);
    try{
      const q=new URLSearchParams({limit:"30",status:filter,sort,direction:reverse?"desc":"asc"});
@@ -103,17 +128,29 @@ export default function AssetsPage(){
      if(filterClient)q.set("clientId",filterClient);
      if(cursor)q.set("cursor",cursor);
      q.set("folderId",folderId??"root");
-     const folderRequest=request<{folders:FolderItem[]}>("/asset-folders?parentId="+(folderId??"root"));
-     let result:Listing;
-     try{result=await request<Listing>("/assets?"+q.toString());setLegacySort(false);}
-     catch(e){
-      if(!(e instanceof ApiError)||e.status!==422)throw e;
-      q.delete("sort");q.delete("direction");
-      result=await request<Listing>("/assets?"+q.toString());setLegacySort(true);
-     }
-     const folderList=await folderRequest;
-     setItems(result.items);setFolders(folderList.folders);setNextCursor(result.nextCursor);setError("");
-   }catch(e){setError(errText(e));}finally{setLoading(false);}
+     let usedLegacySort=false;
+     // Await both requests together. Their responses must belong to this specific
+     // folder/navigation generation, even when the previous request finishes last.
+     const [result,folderList]=await Promise.all([
+      request<Listing>("/assets?"+q.toString()).catch(async e=>{
+       if(!(e instanceof ApiError)||e.status!==422)throw e;
+       q.delete("sort");q.delete("direction");
+       const fallback=await request<Listing>("/assets?"+q.toString());
+       usedLegacySort=true;return fallback;
+      }),
+      request<{folders:FolderItem[]}>("/asset-folders?parentId="+(folderId??"root")),
+     ]);
+     if(sequence!==loadSequence.current||activeFolderRef.current!==folderId)return;
+     // Defensively exclude anything that does not belong to the requested folder.
+     setItems(result.items.filter(item=>(item.folderId??null)===folderId));
+     setFolders(folderList.folders.filter(folder=>folder.parentId===folderId));
+     setLegacySort(usedLegacySort);
+     setNextCursor(result.nextCursor);setError("");
+   }catch(e){
+    if(sequence===loadSequence.current&&activeFolderRef.current===folderId)setError(errText(e));
+   }finally{
+    if(sequence===loadSequence.current&&activeFolderRef.current===folderId)setLoading(false);
+   }
  },[canRead,request,filter,search,filterClient,cursor,folderId,sort,reverse]);
  useEffect(()=>{void load();},[load]);
  // Short-lived authenticated URLs are held only in component memory.
@@ -152,31 +189,52 @@ export default function AssetsPage(){
   return()=>{active=false;};
  },[canRead,request]);
 
- const navigateTrail=(next:FolderItem[],push=true)=>{
+ const applyTrail=(next:FolderItem[])=>{
+  // Invalidate in-flight requests synchronously, before React effects re-run.
+  ++loadSequence.current;
+  activeFolderRef.current=next.length?next[next.length-1].id:null;
   setTrail(next);setCursor(null);setNextCursor(null);setSelected(null);setSelectedIds([]);setContext(null);
-  const url=new URL(window.location.href);
-  if(next.length)url.searchParams.set("folders",JSON.stringify(next.map(f=>({id:f.id,name:f.name,color:f.color,parentId:f.parentId,version:f.version}))));
-  else url.searchParams.delete("folders");
-  if(push)window.history.pushState({awDriveTrail:next},"",url);
-  else window.history.replaceState({awDriveTrail:next},"",url);
+  setItems([]);setFolders([]);setImagePreviews({});setLoading(true);setError("");
  };
- const enter=(folder:FolderItem)=>navigateTrail([...trail,folder]);
+ const navigateTrail=(next:FolderItem[],push=true)=>{
+  applyTrail(next);
+  const url=new URL(window.location.href);
+  if(next.length)url.searchParams.set("folders",JSON.stringify(next));
+  else url.searchParams.delete("folders");
+  const state={...(window.history.state??{}),awDriveTrail:next};
+  if(push)window.history.pushState(state,"",url);
+  else window.history.replaceState(state,"",url);
+ };
+ const enter=(folder:FolderItem)=>{
+  if(folder.parentId!==activeFolderRef.current||trail.some(item=>item.id===folder.id)){
+   // Rapid double-clicks and stale responses must never append the same folder.
+   setError("This folder view is out of date. Wait for the current folder to load.");
+   return;
+  }
+  navigateTrail([...trail,folder]);
+ };
  const goTo=(depth:number)=>navigateTrail(trail.slice(0,depth));
  useEffect(()=>{
   const readPath=(state:unknown):FolderItem[]=>{
-   if(state&&typeof state==="object"&&"awDriveTrail" in state&&Array.isArray(state.awDriveTrail))return state.awDriveTrail as FolderItem[];
-   try{
-    const value=new URLSearchParams(window.location.search).get("folders");
-    const found=value?JSON.parse(value):[];
-    if(!Array.isArray(found)||found.length>30)return[];
-    return found.every(x=>typeof x?.id==="string"&&/^[0-9a-f-]{36}$/i.test(x.id)&&typeof x?.name==="string")?found:[];
-   }catch{return[];}
+   const saved=state&&typeof state==="object"&&"awDriveTrail" in state
+     ?(state as {awDriveTrail:unknown}).awDriveTrail:undefined;
+   let candidate:unknown=saved;
+   if(candidate===undefined){
+    try{
+     const value=new URLSearchParams(window.location.search).get("folders");
+     candidate=value?JSON.parse(value):[];
+    }catch{candidate=null;}
+   }
+   const valid=parseFolderTrail(candidate);
+   if(valid)return valid;
+   // Repair bad links left by earlier versions rather than keeping invalid crumbs.
+   const url=new URL(window.location.href);url.searchParams.delete("folders");
+   window.history.replaceState({...window.history.state,awDriveTrail:[]},"",url);
+   return [];
   };
   const initial=readPath(window.history.state);
-  if(initial.length)setTrail(initial);
-  const onPop=(event:PopStateEvent)=>{
-   setTrail(readPath(event.state));setCursor(null);setNextCursor(null);setSelected(null);setSelectedIds([]);setContext(null);
-  };
+  if(initial.length)applyTrail(initial);
+  const onPop=(event:PopStateEvent)=>applyTrail(readPath(event.state));
   window.addEventListener("popstate",onPop);
   return()=>window.removeEventListener("popstate",onPop);
  },[]);
@@ -441,7 +499,7 @@ export default function AssetsPage(){
   </div>
   <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files. {legacySort?"Sorting is limited to this page until the API updates.":""}</p>
   <nav className="aw-drive-path" aria-label="Folder path">
-   {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>{if(window.history.state?.awDriveTrail)window.history.back();else goTo(trail.length-1);}}><ArrowLeft size={17}/></button>}
+   {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>goTo(trail.length-1)}><ArrowLeft size={17}/></button>
    <button type="button" onClick={()=>goTo(0)}><Home size={17}/> My Drive</button>
    {trail.map((f,i)=><span key={f.id} className="aw-drive-crumb"><ChevronRight size={14}/><button type="button" onClick={()=>goTo(i+1)}>{f.name}</button></span>)}
   </nav>
