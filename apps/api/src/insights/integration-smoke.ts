@@ -1,5 +1,6 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
+import {randomUUID} from "node:crypto";
 import {createDatabaseClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {InsightsService} from "./insights";
@@ -61,6 +62,37 @@ try{
   sellerName:"Agency",sellerAddress:"Prayagraj",buyerName:"Sunrise Coffee",
   subtotal:"100.0000",total:"100.0000",paidTotal:"0",
  }});
+ // Amounts remain exact Decimal values: founders search all permitted agency income/expenses,
+ // while staff without the finance grant cannot discover another person's transactions.
+ const fundsCategory=await db.financialCategory.create({data:{
+  organizationId:org.id,kind:"INCOME",name:"Funds",normalizedName:"funds",
+ }});
+ const expenseCategory=await db.financialCategory.create({data:{
+  organizationId:org.id,kind:"EXPENSE",name:"Travel",normalizedName:"travel",
+ }});
+ const financePolicy=await db.approvalPolicy.create({data:{
+  organizationId:org.id,category:"FINANCE",name:"Finance review",approverRoleKeys:["ADMIN"],
+ }});
+ for(const testCase of [
+  {kind:"INCOME" as const,amount:"15400.0000",categoryId:fundsCategory.id,enteredById:manager.id,source:"Previous Business Funds"},
+  {kind:"EXPENSE" as const,amount:"800.0000",categoryId:expenseCategory.id,enteredById:worker.id,source:"Taxi"},
+ ]){
+  const decision=await db.approvalRequest.create({data:{
+   organizationId:org.id,policyId:financePolicy.id,requesterId:testCase.enteredById,
+   title:testCase.source,description:"CI amount index",status:"APPROVED",approverRoleKeys:["ADMIN"],
+  }});
+  const entry=await db.financialTransaction.create({data:{
+   organizationId:org.id,enteredById:testCase.enteredById,
+   categoryId:testCase.categoryId,approvalRequestId:decision.id,idempotencyKey:randomUUID(),
+   kind:testCase.kind,amount:testCase.amount,currencyCode:"INR",occurredOn:day,
+   merchantOrSource:testCase.source,method:"UPI",status:"POSTED",
+  }});
+  const searched=testCase.kind==="INCOME"?"15400":"800";
+  assert.ok((await insights.search(admin,searched)).items.some(x=>x.id===entry.id));
+  assert.equal((await insights.search(employee,searched)).items.some(x=>x.id===entry.id),false);
+  if(testCase.kind==="INCOME")
+   assert.ok((await insights.search(admin,"₹15,400")).items.some(x=>x.id===entry.id));
+ }
  const publicHits=(await insights.search(employee,"Sunrise")).items;
  // Access to client lists does not expose other users' clients in personal search.
  assert.equal(publicHits.some(x=>x.id===client.id),false);
