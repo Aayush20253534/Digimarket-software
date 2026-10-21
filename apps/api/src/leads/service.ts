@@ -36,6 +36,11 @@ export class LeadsService {
  }
  private async addIn(tx:Tx,a:Principal,input:LeadCreateInput,importKey?:string){
    const normalizedPhone=phone(input.phone);
+   // Both manual and webhook paths use the same transaction lock to prevent
+   // duplicate leads when two messages or form submissions arrive concurrently.
+   await tx.$queryRaw`SELECT 1 AS acquired FROM (SELECT pg_advisory_xact_lock(hashtextextended(${a.organizationId+":"+normalizedPhone},0))) AS lock_row`;
+   if(await tx.lead.findFirst({where:{organizationId:a.organizationId,normalizedPhone}}))
+     throw new AuthError(409,"LEAD_ALREADY_EXISTS","This phone number already belongs to a lead");
    const r=await tx.lead.create({data:{
      organizationId:a.organizationId,businessName:"Lead "+normalizedPhone,
      normalizedBusinessName:"lead "+normalizedPhone,contactName:null,
