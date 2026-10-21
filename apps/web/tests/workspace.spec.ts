@@ -117,6 +117,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
   await page.goto("/app/notes");
+  // The studio must reach the bottom of the visible desktop viewport at 75% zoom.
+  const notesBottom=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect().bottom);
+  const viewportHeight=await page.evaluate(()=>window.innerHeight);
+  expect(Math.abs(notesBottom-viewportHeight),"Notes Studio must fill the desktop viewport")
+    .toBeLessThanOrEqual(3);
   await expect(page.getByRole("button",{name:"Drawn note"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Typed note"})).toBeVisible();
   await page.getByRole("button",{name:/Drawn note/}).click();
@@ -264,9 +269,32 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Agency totals"})).toHaveCount(0);
-  for(const width of [320,375,768,1024,1366]){
-    await page.setViewportSize({width,height:812});await page.goto("/app/dashboard");
+  for(const width of [320,375,390,768,1024,1366]){
+    await page.setViewportSize({width,height:812});
+    await page.goto("/app/dashboard");
     expect(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2)).toBe(false);
+    if(width<=390){
+      const nav=await page.locator(".aw-work-topbar").evaluate(el=>{
+        const box=el.getBoundingClientRect();
+        const first=el.firstElementChild!.getBoundingClientRect();
+        const actions=el.querySelector(".aw-work-topactions")!.getBoundingClientRect();
+        return {contained:first.right<=actions.left+1,right:actions.right<=box.right+1};
+      });
+      expect(nav.contained,"Mobile navigation title must not collide with icons").toBe(true);
+      expect(nav.right,"Mobile navigation actions must stay on-screen").toBe(true);
+      await page.goto("/app/finance");
+      const grid=await page.locator(".aw-finance-summary-grid").evaluate(el=>{
+        const cards=[...el.children].map(x=>x.getBoundingClientRect());
+        return {columns:getComputedStyle(el).gridTemplateColumns.split(" ").length,
+          compact:cards.slice(0,4).every(x=>x.height<=125)};
+      });
+      expect(grid.columns,"Finance summary should use two columns on phones").toBe(2);
+      expect(grid.compact,"Finance cards should stay compact on phones").toBe(true);
+      await page.goto("/app/notes");
+      const studio=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect());
+      expect(studio.right,"Mobile notes must stay inside viewport")
+        .toBeLessThanOrEqual(width+1);
+    }
   }
 });
 test("unauthenticated dashboard access is denied",async({page})=>{

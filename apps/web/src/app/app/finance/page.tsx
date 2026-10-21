@@ -238,7 +238,7 @@ export default function FinancePage(){
   }
   if(!session)return <Spinner label="Checking finance access…"/>;
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
-  return <div className="space-y-7">
+  return <div className="aw-finance-page space-y-7">
     <PageHeader eyebrow="Financial operations" title="Income & expenses"
       description="All financial records are submitted for approval. Only posted entries count towards net income."
       actions={<div className="flex flex-wrap gap-2">
@@ -250,7 +250,7 @@ export default function FinancePage(){
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
     </div>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="aw-finance-summary-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Financial totals">
       {([
         ["Posted income",totals.postedIncome],
         ["Posted expenses",totals.postedExpense],
@@ -266,9 +266,9 @@ export default function FinancePage(){
     {!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}
-    <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+    <div className="aw-finance-panels grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       {canCreate&&<Card title="New income or expense" description="Every submission enters the approval queue. Amounts are stored with four decimal places, not floating-point math.">
-        <form className="grid gap-4 sm:grid-cols-2" onSubmit={submit}>
+        <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
           <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" value={kind} onChange={e=>setKind(e.target.value as Kind)}>
             <option value="EXPENSE">Expense</option><option value="INCOME">Income</option></select></FormField>
           <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>setCategoryId(e.target.value)}>
@@ -305,7 +305,7 @@ export default function FinancePage(){
             maxLength={120} value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder="Rapido"/></FormField>
           <button className="btn-primary" type="submit" disabled={busy}>Add category</button>
         </form>}
-        <div className="mt-5 space-y-2">{categories.length?categories.map(c=><div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
+        <div className="aw-finance-category-list mt-5 space-y-2" role="region" aria-label="Financial categories" tabIndex={0}>{categories.length?categories.map(c=><div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
           <div><p className="text-sm font-semibold">{c.name}</p><p className="text-xs text-slate-500">{c.kind} · {c.active?"Active":"Inactive"}</p></div>
           {canManage&&<div className="flex flex-wrap gap-2">
             <button type="button" className="btn-secondary text-xs" onClick={()=>void toggleCategory(c)} disabled={busy}>{c.active?"Disable":"Enable"}</button>

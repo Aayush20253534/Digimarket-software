@@ -245,3 +245,38 @@
  .aw-studio-header-name{min-width:0}
 }
 @media(max-width:560px){.aw-notes-create-choices{grid-template-columns:1fr}.aw-notes-home{justify-content:flex-start;padding:22px 12px}.aw-studio-header{align-items:flex-start}.aw-studio-head-actions{justify-content:flex-start}}
+ 
+
+/* Notes Studio is inside a desktop workspace with zoom:.75.
+   Its height must be specified in the unscaled coordinate system. */
+@media(min-width:1024px){
+  .aw-studio:not(.aw-studio-fullscreen){
+    height:calc(100dvh / .75 - 72px);
+    min-height:0;
+    border-radius:0;
+    border-bottom:0;
+  }
+  .aw-studio-library,.aw-studio-inspector{
+    scrollbar-width:thin;
+    scrollbar-color:#6d537c transparent;
+  }
+}
+@media(min-width:640px) and (max-width:1023px){
+  .aw-studio:not(.aw-studio-fullscreen){height:calc(100dvh - 72px);min-height:0}
+}
+@media(max-width:639px){
+  .aw-studio:not(.aw-studio-fullscreen){
+    height:calc(100dvh - 60px);
+    min-height:0;
+    border-radius:0;
+  }
+  .aw-studio-library,.aw-studio-inspector{
+    scrollbar-width:thin;
+    scrollbar-color:#71508a transparent;
+  }
+  .aw-studio-header{align-items:center}
+  .aw-studio-head-actions{justify-content:flex-end}
+  .aw-notes-home{min-height:0;justify-content:center;padding:14px 12px;gap:10px}
+  .aw-notes-create-choices{gap:9px;margin-top:2px}
+  .aw-notes-create-choices button{padding:13px;gap:8px}
+}

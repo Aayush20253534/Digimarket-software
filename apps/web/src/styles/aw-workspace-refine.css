@@ -274,3 +274,105 @@
 /* If a scaled page ends before the viewport, never reveal the public light theme. */
 body:has(> #__next .aw-workspace),
 body:has(.aw-workspace){background:#09070e}
+ 
+
+/* Mobile top bar. Prior 40px actions + breadcrumbs left too little room on a phone. */
+@media(max-width:639px){
+  .aw-work-topbar{
+    height:60px;
+    padding-inline:10px;
+    gap:7px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+  }
+  .aw-work-topbar>div:first-child{min-width:0;gap:7px;overflow:hidden}
+  .aw-work-breadcrumb{display:none}
+  .aw-work-title{
+    margin-top:0;
+    font-size:13px;
+    line-height:1.2;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .aw-work-topactions{gap:5px;flex:none}
+  .aw-work-topactions .aw-work-icon,
+  .aw-work-topactions .aw-work-search,
+  .aw-work-mobile-trigger{
+    width:36px;min-width:36px;height:38px;padding:0;
+    border-radius:10px;
+  }
+  .aw-work-header-avatar .aw-work-avatar{width:36px;height:36px}
+  .aw-work-content{min-height:calc(100dvh - 60px)}
+  .aw-work-content-width{min-width:0}
+}
+@media(max-width:360px){
+  .aw-work-topbar{gap:5px;padding-inline:8px}
+  .aw-work-topactions{gap:3px}
+  .aw-work-topactions .aw-work-icon,.aw-work-topactions .aw-work-search,
+  .aw-work-mobile-trigger{width:33px;min-width:33px;height:36px}
+  .aw-work-header-avatar .aw-work-avatar{height:33px;width:33px}
+  .aw-work-title{font-size:12px}
+}
+
+/* Keep the finance overview dense without sacrificing the 44px form tap targets. */
+@media(max-width:639px){
+  .aw-finance-page{min-width:0}
+  .aw-finance-page.space-y-7 > :not([hidden]) ~ :not([hidden]){margin-top:14px}
+  .aw-finance-summary-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .aw-finance-summary-grid > section{
+    min-width:0;
+    min-height:91px;
+    padding:10px 11px!important;
+    border-radius:12px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    gap:3px;
+  }
+  .aw-finance-summary-grid > section:nth-child(5){
+    grid-column:1 / -1;
+    min-height:76px;
+  }
+  .aw-finance-summary-grid > section > p{
+    margin-top:0!important;
+    line-height:1.25;
+    min-width:0;
+  }
+  .aw-finance-summary-grid > section > p:first-child{font-size:10px;letter-spacing:.025em}
+  .aw-finance-summary-grid > section > p:nth-child(2){
+    font-size:clamp(14px,4vw,18px);
+    overflow-wrap:anywhere;
+    font-variant-numeric:tabular-nums;
+    font-weight:800;
+  }
+  .aw-finance-summary-grid > section > p:last-child{font-size:10px}
+  .aw-finance-panels{gap:12px!important}
+  .aw-finance-panels > section{
+    min-width:0;
+    padding:13px!important;
+    border-radius:14px;
+  }
+  .aw-finance-new-form{gap:10px!important}
+  .aw-finance-page .aw-finance-category-list{
+    max-height:198px;
+    overflow-y:auto;
+    overscroll-behavior-y:contain;
+    scrollbar-width:thin;
+    scrollbar-color:#725188 transparent;
+    padding-right:2px;
+  }
+  .aw-finance-category-list > div{gap:6px;padding:8px 9px}
+  .aw-finance-category-list button{padding:6px 9px;min-height:35px}
+  .aw-finance-page .aw-finance-register-scroll{max-width:100%}
+}
+@media(min-width:360px) and (max-width:639px){
+  .aw-finance-new-form{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .aw-finance-new-form > div{min-width:0}
+  .aw-finance-new-form > .sm\\:col-span-2{grid-column:1 / -1}
+  .aw-finance-new-form input,.aw-finance-new-form select{min-width:0;width:100%;font-size:13px}
+}
