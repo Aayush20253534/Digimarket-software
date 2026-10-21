@@ -10,6 +10,7 @@
 @import "../styles/aw-personal-tasks.css";
 @import "../styles/aw-drive.css";
 @import "../styles/aw-workspace-refine.css";
+@import "../styles/aw-pwa.css";
 
 :root {
   color-scheme: light;
