@@ -158,7 +158,7 @@ export default function ClientsPage(){
          {canEdit?<form onSubmit={save} className="space-y-3">
            {editableFields.map(([key,label])=><FormField key={key} id={"edit-client-"+key} label={label}>
              <input id={"edit-client-"+key} className="field" value={draft[key]}
-               required={key==="businessName"} type={key==="email"?"email":key.endsWith("Url")?"url":"text"}
+               required={key==="businessName"} type="text"
                onChange={e=>setDraft(v=>({...v,[key]:e.target.value}))}/>
            </FormField>)}
            <FormField id="client-status" label="Client status">
