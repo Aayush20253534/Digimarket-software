@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { clientCreateSchema,clientUpdateSchema,clientListQuerySchema,
-  clientContactSchema,clientServiceSchema,clientConvertSchema } from "@digimarket/contracts";
+import { clientUpdateSchema,clientListQuerySchema,
+  clientContactSchema,clientServiceSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { ClientsService } from "./service";
@@ -27,8 +27,9 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.set("Cache-Control","no-store");
    res.json({data:await svc.list(actor(res),parse(clientListQuerySchema,req.query))});
  });
- app.post(root,authenticated,async(req,res)=>{
-   res.status(201).json({data:await svc.create(actor(res),parse(clientCreateSchema,req.body))});
+ app.post(root,authenticated,async(_req,res)=>{
+   res.status(405).json({error:{code:"LEAD_APPROVAL_REQUIRED",
+     message:"Approve a lead in Leads CRM to create a client"}});
  });
  app.get(root+"/:id",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
@@ -45,8 +46,8 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.status(201).json({data:await svc.addService(actor(res),parse(id,req.params.id),
      parse(clientServiceSchema,req.body))});
  });
- app.post("/api/v1/leads/:id/convert",authenticated,async(req,res)=>{
-   res.status(201).json({data:await svc.convert(actor(res),parse(id,req.params.id),
-     parse(clientConvertSchema,req.body).version)});
+ app.post("/api/v1/leads/:id/convert",authenticated,async(_req,res)=>{
+   res.status(405).json({error:{code:"AUTO_CONVERSION_ONLY",
+     message:"Set lead status to Approved to create its client"}});
  });
 }

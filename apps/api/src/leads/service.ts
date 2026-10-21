@@ -16,7 +16,6 @@ function phone(value?:string){
 }
 const safeCSV=(s:string)=>'"'+(/^[\s]*[=+@\-\t\r]/.test(s)?"'":"")+s.replaceAll('"','""')+'"';
 const urlOrNull=(s?:string)=>s?.trim()||null;
-const follow=(s?:string)=>s?new Date(s):null;
 const keyFor=(batch:string,i:number)=>{
   const h=createHash("sha256").update(batch+":"+i).digest("hex");
   return [h.slice(0,8),h.slice(8,12),"4"+h.slice(13,16),"8"+h.slice(17,20),h.slice(20,32)].join("-");
@@ -25,7 +24,7 @@ type Tx=Prisma.TransactionClient;
 
 export class LeadsService {
  constructor(private readonly db:PrismaClient){}
- private canEdit(a:Principal,r:{assignedToId:string|null;createdById:string}){
+ private canEdit(a:Principal,_r:{assignedToId:string|null;createdById:string}){
    return a.permissions.has("leads.edit") || a.permissions.has("leads.edit.own");
  }
  private async find(a:Principal,id:string){

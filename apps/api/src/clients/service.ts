@@ -47,21 +47,10 @@ export class ClientsService {
        services:{orderBy:{createdAt:"asc"}},
        sourceLead:{select:{id:true,businessName:true,status:true}}}});
  }
- async create(a:Principal,input:ClientCreateInput){
-   deny(a,"clients.create");
-   return this.db.$transaction(async tx=>{
-     const client=await tx.client.create({data:{
-       organizationId:a.organizationId,createdById:a.userId,
-       businessName:input.businessName.trim(),businessType:optional(input.businessType),
-       phone:optional(input.phone),email:optional(input.email),location:optional(input.location),
-       websiteUrl:optional(input.websiteUrl),instagramUrl:optional(input.instagramUrl),
-       facebookUrl:optional(input.facebookUrl),notes:optional(input.notes),
-     }});
-     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-       action:"clients.created",entityType:"Client",entityId:client.id}});
-     return client;
-   });
+ async create(_a:Principal,_input:ClientCreateInput):Promise<never>{
+   throw new AuthError(405,"LEAD_APPROVAL_REQUIRED","Approve a lead to create a client");
  }
+
  async update(a:Principal,id:string,input:ClientUpdateInput){
    deny(a,"clients.edit");
    await this.existing(a,id);
@@ -114,39 +103,7 @@ export class ClientsService {
      return service;
    });
  }
- async convert(a:Principal,leadId:string,version:number){
-   deny(a,"leads.convert");deny(a,"clients.create");deny(a,"leads.read");
-   try{return await this.db.$transaction(async tx=>{
-     // An optimistic update is the conversion lock. A stale or cross-org lead cannot convert.
-     const lead=await tx.lead.findFirst({where:{id:leadId,organizationId:a.organizationId}});
-     if(!lead)throw new AuthError(404,"NOT_FOUND","Lead not found");
-     if(lead.status!=="WON")throw new AuthError(422,"LEAD_NOT_WON","Only won leads can become clients");
-     if(lead.version!==version)throw new AuthError(409,"VERSION_CONFLICT","Lead changed; refresh before converting");
-     const changed=await tx.lead.updateMany({
-       where:{id:leadId,organizationId:a.organizationId,version,status:"WON"},
-       data:{version:{increment:1}},
-     });
-     if(changed.count!==1)throw conflict();
-     // A unique sourceLeadId and single transaction reject simultaneous duplicates.
-     const client=await tx.client.create({data:{
-       organizationId:a.organizationId,sourceLeadId:leadId,createdById:a.userId,
-       businessName:lead.businessName,businessType:lead.businessType,
-       phone:lead.phone,location:lead.location,websiteUrl:lead.websiteUrl,
-       instagramUrl:lead.instagramUrl,
-       ...(lead.contactName?{contacts:{create:{name:lead.contactName,phone:lead.phone,isPrimary:true}}}:{}),
-     }});
-     await tx.leadActivity.create({data:{leadId,actorId:a.userId,kind:"DETAILS_UPDATED",
-       metadata:{action:"CONVERTED_TO_CLIENT",clientId:client.id}}});
-     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-       action:"leads.converted_to_client",entityType:"Lead",entityId:leadId,
-       afterRedacted:{clientId:client.id}}});
-     await tx.outboxEvent.create({data:{organizationId:a.organizationId,
-       eventKey:"lead-converted:"+leadId,kind:"lead.converted",
-       aggregateType:"Client",aggregateId:client.id,payloadMinimal:{leadId,clientId:client.id}}});
-     return client;
-   });}catch(e){
-     if((e as {code?:string}).code==="P2002")throw converted();
-     throw e;
-   }
+ async convert(_a:Principal,_leadId:string,_version:number):Promise<never>{
+   throw new AuthError(405,"AUTO_CONVERSION_ONLY","Clients are created when the lead is Approved");
  }
 }
