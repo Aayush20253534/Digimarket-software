@@ -10,10 +10,12 @@ import { ApiError } from "@/lib/api";
 type Kind="INCOME"|"EXPENSE";
 type View="mine"|"all";
 type Category={id:string;kind:Kind;name:string;active:boolean};
+type Assignee={id:string;displayName:string;loginId:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
   amount:string;currencyCode:string;occurredOn:string;method:string;description:string|null;
   merchantOrSource:string|null;createdAt:string;approvalRequestId:string;
-  receiptAssetId?:string|null;category:{name:string};enteredBy:{displayName:string;loginId:string}};
+  receiptAssetId?:string|null;enteredById:string;category:{id:string;name:string;active:boolean};
+  enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
 type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
   pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[]};
 type FinancePolicy={category:string;active:boolean};
@@ -41,7 +43,10 @@ export default function FinancePage(){
   const [editingCategory,setEditingCategory]=useState<Category|null>(null);
   const [editedCategoryName,setEditedCategoryName]=useState("");
   const [editingExpense,setEditingExpense]=useState<Entry|null>(null);
-  const [expenseEdit,setExpenseEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",merchantOrSource:"",description:""});
+  const [expenseEdit,setExpenseEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",
+    merchantOrSource:"",description:"",enteredById:""});
+  const [assignees,setAssignees]=useState<Assignee[]>([]);
+  const [assigneesError,setAssigneesError]=useState("");
   const [categories,setCategories]=useState<Category[]>([]);
   const [entries,setEntries]=useState<Entry[]>([]);
   const [totals,setTotals]=useState<Totals>(zero);
@@ -85,6 +90,16 @@ export default function FinancePage(){
     }catch(e){setError(readable(e));}finally{setLoading(false);}
   },[request,view,canReadOwn,canAll]);
   useEffect(()=>{void reload();},[reload]);
+  useEffect(()=>{
+    if(!adminFinance)return;
+    let active=true;
+    void request<Assignee[]>("/finance/assignees").then(users=>{
+      if(active){setAssignees(users);setAssigneesError("");}
+    }).catch(e=>{
+      if(active)setAssigneesError(readable(e));
+    });
+    return()=>{active=false;};
+  },[adminFinance,request]);
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
     if(!id||!entries.some(entry=>entry.id===id))return;
@@ -162,17 +177,17 @@ export default function FinancePage(){
   }
   function beginExpenseEdit(row:Entry){
     setEditingExpense(row);setError("");
-    setExpenseEdit({categoryId:categories.find(c=>c.kind==="EXPENSE"&&c.name===row.category.name)?.id??(
-      categories.find(c=>c.kind==="EXPENSE"&&c.active)?.id??""),
+    setExpenseEdit({categoryId:row.category.id,
       amount:row.amount,occurredOn:row.occurredOn,method:row.method,
-      merchantOrSource:row.merchantOrSource??"",description:row.description??""});
+      merchantOrSource:row.merchantOrSource??"",description:row.description??"",
+      enteredById:row.enteredById});
   }
   async function saveExpense(e:FormEvent){
     e.preventDefault();if(!editingExpense)return;
     setBusy(true);setError("");setSuccess("");
     try{
       await request("/finance/entries/"+editingExpense.id,{method:"PUT",body:expenseEdit});
-      setEditingExpense(null);setSuccess("Expense updated with an audit record.");
+      setEditingExpense(null);setSuccess("Expense updated and assigned user saved with an audit record.");
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
@@ -288,7 +303,7 @@ export default function FinancePage(){
       {loading?<Spinner label="Loading financial entries…"/>:!entries.length?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
         <div className="aw-finance-register-scroll" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
-            {["Date","Type","Category","Source","Amount","Status","Entered by","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
+            {["Date","Type","Category","Source","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
           </tr></thead><tbody>{entries.map(row=><tr key={row.id} id={"finance-"+row.id}>
             <td className="py-3 pr-4">{row.occurredOn}</td>
             <td><span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>{row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>} {row.kind==="INCOME"?"Income":"Expense"}</span></td>
@@ -296,7 +311,9 @@ export default function FinancePage(){
             <td className="py-3 pr-4">{row.merchantOrSource||"—"}</td>
             <td className={"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>{money(row.amount)}</td>
             <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
-            <td className="py-3 pr-4">{row.enteredBy.displayName}</td>
+            <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
+              {row.submittedBy&&row.submittedBy.displayName!==row.enteredBy.displayName&&
+               <span className="aw-finance-original-submitter">Submitted by {row.submittedBy.displayName}</span>}</td>
             <td className="py-3">{row.receiptAssetId?
               <button type="button" className="btn-secondary" disabled={busy} aria-label={"View receipt for "+row.occurredOn}
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
@@ -325,12 +342,23 @@ export default function FinancePage(){
     </div>}
     {adminFinance&&editingExpense&&<div className="aw-finance-admin-overlay" role="presentation">
       <div className="aw-finance-admin-modal" role="dialog" aria-modal="true" aria-label="Edit expense">
-        <h2>Edit expense</h2><p>Submitted by {editingExpense.enteredBy.displayName}. Changes are audited.</p>
+        <h2>Edit expense</h2><p>Originally submitted by {editingExpense.submittedBy?.displayName??editingExpense.enteredBy.displayName}.
+          You can edit or assign this expense to any active member of the company. The original approval requester remains recorded.</p>
+        {assigneesError&&<Notice kind="error">{assigneesError}</Notice>}
         <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>void saveExpense(e)}>
           <FormField id="admin-expense-category" label="Expense category"><select id="admin-expense-category" className="field" required value={expenseEdit.categoryId}
             onChange={e=>setExpenseEdit(v=>({...v,categoryId:e.target.value}))}>
-            {categories.filter(c=>c.kind==="EXPENSE"&&(c.active||c.name===editingExpense.category.name)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.filter(c=>c.kind==="EXPENSE"&&(c.active||c.id===editingExpense.category.id)).map(c=>
+              <option key={c.id} value={c.id}>{c.name}{!c.active?" (archived)":""}</option>)}
           </select></FormField>
+          <FormField id="admin-expense-assignee" label="Assign expense to">
+            <select id="admin-expense-assignee" className="field" required value={expenseEdit.enteredById}
+              onChange={e=>setExpenseEdit(v=>({...v,enteredById:e.target.value}))}>
+              {!assignees.some(user=>user.id===editingExpense.enteredById)&&
+                <option value={editingExpense.enteredById}>{editingExpense.enteredBy.displayName} (current)</option>}
+              {assignees.map(user=><option key={user.id} value={user.id}>{user.displayName} ({user.loginId})</option>)}
+            </select>
+          </FormField>
           <FormField id="admin-expense-amount" label="Amount (INR)"><input id="admin-expense-amount" className="field" inputMode="decimal" required
             pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" value={expenseEdit.amount}
             onChange={e=>setExpenseEdit(v=>({...v,amount:e.target.value}))}/></FormField>
@@ -344,7 +372,7 @@ export default function FinancePage(){
           <div className="sm:col-span-2"><FormField id="admin-expense-desc" label="Notes"><textarea id="admin-expense-desc" className="field" maxLength={2000}
               value={expenseEdit.description} onChange={e=>setExpenseEdit(v=>({...v,description:e.target.value}))}/></FormField></div>
           <div className="sm:col-span-2 aw-finance-admin-actions"><button type="button" className="btn-secondary" onClick={()=>setEditingExpense(null)}>Cancel</button>
-            <button type="submit" className="btn-primary" disabled={busy||!expenseEdit.categoryId}>Save expense</button></div>
+            <button type="submit" className="btn-primary" disabled={busy||!expenseEdit.categoryId||!expenseEdit.enteredById}>Save expense</button></div>
         </form>
       </div>
     </div>}
