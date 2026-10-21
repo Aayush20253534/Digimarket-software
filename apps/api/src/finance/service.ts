@@ -122,23 +122,23 @@ export class FinanceService {
     });
   }
 
-  async editExpense(actor:Principal,id:string,input:FinanceEntryAdminEdit){
+  async editEntry(actor:Principal,id:string,input:FinanceEntryAdminEdit){
     this.administrator(actor);
     const amount=new Prisma.Decimal(input.amount);
     if(!amount.isFinite()||amount.lte(0))throw invalid("Amount must be greater than zero");
     return this.db.$transaction(async tx=>{
       const entry=await tx.financialTransaction.findFirst({
-        where:{id,organizationId:actor.organizationId,kind:"EXPENSE"},
+        where:{id,organizationId:actor.organizationId},
         include:{verifiedPayment:{select:{id:true}}},
       });
-      if(!entry)throw new AuthError(404,"NOT_FOUND","Expense not found");
+      if(!entry)throw new AuthError(404,"NOT_FOUND","Financial entry not found");
       if(entry.status==="CANCELLED"||entry.verifiedPayment)
-        throw new AuthError(409,"FINANCE_IMMUTABLE","Cancelled or reconciled expenses cannot be edited");
+        throw new AuthError(409,"FINANCE_IMMUTABLE","Cancelled or reconciled entries cannot be edited");
       const category=await tx.financialCategory.findFirst({
-        where:{id:input.categoryId,organizationId:actor.organizationId,kind:"EXPENSE",
+        where:{id:input.categoryId,organizationId:actor.organizationId,kind:entry.kind,
           ...(input.categoryId===entry.categoryId?{}:{active:true})},
       });
-      if(!category)throw invalid("Choose an active expense category in this organization");
+      if(!category)throw invalid("Choose a valid "+entry.kind.toLowerCase()+" category in this organization");
       const assignedUserId=input.enteredById??entry.enteredById;
       if(assignedUserId!==entry.enteredById){
         const assignedUser=await tx.user.findFirst({where:{
@@ -152,7 +152,8 @@ export class FinanceService {
         enteredById:assignedUserId,
       }});
       await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
-        action:"finance.expense_edited",entityType:"FinancialTransaction",entityId:id,
+        action:entry.kind==="INCOME"?"finance.income_edited":"finance.expense_edited",
+        entityType:"FinancialTransaction",entityId:id,
         beforeRedacted:{amount:entry.amount.toFixed(4),categoryId:entry.categoryId,status:entry.status,
           assignedUserId:entry.enteredById},
         afterRedacted:{amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status,
@@ -162,6 +163,16 @@ export class FinanceService {
       return {id,amount:updated.amount.toFixed(4),categoryId:updated.categoryId,
         status:updated.status,enteredById:updated.enteredById};
     });
+  }
+
+  // Preserve the existing expense-only service method used by older callers.
+  async editExpense(actor:Principal,id:string,input:FinanceEntryAdminEdit){
+    this.administrator(actor);
+    const entry=await this.db.financialTransaction.findFirst({
+      where:{id,organizationId:actor.organizationId,kind:"EXPENSE"},select:{id:true},
+    });
+    if(!entry)throw new AuthError(404,"NOT_FOUND","Expense not found");
+    return this.editEntry(actor,id,input);
   }
 
   async removeExpense(actor:Principal,id:string){

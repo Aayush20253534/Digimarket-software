@@ -64,7 +64,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.put("/api/v1/finance/entries/:id",authenticate,async(req,res)=>{
     const id=parse(z.uuid(),req.params.id),body=parse(financeEntryAdminEditSchema,req.body);
-    res.json({data:await finance.editExpense(actor(res),id,body)});
+    res.json({data:await finance.editEntry(actor(res),id,body)});
   });
   app.delete("/api/v1/finance/entries/:id",authenticate,async(req,res)=>{
     const id=parse(z.uuid(),req.params.id);

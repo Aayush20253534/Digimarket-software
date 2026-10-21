@@ -256,3 +256,15 @@
 .aw-finance-original-submitter{display:block;margin-top:4px;color:#b9a6c8;font-size:.69rem;white-space:normal}
 .aw-finance-register td:nth-child(7){min-width:145px}
 .aw-finance-admin-modal .field{min-width:0;width:100%}
+
+/* Compact desktop density: scale the application as one cohesive unit without
+   expanding its percentage width beyond the document viewport. Mobile retains
+   natural 100% sizing and accessible touch targets. */
+@media (min-width:1024px){
+  .aw-workspace{
+    zoom:.75;
+    width:100%;
+    max-width:100%;
+    min-height:100svh;
+  }
+}
