@@ -208,15 +208,15 @@ export default function LeadsPage(){
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Lead register" description="Live agency prospects and assigned follow-ups.">
+       <Card title="Lead register" description="Organization-wide contacts, meeting updates and approval status.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
            <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
-             <option value="">All stages</option>{stages.map(x=><option key={x}>{stageLabel(x)}</option>)}
+             <option value="">All stages</option>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}
            </select>
 <select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setCursor(null);setHistory([]);}}>
-  <option value="businessName">Business</option><option value="contactName">Contact</option><option value="location">Location</option><option value="status">Stage</option><option value="nextFollowUpAt">Follow-up</option>
+  <option value="businessName">Business</option><option value="contactName">Contact</option><option value="status">Stage</option><option value="createdAt">Created</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading&&<Spinner label="Loading leads…"/>}
