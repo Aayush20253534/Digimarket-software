@@ -15,6 +15,7 @@ import { registerProjectRoutes } from "./projects/routes";
 import { registerAssetRoutes } from "./assets/routes";
 import { registerClientRoutes } from "./clients/routes";
 import { registerLeadRoutes } from "./leads/routes";
+import { registerWhatsAppWebhook } from "./whatsapp/webhook";
 import { registerFinanceRoutes } from "./finance/routes";
 import { registerApprovalRoutes } from "./approvals/routes";
 import { registerAuthRoutes } from "./auth/routes";
@@ -26,6 +27,8 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
   app.set("trust proxy", 1);
   app.use(helmet());
   app.use(cors({ origin: allowedOrigins, credentials: true }));
+  // Register webhook before JSON parsing: signature verification requires raw bytes.
+  if(authService)registerWhatsAppWebhook(app,authService);
   app.use(express.json({ limit: "128kb" }));
   app.use((req,res,next)=>{
     const id=crypto.randomUUID();
