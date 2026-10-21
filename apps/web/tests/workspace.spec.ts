@@ -286,10 +286,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
       const grid=await page.locator(".aw-finance-summary-grid").evaluate(el=>{
         const cards=[...el.children].map(x=>x.getBoundingClientRect());
         return {columns:getComputedStyle(el).gridTemplateColumns.split(" ").length,
-          compact:cards.slice(0,4).every(x=>x.height<=125)};
+          compact:cards.slice(0,4).every(x=>x.height<=112),heights:cards.slice(0,5).map(x=>Math.round(x.height))};
       });
       expect(grid.columns,"Finance summary should use two columns on phones").toBe(2);
-      expect(grid.compact,"Finance cards should stay compact on phones").toBe(true);
+      expect(grid.compact,"Finance cards should stay compact on phones: "+JSON.stringify(grid.heights)).toBe(true);
       await page.goto("/app/notes");
       const studio=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect());
       expect(studio.right,"Mobile notes must stay inside viewport")

@@ -251,7 +251,7 @@
    Its height must be specified in the unscaled coordinate system. */
 @media(min-width:1024px){
   .aw-studio:not(.aw-studio-fullscreen){
-    height:calc(100dvh / .75 - 72px);
+    height:calc(133.333333dvh - 72px);
     min-height:0;
     border-radius:0;
     border-bottom:0;
