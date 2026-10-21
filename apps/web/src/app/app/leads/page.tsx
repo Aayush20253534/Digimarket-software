@@ -252,7 +252,7 @@ export default function LeadsPage(){
             <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
              <td><strong>{l.phone||"—"}</strong></td>
              <td>{l.contactName||"Name pending"}<span>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</span></td>
-             <td>{l.businessType||"Not recorded"}</td><td><StatusBadge status={l.status}/></td>
+             <td>{l.businessType||"Not recorded"}</td><td><StatusBadge status={l.status} rectangular/></td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
             </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
