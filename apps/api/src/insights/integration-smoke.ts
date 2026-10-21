@@ -85,7 +85,7 @@ try{
    organizationId:org.id,enteredById:testCase.enteredById,
    categoryId:testCase.categoryId,approvalRequestId:decision.id,idempotencyKey:randomUUID(),
    kind:testCase.kind,amount:testCase.amount,currencyCode:"INR",occurredOn:day,
-   merchantOrSource:testCase.source,method:"UPI",status:"POSTED",
+   merchantOrSource:testCase.source,method:"UPI",status:"POSTED",postedAt:now,
   }});
   const searched=testCase.kind==="INCOME"?"15400":"800";
   assert.ok((await insights.search(admin,searched)).items.some(x=>x.id===entry.id));
