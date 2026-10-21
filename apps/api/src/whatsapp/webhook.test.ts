@@ -13,6 +13,18 @@ describe("authenticated WhatsApp lead capture",()=>{
   expect(inboundSenders(body,"1234567890")).toEqual(["919876543210","919988776655"]);
   expect(inboundSenders(body,"other")).toEqual([]);
  });
+ it("never turns group conversation metadata into leads",()=>{
+  const group={object:"whatsapp_business_account",entry:[{changes:[{
+   field:"messages",value:{metadata:{phone_number_id:"1234567890"},messages:[
+    {from:"919876543210",id:"wamid.group",group_id:"group-1",type:"text"},
+    {from:"919876543210",id:"wamid.group2",context:{group_id:"group-2"},type:"text"},
+    {from:"919876543210",id:"wamid.group3",recipient_type:"group",type:"text"},
+    {from:"919876543210",id:"wamid.group4",chat_id:"120363000@g.us",type:"text"},
+    {from:"919876543210@g.us",id:"wamid.group5",type:"text"},
+   ]},
+  }]}]};
+  expect(inboundSenders(group,"1234567890")).toEqual([]);
+ });
  it("ignores delivery status and invalid numbers",()=>{
   expect(inboundSenders({object:"whatsapp_business_account",entry:[{changes:[{
    field:"messages",value:{metadata:{phone_number_id:"1234567890"},

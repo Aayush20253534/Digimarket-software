@@ -84,6 +84,7 @@ enum LeadStage {
   PENDING
   MEETING_PROCESS
   APPROVED
+  REJECTED
 }
 enum LeadActivityKind {
   CREATED
@@ -536,6 +537,8 @@ model Lead {
   createdById       String      @db.Uuid
   nextFollowUpAt    DateTime?   @db.Timestamptz(6)
   importKey         String?     @db.Uuid
+  deletedAt         DateTime?   @db.Timestamptz(6)
+  deletedById       String?     @db.Uuid
   version           Int         @default(1)
   createdAt         DateTime    @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime    @updatedAt @db.Timestamptz(6)
@@ -548,6 +551,7 @@ model Lead {
   convertedClient Client? @relation("ClientSourceLead")
   @@unique([organizationId, importKey])
   @@index([organizationId, status, updatedAt])
+  @@index([organizationId, deletedAt, createdAt])
   @@index([organizationId, assignedToId, nextFollowUpAt])
   @@index([organizationId, normalizedPhone])
   @@index([organizationId, normalizedBusinessName])

@@ -11,6 +11,24 @@ export function validMetaSignature(raw:Buffer,header:string|undefined,secret:str
  const expected=createHmac("sha256",secret).update(raw).digest();
  return got.length===expected.length&&timingSafeEqual(got,expected);
 }
+// Meta Cloud API is 1:1 today; explicitly reject group markers should a
+// different/expanded event format be delivered. Never create a lead for a chat.
+export function isDirectMessage(value:unknown,message:unknown):boolean{
+ if(!value||typeof value!=="object"||!message||typeof message!=="object")return false;
+ const v=value as Record<string,unknown>,m=message as Record<string,unknown>;
+ const context=m.context;
+ const ctx=context&&typeof context==="object"?context as Record<string,unknown>:{};
+ const markers=[v.group_id,v.groupId,v.chat_id,m.group_id,m.groupId,m.chat_id,
+   m.recipient_type,m.chat_type,ctx.group_id,ctx.groupId,ctx.chat_id];
+ if(markers.some(marker=>marker!==undefined&&marker!==null&&marker!=="individual"&&marker!=="user"))
+   return false;
+ // Never use group JIDs, recipients or participant identifiers as phone numbers.
+ for(const id of [v.from,m.from,m.to,m.recipient_id,m.remoteJid,m.chat_id,ctx.chat_id]){
+  if(typeof id==="string"&&(/@g\.us$/i.test(id)||/@broadcast$/i.test(id)))return false;
+ }
+ if(m.participant!==undefined||v.participants!==undefined)return false;
+ return true;
+}
 export function inboundSenders(body:unknown,phoneNumberId:string):string[]{
  if(!body||typeof body!=="object"||Array.isArray(body))return [];
  const document=body as Record<string,unknown>;
@@ -24,7 +42,7 @@ export function inboundSenders(body:unknown,phoneNumberId:string):string[]{
    if(!value||typeof value!=="object"||value.metadata?.phone_number_id!==phoneNumberId||
      !Array.isArray(value.messages))continue;
    for(const msg of value.messages.slice(0,100)){
-    if(msg&&typeof msg==="object"&&typeof msg.from==="string"&&
+    if(msg&&typeof msg==="object"&&isDirectMessage(value,msg)&&typeof msg.from==="string"&&
       /^[0-9]{7,15}$/.test(msg.from)&&typeof msg.id==="string"&&msg.id.length>0)result.push(msg.from);
    }
   }
