@@ -154,7 +154,7 @@ export default function ContentPage(){
  if(!canRead)return <><PageHeader title="Content calendar access denied"/><Notice kind="error">Content read permission required.</Notice></>;
  return <div data-aw-module="content" className="aw-module-root space-y-6">
   <PageHeader eyebrow="Campaign planning" title="Content calendar"
-    description="Plan and review content without leaving the workspace. Publishing is recorded manually after approval."
+    description="Plan content without leaving the workspace. Founder submissions are approved immediately; publishing remains a separate action."
     actions={<button type="button" className="btn-secondary" onClick={()=>void load()}>
       <RefreshCw className="h-4 w-4"/> Refresh</button>}/>
   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Editorial planning</span><span className="aw-module-count">{rows.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="list"?"All content":view==="week"?"Week view":"Month view"}</span></div>}
@@ -256,7 +256,7 @@ export default function ContentPage(){
         onClick={()=>{setDraft(toInput(selected));setEditing(true);}}>Edit / new revision</button>}
       {editAllowed&&canSubmit&&["DRAFT","CHANGES_REQUESTED"].includes(selected.status)&&
         <button disabled={busy} className="btn-primary" type="button" onClick={()=>void perform(()=>
-          request("/content/"+selected.id+"/submit",{method:"POST",body:{version:selected.version}}),"Submitted for content approval.")}>Submit for review</button>}
+          request("/content/"+selected.id+"/submit",{method:"POST",body:{version:selected.version}}),session?.identity.roles.includes("FOUNDER")?"Content approved.":"Submitted for content approval.")}>{session?.identity.roles.includes("FOUNDER")?"Approve content":"Submit for review"}</button>}
       {editAllowed&&selected.status==="APPROVED"&&selected.publishAt&&
         <button disabled={busy} className="btn-secondary" type="button" onClick={()=>void perform(()=>
           request("/content/"+selected.id+"/schedule",{method:"POST",body:{version:selected.version}}),"Content scheduled for manual publishing.")}>Schedule</button>}
@@ -271,7 +271,7 @@ export default function ContentPage(){
       {canManage&&["IDEA","DRAFT","CHANGES_REQUESTED","APPROVED","SCHEDULED"].includes(selected.status)&&
         <button type="button" className="btn-secondary" disabled={busy} onClick={()=>void perform(()=>
           request("/content/"+selected.id+"/cancel",{method:"POST",body:{version:selected.version}}),"Content cancelled.")}>Cancel content</button>}
-      {selected.approvalRequestId&&<Link className="btn-secondary" href="/app/approvals">Review in Approvals</Link>}
+      {selected.approvalRequestId&&selected.status==="IN_REVIEW"&&<Link className="btn-secondary" href="/app/approvals">Review in Approvals</Link>}
      </div>
      {selected.status==="IN_REVIEW"&&<p className="text-xs text-slate-500">Editing is locked during review. Reject or cancel the request in Approvals before changing this revision.</p>}
      {selected.status==="PUBLISHED"&&<p className="text-sm text-slate-500">

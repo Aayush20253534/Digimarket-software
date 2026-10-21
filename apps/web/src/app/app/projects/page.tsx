@@ -256,7 +256,7 @@ export default function ProjectsPage(){
           </form>}
         </Card>
       </div>
-      <Card title="Deliverables" description="Submit revisions to the DELIVERABLE approval policy; approvers decide in the Approvals queue.">
+      <Card title="Deliverables" description={session?.identity.roles.includes("FOUNDER")?"Founder deliverables are approved immediately.":"Submit revisions for approval in the Approvals queue."}>
         <div className="space-y-3">{selected.deliverables.map(d=><div key={d.id} className="rounded-xl border border-slate-200 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><b className="text-sm">{d.title}</b><p className="text-xs text-slate-500">Revision {d.revision} · {d.description||"No description"}</p></div>
@@ -268,8 +268,8 @@ export default function ProjectsPage(){
             {canWrite&&grants.includes("approvals.submit")&&(d.status==="DRAFT"||d.status==="CHANGES_REQUESTED")&&
               <button type="button" className="btn-primary" disabled={busy}
                 onClick={()=>void mutate(()=>request("/projects/"+selected.id+"/deliverables/"+d.id+"/submit",
-                  {method:"POST",body:{version:d.version}}),"Submitted for review.")}>Submit for approval</button>}
-            {d.approvalRequestId&&<Link className="btn-secondary" href="/app/approvals">View approval queue</Link>}
+                  {method:"POST",body:{version:d.version}}),session?.identity.roles.includes("FOUNDER")?"Deliverable approved.":"Submitted for review.")}>{session?.identity.roles.includes("FOUNDER")?"Approve deliverable":"Submit for approval"}</button>}
+            {d.approvalRequestId&&d.status==="IN_REVIEW"&&<Link className="btn-secondary" href="/app/approvals">View approval queue</Link>}
           </div>
         </div>)}</div>
         {canWrite&&<form className="mt-5 grid gap-3 md:grid-cols-2" onSubmit={saveDeliverable}>
