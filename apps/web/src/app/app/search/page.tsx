@@ -21,7 +21,7 @@ export default function SearchPage(){
  if(!can)return <Notice kind="error">Personal search permission required.</Notice>;
  return <div className="space-y-6">
   <PageHeader eyebrow="Private workspace index" title="My workspace search"
-   description="Find your own or assigned leads, clients, projects, tasks, content, invoices, files, notes, finance entries and approvals. Results are scoped to the signed-in user."/>
+   description="Find your own or assigned leads, clients, projects, tasks, content, files, notes, income, expenses and approvals. Results are scoped to the signed-in user."/>
   <Card title="Find one of your records">
    <form onSubmit={e=>void search(e)} className="flex flex-wrap gap-3">
     <label className="flex-1"><span className="sr-only">Search workspace</span>

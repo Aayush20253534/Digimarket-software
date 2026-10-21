@@ -43,22 +43,27 @@ export class InsightsService{
    where:{organizationId:org,title:match,OR:[{createdById:me},{ownerId:me}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,title:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"content",id:x.id,title:x.title,detail:"Content · "+x.status,href:url("content",x.id)}))));
-  if(can(a,"invoices.read"))parts.push(this.db.invoice.findMany({
-   where:{organizationId:org,createdById:me,OR:[{number:match},{client:{businessName:match}}]},
-   take:8,orderBy:{updatedAt:"desc"},select:{id:true,number:true,client:{select:{businessName:true}}},
-  }).then(rows=>rows.map(x=>({kind:"invoice",id:x.id,title:x.number??"Invoice",
-   detail:"Invoice · "+x.client.businessName,href:url("billing",x.id)}))));
   if(can(a,"assets.read"))parts.push(this.db.asset.findMany({
    where:{organizationId:org,uploadedById:me,status:"ACTIVE",filename:match,
     publicId:{not:{startsWith:"digimarket/"+org+"/finance/"}},
     ...(can(a,"clients.read")?{}:{clientId:null})},
    take:8,orderBy:{createdAt:"desc"},select:{id:true,filename:true,contentType:true},
   }).then(rows=>rows.map(x=>({kind:"file",id:x.id,title:x.filename,detail:"File · "+x.contentType,href:url("assets",x.id)}))));
-  if(can(a,"finance.entry.read.own"))parts.push(this.db.financialTransaction.findMany({
-   where:{organizationId:org,enteredById:me,OR:[{merchantOrSource:match},{description:match},{category:{name:match}}]},
-   take:8,orderBy:{createdAt:"desc"},select:{id:true,kind:true,status:true,merchantOrSource:true,category:{select:{name:true}}},
-  }).then(rows=>rows.map(x=>({kind:"finance",id:x.id,title:x.merchantOrSource||x.category.name,
-   detail:x.kind+" · "+x.status,href:url("finance",x.id)}))));
+  // Finance search recognizes INR formatted amounts and checks the user's access.
+  if(can(a,"finance.entry.read.own")||can(a,"finance.read.all")){
+   const normalized=q.trim().replace(/^[₹\\s]+/,"").replace(/,/g,"");
+   const amount=/^\\d{1,15}(?:\\.\\d{1,4})?$/.test(normalized)?new Prisma.Decimal(normalized):null;
+   parts.push(this.db.financialTransaction.findMany({
+    where:{organizationId:org,...(can(a,"finance.read.all")?{}:{enteredById:me}),
+     OR:[{merchantOrSource:match},{description:match},{category:{name:match}},...(amount?[{amount}]:[])]},
+    take:20,orderBy:[{createdAt:"desc"},{id:"desc"}],
+    select:{id:true,kind:true,status:true,merchantOrSource:true,amount:true,category:{select:{name:true}},
+      enteredBy:{select:{displayName:true}}},
+   }).then(rows=>rows.map(x=>({kind:"finance",id:x.id,
+    title:(x.kind==="INCOME"?"Income":"Expense")+" · ₹"+x.amount.toFixed(2),
+    detail:x.category.name+" · "+(x.merchantOrSource||"No source")+" · "+x.status+" · "+x.enteredBy.displayName,
+    href:url("finance",x.id)}))));
+  }
   if(can(a,"approvals.read"))parts.push(this.db.approvalRequest.findMany({
    where:{organizationId:org,requesterId:me,OR:[{title:match},{description:match}]},
    take:8,orderBy:{createdAt:"desc"},select:{id:true,title:true,status:true},

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import BillingPage from "../billing/page";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Download, FileImage, Plus, RefreshCw, Wallet } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -33,14 +32,12 @@ function readable(error:unknown){return error instanceof ApiError?error.message:
 export default function FinancePage(){
   const {session,request}=useAuth();
   const canAll=!!session?.identity.permissions.includes("finance.read.all");
-  const canBilling=!!session?.identity.permissions.some(p=>p==="invoices.read"||p==="payments.read");
-  const [section,setSection]=useState<"ledger"|"billing">("ledger");
   const canManage=!!session?.identity.permissions.includes("finance.category.manage");
   const adminFinance=!!session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&canManage;
   const canCreate=!!session?.identity.permissions.includes("finance.entry.create");
   const canReadOwn=!!session?.identity.permissions.includes("finance.entry.read.own");
   const [view,setView]=useState<View>("mine");
-  useEffect(()=>{if(adminFinance)setView("all");},[adminFinance]);
+  useEffect(()=>{if(canAll)setView("all");},[canAll]);
   const [editingCategory,setEditingCategory]=useState<Category|null>(null);
   const [editedCategoryName,setEditedCategoryName]=useState("");
   const [editingExpense,setEditingExpense]=useState<Entry|null>(null);
@@ -72,14 +69,18 @@ export default function FinancePage(){
     setLoading(true);
     try{
       const target=view==="all"&&canAll?"all":"mine";
-      const [cats,ledger,sums,policies]=await Promise.all([
-        request<Category[]>("/finance/categories"),
+      const [ledger,sums]=await Promise.all([
         request<Entry[]>("/finance/entries?view="+target),
         request<Totals>("/finance/summary?view="+target),
+      ]);
+      setEntries(ledger);setTotals(sums);
+      // A failed policy request must not blank the financial register.
+      const [cats,policies]=await Promise.allSettled([
+        request<Category[]>("/finance/categories"),
         request<FinancePolicy[]>("/approval-policies"),
       ]);
-      setCategories(cats);setEntries(ledger);setTotals(sums);
-      setFinanceReady(policies.some(p=>p.category==="FINANCE"&&p.active));
+      if(cats.status==="fulfilled")setCategories(cats.value);
+      if(policies.status==="fulfilled")setFinanceReady(policies.value.some(p=>p.category==="FINANCE"&&p.active));
       setError("");
     }catch(e){setError(readable(e));}finally{setLoading(false);}
   },[request,view,canReadOwn,canAll]);
@@ -198,19 +199,9 @@ export default function FinancePage(){
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
   if(!session)return <Spinner label="Checking finance access…"/>;
-  if(!canReadOwn&&!canAll&&!canBilling)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
-  const nav=<div className="aw-finance-tabs" role="tablist" aria-label="Finance sections">
-     {(canReadOwn||canAll)&&<button type="button" role="tab" aria-selected={section==="ledger"}
-       className={section==="ledger"?"active":""} onClick={()=>setSection("ledger")}><Wallet size={16}/> Income & expenses</button>}
-     {canBilling&&<button type="button" role="tab" aria-selected={section==="billing"}
-       className={section==="billing"?"active":""} onClick={()=>setSection("billing")}>Invoices & payments</button>}
-   </div>;
-  if(section==="billing"||(!canReadOwn&&!canAll)){
-   return <div className="space-y-5">{nav}<BillingPage/></div>;
-  }
+  if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
   return <div className="space-y-7">
-    {nav}
-    <PageHeader eyebrow="Financial operations" title="Income, expenses & billing"
+    <PageHeader eyebrow="Financial operations" title="Income & expenses"
       description="All financial records are submitted for approval. Only posted entries count towards net income."
       actions={<div className="flex flex-wrap gap-2">
         <button className="btn-secondary" type="button" disabled={busy} onClick={()=>void exportCsv()}><Download className="h-4 w-4"/>Export CSV</button>
@@ -219,7 +210,7 @@ export default function FinancePage(){
     {error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}
     <div className="flex gap-2" role="group" aria-label="Finance visibility">
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
-      {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals</button>}
+      {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
     </div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       {([

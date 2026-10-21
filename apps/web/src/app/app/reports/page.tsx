@@ -29,7 +29,7 @@ export default function ReportsPage(){
  useEffect(()=>{void load();},[load]);
  if(!session)return <Spinner label="Checking reporting permissions…"/>;
  if(!can)return <Notice kind="error">Business reporting permission required.</Notice>;
- const cards=Object.entries(report?.sections??{});
+ const cards=Object.entries(report?.sections??{}).filter(([key])=>key!=="invoices");
  return <div className="aw-report-page space-y-6">
   <PageHeader eyebrow="Agency intelligence" title="Performance reports"
    description="A comprehensive view of your business, delivered from real records and enforced by the current API permissions."/>
