@@ -109,6 +109,16 @@ try{
    ()=>svc.intent(admin,{filename:"too-large.pdf",contentType:"application/pdf",bytes:50_000_001}),
    (error:{status?:number})=>error.status===422,
  );
+ // Finance proof receipts retain their existing 10 MB policy, regardless of the 50 MB Drive limit.
+ const financeUploader=identity(owner.id,a.id,["finance.entry.create"]);
+ const financePdf=await svc.intent(financeUploader,{
+   filename:"receipt.pdf",contentType:"application/pdf",bytes:10_000_000,
+ },true);
+ assert.equal(financePdf.resourceType,"raw");
+ await assert.rejects(
+   ()=>svc.intent(financeUploader,{filename:"oversized-receipt.pdf",contentType:"application/pdf",bytes:10_000_001},true),
+   (error:{status?:number})=>error.status===422,
+ );
  const expiredIntent=await svc.intent(admin,{filename:"Expired.pdf",contentType:"application/pdf",bytes:250});
  await db.assetUploadIntent.update({where:{id:expiredIntent.intentId},data:{expiresAt:new Date(Date.now()-5000)}});
  uploadMock(expiredIntent.params.public_id,"raw","pdf",250,"expired-provider-id");

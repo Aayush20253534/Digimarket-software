@@ -34,6 +34,9 @@ export class AssetService {
    else {deny(a,"assets.upload");deny(a,"assets.read");}
    const type=validateMedia(input.contentType,input.bytes);
    if(financeProof&&type.kind==="video")throw new AuthError(422,"VALIDATION_ERROR","Only images and PDFs are accepted as finance proof");
+   // Keep finance receipt policy separate from the general Files & Assets PDF cap.
+   if(financeProof&&type.kind==="raw"&&input.bytes>10_000_000)
+     throw new AuthError(422,"VALIDATION_ERROR","Finance proof PDFs cannot exceed 10 MB");
    const clientId=financeProof?null:await this.client(a,input.clientId);
    const id=randomUUID();
    const publicId=(financeProof?financeProofPrefix(a.organizationId):"digimarket/"+a.organizationId+"/")+id+(type.kind==="raw"?".pdf":"");
