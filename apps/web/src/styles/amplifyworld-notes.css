@@ -203,3 +203,45 @@
 .aw-studio-page-thumbnail svg{width:100%;height:100%}
 .aw-studio-page-tile:hover{border-color:#aa77dc}
 @media(max-width:600px){.aw-studio-page-grid{max-height:190px}}
+
+/* Notes chooser and sensible pane widths with compact global desktop scaling. */
+.aw-studio{width:100%;max-width:100%;min-width:0;grid-template-columns:minmax(205px,245px) minmax(0,1fr) minmax(210px,260px)}
+.aw-studio-main,.aw-studio-library,.aw-studio-inspector{min-width:0}
+.aw-studio-header{min-width:0;flex-wrap:wrap;gap:8px;padding:8px 11px;min-height:55px}
+.aw-studio-header-name{min-width:0;flex:1 1 225px}
+.aw-studio-head-actions{flex-wrap:wrap;justify-content:flex-end}
+.aw-studio-modebar{flex-wrap:wrap;gap:7px}
+.aw-studio-mode-switch{min-width:0}.aw-studio-mode-switch button{padding:8px 10px}
+.aw-studio-utility{max-width:100%;flex-wrap:wrap;justify-content:flex-end;white-space:normal}
+.aw-studio-utility button{padding:7px}
+.aw-studio-tools{margin:0 8px 7px;max-width:calc(100% - 16px)}
+.aw-studio-tools button{min-width:58px;padding:8px 6px}
+.aw-studio-sheet-scroll{min-width:0;max-width:100%;overflow:auto;padding:0 8px 8px}
+.aw-studio-sheet{min-width:0;width:100%;max-width:none}
+.aw-studio-sheet .aw-notes-canvas{max-width:100%}
+.aw-studio-home-button,.aw-notes-home-button{display:inline-flex;align-items:center;gap:4px;padding:7px 9px;color:#dbc5ef!important;background:#281b3b;border:1px solid #684789;border-radius:8px;white-space:nowrap;font-size:12px}
+.aw-notes-home{display:flex;flex:1;min-height:320px;overflow-y:auto;flex-direction:column;align-items:center;justify-content:center;padding:clamp(18px,4vw,48px);text-align:center;gap:15px;color:#d8c7eb}
+.aw-notes-home>svg{color:#b77cff}.aw-notes-home h2{font-size:clamp(18px,2vw,28px);font-weight:800;color:#fff}
+.aw-notes-home>p{font-size:13px;line-height:1.5;max-width:500px}
+.aw-notes-create-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;width:min(100%,570px);margin-top:7px}
+.aw-notes-create-choices button{display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-width:0;padding:22px;border:1px solid #79529b;background:linear-gradient(135deg,#29163d,#141327);border-radius:15px;color:#f3e8ff;text-align:left}
+.aw-notes-create-choices button:hover{background:#3b215b;border-color:#d797ff}
+.aw-notes-create-choices button>svg{color:#d69cfb}
+.aw-notes-create-choices button strong{font-size:18px;font-weight:800}
+.aw-notes-create-choices button span{font-size:12px;color:#c3b0d6;line-height:1.4}
+.aw-notes-home-library{font-size:12px;color:#b9a5cd}
+.aw-notes-trash-actions{display:flex;align-items:center;gap:4px;flex:none}
+.aw-notes-trash-actions button{display:inline-flex;align-items:center;justify-content:center;min-width:30px;min-height:30px;border-radius:7px}
+.aw-studio-note-open span{min-width:0;flex:1}
+@media(max-width:1400px) and (min-width:921px){
+ .aw-studio{grid-template-columns:minmax(195px,230px) minmax(0,1fr)}
+ .aw-studio-inspector{position:absolute;right:0;top:0;bottom:0;width:min(275px,80vw);transform:translateX(105%);z-index:8;box-shadow:0 12px 35px #0009;transition:transform .18s}
+ .aw-studio-inspector-open{transform:translateX(0)}
+ .aw-studio{position:relative}
+}
+@media(max-width:920px){
+ .aw-studio{grid-template-columns:minmax(0,1fr)!important}
+ .aw-studio-sheet{min-width:0}
+ .aw-studio-header-name{min-width:0}
+}
+@media(max-width:560px){.aw-notes-create-choices{grid-template-columns:1fr}.aw-notes-home{justify-content:flex-start;padding:22px 12px}.aw-studio-header{align-items:flex-start}.aw-studio-head-actions{justify-content:flex-start}}
