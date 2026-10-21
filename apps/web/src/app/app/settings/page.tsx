@@ -49,7 +49,7 @@ export default function CompanySettingsPage(){
  if(!canManage)return <><PageHeader title="Company settings"/><Notice kind="error">Organization settings management permission required.</Notice></>;
  return <div className="space-y-6">
   <PageHeader eyebrow="Administration" title="Company settings"
-   description="Manage the workspace identity and future billing defaults. Category and approval controls use their existing permission-checked modules."/>
+   description="Manage workspace identity, team governance, finance categories and approval policies."/>
   {error&&<Notice kind="error">{error}</Notice>}
   {success&&<Notice kind="success">{success}</Notice>}
   {loading&&<Spinner label="Loading company configuration…"/>}
@@ -67,27 +67,8 @@ export default function CompanySettingsPage(){
        <datalist id="organization-timezones"><option value="Asia/Kolkata"/><option value="UTC"/>
         <option value="Asia/Kathmandu"/><option value="America/New_York"/><option value="Europe/London"/></datalist>
       </label>
-      <p className="text-sm text-slate-600">Accounting currency: <strong>{settings.organization.defaultCurrency}</strong>. Currency cannot be changed here because existing invoices and ledger entries use INR.</p>
+      <p className="text-sm text-slate-600">Accounting currency: <strong>{settings.organization.defaultCurrency}</strong>. Existing ledger entries retain their recorded currency.</p>
       <button className="btn-primary" disabled={busy}>{busy?"Saving…":"Save organization"}</button>
-     </form>
-    </Card>
-    <Card title="Invoice defaults" description="The invoice prefix applies to new invoice numbers. Previous issued invoice numbers and PDFs remain unchanged.">
-     <form className="space-y-4" onSubmit={e=>void submit(e,"billing")}>
-      <label className="block text-sm">Invoice prefix
-       <input className="field mt-1 w-full" required minLength={2} maxLength={12}
-        pattern="[A-Z][A-Z0-9]{1,11}" value={bill.invoicePrefix}
-        onChange={e=>setBill(s=>({...s,invoicePrefix:e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,"")}))}/>
-      </label>
-      <label className="block text-sm">Default payment terms (days)
-       <input className="field mt-1 w-full" required type="number" min={0} max={365}
-        value={bill.defaultDueDays} onChange={e=>setBill(s=>({...s,defaultDueDays:Number(e.target.value)}))}/>
-      </label>
-      <label className="block text-sm">Optional payment instructions
-       <textarea className="field mt-1 w-full" rows={3} maxLength={1000} value={bill.paymentInstructions}
-        onChange={e=>setBill(s=>({...s,paymentInstructions:e.target.value}))}/>
-      </label>
-      <p className="text-xs text-slate-500">Instructions are copied into the notes of new draft invoices. Editing defaults never alters issued snapshots.</p>
-      <button className="btn-primary" disabled={busy}>{busy?"Saving…":"Save billing defaults"}</button>
      </form>
     </Card>
    </div>
@@ -113,14 +94,10 @@ export default function CompanySettingsPage(){
       className="btn-secondary mt-4 inline-flex">Manage approval policies</Link>}
     </Card>
    </div>
-   <Card title="Recurring billing & team governance" description="These controls do not grant access simply because a person has a leadership title.">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-     <p className="text-sm">{settings.activeBillingSchedules} active recurring invoice schedules.</p>
-     <div className="flex flex-wrap gap-2">
-      <Link href="/app/billing" className="btn-secondary">Billing schedules</Link>
-      <Link href="/app/founders" className="btn-secondary">Founder responsibilities</Link>
-      {session.identity.permissions.includes("users.read")&&<Link href="/app/team/users" className="btn-secondary">Account management</Link>}
-     </div>
+   <Card title="Team governance" description="Manage roles without changing historical finance data.">
+    <div className="flex flex-wrap gap-2">
+     <Link href="/app/founders" className="btn-secondary">Founder responsibilities</Link>
+     {session.identity.permissions.includes("users.read")&&<Link href="/app/team/users" className="btn-secondary">Account management</Link>}
     </div>
    </Card>
   </>}

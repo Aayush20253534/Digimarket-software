@@ -85,6 +85,8 @@ export default function AssetsPage(){
   document.addEventListener("keydown",esc);
   return()=>document.removeEventListener("keydown",esc);
  },[busy]);
+ useEffect(()=>{try{const saved=window.localStorage.getItem("aw-drive-layout");if(saved==="grid"||saved==="list")setView(saved);}catch{/* optional preference */}},[]);
+ const chooseView=(layout:"grid"|"list")=>{setView(layout);try{window.localStorage.setItem("aw-drive-layout",layout);}catch{/* optional preference */}};
  const displayed=useMemo(()=>[...items].sort((a,b)=>{
    const x=sort==="name"?a.filename:sort==="type"?a.contentType:sort==="size"?a.bytes:a.createdAt;
    const y=sort==="name"?b.filename:sort==="type"?b.contentType:sort==="size"?b.bytes:b.createdAt;
@@ -419,7 +421,7 @@ export default function AssetsPage(){
    {canClients&&<select aria-label="Filter assets by client" className="aw-drive-select" value={filterClient} onChange={e=>{setFilterClient(e.target.value);setCursor(null);setSelectedIds([]);}}><option value="">All clients</option>{clients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}</select>}
    <select className="aw-drive-select" aria-label="Sort assets" value={sort} onChange={e=>{setSort(e.target.value as typeof sort);setCursor(null);setSelectedIds([]);}}><option value="name">Name</option><option value="date">Date</option><option value="type">Type</option><option value="size">Size</option></select>
    <button type="button" className="aw-drive-icon-button" aria-label="Reverse sort" title="Reverse sort" onClick={()=>{setReverse(x=>!x);setCursor(null);setSelectedIds([]);}}><ArrowUpDown size={17}/></button>
-   <div className="aw-drive-view-switch"><button type="button" aria-label="Grid view" aria-pressed={view==="grid"} onClick={()=>setView("grid")}><Grid2X2 size={18}/></button><button type="button" aria-label="List view" aria-pressed={view==="list"} onClick={()=>setView("list")}><List size={18}/></button></div>
+   <div className="aw-drive-view-switch" role="group" aria-label="File display"><button type="button" aria-label="Grid view" aria-pressed={view==="grid"} onClick={()=>chooseView("grid")}><Grid2X2 size={18}/></button><button type="button" aria-label="List view" aria-pressed={view==="list"} onClick={()=>chooseView("list")}><List size={18}/></button></div>
   </div>
   <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files. {legacySort?"Sorting is limited to this page until the API updates.":""}</p>
   <nav className="aw-drive-path" aria-label="Folder path">
@@ -431,7 +433,7 @@ export default function AssetsPage(){
   {selectedIds.length>0&&<div className="aw-drive-selection"><strong>{selectedIds.length} selected</strong><button type="button" onClick={()=>setSelectedIds([])}>Clear selection</button>{canArchive&&<button type="button" disabled={busy} onClick={()=>void bulkArchive()}><Archive size={15}/> Archive selected</button>}</div>}
   {loading?<div className="aw-drive-loading"><Spinner label="Loading Drive…"/></div>:<>
    {visibleFolders.length>0&&<section aria-label="Folders" className="aw-drive-section"><h2>Folders <span>{visibleFolders.length}</span></h2>
-     <div className="aw-drive-tile-grid">{visibleFolders.map(folder=><div key={folder.id} className="aw-drive-folder-tile" draggable={canUpload}
+     <div className={"aw-drive-tile-grid aw-drive-folders-"+view}>{visibleFolders.map(folder=><div key={folder.id} className="aw-drive-folder-tile" draggable={canUpload}
        onDragStart={e=>{if(!canUpload)return;e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("application/x-aw-folder",folder.id);}}
        onDragOver={e=>{if(e.dataTransfer.types.includes("application/x-aw-asset")||e.dataTransfer.types.includes("application/x-aw-folder")){e.preventDefault();e.dataTransfer.dropEffect="move";}}}
        onDrop={e=>{
@@ -457,7 +459,7 @@ export default function AssetsPage(){
    </section>}
    <section className="aw-drive-section" aria-label="Files in current directory"><h2>Files <span>{items.length}{nextCursor?"+":""}</span></h2>
     {!items.length?<div className="aw-drive-empty"><File size={28}/><strong>{folders.length||search?"No matching files":"This folder is empty"}</strong><p>Files uploaded here will appear in this list.</p></div>:
-    <div className={"aw-drive-items aw-drive-"+view} role="list">{displayed.map(asset=><div key={asset.id} className={"aw-drive-file"+(selected?.id===asset.id?" is-selected":"")} role="listitem"
+    <div className={"aw-drive-items aw-drive-"+view} data-view={view} role="list">{displayed.map(asset=><div key={asset.id} className={"aw-drive-file"+(selected?.id===asset.id?" is-selected":"")} role="listitem"
        draggable={canUpload&&asset.status==="ACTIVE"}
        onDragStart={e=>{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("application/x-aw-asset",JSON.stringify(selectedIds.includes(asset.id)?selectedIds:[asset.id]));}}
        onContextMenu={e=>{e.preventDefault();open(asset);setContext("file:"+asset.id);}}>

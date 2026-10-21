@@ -248,7 +248,7 @@ export default function LeadsPage(){
              ["location","City / location",true],["source","Source",true],
              ["websiteUrl","Website URL",false],["instagramUrl","Instagram URL",false],
              ["note","First note",true],
-           ] as const).map(([field,label,required])=><FormField key={field} id={"new-"+field} label={label}>
+           ] as const).map(([field,label,required])=><FormField key={field} id={"new-"+field} label={<>{label}{required?<span className="aw-required-star" aria-label="required"> *</span>:<span className="aw-optional-label"> (optional)</span>}</>}>
              <input id={"new-"+field} className="field" autoFocus={field==="businessName"} required={required} type={field.endsWith("Url")?"url":field==="phone"?"tel":"text"} maxLength={field==="note"?2000:500}
                value={created[field]} onChange={e=>setCreated(v=>({...v,[field]:e.target.value}))}/>
            </FormField>)}

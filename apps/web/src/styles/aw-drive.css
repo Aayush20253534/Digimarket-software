@@ -57,3 +57,12 @@
 .aw-drive-grid .aw-drive-file-primary:has(.aw-drive-image-thumb){align-items:flex-start;flex-wrap:wrap}
 .aw-drive-grid .aw-drive-file-primary:has(.aw-drive-image-thumb) .aw-drive-file-name{width:100%}
 .aw-drive-list .aw-drive-file-icon.aw-drive-has-image{width:44px;height:44px}
+
+/* View switching applies to folders and files alike. */
+.aw-drive-tile-grid.aw-drive-folders-list{grid-template-columns:minmax(0,1fr)!important;gap:6px}
+.aw-drive-folders-list .aw-drive-folder-tile{min-height:50px}
+.aw-drive-items.aw-drive-grid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(185px,1fr))!important;align-items:start;gap:12px}
+.aw-drive-items.aw-drive-list{display:flex!important;flex-direction:column!important;gap:7px;width:100%}
+.aw-drive-items.aw-drive-list .aw-drive-file{width:100%;min-height:58px;flex-wrap:nowrap;align-content:center}
+.aw-drive-items.aw-drive-list .aw-drive-file-primary{order:0;flex-basis:auto;margin-top:0}
+.aw-drive-view-switch button[aria-pressed=true]{background:#7346a1;color:#fff;outline:1px solid #b984e1}
