@@ -199,7 +199,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // Direct links and refresh retain a single valid breadcrumb.
   await page.reload();
   await expect(page.locator(".aw-drive-crumb")).toHaveCount(1);
-  const savedTrail=await page.evaluate(()=>window.history.state?.awDriveTrail);
+  const savedTrail=await page.evaluate(()=>JSON.parse(new URLSearchParams(window.location.search).get("folders")??"[]"));
   expect(savedTrail).toHaveLength(1);
   // Old builds could save repeated IDs into the URL; repair them on load.
   await page.goto("/app/assets?folders="+encodeURIComponent(JSON.stringify([...savedTrail,...savedTrail])));

@@ -499,7 +499,7 @@ export default function AssetsPage(){
   </div>
   <p className="aw-drive-storage-label">{items.length} files loaded · {prettyBytes(items.reduce((total,f)=>total+f.bytes,0))} on this page. Protected, permission-scoped files. {legacySort?"Sorting is limited to this page until the API updates.":""}</p>
   <nav className="aw-drive-path" aria-label="Folder path">
-   {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>goTo(trail.length-1)}><ArrowLeft size={17}/></button>
+   {trail.length>0&&<button type="button" aria-label="Go back" onClick={()=>goTo(trail.length-1)}><ArrowLeft size={17}/></button>}
    <button type="button" onClick={()=>goTo(0)}><Home size={17}/> My Drive</button>
    {trail.map((f,i)=><span key={f.id} className="aw-drive-crumb"><ChevronRight size={14}/><button type="button" onClick={()=>goTo(i+1)}>{f.name}</button></span>)}
   </nav>
