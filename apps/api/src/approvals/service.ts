@@ -2,6 +2,7 @@ import type { PrismaClient } from "@digimarket/db";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 import type { ApprovalCategory, ApprovalSubmission, ApprovalPolicyInput, ApprovalDecisionInput } from "@digimarket/contracts";
+import { founderPolicy, isFounder } from "./founder";
 
 const notFound = () => new AuthError(404, "NOT_FOUND", "Approval not found");
 const conflict = () => new AuthError(409, "ALREADY_RESOLVED", "Approval is no longer pending");
@@ -41,20 +42,30 @@ export class ApprovalService {
 
   async submit(actor: Principal, input: ApprovalSubmission) {
     grant(actor,"approvals.submit");
-    const policy = await this.db.approvalPolicy.findUnique({
+    const founder=isFounder(actor);
+    const policy=founder?null:await this.db.approvalPolicy.findUnique({
       where:{organizationId_category:{organizationId:actor.organizationId,category:input.category}},
     });
-    if(!policy?.active || !policy.approverRoleKeys.length) throw invalid("Category has no active policy");
-    return this.db.$transaction(async tx => {
+    if(!founder&&(!policy?.active||!policy.approverRoleKeys.length))throw invalid("Category has no active policy");
+    return this.db.$transaction(async tx=>{
+      const applied=founder?await founderPolicy(tx,actor.organizationId,input.category):policy!;
       const result=await tx.approvalRequest.create({data:{
-        organizationId:actor.organizationId,policyId:policy.id,requesterId:actor.userId,
-        title:input.title,description:input.description,approverRoleKeys:policy.approverRoleKeys,
+        organizationId:actor.organizationId,policyId:applied.id,requesterId:actor.userId,
+        title:input.title,description:input.description,approverRoleKeys:applied.approverRoleKeys,
+        ...(founder?{status:"APPROVED" as const,decidedAt:new Date()}:{}),
+      }});
+      if(founder)await tx.approvalDecision.create({data:{
+        requestId:result.id,actorId:actor.userId,outcome:"APPROVED",
+        reason:"Founder action requires no review",
       }});
       await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
-        action:"approvals.submitted",entityType:"ApprovalRequest",entityId:result.id}});
-      await tx.outboxEvent.create({data:{organizationId:actor.organizationId,eventKey:"approval.created."+result.id,
-        kind:"approvals.submitted",aggregateType:"ApprovalRequest",aggregateId:result.id,
-        payloadMinimal:{approvalId:result.id,category:input.category}}});
+        action:founder?"approvals.founder_auto_approved":"approvals.submitted",
+        entityType:"ApprovalRequest",entityId:result.id}});
+      await tx.outboxEvent.create({data:{organizationId:actor.organizationId,
+        eventKey:(founder?"approval.resolved.":"approval.created.")+result.id,
+        kind:founder?"approvals.resolved":"approvals.submitted",
+        aggregateType:"ApprovalRequest",aggregateId:result.id,
+        payloadMinimal:founder?{approvalId:result.id,outcome:"APPROVED"}:{approvalId:result.id,category:input.category}}});
       return result;
     });
   }

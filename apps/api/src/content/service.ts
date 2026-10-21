@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@digimarket/db";
 import type { ContentCreateInput, ContentUpdateInput, ContentListQuery } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
+import { founderPolicy, isFounder } from "../approvals/founder";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 const grant=(a:Principal,key:string)=>{if(!a.permissions.has(key))throw forbidden();};
 const missing=()=>new AuthError(404,"NOT_FOUND","Content not found");
@@ -143,11 +144,13 @@ export class ContentService {
     });
   }
   async submit(a:Principal,id:string,version:number){
-    const p=await this.editable(a,id);grant(a,"approvals.submit");
+    const p=await this.editable(a,id);
+    const founder=isFounder(a);
+    if(!founder)grant(a,"approvals.submit");
     if(!["DRAFT","CHANGES_REQUESTED"].includes(p.status))throw invalid("Save a draft before submitting");
-    const policy=await this.db.approvalPolicy.findUnique({
+    const policy=founder?null:await this.db.approvalPolicy.findUnique({
       where:{organizationId_category:{organizationId:a.organizationId,category:"CONTENT"}}});
-    if(!policy?.active||!policy.approverRoleKeys.length)throw invalid("Configure an active CONTENT approval policy");
+    if(!founder&&(!policy?.active||!policy.approverRoleKeys.length))throw invalid("Configure an active CONTENT approval policy");
     const assets=await this.db.contentPostAsset.findMany({where:{postId:id},select:{assetId:true}});
     if(assets.length){
       const active=await this.db.asset.count({where:{
@@ -157,22 +160,29 @@ export class ContentService {
     return this.db.$transaction(async tx=>{
       const changed=await tx.contentPost.updateMany({where:{id,organizationId:a.organizationId,
         version,status:{in:["DRAFT","CHANGES_REQUESTED"]}},
-        data:{status:"IN_REVIEW",version:{increment:1}}});
+        data:{status:founder?"APPROVED":"IN_REVIEW",version:{increment:1}}});
       if(changed.count!==1)throw stale();
+      const applied=founder?await founderPolicy(tx,a.organizationId,"CONTENT"):policy!;
       const request=await tx.approvalRequest.create({data:{
-        organizationId:a.organizationId,policyId:policy.id,requesterId:a.userId,
+        organizationId:a.organizationId,policyId:applied.id,requesterId:a.userId,
         title:("Content review: "+p.title).slice(0,180),
         description:"Review content revision "+p.revision+" for "+p.platform,
-        approverRoleKeys:policy.approverRoleKeys,referenceType:"CONTENT_POST",referenceId:id,
+        approverRoleKeys:applied.approverRoleKeys,referenceType:"CONTENT_POST",referenceId:id,
+        ...(founder?{status:"APPROVED" as const,decidedAt:new Date()}:{}),
       }});
       await tx.contentPost.update({where:{id},data:{approvalRequestId:request.id}});
+      if(founder)await tx.approvalDecision.create({data:{
+        requestId:request.id,actorId:a.userId,outcome:"APPROVED",reason:"Founder content requires no review",
+      }});
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-        action:"content.submitted",entityType:"ContentPost",entityId:id,
+        action:founder?"content.founder_approved":"content.submitted",entityType:"ContentPost",entityId:id,
         afterRedacted:{revision:p.revision,approvalId:request.id}}});
       await tx.outboxEvent.create({data:{organizationId:a.organizationId,
-        eventKey:"content.submitted."+request.id,kind:"content.submitted",
-        aggregateType:"ContentPost",aggregateId:id,payloadMinimal:{postId:id,approvalId:request.id}}});
-      return {approvalId:request.id,status:"IN_REVIEW" as const};
+        eventKey:(founder?"content.review.":"content.submitted.")+request.id,
+        kind:founder?"content.review_resolved":"content.submitted",
+        aggregateType:"ContentPost",aggregateId:id,
+        payloadMinimal:founder?{postId:id,approvalId:request.id,outcome:"APPROVED"}:{postId:id,approvalId:request.id}}});
+      return {approvalId:request.id,status:founder?"APPROVED" as const:"IN_REVIEW" as const};
     });
   }
   async schedule(a:Principal,id:string,version:number){

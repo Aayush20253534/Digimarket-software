@@ -1,5 +1,6 @@
 import type { PrismaClient, Prisma } from "@digimarket/db";
 import type { Principal } from "../auth/service";
+import { founderPolicy, isFounder } from "../approvals/founder";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 import type { ProjectCreateInput,ProjectUpdateInput,ProjectListInput,ProjectMemberInput,
   ProjectMilestoneInput,ProjectDeliverableInput,ProjectDeliverableUpdateInput } from "@digimarket/contracts";
@@ -222,9 +223,11 @@ export class ProjectsService {
     });
   }
   async submit(a:Principal,id:string,deliverableId:string,version:number){
-    await this.writer(a,id);need(a,"approvals.submit");
-    const policy=await this.db.approvalPolicy.findUnique({where:{organizationId_category:{organizationId:a.organizationId,category:"DELIVERABLE"}}});
-    if(!policy?.active||!policy.approverRoleKeys.length)throw invalid("Configure an active DELIVERABLE approval policy");
+    await this.writer(a,id);
+    const founder=isFounder(a);
+    if(!founder)need(a,"approvals.submit");
+    const policy=founder?null:await this.db.approvalPolicy.findUnique({where:{organizationId_category:{organizationId:a.organizationId,category:"DELIVERABLE"}}});
+    if(!founder&&(!policy?.active||!policy.approverRoleKeys.length))throw invalid("Configure an active DELIVERABLE approval policy");
     return this.db.$transaction(async tx=>{
       const item=await tx.projectDeliverable.findFirst({where:{id:deliverableId,projectId:id}});
       if(!item)throw missing();
@@ -237,21 +240,29 @@ export class ProjectsService {
         if(asset.status!=="ACTIVE")throw invalid("Referenced asset is archived");
       }
       const changed=await tx.projectDeliverable.updateMany({where:{id:deliverableId,projectId:id,version,
-        status:{in:["DRAFT","CHANGES_REQUESTED"]}},data:{version:{increment:1},status:"IN_REVIEW"}});
+        status:{in:["DRAFT","CHANGES_REQUESTED"]}},data:{version:{increment:1},status:founder?"APPROVED":"IN_REVIEW"}});
       if(changed.count!==1)throw conflict();
+      const applied=founder?await founderPolicy(tx,a.organizationId,"DELIVERABLE"):policy!;
       const approval=await tx.approvalRequest.create({data:{
-        organizationId:a.organizationId,policyId:policy.id,requesterId:a.userId,
+        organizationId:a.organizationId,policyId:applied.id,requesterId:a.userId,
         title:("Deliverable: "+item.title).slice(0,180),description:item.description||"Review project deliverable",
-        approverRoleKeys:policy.approverRoleKeys,referenceType:"PROJECT_DELIVERABLE",referenceId:deliverableId,
+        approverRoleKeys:applied.approverRoleKeys,referenceType:"PROJECT_DELIVERABLE",referenceId:deliverableId,
+        ...(founder?{status:"APPROVED" as const,decidedAt:new Date()}:{}),
       }});
       await tx.projectDeliverable.update({where:{id:deliverableId},data:{approvalRequestId:approval.id}});
+      if(founder)await tx.approvalDecision.create({data:{
+        requestId:approval.id,actorId:a.userId,outcome:"APPROVED",reason:"Founder deliverable requires no review",
+      }});
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-        action:"projects.deliverable_submitted",entityType:"ProjectDeliverable",entityId:deliverableId,
+        action:founder?"projects.deliverable_founder_approved":"projects.deliverable_submitted",
+        entityType:"ProjectDeliverable",entityId:deliverableId,
         afterRedacted:{approvalId:approval.id,revision:item.revision}}});
-      await tx.outboxEvent.create({data:{organizationId:a.organizationId,eventKey:"project.deliverable.submitted."+approval.id,
-        kind:"projects.deliverable_submitted",aggregateType:"ProjectDeliverable",aggregateId:deliverableId,
-        payloadMinimal:{projectId:id,deliverableId,approvalId:approval.id}}});
-      return {approvalId:approval.id,status:"IN_REVIEW"};
+      await tx.outboxEvent.create({data:{organizationId:a.organizationId,
+        eventKey:(founder?"project.deliverable.resolved.":"project.deliverable.submitted.")+approval.id,
+        kind:founder?"projects.deliverable_resolved":"projects.deliverable_submitted",
+        aggregateType:"ProjectDeliverable",aggregateId:deliverableId,
+        payloadMinimal:founder?{projectId:id,deliverableId,approvalId:approval.id,outcome:"APPROVED"}:{projectId:id,deliverableId,approvalId:approval.id}}});
+      return {approvalId:approval.id,status:founder?"APPROVED":"IN_REVIEW"};
     });
   }
 }
