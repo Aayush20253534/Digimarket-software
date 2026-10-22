@@ -145,7 +145,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByLabel("Zoom percentage")).toHaveText("125%");
   await page.getByRole("button",{name:"Add page"}).click();
   await expect(page.getByLabel("Page number")).toHaveText("2 / 2");
-  await page.getByRole("button",{name:"Toggle tool settings"}).click();
+  await expect(page.getByRole("complementary",{name:"Tool inspector"})).toBeVisible();
   await expect(page.getByRole("region",{name:"Note pages"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Open note page 1"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Open note page 2"})).toBeVisible();
