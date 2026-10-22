@@ -45,7 +45,7 @@ export async function sendTaskPush(db:PrismaClient,organizationId:string,recipie
  if(!credentials()||!recipientIds.length)return;
  const subscriptions=await db.webPushSubscription.findMany({where:{
   organizationId,userId:{in:[...new Set(recipientIds)]}},select:{id:true,endpoint:true}
- }}).catch(()=>[]);
+ }).catch(()=>[]);
  await Promise.all(subscriptions.map(async sub=>{
   if(!validPushEndpoint(sub.endpoint))return;
   try{
