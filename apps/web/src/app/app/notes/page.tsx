@@ -675,6 +675,14 @@ export default function NotesPage(){
    {panel==="tools"?<div className="aw-studio-settings">
     <div className="aw-studio-tool-summary"><strong>{tools.find(x=>x.id===tool)?.label} settings</strong>
      <span>{tool==="eraser"?"Adjust eraser size and remove strokes":tool==="shape"?"Choose a shape, color, outline and stroke size":tool==="select"?"Select an object on the canvas":"Customize this drawing tool"}</span></div>
+    {tool==="shape"&&<><p className="aw-studio-label">Choose shape</p>
+    <div className="aw-studio-shape-grid">{([
+      ["line","Line","／"],["square","Square","□"],["rectangle","Rectangle","▭"],
+      ["roundedRectangle","Rounded","▢"],["circle","Circle","○"],["ellipse","Oval","⬭"],
+      ["triangle","Triangle","△"],["star","Star","☆"],["diamond","Diamond","◇"],
+      ["pentagon","Pentagon","⬠"],["hexagon","Hexagon","⬡"],["arrow","Arrow","➜"]
+     ] as const).map(([id,label,glyph])=><button key={id} type="button" aria-pressed={shape===id}
+       aria-label={label+" shape"} onClick={()=>setShape(id)}><span aria-hidden="true">{glyph}</span><small>{label}</small></button>)}</div></>}
     {tool!=="eraser"&&tool!=="select"&&<>
     <label htmlFor="aw-pen-color">Color</label><div className="aw-studio-picker"><input id="aw-pen-color" aria-label="Ink color" type="color" value={pen} onChange={e=>setPen(e.target.value)}/><span>{pen.toUpperCase()}</span></div>
     <div className="aw-studio-swatches">{["#181321","#FFFFFF","#F9A37E","#FF8E36","#F9DC4D","#54DF92","#3064F5","#9D43EA","#FF54B7"].map(c=>
@@ -687,14 +695,6 @@ export default function NotesPage(){
     <div className="aw-studio-width-presets">{[4,8,16,32,48,80].map(value=><button type="button" key={value} aria-label={"Set eraser size "+value} aria-pressed={eraserSize===value} onClick={()=>setEraserSize(value)}>{value}</button>)}</div></>}
     {tool!=="eraser"&&tool!=="select"&&<>
     <p className="aw-studio-label">Stroke Style</p><div className="aw-studio-options">{(["solid","dashed","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={strokeStyle===s} onClick={()=>setStrokeStyle(s)}>{s}</button>)}</div>
-    {tool==="shape"&&<><p className="aw-studio-label">Choose shape</p>
-    <div className="aw-studio-shape-grid">{([
-      ["line","Line","／"],["square","Square","□"],["rectangle","Rectangle","▭"],
-      ["roundedRectangle","Rounded","▢"],["circle","Circle","○"],["ellipse","Oval","⬭"],
-      ["triangle","Triangle","△"],["star","Star","☆"],["diamond","Diamond","◇"],
-      ["pentagon","Pentagon","⬠"],["hexagon","Hexagon","⬡"],["arrow","Arrow","➜"]
-     ] as const).map(([id,label,glyph])=><button key={id} type="button" aria-pressed={shape===id}
-       aria-label={label+" shape"} onClick={()=>setShape(id)}><span aria-hidden="true">{glyph}</span><small>{label}</small></button>)}</div></>}
     </>}
     <p className="aw-studio-label">Paper Style</p><div className="aw-studio-paper-options">{(["blank","ruled","grid","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={paper===s} onClick={()=>choosePaper(s)}><span className={"paper-"+s}/>{s}</button>)}</div>
     <button type="button" className="aw-studio-clear" onClick={()=>{if(window.confirm("Clear the entire drawing?"))setStrokes([]);}} disabled={!parseStrokes(draft.strokes).length}><Eraser size={16}/> Clear drawing</button>
