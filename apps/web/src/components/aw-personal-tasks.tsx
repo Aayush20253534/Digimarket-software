@@ -50,6 +50,9 @@ export function AWPersonalTasks(){
    {title:"Expired / overdue tasks",test:"personal-overdue",tone:"overdue",icon:CalendarClock,rows:outstanding},
    {title:"Completed tasks",test:"personal-completed",tone:"completed",icon:CheckCircle2,rows:items.filter(t=>t.status==="DONE").sort(due)}];
  },[items,clock]);
+ // Stack task sections independently. A tall Pending list should never leave
+ // a blank grid-row gap beneath the shorter In Process section.
+ const taskColumns=[[lists[0],lists[2]],[lists[1],lists[3]]];
  return <div className="aw-personal-dashboard space-y-6" data-testid="personal-task-dashboard">
   <header className="aw-dashboard-hero">
    <div><p className="aw-eyebrow">MY WORKSPACE</p><h1 className="aw-dashboard-title">My assignments</h1>
@@ -71,7 +74,8 @@ export function AWPersonalTasks(){
    ].filter(x=>x.permits.some(p=>session?.identity.permissions.includes(p))).map(({title,desc,href,icon:Icon,tone})=>
     <Link key={href} href={href} className={"aw-personal-shortcut aw-personal-shortcut-"+tone}>
       <Icon size={19}/><span><strong>{title}</strong><small>{desc}</small></span><ArrowRight size={16}/></Link>)}</div></section>
-  <div className="aw-personal-task-grid">{lists.map(group=><section key={group.test} data-testid={group.test} className={"aw-personal-task-section aw-personal-"+group.tone}>
+  <div className="aw-personal-task-grid">{taskColumns.map((groups,index)=><div className="aw-personal-task-column" key={index}>
+   {groups.map(group=><section key={group.test} data-testid={group.test} className={"aw-personal-task-section aw-personal-"+group.tone}>
     <div className="aw-personal-task-heading"><span className="aw-personal-task-icon"><group.icon size={20}/></span>
      <h2>{group.title}</h2><strong className="aw-personal-task-count">{loaded?group.rows.length:"…"}</strong></div>
     {!loaded?<p role="status" className="aw-action-status">Loading assignments…</p>:
@@ -84,7 +88,7 @@ export function AWPersonalTasks(){
       {(group.test==="personal-pending"||group.test==="personal-in-process")&&<button type="button" className="aw-action-item-link" disabled={busy} aria-label={group.test==="personal-pending"?"Start "+t.title:"Complete "+t.title} title={group.test==="personal-pending"?"Move to In Process":"Mark completed"} onClick={()=>void progress(t)}><CheckCircle2 size={18}/></button>}
       <Link className="aw-action-item-link" href={"/app/tasks?task="+t.id} aria-label={"Open "+t.title}><ArrowRight size={16}/></Link>
      </li>)}</ol>:<p className="aw-action-status">{error?"Unable to verify tasks.":"No "+group.title.toLowerCase()+"."}</p>}
-   </section>)}</div>
+   </section>)}</div>)}</div>
   <Link className="aw-dashboard-refresh w-fit" href="/app/tasks">Task management <ArrowRight size={16}/></Link>
  </div>;
 }

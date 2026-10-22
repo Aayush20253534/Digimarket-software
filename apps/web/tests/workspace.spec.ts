@@ -380,6 +380,26 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await finishPasswordRotation(page,employeePassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
+  // Masonry-style task columns: Completed starts immediately under In Process,
+  // not below the height of the much taller Pending tasks card.
+  await page.setViewportSize({width:1366,height:812});
+  const columns=page.locator(".aw-personal-task-column");
+  await expect(columns).toHaveCount(2);
+  await expect(columns.nth(0).locator('[data-testid="personal-pending"]')).toBeVisible();
+  await expect(columns.nth(0).locator('[data-testid="personal-overdue"]')).toBeVisible();
+  await expect(columns.nth(1).locator('[data-testid="personal-in-process"]')).toBeVisible();
+  await expect(columns.nth(1).locator('[data-testid="personal-completed"]')).toBeVisible();
+  const cardGeometry=await page.evaluate(()=>{
+    const box=(testid:string)=>document.querySelector<HTMLElement>('[data-testid="'+testid+'"]')!.getBoundingClientRect();
+    const pending=box("personal-pending"),inProcess=box("personal-in-process"),completed=box("personal-completed");
+    return {rightAligned:Math.abs(completed.left-inProcess.left),
+      completedGap:completed.top-inProcess.bottom,
+      pendingLeft:pending.left,progressLeft:inProcess.left};
+  });
+  expect(cardGeometry.rightAligned,"Completed must share the right column with In Process").toBeLessThanOrEqual(2);
+  expect(cardGeometry.completedGap,"Completed should sit directly under In Process").toBeGreaterThanOrEqual(0);
+  expect(cardGeometry.completedGap,"No empty grid-row gap before Completed").toBeLessThanOrEqual(25);
+  expect(cardGeometry.progressLeft).toBeGreaterThan(cardGeometry.pendingLeft);
   await expect(page.getByRole("link",{name:"Team & accounts"})).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
   await page.goto("/app/finance");
