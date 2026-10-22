@@ -97,6 +97,8 @@ try{
  const next=await crm.list(founder,{limit:1,cursor:pagination.nextCursor!});
  assert.notEqual(next.items[0].id,pagination.items[0].id);
  assert.ok((await crm.export(founder)).csv.includes("919999887766"));
+ assert.equal(Number.isNaN(new Date(pagination.items[0].createdAt).getTime()),false);
+ assert.equal((await crm.detail(founder,first.id)).createdAt.toISOString(),first.createdAt.toISOString());
 
  // Rejection is a non-converted outcome and remains in the rate denominator.
  const rejectedDraft=await crm.create(employee,{phone:"919555001122"});
@@ -168,6 +170,20 @@ try{
  assert.equal(notPicking.status,"CALL_NOT_PICKING");
  assert.equal((await crm.list(founder,{stage:"CALL_NOT_PICKING",limit:30})).items[0]?.id,call.id);
 
+ // Verify server-side page boundaries with more than ten persisted leads.
+ const batchRows=Array.from({length:12},(_,i)=>({phone:"91970000"+String(i+1).padStart(4,"0"),source:"COLD_CALL" as const}));
+ assert.equal((await crm.import(founder,randomUUID(),batchRows)).count,12);
+ const pageOne=await crm.list(founder,{limit:10,sort:"createdAt",direction:"desc"});
+ assert.equal(pageOne.items.length,10);
+ assert.ok(pageOne.nextCursor);
+ const pageTwo=await crm.list(founder,{limit:10,sort:"createdAt",direction:"desc",cursor:pageOne.nextCursor!});
+ assert.ok(pageTwo.items.length>0&&pageTwo.items.length<=10);
+ const firstIds=new Set(pageOne.items.map(x=>x.id));
+ assert.ok(pageTwo.items.every(x=>!firstIds.has(x.id)));
+ for(const entry of [...pageOne.items,...pageTwo.items]){
+  assert.ok(entry.createdAt instanceof Date);
+  assert.equal(Number.isNaN(entry.createdAt.getTime()),false);
+ }
 
  console.info("Module 7 PASS: phone-only lead, shared editing, atomic Approved conversion, history, webhook dedupe, tenant isolation and import.");
 }finally{await db.$disconnect();}

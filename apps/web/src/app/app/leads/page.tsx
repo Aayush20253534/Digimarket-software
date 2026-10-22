@@ -88,7 +88,7 @@ export default function LeadsPage(){
    if(!canRead){setLoading(false);return;}
    setLoading(true);
    try{
-     const q=new URLSearchParams({limit:"30",sort:sortBy,direction:descending?"desc":"asc"});
+     const q=new URLSearchParams({limit:"10",sort:sortBy,direction:descending?"desc":"asc"});
      if(stage)q.set("stage",stage);if(sourceFilter)q.set("source",sourceFilter);if(search.trim())q.set("q",search.trim());
      if(cursor)q.set("cursor",cursor);
      let result:Page;
@@ -276,7 +276,7 @@ export default function LeadsPage(){
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Lead register" description="Organization-wide contacts, meeting updates and approval status.">
+       <Card title="Lead register" description="10 leads per page. Dates are recorded automatically when each lead enters the CRM.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
@@ -293,17 +293,19 @@ export default function LeadsPage(){
          {loading&&<Spinner label="Loading leads…"/>}
           {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
-            <thead><tr><th>Phone</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Meeting / status notes</th><th>Details</th></tr></thead>
+            <thead><tr><th>Phone</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Meeting / status notes</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
              <td><strong>{l.phone||"—"}</strong></td>
              <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
              <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular/></td>
+             <td><time dateTime={l.createdAt} title="Automatically recorded when this lead was created">{fmt(l.createdAt)}</time></td>
              <td className="aw-lead-notes-cell"><div className={"aw-lead-notes-preview"+(!l.stageNote?.trim()?" aw-lead-notes-empty":"")} title={l.stageNote||"No notes yet"}>{l.stageNote?.trim()||"No notes yet"}</div></td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
             </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
-           <button className="btn-secondary" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button><span className="aw-register-page">Page {history.length+1}</span>
-           <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
+           <button type="button" className="btn-secondary" aria-label="Previous leads page" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button>
+           <span className="aw-register-page" aria-live="polite">Page {history.length+1} · {items.length} lead{items.length===1?"":"s"} (max 10)</span>
+           <button type="button" className="btn-secondary" aria-label="Next leads page" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
        {canCreate&&creating&&<DirectoryModal title="Add lead"

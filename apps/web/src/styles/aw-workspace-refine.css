@@ -444,7 +444,7 @@ body:has(.aw-workspace){background:#09070e}
 [data-aw-module="leads"] .aw-status-rejected{background:#FF0000!important;color:#fff!important;border:1px solid #FF0000!important}
 [data-aw-module="leads"] .aw-status-yet-to-call{background:#000!important;color:#fff!important;border:1px solid #71717a!important}
 [data-aw-module="leads"] .aw-register-scroll{max-width:100%;max-height:min(64dvh,690px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-color:#8052a0 #21172b}
-[data-aw-module="leads"] .aw-register-table{min-width:1230px}
+[data-aw-module="leads"] .aw-register-table{min-width:1400px}
 [data-aw-module="leads"] .aw-register-table thead th{position:sticky;top:0;z-index:3}
 [data-aw-module="leads"] .aw-register-table td{white-space:nowrap}
 [data-aw-module="leads"] .aw-register-table .aw-lead-notes-cell{min-width:240px;max-width:310px;white-space:normal}

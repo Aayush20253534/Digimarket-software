@@ -48,7 +48,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
-  await expect(page.getByRole("table",{name:"Leads directory"})).toBeVisible();
+  const leadsRegister=page.getByRole("table",{name:"Leads directory"});
+  await expect(leadsRegister).toBeVisible();
+  await expect(leadsRegister.getByRole("columnheader",{name:"Date added"})).toBeVisible();
+  expect(await leadsRegister.locator("tbody tr").count()).toBeLessThanOrEqual(10);
+  await expect(page.getByText(/^Page 1 · \d+ leads? \(max 10\)$/)).toBeVisible();
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:"Past deadline"})).toHaveCount(0);
   await page.goto("/app/notes");
@@ -245,6 +249,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("dialog",{name:"Add lead"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:/Lead: Lead/})).toBeVisible();
   await expect(page.getByText(/Source: Meta Leads/)).toBeVisible();
+  const dateAdded=page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").filter({hasText:"9876543210"}).locator("time");
+  await expect(dateAdded).toHaveAttribute("dateTime",/^20\d{2}-/);
+  expect(Number.isNaN(Date.parse(await dateAdded.getAttribute("dateTime")??""))).toBe(false);
+  expect(await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").count()).toBeLessThanOrEqual(10);
   await page.getByLabel("Lead status").selectOption("YET_TO_CALL");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
