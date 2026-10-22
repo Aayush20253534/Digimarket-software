@@ -612,7 +612,7 @@ export default function NotesPage(){
       <button type="button" disabled={actionBusy} onClick={()=>void create("typed")}><Type size={25}/><strong>Typed note</strong><span>Write and format text</span></button>
      </div>
      {list.filter(n=>!n.deletedAt).length>0&&<p className="aw-notes-home-library">Saved notes are listed on the left. Select one to open it.</p>}
-    </div>:<>
+    </div>:selected?<>
     <div className="aw-studio-modebar">
      <div className="aw-studio-mode-switch" role="group" aria-label="Note mode">
       {mode==="handwritten"&&<span style={{padding:"8px 12px",color:"#d9baff"}}><PenLine size={18}/> Handwritten Note</span>}
@@ -662,7 +662,7 @@ export default function NotesPage(){
      <button type="button" aria-label="Reload note" onClick={()=>{if(selected)void open(selected,true);}} disabled={saveState!=="saved"}><RefreshCw size={16}/> Reload</button>
      <button type="button" className="danger" onClick={()=>void remove()} disabled={actionBusy||saveState==="saving"}><Trash2 size={16}/> Move to Trash</button>
     </div>
-   </>}
+   </>:null}
   </main>
   <aside className={"aw-studio-inspector"+(inspectorOpen?" aw-studio-inspector-open":"")} aria-label="Tool inspector">
    {selected&&<section className="aw-studio-page-switcher" aria-label="Note pages">
