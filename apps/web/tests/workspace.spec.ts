@@ -360,7 +360,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // deleting an approved lead never removes its linked client.
   await page.goto("/app/leads");
   await expect(page.getByRole("region",{name:"CRM pipeline summary"})).toBeVisible();
-  await expect(page.getByText("Conversion rate",{exact:true})).toBeVisible();
+  await expect(page.getByRole("region",{name:"CRM pipeline summary"}).getByText("FOLLOW UP",{exact:true})).toBeVisible();
+  await expect(page.getByText("Conversion rate",{exact:true})).toHaveCount(0);
   const reopenLeadRow=page.getByRole("table",{name:"Leads directory"}).getByRole("row").filter({hasText:"Founder CI Lead"});
   await reopenLeadRow.click();
   await expect(page.getByRole("heading",{name:"Lead: Founder CI Lead"})).toBeVisible();
