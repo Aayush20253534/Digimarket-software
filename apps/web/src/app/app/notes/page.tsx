@@ -128,6 +128,7 @@ export default function NotesPage(){
  const [tool,setTool]=useState<Tool>("pen");
  const [mode,setMode]=useState<"handwritten"|"typed">("handwritten");
  const [gridOpen,setGridOpen]=useState(false);
+ const [shared,setShared]=useState<{id:string;title:string;kind:"typed"|"handwritten";body:string;strokes:string;pages:string}|null>(null);
  const [shareTarget,setShareTarget]=useState("");
  const [shareUsers,setShareUsers]=useState<{id:string;displayName:string}[]>([]);
  const [paper,setPaper]=useState<"dotted"|"blank"|"ruled"|"grid">("dotted");
@@ -220,6 +221,8 @@ export default function NotesPage(){
   initialized.current=true;
   void request<{items:NoteSummary[];limited:boolean}>("/notes")
    .then(result=>{setList(result.items);
+     const sharedId=new URLSearchParams(window.location.search).get("shared");
+     if(sharedId&&/^[0-9a-f-]{36}$/i.test(sharedId))void request<Omit<NonNullable<typeof shared>,"id">>("/messages/"+sharedId+"/note").then(note=>setShared({...note,id:sharedId})).catch(e=>setError(explanation(e)));
      const focus=new URLSearchParams(window.location.search).get("note");
      if(focus&&result.items.some(n=>n.id===focus))void open(focus);
    })
@@ -599,7 +602,8 @@ export default function NotesPage(){
    {!modernNotesApi&&<AWNotice tone="error">The Notes API on Render is outdated. Single-page notes can still be saved, but notebooks and multi-page persistence require deploying the latest backend.</AWNotice>}
    {error&&<AWNotice tone="error">{error} {saveState==="conflict"&&"Unsaved work remains here."}</AWNotice>}
    {gridOpen&&<section aria-label="Notes list grid" style={{padding:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:12}}>{visibleNotes.map(n=><button key={n.id} type="button" onClick={()=>{void open(n.id);setGridOpen(false);}} style={{minHeight:128,border:"1px solid #7d4eae",borderRadius:14,padding:15,background:"#211630",color:"white",textAlign:"left",display:"flex",flexDirection:"column",gap:12}}><strong>{n.title}</strong><span>{n.kind==="typed"?"Typed document":"Handwritten document"}</span><small>{new Date(n.updatedAt).toLocaleString()}</small></button>)}</section>}
-   {!selected?<div className="aw-notes-home" aria-label="Choose a note type">
+   {!selected&&shared&&<section aria-label="Shared note preview" style={{padding:25,color:"#e9dcfa"}}><h2 style={{fontSize:24,fontWeight:700,marginBottom:12}}>{shared.title}</h2><p>Shared {shared.kind} note. Read-only until you save your own copy.</p>{shared.kind==="typed"?<pre style={{whiteSpace:"pre-wrap",background:"#f9f7fd",color:"#171225",padding:20,borderRadius:12,marginTop:20}}>{shared.body}</pre>:<div style={{background:"white",padding:15,borderRadius:12,marginTop:20,color:"#24162f"}}>Handwritten document with {parseStrokes(shared.strokes).length} strokes. Save a copy to open its drawing pages.</div>}<button type="button" className="aw-studio-new" style={{marginTop:20}} onClick={async()=>{try{const n=await request<{id:string}>("/messages/"+shared.id+"/save-note",{method:"POST"});setShared(null);await listNotes();window.history.replaceState(null,"","/app/notes?note="+n.id);void open(n.id);}catch(e){setError(explanation(e));}}}>Save to My Notes</button></section>}
+   {!selected&&!shared?<div className="aw-notes-home" aria-label="Choose a note type">
      <NotebookPen size={35}/>
      <h2>Start a new note</h2>
      <p>Choose the editor first. Existing notes stay in your library until you explicitly open one.</p>
