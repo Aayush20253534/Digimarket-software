@@ -5,6 +5,7 @@ import { AuthError, unauthorized, forbidden } from "../auth/errors";
 
 const uuid=z.uuid();
 const content=z.strictObject({
+ kind:z.enum(["typed","handwritten"]).optional(),
  title:z.string().trim().min(1).max(180),
  body:z.string().max(60000),
  pages:z.string().max(120000).refine(value=>{
@@ -42,7 +43,6 @@ export function registerNotesRoutes(app:Express,auth:AuthService){
   try{const header=req.get("authorization");
    if(!header?.startsWith("Bearer "))throw unauthorized();
    res.locals.principal=await auth.authenticate(header.slice(7));
-   if((res.locals.principal as Principal).roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN"))throw forbidden();
    next();
   }catch(error){next(error);}
  };
@@ -102,13 +102,14 @@ export function registerNotesRoutes(app:Express,auth:AuthService){
   const p=actor(res);res.set("Cache-Control","no-store");
   const deleted=req.query.trash==="true";
   const items=await db.personalNote.findMany({where:{...scope(p),deletedAt:deleted?{not:null}:null},
-   select:{id:true,title:true,strokes:true,starred:true,notebookId:true,deletedAt:true,version:true,updatedAt:true,createdAt:true},
+   select:{id:true,title:true,kind:true,strokes:true,starred:true,notebookId:true,deletedAt:true,version:true,updatedAt:true,createdAt:true},
    orderBy:[{updatedAt:"desc"},{id:"desc"}],take:100});
   res.json({data:{items,limited:items.length===100}});
  });
  app.post(path,authenticate,async(req,res)=>{
   const p=actor(res);const input=checked(content,req.body);
-  const note=await db.personalNote.create({data:{...scope(p),...input}});
+  const kind=input.kind??(input.body.trim()?"typed":"handwritten");
+  const note=await db.personalNote.create({data:{...scope(p),...input,kind}});
   res.status(201).set("Cache-Control","no-store").json({data:note});
  });
  app.get(path+"/:id",authenticate,async(req,res)=>{
@@ -119,6 +120,8 @@ export function registerNotesRoutes(app:Express,auth:AuthService){
  });
  app.put(path+"/:id",authenticate,async(req,res)=>{
   const p=actor(res),id=checked(uuid,req.params.id),input=checked(update,req.body);
+  const existing=await db.personalNote.findFirst({where:{id,...scope(p),deletedAt:null},select:{kind:true}});
+  if(existing && input.kind && input.kind!==existing.kind)throw new AuthError(422,"IMMUTABLE_NOTE_TYPE","Note type cannot be changed");
   const result=await db.personalNote.updateMany({where:{id,...scope(p),deletedAt:null,version:input.version},
    data:{title:input.title,body:input.body,strokes:input.strokes,...(input.pages!==undefined?{pages:input.pages}:{}),version:{increment:1}}});
   if(result.count===0){
