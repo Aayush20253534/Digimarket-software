@@ -9,10 +9,11 @@ type Message={id:string;senderId:string;recipientId:string;text:string;createdAt
 export default function MessagesPage(){
  const {session,request}=useAuth();
  const [people,setPeople]=useState<Person[]>([]),[peer,setPeer]=useState("");
+ const [memberQuery,setMemberQuery]=useState("");
  const [items,setItems]=useState<Message[]>([]),[text,setText]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
  const [file,setFile]=useState<{name:string;mime:string;data:string}|null>(null);
  const bottom=useRef<HTMLDivElement>(null);
- useEffect(()=>{if(!session)return;void request<{items:Person[]}>("/messages/users").then(x=>setPeople(x.items)).catch(e=>setError(String(e)));},[session,request]);
+ useEffect(()=>{if(!session)return;void request<{items:Person[]}>("/messages/users").then(x=>setPeople(x.items)).catch(e=>setError(e instanceof Error&&e.message.includes("Route not found")?"Messaging API is not deployed on Render. Deploy the latest backend and run database migrations.":String(e)));},[session,request]);
  useEffect(()=>{if(!peer)return;let cancelled=false;
  const reload=()=>request<{items:Message[]}>("/messages?with="+encodeURIComponent(peer)).then(x=>{if(!cancelled)setItems(x.items);}).catch(e=>{if(!cancelled)setError(String(e));});
  void reload();const id=window.setInterval(()=>void reload(),12000);return()=>{cancelled=true;window.clearInterval(id);};
@@ -26,10 +27,11 @@ export default function MessagesPage(){
  const upload=(f:File|undefined)=>{if(!f)return;if(f.size>1024*1024){setError("Maximum attachment size is 1 MB");return;}
   const reader=new FileReader();reader.onload=()=>setFile({name:f.name,mime:f.type||"application/octet-stream",data:String(reader.result)});reader.readAsDataURL(f);
  };
- return <div style={{display:"grid",gridTemplateColumns:"minmax(180px,260px) 1fr",gap:16,minHeight:"70vh",color:"#f3e9ff"}}>
+ return <div className="aw-messages-page" style={{display:"grid",gridTemplateColumns:"minmax(210px,290px) minmax(0,1fr)",gap:16,minHeight:"calc(100dvh - 125px)",width:"100%",maxWidth:"none",color:"#f3e9ff",overflow:"hidden"}}>
   <aside style={{background:"#170e26",borderRadius:18,padding:14}}>
    <h1 style={{fontSize:20,fontWeight:700,marginBottom:16}}>Messages</h1>
-   {people.map(u=><button key={u.id} type="button" onClick={()=>setPeer(u.id)} style={{display:"flex",alignItems:"center",gap:10,width:"100%",textAlign:"left",padding:10,marginBottom:6,borderRadius:12,background:peer===u.id?"#663393":"#281738",color:"white"}}>
+   <input aria-label="Search available members" value={memberQuery} onChange={e=>setMemberQuery(e.target.value)} placeholder="Search all members..." style={{width:"100%",padding:11,border:"1px solid #694581",borderRadius:10,background:"#291938",color:"#fff",marginBottom:12}}/>
+   {people.filter(u=>(u.displayName+" "+u.loginId).toLowerCase().includes(memberQuery.toLowerCase())).map(u=><button key={u.id} type="button" onClick={()=>setPeer(u.id)} style={{display:"flex",alignItems:"center",gap:10,width:"100%",textAlign:"left",padding:10,marginBottom:6,borderRadius:12,background:peer===u.id?"#663393":"#281738",color:"white"}}>
     {u.avatarData?<img src={u.avatarData} alt="" style={{width:36,height:36,borderRadius:"50%",objectFit:"cover"}}/>:<MessageCircle size={24}/>}
     <span><strong style={{display:"block"}}>{u.displayName}</strong><small>{u.loginId}</small></span>
    </button>)}
@@ -37,7 +39,7 @@ export default function MessagesPage(){
   </aside>
   <section style={{background:"#120c20",border:"1px solid #55316d",borderRadius:18,padding:16,display:"flex",flexDirection:"column",minWidth:0}}>
    {peer?<><h2 style={{fontSize:19,fontWeight:700,borderBottom:"1px solid #55316d",paddingBottom:12}}>{people.find(p=>p.id===peer)?.displayName}</h2>
-    <div style={{flex:1,overflowY:"auto",maxHeight:"60vh",padding:"20px 0"}}>
+    <div style={{flex:1,overflowY:"auto",maxHeight:"calc(100dvh - 285px)",padding:"20px 0"}}>
      {items.map(m=><div key={m.id} style={{maxWidth:"85%",margin:m.senderId===session?.user.id?"10px 0 10px auto":"10px auto 10px 0",background:m.senderId===session?.user.id?"#4d236b":"#2a2037",padding:13,borderRadius:14,overflowWrap:"anywhere"}}>
       {m.text&&<p style={{whiteSpace:"pre-wrap"}}>{m.text}</p>}
       {m.noteSnapshot&&<div style={{marginTop:8,padding:12,background:"#170e26",borderRadius:10}}><FileText size={20}/><strong>{m.noteSnapshot.title}</strong><p>{m.noteSnapshot.kind} note</p>
