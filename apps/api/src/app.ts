@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { apiHealthSchema } from "@digimarket/contracts";
+import { registerWorkspaceMessages } from "./messages/routes";
 import { registerNotesRoutes } from "./notes/routes";
 import { registerInsightsRoutes } from "./insights/routes";
 import { registerCompanyRoutes } from "./company/routes";
@@ -110,7 +111,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     // Governance accounts do not gain operational access through direct API URLs,
     // even when older role-permission rows still contain legacy grants.
     const operationalPrefixes = [
-      "/notes", "/assets", "/asset-folders", "/content",
+      "/assets", "/asset-folders", "/content",
       "/search",
     ];
     app.use("/api/v1", async (request,response,next)=>{
@@ -130,6 +131,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
       }catch(error){next(error);}
     });
     registerNotesRoutes(app, authService);
+    registerWorkspaceMessages(app, authService);
     registerInsightsRoutes(app, authService);
     registerCompanyRoutes(app, authService);
     registerProfitabilityRoutes(app, authService);
