@@ -280,3 +280,29 @@
   .aw-notes-create-choices{gap:9px;margin-top:2px}
   .aw-notes-create-choices button{padding:13px;gap:8px}
 }
+
+/* Stable editor sizing: no viewport clipping beneath the notes toolbar. */
+.aw-studio{overflow:hidden;min-height:540px;align-items:stretch}
+.aw-studio-main{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.aw-studio-header{flex:none}
+.aw-studio-modebar,.aw-studio-tools,.aw-studio-foot{flex:none}
+.aw-studio-typed{display:flex;flex:1 1 auto;min-height:220px;flex-direction:column;overflow:auto}
+.aw-notes-textarea{flex:1 1 auto;min-height:220px;resize:vertical}
+.aw-studio-sheet-scroll{flex:1 1 auto;min-height:140px;overflow:auto}
+.aw-studio-inspector{overflow-y:auto}
+.aw-studio-tools{overflow-x:auto;flex-shrink:0}
+.aw-notes-list-page{min-height:calc(100dvh - 130px);width:100%;padding:24px;color:#f4e8ff;background:#100b1c}
+.aw-notes-list-header{display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-bottom:24px}
+.aw-notes-list-header>div{flex:1}.aw-notes-list-header h1{font-size:27px;font-weight:800}
+.aw-notes-list-header p,.aw-notes-list-header>span{color:#c4acce;font-size:13px}
+.aw-notes-list-back{display:inline-flex;align-items:center;gap:7px;padding:11px;border:1px solid #68477e;border-radius:10px}
+.aw-notes-list-search{display:flex;align-items:center;gap:12px;padding:13px 16px;border:1px solid #67437b;border-radius:12px;background:#21162f;margin-bottom:24px}
+.aw-notes-list-search input{flex:1;min-width:0;outline:none;background:transparent;color:#fff}
+.aw-notes-list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px}
+.aw-notes-list-card{display:flex;flex-direction:column;gap:9px;padding:14px;border:1px solid #5d3a74;border-radius:14px;background:#20152e;min-width:0}
+.aw-notes-list-card:hover{border-color:#bc78ea;background:#302044}
+.aw-notes-list-thumbnail{height:120px;display:grid;place-items:center;background:#faf8ff;color:#7c39bb;border-radius:9px}
+.aw-notes-list-card strong{font-size:14px;overflow-wrap:anywhere}
+.aw-notes-list-card small,.aw-notes-list-card time{font-size:11px;color:#bba8c9}
+.aw-notes-list-empty{display:grid;justify-items:center;gap:10px;padding:70px 10px;color:#c6b0d8}
+@media(max-width:700px){.aw-notes-list-page{padding:15px}.aw-notes-list-header{gap:12px}}
