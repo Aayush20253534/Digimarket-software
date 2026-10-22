@@ -51,6 +51,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const leadsRegister=page.getByRole("table",{name:"Leads directory"});
   await expect(leadsRegister).toBeVisible();
   await expect(leadsRegister.getByRole("columnheader",{name:"Date added"})).toBeVisible();
+  await expect(leadsRegister.getByRole("columnheader",{name:"Call"})).toBeVisible();
+  await expect(leadsRegister.getByRole("columnheader",{name:"Location"})).toBeVisible();
+  await expect(leadsRegister.getByRole("columnheader",{name:"Details"})).toHaveCount(0);
   expect(await leadsRegister.locator("tbody tr").count()).toBeLessThanOrEqual(10);
   await expect(page.getByText(/^Page 1 · \d+ leads? \(max 10\)$/)).toBeVisible();
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
@@ -249,34 +252,43 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("dialog",{name:"Add lead"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:/Lead: Lead/})).toBeVisible();
   await expect(page.getByText(/Source: Meta Leads/)).toBeVisible();
-  const dateAdded=page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").filter({hasText:"9876543210"}).locator("time");
+  const freshLeadRow=page.getByRole("table",{name:"Leads directory"}).locator("tbody tr")
+    .filter({has:page.getByRole("link",{name:"Call 9876543210"})});
+  await expect(freshLeadRow).toHaveCount(1);
+  await expect(page.getByRole("link",{name:"Call 9876543210"})).toHaveAttribute("href","tel:9876543210");
+  await expect(freshLeadRow.getByRole("button",{name:"Open"})).toHaveCount(0);
+  const dateAdded=freshLeadRow.locator("time");
   await expect(dateAdded).toHaveAttribute("dateTime",/^20\d{2}-/);
   expect(Number.isNaN(Date.parse(await dateAdded.getAttribute("dateTime")??""))).toBe(false);
   expect(await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").count()).toBeLessThanOrEqual(10);
   await page.getByLabel("Lead status").selectOption("YET_TO_CALL");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
-    .getByRole("row").filter({hasText:"9876543210"}).locator(".aw-status-yet-to-call");
+    .locator("tbody tr").filter({has:page.getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-yet-to-call");
   await expect(yetToCallBadge).toHaveText("Yet to Call");
   await expect(yetToCallBadge).toHaveCSS("background-color","rgb(0, 0, 0)");
   await expect(yetToCallBadge).toHaveCSS("color","rgb(255, 255, 255)");
   await page.getByLabel("Lead status").selectOption("CALL_NOT_PICKING");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
-    .getByRole("row").filter({hasText:"9876543210"}).locator(".aw-status-not-picking");
+    .locator("tbody tr").filter({has:page.getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-not-picking");
   await expect(notPickingBadge).toHaveCSS("background-color","rgb(255, 0, 255)");
   await page.getByLabel("Lead status").selectOption("REJECTED");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const rejectedBadge=page.getByRole("table",{name:"Leads directory"})
-    .getByRole("row").filter({hasText:"9876543210"}).locator(".aw-status-rejected");
+    .locator("tbody tr").filter({has:page.getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-rejected");
   await expect(rejectedBadge).toHaveCSS("background-color","rgb(255, 0, 0)");
   await page.getByLabel("Contact name",{exact:true}).fill("CI Contact");
   await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
   await page.getByLabel("Business type",{exact:true}).fill("Retail");
+  await page.getByLabel("Google Maps link").fill("https://maps.app.goo.gl/abcdEFG123");
   await page.getByLabel("Lead status").selectOption("MEETING_PROCESS");
   await page.getByLabel("Note for Meeting Process").fill("Initial meeting scheduled");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   await expect(page.getByRole("heading",{name:"Lead: Founder CI Lead"})).toBeVisible();
+  const savedMap=page.getByRole("link",{name:"Open Google Maps for CI Contact"});
+  await expect(savedMap).toHaveAttribute("href","https://maps.app.goo.gl/abcdEFG123");
+  await expect(savedMap).toHaveAttribute("target","_blank");
   await page.getByLabel("Lead status").selectOption("APPROVED");
   await page.getByLabel("Note for Approved").fill("Agreed to onboard");
   await page.getByRole("button",{name:"Save details and stage"}).click();
@@ -290,7 +302,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/leads");
   await expect(page.getByRole("region",{name:"Lead conversion metrics"})).toBeVisible();
   await expect(page.getByText("Conversion rate",{exact:true})).toBeVisible();
-  await page.getByRole("row").filter({hasText:"Founder CI Lead"}).getByRole("button",{name:"Open"}).click();
+  const reopenLeadRow=page.getByRole("table",{name:"Leads directory"}).getByRole("row").filter({hasText:"Founder CI Lead"});
+  await reopenLeadRow.click();
+  await expect(page.getByRole("heading",{name:"Lead: Founder CI Lead"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Delete lead"})).toBeVisible();
   page.once("dialog",dialog=>{void dialog.accept();});
   await page.getByRole("button",{name:"Delete lead"}).click();

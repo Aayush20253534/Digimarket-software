@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { Download, MapPin, PhoneCall, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryModal } from "@/components/directory-modal";
@@ -12,7 +12,7 @@ type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"MEETING_PROCE
 const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","MEETING_PROCESS","APPROVED","REJECTED"];
 const stageLabel=(s:Stage)=>s==="YET_TO_CALL"?"Yet to Call":s==="MEETING_PROCESS"?"Meeting Process":s==="CALL_NOT_PICKING"?"Call Not Picking":s==="CALL_BUSY"?"Call Busy":s==="APPROVED"?"Approved":s==="REJECTED"?"Rejected":"Pending";
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
- location:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
+ location:string|null;googleMapsUrl:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
  status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
  version:number;createdAt:string;canEdit?:boolean;assignee?:{displayName:string}|null};
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
@@ -25,6 +25,7 @@ type LeadSource="COLD_CALL"|"META_LEADS";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value;
 const draftKey=(id:string)=>"amplifyworld:lead-stage-note:"+id;
+const callHref=(value:string)=>"tel:"+(value.trim().startsWith("+")?"+":"")+value.replace(/\D/g,"");
 type NewLead={phone:string;source:LeadSource};
 const blank:NewLead={phone:"",source:"COLD_CALL"};
 const errText=(e:unknown)=>e instanceof ApiError?e.message:"Lead request failed.";
@@ -83,7 +84,7 @@ export default function LeadsPage(){
  const [csvRows,setCsvRows]=useState<NewLead[]>([]);
  const [batchId,setBatchId]=useState<string>("");
  const [csvError,setCsvError]=useState("");
- const [updating,setUpdating]=useState({businessName:"",contactName:"",businessType:""});
+ const [updating,setUpdating]=useState({businessName:"",contactName:"",businessType:"",googleMapsUrl:""});
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
    setLoading(true);
@@ -114,7 +115,7 @@ export default function LeadsPage(){
      latestStageNote.current=draft??detail.stageNote??"";
      setNote("");setStageNote(latestStageNote.current);setNoteSaveState(draft===null?"idle":"saving");
      setUpdating({businessName:detail.businessName.startsWith("Lead ")? "":detail.businessName,
-       contactName:detail.contactName??"",businessType:detail.businessType??""});
+       contactName:detail.contactName??"",businessType:detail.businessType??"",googleMapsUrl:detail.googleMapsUrl??""});
    }catch(e){setError(errText(e));}
  };
  useEffect(()=>{
@@ -293,15 +294,25 @@ export default function LeadsPage(){
          {loading&&<Spinner label="Loading leads…"/>}
           {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
-            <thead><tr><th>Phone</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Meeting / status notes</th><th>Details</th></tr></thead>
-            <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
-             <td><strong>{l.phone||"—"}</strong></td>
+            <thead><tr><th>Call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
+           <tbody>{sorted.map(l=><tr key={l.id} tabIndex={0}
+             aria-label={"Open lead "+(l.contactName||l.businessName)}
+             className={"aw-lead-clickable"+(selected?.id===l.id?" aw-register-selected":"")}
+             onClick={()=>void open(l.id)}
+             onKeyDown={e=>{if(e.target!==e.currentTarget)return;
+               if(e.key==="Enter"||e.key===" "){e.preventDefault();void open(l.id);}}}>
+             <td>{l.phone?<a href={callHref(l.phone)} className="aw-lead-action" aria-label={"Call "+l.phone}
+               title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
+               <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>
              <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
              <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular/></td>
              <td><time dateTime={l.createdAt} title="Automatically recorded when this lead was created">{fmt(l.createdAt)}</time></td>
+             <td>{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+               className="aw-lead-action" aria-label={"Open Google Maps for "+(l.contactName||l.businessName)}
+               title="Open location in Google Maps" onClick={e=>e.stopPropagation()}>
+               <MapPin size={18} aria-hidden="true"/></a>:<span className="aw-lead-no-location" title="Location link not added"><MapPin size={17} aria-hidden="true"/></span>}</td>
              <td className="aw-lead-notes-cell"><div className={"aw-lead-notes-preview"+(!l.stageNote?.trim()?" aw-lead-notes-empty":"")} title={l.stageNote||"No notes yet"}>{l.stageNote?.trim()||"No notes yet"}</div></td>
-             <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
-            </tr>)}</tbody></table></div>
+           </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
            <button type="button" className="btn-secondary" aria-label="Previous leads page" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button>
            <span className="aw-register-page" aria-live="polite">Page {history.length+1} · {items.length} lead{items.length===1?"":"s"} (max 10)</span>
@@ -334,6 +345,10 @@ export default function LeadsPage(){
        {selected?<Card title={"Lead: "+selected.businessName} description={"Version "+selected.version+" · "+selected.status}>
          <div className="space-y-5">
            <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · Source: {sourceLabel(selected.source)}</p>
+           {selected.phone&&<a className="aw-lead-location-link" href={callHref(selected.phone)}>
+             <PhoneCall size={16} aria-hidden="true"/>Call {selected.phone}</a>}
+           {selected.googleMapsUrl&&!selected.canEdit&&<a className="aw-lead-location-link" href={selected.googleMapsUrl}
+             target="_blank" rel="noopener noreferrer"><MapPin size={16} aria-hidden="true"/>Open location in Google Maps</a>}
            {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href="/app/clients">client record</Link>.</p>}
            {selected.canEdit&&!isAdmin?<form onSubmit={edit} className="space-y-3">
              {(["contactName","businessName","businessType"] as const).map(k=>
@@ -341,6 +356,17 @@ export default function LeadsPage(){
                  <input id={"edit-"+k} className="field" maxLength={k==="businessName"?180:k==="contactName"?160:120}
                    value={updating[k]} onChange={e=>setUpdating(v=>({...v,[k]:e.target.value}))}/>
                </FormField>)}
+             <section aria-label="Lead location" className="aw-lead-location-section">
+               <h3 className="text-sm font-semibold">Location</h3>
+               <FormField id="edit-google-maps-url" label="Google Maps link">
+                 <input id="edit-google-maps-url" type="url" className="field" maxLength={1000}
+                   placeholder="https://maps.app.goo.gl/..."
+                   value={updating.googleMapsUrl}
+                   onChange={e=>setUpdating(v=>({...v,googleMapsUrl:e.target.value}))}/>
+               </FormField>
+               {selected.googleMapsUrl&&<a className="aw-lead-location-link" href={selected.googleMapsUrl}
+                 target="_blank" rel="noopener noreferrer"><MapPin size={16} aria-hidden="true"/>View saved location</a>}
+             </section>
              <FormField id="edit-source" label="Lead source">
                <select id="edit-source" className="field" value={editSource} onChange={e=>setEditSource(e.target.value as LeadSource)}>
                  {leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}

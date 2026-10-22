@@ -87,11 +87,22 @@ export const leadCreateSchema = z.strictObject({
  source:leadSourceSchema.optional(),
 });
 export type LeadCreateInput = z.infer<typeof leadCreateSchema>;
+export const leadGoogleMapsUrlSchema = z.union([
+ z.literal(""),
+ z.url({protocol:/^https?$/}).max(1000).refine(value=>{
+   const url=new URL(value),host=url.hostname.toLowerCase();
+   return host==="maps.app.goo.gl"||
+     (host==="goo.gl"&&url.pathname.startsWith("/maps/"))||
+     (/^(?:[a-z0-9-]+\.)*google\.(?:com|co\.in)$/.test(host)&&
+       (host.startsWith("maps.google.")||url.pathname.startsWith("/maps")));
+ },{message:"Enter a valid Google Maps sharing URL"}),
+]);
 export const leadUpdateSchema = z.strictObject({
  version:z.number().int().min(1),
  contactName:z.string().trim().max(160).optional(),
  businessName:z.string().trim().max(180).optional(),
  businessType:z.string().trim().max(120).optional(),
+ googleMapsUrl:leadGoogleMapsUrlSchema.optional(),
  source:leadSourceSchema.optional(),
  status:leadStageSchema.optional(),
  stageNote:z.string().trim().max(2000).optional(),

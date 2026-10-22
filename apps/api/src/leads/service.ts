@@ -182,7 +182,7 @@ export class LeadsService {
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
      orderBy:[{[input.sort??"createdAt"]:input.direction??"desc"} as Prisma.LeadOrderByWithRelationInput,{id:input.direction??"desc"}],
      select:{id:true,businessName:true,contactName:true,phone:true,businessType:true,location:true,
-       websiteUrl:true,instagramUrl:true,source:true,status:true,stageNote:true,assignedToId:true,createdById:true,
+       websiteUrl:true,instagramUrl:true,googleMapsUrl:true,source:true,status:true,stageNote:true,assignedToId:true,createdById:true,
        nextFollowUpAt:true,version:true,createdAt:true,updatedAt:true,
        assignee:{select:{displayName:true}},_count:{select:{duplicateMatches:true,duplicateCandidates:true}}}});
    const hasMore=rows.length>input.limit;
@@ -221,6 +221,7 @@ export class LeadsService {
    }
    if(changes.contactName!==undefined)data.contactName=urlOrNull(changes.contactName);
    if(changes.businessType!==undefined)data.businessType=urlOrNull(changes.businessType);
+   if(changes.googleMapsUrl!==undefined)data.googleMapsUrl=urlOrNull(changes.googleMapsUrl);
    if(changes.source!==undefined)data.source=changes.source;
    if(changes.status!==undefined)data.status=changes.status;
    if(stageNote!==undefined)data.stageNote=stageNote;

@@ -452,3 +452,13 @@ body:has(.aw-workspace){background:#09070e}
 [data-aw-module="leads"] .aw-lead-notes-empty{color:#a995ba;font-style:italic}
 [data-aw-module="leads"] .aw-lead-note-save-state{font-size:.75rem;color:#bfb0d5;line-height:1.5}
 [data-aw-module="leads"] .aw-lead-note-save-state[data-state="error"]{color:#ffb1b1}
+
+/* Use the uploaded wordmark consistently in public pages, login and workspace navigation. */
+.aw-theme .aw-brand{display:inline-flex;align-items:center;min-width:0;gap:0;flex-wrap:wrap}
+.aw-theme .aw-brand-wordmark{display:block;width:min(100%,280px);height:auto;max-height:68px;object-fit:contain;object-position:left center}
+.aw-theme .aw-brand-symbol{display:none;width:38px;height:auto}
+.aw-theme .aw-brand-compact .aw-brand-wordmark{width:min(100%,190px);max-height:50px}
+.aw-theme .aw-brand-tagline{flex-basis:100%;padding-top:4px}
+.aw-work-brand .aw-brand-compact .aw-brand-wordmark{width:min(100%,185px)}
+.aw-workspace[data-collapsed="true"] .aw-work-sidebar .aw-brand-wordmark{display:none}
+.aw-workspace[data-collapsed="true"] .aw-work-sidebar .aw-brand-symbol{display:block}

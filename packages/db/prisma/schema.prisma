@@ -536,6 +536,7 @@ model Lead {
   normalizedPhone   String?     @db.VarChar(20)
   businessType      String?     @db.VarChar(120)
   location          String?     @db.VarChar(240)
+  googleMapsUrl     String?     @db.VarChar(1000)
   websiteUrl        String?     @db.VarChar(500)
   instagramUrl      String?     @db.VarChar(500)
   source            String?     @db.VarChar(120)

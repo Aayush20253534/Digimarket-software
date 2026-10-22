@@ -2,7 +2,7 @@ import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createDatabaseClient } from "@digimarket/db";
-import { leadCreateSchema } from "@digimarket/contracts";
+import { leadCreateSchema, leadUpdateSchema } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { LeadsService } from "./service";
 
@@ -29,6 +29,10 @@ try{
  assert.equal(leadCreateSchema.safeParse({phone:"+91 98765 43210"}).success,true);
  assert.equal(leadCreateSchema.safeParse({businessName:"Not allowed"}).success,false);
  assert.equal(leadCreateSchema.safeParse({phone:"1"}).success,false);
+ assert.equal(leadUpdateSchema.safeParse({version:1,googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"}).success,true);
+ assert.equal(leadUpdateSchema.safeParse({version:1,googleMapsUrl:"https://www.google.com/maps/place/Test"}).success,true);
+ for(const badUrl of ["javascript:alert(1)","https://evil.example/maps","https://google.com.attacker.io/maps","https://google.com/not-maps"])
+   assert.equal(leadUpdateSchema.safeParse({version:1,googleMapsUrl:badUrl}).success,false);
  const first=await crm.create(founder,input);
  assert.equal(first.status,"PENDING");
  assert.equal(first.source,"COLD_CALL");
@@ -46,8 +50,11 @@ try{
  assert.equal((await crm.list(founder,{stage:"YET_TO_CALL",limit:30})).items[0]?.id,first.id);
  assert.equal((await crm.detail(founder,first.id)).stageNote,"Outreach not started");
  const meeting=await crm.update(employee,first.id,{version:yetToCall.version,status:"MEETING_PROCESS",
-  stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe"});
+  stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"});
  assert.equal(meeting.status,"MEETING_PROCESS");
+ assert.equal(meeting.googleMapsUrl,"https://maps.app.goo.gl/abcdEFG123");
+ assert.equal((await crm.list(founder,{limit:30})).items[0]?.googleMapsUrl,meeting.googleMapsUrl);
+ assert.equal((await crm.detail(founder,first.id)).googleMapsUrl,meeting.googleMapsUrl);
  assert.equal((await crm.list(founder,{limit:30})).items[0]?.stageNote,"Discussed the social media package");
  const autosaved=await crm.saveStageNote(employee,first.id,"Meeting on Friday");
  assert.equal(autosaved.stageNote,"Meeting on Friday");
