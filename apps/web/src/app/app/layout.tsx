@@ -9,16 +9,18 @@ import { AWButton, AWNotice } from "@/components/aw-ui";
 import { currentSection, permittedGroups, WorkspaceNav } from "@/components/workspace-navigation";
 import { AWNotificationBell } from "@/components/aw-notification-bell";
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, photo }: { name: string; photo?:string|null }) {
+ if(photo)return <img src={photo} alt="" className="aw-work-avatar" style={{objectFit:"cover",borderRadius:"50%"}}/>;
  const initials=name.trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0)).join("").toUpperCase();
  return <span className="aw-work-avatar" aria-hidden="true">{initials}</span>;
 }
-function SidebarFooter({ name, roles, busy, logout, close }: {
+function SidebarFooter({ name, photo, roles, busy, logout, close }: {
+ photo?:string|null;
  name:string;roles:readonly string[];busy:boolean;logout:()=>void;close?:()=>void;
 }) {
  return <div className="aw-work-footer">
   <Link href="/app/profile" aria-label="View profile" onClick={close} className="aw-work-profile">
-   <Avatar name={name}/>
+   <Avatar name={name} photo={photo}/>
    <span className="aw-work-profile-details">
     <span className="block truncate text-sm font-bold">{name}</span>
     <span className="block truncate text-xs text-[#B6A5C7]">{roles.join(", ")||"Member"}</span>
@@ -32,7 +34,8 @@ function SidebarFooter({ name, roles, busy, logout, close }: {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
  const router=useRouter();
  const pathname=usePathname();
- const { status, session, refresh, logout }=useAuth();
+ const { status, session, refresh, logout, request }=useAuth();
+ const [photo,setPhoto]=useState<string|null>(null);
  const [collapsed,setCollapsed]=useState(false);
  const [mobileOpen,setMobileOpen]=useState(false);
  const [signingOut,setSigningOut]=useState(false);
@@ -44,6 +47,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  useEffect(()=>{if(status==="unauthenticated")router.replace("/login");},[router,status]);
  useEffect(()=>{try{setCollapsed(window.localStorage.getItem("aw-sidebar-collapsed")==="1");}catch{/* optional preference */}},[]);
  useEffect(()=>{setMobileOpen(false);},[pathname]);
+ useEffect(()=>{
+  if(!session)return;
+  let mounted=true;
+  void request<{avatarData:string|null}>("/profile/avatar")
+   .then(data=>{if(mounted)setPhoto(data.avatarData);})
+   .catch(()=>{if(mounted)setPhoto(null);});
+  return()=>{mounted=false;};
+ },[session?.identity.userId,pathname,request]);
  useEffect(()=>{
   const dialog=dialogRef.current;
   if(!dialog)return;
@@ -97,7 +108,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </button>
    </div>
    <WorkspaceNav groups={groups} pathname={pathname} compact={collapsed}/>
-   <SidebarFooter name={name} roles={session.identity.roles} busy={signingOut} logout={()=>void signOut()}/>
+   <SidebarFooter name={name} photo={photo} roles={session.identity.roles} busy={signingOut} logout={()=>void signOut()}/>
   </aside>
 
   <dialog ref={dialogRef} aria-label="Workspace mobile navigation" className="aw-work-dialog"
