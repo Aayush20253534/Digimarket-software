@@ -1204,6 +1204,7 @@ model WorkspaceMessage {
  noteSnapshot Json?
  attachment Json?
  createdAt DateTime @default(now()) @db.Timestamptz(6)
+ readAt DateTime? @db.Timestamptz(6)
  sender User @relation("WorkspaceMessageSender", fields:[senderId],references:[id],onDelete:Cascade)
  recipient User @relation("WorkspaceMessageRecipient", fields:[recipientId],references:[id],onDelete:Cascade)
  @@index([organizationId,senderId,recipientId,createdAt])
