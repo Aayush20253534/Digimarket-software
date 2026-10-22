@@ -325,6 +325,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const followUpBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-badge");
   await expect(followUpBadge).toHaveText("FOLLOW UP");
+  await expect(followUpBadge).toHaveCSS("background-color","rgb(91, 245, 39)");
+  await expect(followUpBadge).toHaveCSS("color","rgb(0, 0, 0)");
   await page.getByLabel("Lead status").selectOption("CALL_NOT_PICKING");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
