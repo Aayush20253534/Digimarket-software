@@ -42,7 +42,7 @@ export default function MessagesPage(){
      {items.map(m=><div key={m.id} style={{maxWidth:"85%",margin:m.senderId===session?.user.id?"10px 0 10px auto":"10px auto 10px 0",background:m.senderId===session?.user.id?"#4d236b":"#2a2037",padding:13,borderRadius:14,overflowWrap:"anywhere"}}>
       {m.text&&<p style={{whiteSpace:"pre-wrap"}}>{m.text}</p>}
       {m.noteSnapshot&&<div style={{marginTop:8,padding:12,background:"#170e26",borderRadius:10}}><FileText size={20}/><strong>{m.noteSnapshot.title}</strong><p>{m.noteSnapshot.kind} note</p>
-       {m.senderId!==session?.user.id&&<button type="button" onClick={()=>void saveNote(m.id)} style={{padding:8,background:"#8742c2",borderRadius:7}}>Open in Notes & Save Copy</button>}
+       {m.senderId!==session?.user.id&&<Link href={"/app/notes?shared="+m.id} style={{display:"inline-block",padding:8,background:"#8742c2",borderRadius:7}}>Open in Notes</Link>}
        {m.senderId===session?.user.id&&<p>Shared note</p>}
       </div>}
       {m.attachment&&<a href={m.attachment.data} download={m.attachment.name} style={{display:"flex",gap:8,padding:8,textDecoration:"underline"}}><Download size={16}/>{m.attachment.name}</a>}
