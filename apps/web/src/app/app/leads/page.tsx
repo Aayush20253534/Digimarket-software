@@ -10,7 +10,7 @@ import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/com
 
 type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
 const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","MEETING_PROCESS","APPROVED","REJECTED"];
-const stageLabel=(s:Stage)=>s==="YET_TO_CALL"?"Yet to Call":s==="MEETING_PROCESS"?"Meeting Process":s==="CALL_NOT_PICKING"?"Call Not Picking":s==="CALL_BUSY"?"Call Busy":s==="APPROVED"?"Approved":s==="REJECTED"?"Rejected":"Pending";
+const stageLabel=(s:Stage)=>s.replaceAll("_"," ");
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;googleMapsUrl:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
  status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
@@ -18,7 +18,7 @@ type Lead={id:string;businessName:string;contactName:string|null;phone:string|nu
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null};
-type Metrics={total:number;pending:number;meetingProcess:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
+type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value;
@@ -128,7 +128,7 @@ export default function LeadsPage(){
    e.preventDefault();setBusy(true);setError("");setMessage("");
    try{
      const data=await request<Lead>("/leads",{method:"POST",body:created});
-     setCreated(blank);setCreating(false);setMessage("Lead added to Pending as "+sourceLabel(created.source)+".");
+     setCreated(blank);setCreating(false);setMessage("Lead added to PENDING as "+sourceLabel(created.source)+".");
      setCursor(null);await load();await open(data.id);
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
@@ -192,9 +192,10 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   {metrics&&<section aria-label="Lead conversion metrics" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+   {metrics&&<section aria-label="Lead conversion metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
      {([["Total leads",metrics.total],["Approved clients",metrics.converted],
-       ["Rejected",metrics.rejected],["Pending",metrics.pending],
+       ["REJECTED",metrics.rejected],["YET TO CALL",metrics.yetToCall],
+       ["MEETING PROCESS",metrics.meetingProcess],
        ["Conversion rate",metrics.conversionRatePercent+"%"]] as const).map(([label,value])=>
        <div key={label} className="rounded-xl border border-slate-200/15 p-3">
          <p className="text-xs text-slate-500">{label}</p>
@@ -202,7 +203,7 @@ export default function LeadsPage(){
        </div>)}
      <p className="col-span-full text-xs text-slate-500">Conversion = linked clients from approved leads ÷ all non-deleted leads. Rejected leads remain in the denominator.</p>
    </section>}
-   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage||"All stages"}</span></div>}
+   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage?stageLabel(stage as Stage):"ALL STAGES"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
@@ -212,7 +213,7 @@ export default function LeadsPage(){
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
            <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
-             <option value="">All stages</option>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}
+             <option value="">ALL STAGES</option>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}
            </select>
            <select aria-label="Filter by lead source" className="field" value={sourceFilter} onChange={e=>{setSourceFilter(e.target.value as ""|LeadSource);setCursor(null);setHistory([]);}}>
              <option value="">All sources</option>{leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
@@ -235,7 +236,7 @@ export default function LeadsPage(){
                title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
                <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>
              <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
-             <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular/></td>
+             <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular uppercase/></td>
              <td><time dateTime={l.createdAt} title="Automatically recorded when this lead was created">{fmt(l.createdAt)}</time></td>
              <td>{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                className="aw-lead-action" aria-label={"Open Google Maps for "+(l.contactName||l.businessName)}
@@ -266,7 +267,7 @@ export default function LeadsPage(){
            </FormField>
            <div className="aw-directory-modal-actions">
              <button className="btn-secondary" type="button" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button>
-             <button className="btn-primary" type="submit" disabled={busy}>Add to Pending</button>
+             <button className="btn-primary" type="submit" disabled={busy}>Add to PENDING</button>
            </div>
          </form>
        </DirectoryModal>}

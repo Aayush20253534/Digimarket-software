@@ -47,11 +47,18 @@ try{
  const yetToCall=await crm.update(employee,first.id,{version:first.version,status:"YET_TO_CALL",
   stageNote:"Outreach not started"});
  assert.equal(yetToCall.status,"YET_TO_CALL");
+ const notContactedMetrics=await crm.metrics(founder);
+ assert.equal(notContactedMetrics.yetToCall,1);
+ assert.equal(notContactedMetrics.meetingProcess,0);
+ assert.equal(notContactedMetrics.pending,0);
  assert.equal((await crm.list(founder,{stage:"YET_TO_CALL",limit:30})).items[0]?.id,first.id);
  assert.equal((await crm.detail(founder,first.id)).stageNote,"Outreach not started");
  const meeting=await crm.update(employee,first.id,{version:yetToCall.version,status:"MEETING_PROCESS",
   stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"});
  assert.equal(meeting.status,"MEETING_PROCESS");
+ const meetingMetrics=await crm.metrics(founder);
+ assert.equal(meetingMetrics.yetToCall,0);
+ assert.equal(meetingMetrics.meetingProcess,1);
  assert.equal(meeting.googleMapsUrl,"https://maps.app.goo.gl/abcdEFG123");
  assert.equal((await crm.list(founder,{limit:30})).items[0]?.googleMapsUrl,meeting.googleMapsUrl);
  assert.equal((await crm.detail(founder,first.id)).googleMapsUrl,meeting.googleMapsUrl);

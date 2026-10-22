@@ -48,6 +48,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
+  const statusMetrics=page.getByRole("region",{name:"Lead conversion metrics"});
+  await expect(statusMetrics).toBeVisible();
+  await expect(statusMetrics.getByText("YET TO CALL",{exact:true})).toBeVisible();
+  await expect(statusMetrics.getByText("MEETING PROCESS",{exact:true})).toBeVisible();
+  await expect(statusMetrics.getByText("REJECTED",{exact:true})).toBeVisible();
+  await expect(statusMetrics.getByText("Pending",{exact:true})).toHaveCount(0);
   const leadsRegister=page.getByRole("table",{name:"Leads directory"});
   await expect(leadsRegister).toBeVisible();
   await expect(leadsRegister.getByRole("columnheader",{name:"Date added"})).toBeVisible();
@@ -258,7 +264,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Add lead"}).click();
   await leadDialog.getByLabel("Phone number").fill("9876543210");
   await leadDialog.getByLabel("Lead source").selectOption("META_LEADS");
-  await leadDialog.getByRole("button",{name:"Add to Pending"}).click();
+  await leadDialog.getByRole("button",{name:"Add to PENDING"}).click();
   await expect(page.getByRole("dialog",{name:"Add lead"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:/Lead: Lead/})).toBeVisible();
   await expect(page.getByText(/Source: Meta Leads/)).toBeVisible();
@@ -277,32 +283,34 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-yet-to-call");
-  await expect(yetToCallBadge).toHaveText("Yet to Call");
+  await expect(yetToCallBadge).toHaveText("YET TO CALL");
   await expect(yetToCallBadge).toHaveCSS("background-color","rgb(0, 0, 0)");
   await expect(yetToCallBadge).toHaveCSS("color","rgb(255, 255, 255)");
   await page.getByLabel("Lead status").selectOption("CALL_NOT_PICKING");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-not-picking");
+  await expect(notPickingBadge).toHaveText("CALL NOT PICKING");
   await expect(notPickingBadge).toHaveCSS("background-color","rgb(255, 0, 255)");
   await page.getByLabel("Lead status").selectOption("REJECTED");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const rejectedBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-rejected");
+  await expect(rejectedBadge).toHaveText("REJECTED");
   await expect(rejectedBadge).toHaveCSS("background-color","rgb(255, 0, 0)");
   await page.getByLabel("Contact name",{exact:true}).fill("CI Contact");
   await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
   await page.getByLabel("Business type",{exact:true}).fill("Retail");
   await page.getByLabel("Google Maps link").fill("https://maps.app.goo.gl/abcdEFG123");
   await page.getByLabel("Lead status").selectOption("MEETING_PROCESS");
-  await page.getByLabel("Note for Meeting Process").fill("Initial meeting scheduled");
+  await page.getByLabel("Note for MEETING PROCESS").fill("Initial meeting scheduled");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   await expect(page.getByRole("heading",{name:"Lead: Founder CI Lead"})).toBeVisible();
   const savedMap=page.getByRole("link",{name:"Open Google Maps for CI Contact"});
   await expect(savedMap).toHaveAttribute("href","https://maps.app.goo.gl/abcdEFG123");
   await expect(savedMap).toHaveAttribute("target","_blank");
   await page.getByLabel("Lead status").selectOption("APPROVED");
-  await page.getByLabel("Note for Approved").fill("Agreed to onboard");
+  await page.getByLabel("Note for APPROVED").fill("Agreed to onboard");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   await expect(page.getByText("Lead approved and automatically added to Clients.")).toBeVisible();
   await page.goto("/app/clients");
