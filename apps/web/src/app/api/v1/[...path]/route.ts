@@ -65,6 +65,7 @@ const folderArchivePattern=/^asset-folders\/[0-9a-fA-F-]{36}\/download$/;
 const folderDetailPattern=/^asset-folders\/[0-9a-fA-F-]{36}$/;
 const financeProofPattern=/^finance\/entries\/[0-9a-fA-F-]{36}\/proof$/;
 const assetOrganizePattern=/^assets\/[0-9a-fA-F-]{36}\/organize$/;
+const messageReadPattern=/^messages\/read\/[0-9a-fA-F-]{36}$/;
 const messageNotePattern=/^messages\/[0-9a-fA-F-]{36}\/note$/;
 const messageSavePattern=/^messages\/[0-9a-fA-F-]{36}\/save-note$/;
 const noteDetailPattern=/^notes\/[0-9a-fA-F-]{36}$/;
@@ -111,6 +112,7 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(messageReadPattern.test(path))return method==="POST";
   if(messageNotePattern.test(path))return method==="GET";
   if(messageSavePattern.test(path))return method==="POST";
   if(financeProofPattern.test(path))return method==="GET";
