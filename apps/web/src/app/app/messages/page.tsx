@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useAuth} from "@/components/auth-provider";
-import {MessageCircle,Paperclip,Send,FileText,Download,Search,Users,CheckCheck,X} from "lucide-react";
+import {MessageCircle,Paperclip,Send,FileText,Download,Search,Users,CheckCheck,ArrowLeft,X} from "lucide-react";
 
 type Person={id:string;displayName:string;loginId:string;avatarData:string|null;unreadCount:number};
 type Attachment={name:string;mime:string;data:string};
@@ -123,6 +123,7 @@ export default function MessagesPage(){
   </aside>
   <section className="aw-chat-conversation" aria-label="Direct message conversation">
    {current?<><header className="aw-chat-conversation-header">
+     <button type="button" className="aw-chat-back" aria-label="Back to conversations" onClick={()=>choose("")}><ArrowLeft size={19}/></button>
      <MemberAvatar person={current} size={46}/>
      <div className="aw-chat-peer-label"><h2>{current.displayName}</h2><p>@{current.loginId} · Private conversation</p></div>
      <span className="aw-chat-header-status"><CheckCheck size={16}/> Team member</span>
