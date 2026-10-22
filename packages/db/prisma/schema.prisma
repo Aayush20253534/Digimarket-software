@@ -252,6 +252,9 @@ model User {
   roles              UserRole[]
   sessions           Session[]
   personalNotes      PersonalNote[]
+  sentMessages WorkspaceMessage[] @relation("WorkspaceMessageSender")
+  receivedMessages WorkspaceMessage[] @relation("WorkspaceMessageRecipient")
+  avatarData String? @db.Text
   teamMemberships    TeamMember[]
   founderProfile     FounderProfile?
   auditActions       AuditLog[]      @relation("AuditActor")
@@ -1159,6 +1162,7 @@ model ServiceHeartbeat {
  
 // Personal workspace notes: tenant and owner isolation, CAS revision for safe autosave.
 model PersonalNote {
+  kind String @default("handwritten") @db.VarChar(16)
   id String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   ownerId String @db.Uuid
@@ -1188,4 +1192,20 @@ model PersonalNotebook {
   color String @default("#8C45DB") @db.VarChar(7)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   @@index([organizationId,ownerId,name])
+}
+
+// Private, organization-bound direct messages. Sharing a note never grants access to its source.
+model WorkspaceMessage {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @db.Uuid
+ senderId String @db.Uuid
+ recipientId String @db.Uuid
+ text String @default("") @db.Text
+ noteSnapshot Json?
+ attachment Json?
+ createdAt DateTime @default(now()) @db.Timestamptz(6)
+ sender User @relation("WorkspaceMessageSender", fields:[senderId],references:[id],onDelete:Cascade)
+ recipient User @relation("WorkspaceMessageRecipient", fields:[recipientId],references:[id],onDelete:Cascade)
+ @@index([organizationId,senderId,recipientId,createdAt])
+ @@index([organizationId,recipientId,createdAt])
 }
