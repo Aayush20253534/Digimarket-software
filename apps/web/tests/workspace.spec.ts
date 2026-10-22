@@ -48,14 +48,17 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
-  const statusMetrics=page.getByRole("region",{name:"Lead conversion metrics"});
+  const statusMetrics=page.getByRole("region",{name:"Lead status metrics"});
   await expect(statusMetrics).toBeVisible();
   await expect(statusMetrics.getByText("YET TO CALL",{exact:true})).toBeVisible();
   await expect(statusMetrics.getByText("MEETING PROCESS",{exact:true})).toBeVisible();
+  await expect(statusMetrics.getByText("FOLLOW UP",{exact:true})).toBeVisible();
+  await expect(statusMetrics.getByText("Conversion rate",{exact:true})).toHaveCount(0);
   await expect(statusMetrics.getByText("REJECTED",{exact:true})).toBeVisible();
   await expect(statusMetrics.getByText("Pending",{exact:true})).toHaveCount(0);
   const leadsRegister=page.getByRole("table",{name:"Leads directory"});
   await expect(leadsRegister).toBeVisible();
+  await expect(leadsRegister).toHaveAttribute("aria-busy","false");
   await expect(leadsRegister.getByRole("columnheader",{name:"Date added"})).toBeVisible();
   await expect(leadsRegister.getByRole("columnheader",{name:"Call"})).toBeVisible();
   await expect(leadsRegister.getByRole("columnheader",{name:"Location"})).toBeVisible();
@@ -83,6 +86,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     await page.setViewportSize({width,height:800});
     await page.goto("/app/reports");
     await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
+    await expect(page.getByRole("article",{name:"Lead conversion rate"})).toBeVisible();
     const bounds=await page.evaluate(()=>({
       documentWidth:document.documentElement.scrollWidth,
       viewportWidth:document.documentElement.clientWidth,
@@ -246,7 +250,34 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"More actions for folder CI Brand Designs"}).click();
   await expect(page.getByRole("button",{name:"Delete empty folder CI Brand Designs"})).toHaveCount(0); // Founder cannot bypass assets.delete permissions.
   await page.goto("/app/leads");
-  await expect(page.getByRole("table",{name:"Leads directory"})).toBeVisible();
+  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
+  // Saved CRM view choices survive both a browser reload and a manual Refresh.
+  await page.getByLabel("Filter by stage").selectOption("FOLLOW_UP");
+  await page.getByLabel("Filter by lead source").selectOption("META_LEADS");
+  await page.getByLabel("Search leads").fill("Persist this CRM search");
+  await page.getByLabel("Sort leads on this page").selectOption("businessName");
+  await page.getByRole("button",{name:"Reverse lead sort"}).click();
+  await expect.poll(()=>page.evaluate(()=>{
+    const key=Object.keys(localStorage).find(value=>value.startsWith("amplifyworld:leads:preferences:"));
+    return key?JSON.parse(localStorage.getItem(key)??"{}"):{};
+  })).toMatchObject({stage:"FOLLOW_UP",sourceFilter:"META_LEADS",
+    search:"Persist this CRM search",sortBy:"businessName",descending:true});
+  await page.reload();
+  await expect(page.getByLabel("Filter by stage")).toHaveValue("FOLLOW_UP");
+  await expect(page.getByLabel("Filter by lead source")).toHaveValue("META_LEADS");
+  await expect(page.getByLabel("Search leads")).toHaveValue("Persist this CRM search");
+  await expect(page.getByLabel("Sort leads on this page")).toHaveValue("businessName");
+  await expect(page.getByRole("button",{name:"Reverse lead sort"})).toContainText("Descending");
+  await page.getByRole("button",{name:"Refresh",exact:true}).click();
+  await expect(page.getByLabel("Filter by stage")).toHaveValue("FOLLOW_UP");
+  await expect(page.getByRole("button",{name:"Reverse lead sort"})).toContainText("Descending");
+  // Only manual edits change these preferences.
+  await page.getByLabel("Filter by stage").selectOption("");
+  await page.getByLabel("Filter by lead source").selectOption("");
+  await page.getByLabel("Search leads").fill("");
+  await page.getByLabel("Sort leads on this page").selectOption("createdAt");
+  await page.getByRole("button",{name:"Reverse lead sort"}).click();
+  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await expect(page.getByText("Potential duplicates",{exact:true})).toHaveCount(0);
   await expect(page.getByText("CSV import",{exact:true})).toHaveCount(0);
   await page.getByRole("button",{name:"Add lead"}).click();
@@ -286,6 +317,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(yetToCallBadge).toHaveText("YET TO CALL");
   await expect(yetToCallBadge).toHaveCSS("background-color","rgb(0, 0, 0)");
   await expect(yetToCallBadge).toHaveCSS("color","rgb(255, 255, 255)");
+  await page.getByLabel("Lead status").selectOption("FOLLOW_UP");
+  await page.getByRole("button",{name:"Save details and stage"}).click();
+  const followUpBadge=page.getByRole("table",{name:"Leads directory"})
+    .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-badge");
+  await expect(followUpBadge).toHaveText("FOLLOW UP");
   await page.getByLabel("Lead status").selectOption("CALL_NOT_PICKING");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
@@ -320,7 +356,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // Confirm the frontend gateway supports metrics and hard-deletion, and that
   // deleting an approved lead never removes its linked client.
   await page.goto("/app/leads");
-  await expect(page.getByRole("region",{name:"Lead conversion metrics"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Lead status metrics"})).toBeVisible();
   await expect(page.getByText("Conversion rate",{exact:true})).toBeVisible();
   const reopenLeadRow=page.getByRole("table",{name:"Leads directory"}).getByRole("row").filter({hasText:"Founder CI Lead"});
   await reopenLeadRow.click();

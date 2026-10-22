@@ -8,8 +8,8 @@ import { DirectoryModal } from "@/components/directory-modal";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
-type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
-const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","MEETING_PROCESS","APPROVED","REJECTED"];
+type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"FOLLOW_UP"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
+const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","APPROVED","REJECTED"];
 const stageLabel=(s:Stage)=>s.replaceAll("_"," ");
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;googleMapsUrl:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
@@ -18,7 +18,7 @@ type Lead={id:string;businessName:string;contactName:string|null;phone:string|nu
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null};
-type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
+type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value;
@@ -26,6 +26,9 @@ const draftKey=(id:string)=>"amplifyworld:lead-stage-note:"+id;
 const callHref=(value:string)=>"tel:"+(value.trim().startsWith("+")?"+":"")+value.replace(/\D/g,"");
 type NewLead={phone:string;source:LeadSource};
 const blank:NewLead={phone:"",source:"COLD_CALL"};
+type SortKey="businessName"|"contactName"|"status"|"createdAt";
+const sortKeys:SortKey[]=["businessName","contactName","status","createdAt"];
+const leadPreferencesKey=(userId:string)=>"amplifyworld:leads:preferences:"+userId;
 const errText=(e:unknown)=>e instanceof ApiError?e.message:"Lead request failed.";
 function fmt(date:string|null){return date?new Date(date).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"Not set";}
 export default function LeadsPage(){
@@ -45,7 +48,9 @@ export default function LeadsPage(){
  const [sourceFilter,setSourceFilter]=useState<""|LeadSource>("");
  const [search,setSearch]=useState("");
  const [history,setHistory]=useState<string[]>([]);
- const [sortBy,setSortBy]=useState<"businessName"|"contactName"|"status"|"createdAt">("createdAt"),[descending,setDescending]=useState(false);
+ const [sortBy,setSortBy]=useState<SortKey>("createdAt"),[descending,setDescending]=useState(false);
+ const [preferencesReady,setPreferencesReady]=useState(false);
+ const loadSequence=useRef(0);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
@@ -64,8 +69,38 @@ export default function LeadsPage(){
  const [note,setNote]=useState("");
  const [staff,setStaff]=useState<StaffUser[]>([]);
  const [updating,setUpdating]=useState({businessName:"",contactName:"",businessType:"",googleMapsUrl:""});
+ // Persist only display preferences, never lead details or auth credentials.
+ useEffect(()=>{
+   const userId=session?.identity.userId;
+   if(!canRead||!userId){setPreferencesReady(false);return;}
+   setPreferencesReady(false);
+   try{
+     const stored=window.localStorage.getItem(leadPreferencesKey(userId));
+     if(stored){
+       const value:unknown=JSON.parse(stored);
+       if(value&&typeof value==="object"){
+         const pref=value as Record<string,unknown>;
+         if(pref.stage===""||stages.includes(pref.stage as Stage))setStage(pref.stage as string);
+         if(pref.sourceFilter===""||pref.sourceFilter==="COLD_CALL"||pref.sourceFilter==="META_LEADS")
+           setSourceFilter(pref.sourceFilter as ""|LeadSource);
+         if(typeof pref.search==="string")setSearch(pref.search.slice(0,100));
+         if(sortKeys.includes(pref.sortBy as SortKey))setSortBy(pref.sortBy as SortKey);
+         if(typeof pref.descending==="boolean")setDescending(pref.descending);
+       }
+     }
+   }catch{/* Browser storage might be unavailable or cleared. */}
+   setCursor(null);setHistory([]);setPreferencesReady(true);
+ },[canRead,session?.identity.userId]);
+ useEffect(()=>{
+   if(!preferencesReady||!session?.identity.userId)return;
+   try{window.localStorage.setItem(leadPreferencesKey(session.identity.userId),
+     JSON.stringify({stage,sourceFilter,search,sortBy,descending}));}
+   catch{/* Optional view preferences. */}
+ },[preferencesReady,session?.identity.userId,stage,sourceFilter,search,sortBy,descending]);
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
+   if(!preferencesReady)return;
+   const sequence=++loadSequence.current;
    setLoading(true);
    try{
      const q=new URLSearchParams({limit:"10",sort:sortBy,direction:descending?"desc":"asc"});
@@ -78,10 +113,14 @@ export default function LeadsPage(){
       q.delete("sort");q.delete("direction");
       result=await request<Page>("/leads?"+q);setLegacySort(true);
      }
+     if(sequence!==loadSequence.current)return;
      setItems(result.items);setNextCursor(result.nextCursor);setError("");
-     request<Metrics>("/leads/metrics").then(setMetrics).catch(()=>{});
-   }catch(e){setError(errText(e));}finally{setLoading(false);}
- },[canRead,request,stage,sourceFilter,search,cursor,sortBy,descending]);
+     void request<Metrics>("/leads/metrics").then(result=>{
+       if(sequence===loadSequence.current)setMetrics(result);
+     }).catch(()=>{});
+   }catch(e){if(sequence===loadSequence.current)setError(errText(e));}
+   finally{if(sequence===loadSequence.current)setLoading(false);}
+ },[canRead,preferencesReady,request,stage,sourceFilter,search,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const focusedRef=useRef(false);
@@ -192,16 +231,15 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   {metrics&&<section aria-label="Lead conversion metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+   {metrics&&<section aria-label="Lead status metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
      {([["Total leads",metrics.total],["Approved clients",metrics.converted],
        ["REJECTED",metrics.rejected],["YET TO CALL",metrics.yetToCall],
        ["MEETING PROCESS",metrics.meetingProcess],
-       ["Conversion rate",metrics.conversionRatePercent+"%"]] as const).map(([label,value])=>
+       ["FOLLOW UP",metrics.followUp]] as const).map(([label,value])=>
        <div key={label} className="rounded-xl border border-slate-200/15 p-3">
          <p className="text-xs text-slate-500">{label}</p>
          <p className="mt-1 text-xl font-semibold">{value}</p>
        </div>)}
-     <p className="col-span-full text-xs text-slate-500">Conversion = linked clients from approved leads ÷ all non-deleted leads. Rejected leads remain in the denominator.</p>
    </section>}
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage?stageLabel(stage as Stage):"ALL STAGES"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
@@ -222,11 +260,17 @@ export default function LeadsPage(){
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="status">Stage</option><option value="createdAt">Created</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
-         {loading&&<Spinner label="Loading leads…"/>}
-          {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
-          <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
+         {loading&&<div className="aw-lead-sync" role="status" aria-live="polite">
+           <RefreshCw size={15} className="aw-lead-sync-icon" aria-hidden="true"/>
+           {items.length?"Refreshing leads…":"Loading lead records…"}
+         </div>}
+         {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
+          <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory" aria-busy={loading}>
             <thead><tr><th>Call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
-           <tbody>{sorted.map(l=><tr key={l.id} tabIndex={0}
+           <tbody>{loading&&!items.length?
+             Array.from({length:5},(_,i)=><tr key={"loading-"+i} aria-hidden="true" className="aw-lead-loading-row">
+               {Array.from({length:9},(_,j)=><td key={j}><div className="aw-lead-skeleton"/></td>)}
+             </tr>):sorted.map(l=><tr key={l.id} tabIndex={0}
              aria-label={"Open lead "+(l.contactName||l.businessName)}
              className={"aw-lead-clickable"+(selected?.id===l.id?" aw-register-selected":"")}
              onClick={()=>void open(l.id)}
@@ -246,7 +290,7 @@ export default function LeadsPage(){
            </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
            <button type="button" className="btn-secondary" aria-label="Previous leads page" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button>
-           <span className="aw-register-page" aria-live="polite">Page {history.length+1} · {items.length} lead{items.length===1?"":"s"} (max 10)</span>
+           <span className="aw-register-page" aria-live="polite">{loading&&!items.length?"Loading page…":`Page ${history.length+1} · ${items.length} lead${items.length===1?"":"s"} (max 10)`}</span>
            <button type="button" className="btn-secondary" aria-label="Next leads page" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>

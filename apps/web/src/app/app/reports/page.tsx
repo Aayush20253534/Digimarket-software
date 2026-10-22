@@ -36,6 +36,9 @@ export default function ReportsPage(){
  if(!session)return <Spinner label="Checking reporting permissions…"/>;
  if(!can)return <Notice kind="error">Business reporting permission required.</Notice>;
  const cards=Object.entries(report?.sections??{}).filter(([key])=>key!=="invoices");
+ const leadConversionRate=report?.sections.leads?.conversionRatePercent;
+ const leadConversionValue=typeof leadConversionRate==="number" ? leadConversionRate:
+   typeof leadConversionRate==="string" ? Number(leadConversionRate):null;
  return <div className="aw-report-page space-y-6">
   <PageHeader eyebrow="Agency intelligence" title="Performance reports"
    description="A comprehensive view of your business, delivered from real records and enforced by the current API permissions."/>
@@ -55,8 +58,17 @@ export default function ReportsPage(){
    <div className="aw-report-sectionhead"><div><p>BUSINESS OVERVIEW</p><h2>Key performance indicators</h2></div>
     <span><ShieldCheck size={15}/> Live, role-protected metrics</span></div>
    <div className="aw-report-grid">
+    {leadConversionValue!==null&&Number.isFinite(leadConversionValue)&&
+     <article className="aw-report-card aw-report-mint" aria-label="Lead conversion rate">
+       <div className="aw-report-card-top"><span className="aw-report-icon"><TrendingUp size={22}/></span>
+         <ArrowUpRight size={18} aria-hidden="true"/></div>
+       <p className="aw-report-card-label">LEAD CONVERSION RATE</p>
+       <div className="aw-report-hero-value">{leadConversionValue.toLocaleString("en-IN",{maximumFractionDigits:2})}%</div>
+       <p className="aw-report-hero-label">Approved leads converted into clients</p>
+       <p className="mt-3 text-xs text-[#c8b6d4]">For leads created during the selected reporting period.</p>
+     </article>}
     {cards.map(([name,values],i)=>{
-     const Icon=icons[i%icons.length],entries=Object.entries(values),ledger=name==="cashLedger"&&Array.isArray(values.posted)?values.posted:null,spot=entries.find(([,v])=>!Array.isArray(v)&&
+     const Icon=icons[i%icons.length],entries=Object.entries(values).filter(([key])=>!(name==="leads"&&key==="conversionRatePercent")),ledger=name==="cashLedger"&&Array.isArray(values.posted)?values.posted:null,spot=entries.find(([,v])=>!Array.isArray(v)&&
        (typeof v==="number"||(/^-?\d+(\.\d+)?$/.test(v)&&v.length<20)))??entries[0];
      return <article className={"aw-report-card aw-report-"+themes[i%themes.length]} key={name}>
       <div className="aw-report-card-top"><span className="aw-report-icon"><Icon size={22}/></span>

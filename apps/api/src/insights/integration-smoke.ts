@@ -112,6 +112,8 @@ try{
  assert.equal("cashLedger" in report.sections,false);
  assert.equal((report.sections.projects as {active:number}).active,1);
  assert.equal((report.sections.tasks as {open:number}).open,1);
+ assert.equal(typeof (report.sections.leads as {conversionRatePercent:number}).conversionRatePercent,"number");
+ assert.equal((report.sections.leads as {followUp:number}).followUp,0);
  const privileged=await insights.report(admin,"2026-10-01","2026-11-30");
  assert.equal((privileged.sections.projects as {active:number}).active,2);
  assert.equal((privileged.sections.invoices as {unpaidCount:number}).unpaidCount,1);
