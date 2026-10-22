@@ -31,6 +31,7 @@ try{
  assert.equal(leadCreateSchema.safeParse({phone:"1"}).success,false);
  const first=await crm.create(founder,input);
  assert.equal(first.status,"PENDING");
+ assert.equal(first.source,"COLD_CALL");
  assert.equal(first.phone,input.phone);
  assert.equal(first.contactName,null);
  assert.ok(first.businessName.startsWith("Lead "));
@@ -59,17 +60,21 @@ try{
  assert.notEqual(elsewhere.organizationId,first.organizationId);
  const incoming=await crm.ingestWhatsApp(org.id,owner.id,"919999887766");
  assert.equal(incoming.created,true);
+ assert.equal((await db.lead.findUniqueOrThrow({where:{id:incoming.id}})).source,"META_LEADS");
  assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919999887766")).created,false);
  assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);
  assert.equal((await db.lead.count({where:{organizationId:org.id,normalizedPhone:"919999887766"}})),1);
  const batch=randomUUID();
- assert.equal((await crm.import(founder,batch,[{phone:"919111111111"},{phone:"919222222222"}])).count,2);
+ assert.equal((await crm.import(founder,batch,[{phone:"919111111111"},{phone:"919222222222",source:"META_LEADS"}])).count,2);
  await assert.rejects(()=>crm.import(founder,batch,[{phone:"919333333333"}]),fail(409));
  const before=await db.lead.count({where:{organizationId:org.id}});
  await assert.rejects(()=>crm.import(founder,randomUUID(),[{phone:"919444444444"},{phone:"invalid"}]),fail(422));
  assert.equal(await db.lead.count({where:{organizationId:org.id}}),before);
  assert.equal((await crm.list(founder,{stage:"PENDING",limit:30})).items.length,3);
  assert.equal((await crm.list(founder,{stage:"APPROVED",limit:30})).items.length,1);
+ assert.equal((await crm.list(founder,{source:"META_LEADS",limit:30})).items.length,2);
+ assert.equal((await crm.list(founder,{source:"COLD_CALL",limit:30})).items.length,2);
+ assert.equal((await db.lead.count({where:{organizationId:org.id,source:"META_LEADS"}})),2);
  const pagination=await crm.list(founder,{limit:1});
  assert.ok(pagination.nextCursor);
  const next=await crm.list(founder,{limit:1,cursor:pagination.nextCursor!});
@@ -79,7 +84,8 @@ try{
  // Rejection is a non-converted outcome and remains in the rate denominator.
  const rejectedDraft=await crm.create(employee,{phone:"919555001122"});
  const rejected=await crm.update(employee,rejectedDraft.id,{version:rejectedDraft.version,
-   status:"REJECTED",stageNote:"Not interested after the meeting"});
+   status:"REJECTED",source:"META_LEADS",stageNote:"Not interested after the meeting"});
+ assert.equal(rejected.source,"META_LEADS");
  assert.equal(rejected.status,"REJECTED");
  assert.equal((await crm.detail(founder,rejected.id)).activities[0]?.note,"Not interested after the meeting");
  assert.equal(await db.client.count({where:{sourceLeadId:rejected.id}}),0);

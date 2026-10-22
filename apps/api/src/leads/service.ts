@@ -46,6 +46,7 @@ export class LeadsService {
      normalizedBusinessName:"lead "+normalizedPhone,contactName:null,
      phone:input.phone.trim(),normalizedPhone,
      createdById:a.userId,importKey:importKey??null,
+     source:input.source??"COLD_CALL",
    }});
    await tx.leadActivity.create({data:{leadId:r.id,actorId:a.userId,kind:"CREATED"}});
    await this.flagDuplicates(tx,a.organizationId,r.id,r.normalizedPhone,r.normalizedBusinessName);
@@ -124,8 +125,7 @@ export class LeadsService {
        {phone:"+"+normalized},{phone:normalized},
      ]},select:{id:true}});
      if(client)return {id:client.id,created:false};
-     const lead=await this.addIn(tx,actor,{phone:"+"+normalized});
-     await tx.lead.update({where:{id:lead.id},data:{source:"WHATSAPP"}});
+     const lead=await this.addIn(tx,actor,{phone:"+"+normalized,source:"META_LEADS"});
      return {id:lead.id,created:true};
    });
  }
@@ -135,6 +135,7 @@ export class LeadsService {
    const where:Prisma.LeadWhereInput={
      organizationId:a.organizationId,deletedAt:null,
      ...(input.stage?{status:input.stage}:{}),
+     ...(input.source?{source:input.source}:{}),
      ...(input.assignedToId?{assignedToId:input.assignedToId}:{}),
      ...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},
        {contactName:{contains:input.q,mode:"insensitive"}},
@@ -184,6 +185,7 @@ export class LeadsService {
    }
    if(changes.contactName!==undefined)data.contactName=urlOrNull(changes.contactName);
    if(changes.businessType!==undefined)data.businessType=urlOrNull(changes.businessType);
+   if(changes.source!==undefined)data.source=changes.source;
    if(changes.status!==undefined)data.status=changes.status;
    return this.db.$transaction(async tx=>{
      const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null,version},data});

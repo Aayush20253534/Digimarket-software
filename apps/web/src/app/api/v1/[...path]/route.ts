@@ -300,7 +300,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
   }
   if (path === "leads") {
-    for (const key of ["stage","assignedToId","q","cursor","limit"]) {
+    for (const key of ["stage","source","assignedToId","q","cursor","limit","sort","direction"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }

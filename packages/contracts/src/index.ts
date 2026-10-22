@@ -81,8 +81,10 @@ export const financeViewSchema = z.enum(["mine","all"]);
 
 // A phone number is all that is required to create a prospect.
 export const leadStageSchema = z.enum(["PENDING","MEETING_PROCESS","APPROVED","REJECTED"]);
+export const leadSourceSchema = z.enum(["COLD_CALL","META_LEADS"]);
 export const leadCreateSchema = z.strictObject({
  phone:z.string().trim().min(7).max(40),
+ source:leadSourceSchema.optional(),
 });
 export type LeadCreateInput = z.infer<typeof leadCreateSchema>;
 export const leadUpdateSchema = z.strictObject({
@@ -90,6 +92,7 @@ export const leadUpdateSchema = z.strictObject({
  contactName:z.string().trim().max(160).optional(),
  businessName:z.string().trim().max(180).optional(),
  businessType:z.string().trim().max(120).optional(),
+ source:leadSourceSchema.optional(),
  status:leadStageSchema.optional(),
  stageNote:z.string().trim().max(2000).optional(),
 });
@@ -100,6 +103,7 @@ export const leadDeleteSchema = z.strictObject({version:z.number().int().positiv
 export const leadDuplicateReviewSchema = z.strictObject({resolution:z.enum(["CONFIRMED","DISMISSED"])});
 export const leadListQuerySchema = z.strictObject({
   stage:leadStageSchema.optional(),
+  source:leadSourceSchema.optional(),
   sort:z.enum(["businessName","contactName","status","createdAt"]).optional(),
   direction:z.enum(["asc","desc"]).optional(),
   assignedToId:z.uuid().optional(),

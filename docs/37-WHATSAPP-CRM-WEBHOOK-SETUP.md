@@ -36,3 +36,9 @@ Use an approved WhatsApp Business Platform / Meta Cloud API account. An ordinary
 - Client and lead records remain organization-scoped; phone deduplication and transaction locks prevent simultaneous duplicate inserts.
 - Do not expose app secrets, service role identity, or phone numbers in public logs. If the webhook returns 500, Meta may retry and deduplication prevents duplicate records.
 - Without valid environment configuration, the webhook returns 503 and automatic WhatsApp capture remains unavailable. Manual phone-only lead entry remains available through the CRM.
+
+## CRM lead source categories
+
+- Leads created from incoming messages via the authenticated WhatsApp webhook are recorded as **Meta Leads**. This category denotes the WhatsApp/Meta capture channel, not proof of a paid ad click.
+- Manually created leads require selecting **Cold Call** or **Meta Leads** in Add Lead. Imported CSV rows may include `source` with `COLD_CALL` or `META_LEADS`; missing source defaults to Cold Call.
+- The rollout migration relabels existing `WHATSAPP` sources to `META_LEADS` and previously unclassified records to `COLD_CALL`. Existing phone-number matches remain unchanged and are not duplicated or automatically reclassified.

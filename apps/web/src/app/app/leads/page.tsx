@@ -21,8 +21,11 @@ type Duplicate={id:string;reason:string;resolution:string;lead:{id:string;busine
 type Detail=Lead&{activities:Activity[];duplicates:Duplicate[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null};
 type Metrics={total:number;pending:number;meetingProcess:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
-type NewLead={phone:string};
-const blank:NewLead={phone:""};
+type LeadSource="COLD_CALL"|"META_LEADS";
+const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
+const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value;
+type NewLead={phone:string;source:LeadSource};
+const blank:NewLead={phone:"",source:"COLD_CALL"};
 const errText=(e:unknown)=>e instanceof ApiError?e.message:"Lead request failed.";
 function fmt(date:string|null){return date?new Date(date).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"Not set";}
 function decodeCSV(text:string){
@@ -38,8 +41,7 @@ function decodeCSV(text:string){
  row.push(field);if(row.some(x=>x.trim()))rows.push(row);
  return rows;
 }
-const formKeys=["phone"] as const;
-const headers:Record<string,string>={phone:"phone",phone_number:"phone",mobile:"phone"};
+const headers:Record<string,string>={phone:"phone",phone_number:"phone",mobile:"phone",source:"source",lead_source:"source"};
 export default function LeadsPage(){
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("leads.read");
@@ -55,6 +57,7 @@ export default function LeadsPage(){
  const [legacySort,setLegacySort]=useState(false);
  const [cursor,setCursor]=useState<string|null>(null);
  const [stage,setStage]=useState("");
+ const [sourceFilter,setSourceFilter]=useState<""|LeadSource>("");
  const [search,setSearch]=useState("");
  const [history,setHistory]=useState<string[]>([]);
  const [sortBy,setSortBy]=useState<"businessName"|"contactName"|"status"|"createdAt">("createdAt"),[descending,setDescending]=useState(false);
@@ -66,6 +69,7 @@ export default function LeadsPage(){
  const [creating,setCreating]=useState(false);
  const [selected,setSelected]=useState<Detail|null>(null);
  const [editStage,setEditStage]=useState<Stage>("PENDING");
+ const [editSource,setEditSource]=useState<LeadSource>("COLD_CALL");
  const [stageNote,setStageNote]=useState("");
  const [owner,setOwner]=useState("");
  const [note,setNote]=useState("");
@@ -80,7 +84,7 @@ export default function LeadsPage(){
    setLoading(true);
    try{
      const q=new URLSearchParams({limit:"30",sort:sortBy,direction:descending?"desc":"asc"});
-     if(stage)q.set("stage",stage);if(search.trim())q.set("q",search.trim());
+     if(stage)q.set("stage",stage);if(sourceFilter)q.set("source",sourceFilter);if(search.trim())q.set("q",search.trim());
      if(cursor)q.set("cursor",cursor);
      let result:Page;
      try{result=await request<Page>("/leads?"+q);setLegacySort(false);}
@@ -92,14 +96,14 @@ export default function LeadsPage(){
      setItems(result.items);setNextCursor(result.nextCursor);setError("");
      request<Metrics>("/leads/metrics").then(setMetrics).catch(()=>{});
    }catch(e){setError(errText(e));}finally{setLoading(false);}
- },[canRead,request,stage,search,cursor,sortBy,descending]);
+ },[canRead,request,stage,sourceFilter,search,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const focusedRef=useRef(false);
  const open=async(id:string)=>{
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
-     setSelected(detail);setEditStage(detail.status);setOwner(detail.assignedToId??"");
+     setSelected(detail);setEditStage(detail.status);setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
      setNote("");setStageNote("");
      setUpdating({businessName:detail.businessName.startsWith("Lead ")? "":detail.businessName,
        contactName:detail.contactName??"",businessType:detail.businessType??""});
@@ -115,14 +119,14 @@ export default function LeadsPage(){
    e.preventDefault();setBusy(true);setError("");setMessage("");
    try{
      const data=await request<Lead>("/leads",{method:"POST",body:created});
-     setCreated(blank);setCreating(false);setMessage("Phone-only lead created in the shared Pending list.");
+     setCreated(blank);setCreating(false);setMessage("Lead added to Pending as "+sourceLabel(created.source)+".");
      setCursor(null);await load();await open(data.id);
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function edit(e:FormEvent){
    e.preventDefault();if(!selected)return;setBusy(true);setError("");
    try{
-     await request("/leads/"+selected.id,{method:"PUT",body:{...updating,status:editStage,
+     await request("/leads/"+selected.id,{method:"PUT",body:{...updating,source:editSource,status:editStage,
        stageNote,version:selected.version}});
      setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":"Shared lead and status note saved.");await open(selected.id);await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
@@ -178,8 +182,15 @@ export default function LeadsPage(){
      const data=rows.slice(1).map(columns=>{
        const obj:NewLead={...blank};
        for(let i=0;i<header.length;i++){
-         const k=header[i] as keyof NewLead;
-         if(formKeys.includes(k as (typeof formKeys)[number]))obj[k]=(columns[i]??"").trim();
+         const k=header[i];
+         const raw=(columns[i]??"").trim();
+         if(k==="phone")obj.phone=raw;
+         if(k==="source"&&raw){
+           const normalized=raw.toUpperCase().replace(/[ -]+/g,"_");
+           if(normalized!=="COLD_CALL"&&normalized!=="META_LEADS")
+             throw new Error("CSV source must be COLD_CALL or META_LEADS");
+           obj.source=normalized;
+         }
        }
        return obj;
      });
@@ -212,7 +223,7 @@ export default function LeadsPage(){
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
-     description="Every number enters Pending. Add names later, record meeting notes and approve to create a client automatically."
+     description="Track Cold Call and Meta Leads separately. New WhatsApp leads are automatically classified as Meta Leads."
      actions={<div className="flex flex-wrap gap-2">
        {canCreate&&<button className="btn-primary" type="button" onClick={()=>setCreating(x=>!x)} aria-expanded={creating}>
         <Plus className="h-4 w-4"/>{creating?"Hide lead form":"Add lead"}</button>}
@@ -241,6 +252,9 @@ export default function LeadsPage(){
            <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
              <option value="">All stages</option>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}
            </select>
+           <select aria-label="Filter by lead source" className="field" value={sourceFilter} onChange={e=>{setSourceFilter(e.target.value as ""|LeadSource);setCursor(null);setHistory([]);}}>
+             <option value="">All sources</option>{leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
+           </select>
 <select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setCursor(null);setHistory([]);}}>
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="status">Stage</option><option value="createdAt">Created</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
@@ -248,11 +262,11 @@ export default function LeadsPage(){
          {loading&&<Spinner label="Loading leads…"/>}
           {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
-            <thead><tr><th>Phone</th><th>Contact / business</th><th>Business type</th><th>Stage</th><th>Details</th></tr></thead>
+            <thead><tr><th>Phone</th><th>Contact / business</th><th>Business type</th><th>Source</th><th>Stage</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
              <td><strong>{l.phone||"—"}</strong></td>
              <td>{l.contactName||"Name pending"}<span>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</span></td>
-             <td>{l.businessType||"Not recorded"}</td><td><StatusBadge status={l.status} rectangular/></td>
+             <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular/></td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
             </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
@@ -260,14 +274,20 @@ export default function LeadsPage(){
            <button className="btn-secondary" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
-       {canCreate&&creating&&<DirectoryModal title="Add phone-only lead"
-         description="Enter the WhatsApp or contact number. Other details can be filled after your conversation."
+       {canCreate&&creating&&<DirectoryModal title="Add lead"
+         description="Enter the phone number and select how the lead was acquired. WhatsApp webhook leads are categorized automatically."
          onClose={()=>{if(!busy)setCreating(false);}}>
          <form onSubmit={create} className="space-y-3">
            <FormField id="new-lead-phone" label="Phone number">
              <input id="new-lead-phone" aria-label="Phone number" className="field" type="tel"
                autoFocus required minLength={7} maxLength={40} placeholder="+91 98765 43210"
-               value={created.phone} onChange={e=>setCreated({phone:e.target.value})}/>
+               value={created.phone} onChange={e=>setCreated(v=>({...v,phone:e.target.value}))}/>
+           </FormField>
+           <FormField id="new-lead-source" label="Lead source">
+             <select id="new-lead-source" aria-label="Lead source" className="field" required
+               value={created.source} onChange={e=>setCreated(v=>({...v,source:e.target.value as LeadSource}))}>
+               {leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
+             </select>
            </FormField>
            <div className="aw-directory-modal-actions">
              <button className="btn-secondary" type="button" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button>
@@ -279,7 +299,7 @@ export default function LeadsPage(){
      <div className="space-y-5">
        {selected?<Card title={"Lead: "+selected.businessName} description={"Version "+selected.version+" · "+selected.status}>
          <div className="space-y-5">
-           <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · {selected.source||"No source"}</p>
+           <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · Source: {sourceLabel(selected.source)}</p>
            {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href="/app/clients">client record</Link>.</p>}
            {selected.canEdit&&!isAdmin?<form onSubmit={edit} className="space-y-3">
              {(["contactName","businessName","businessType"] as const).map(k=>
@@ -287,6 +307,11 @@ export default function LeadsPage(){
                  <input id={"edit-"+k} className="field" maxLength={k==="businessName"?180:k==="contactName"?160:120}
                    value={updating[k]} onChange={e=>setUpdating(v=>({...v,[k]:e.target.value}))}/>
                </FormField>)}
+             <FormField id="edit-source" label="Lead source">
+               <select id="edit-source" className="field" value={editSource} onChange={e=>setEditSource(e.target.value as LeadSource)}>
+                 {leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
+               </select>
+             </FormField>
              <FormField id="edit-stage" label="Lead status"><select id="edit-stage" className="field" value={editStage} disabled={selected.status==="APPROVED"}
                onChange={e=>setEditStage(e.target.value as Stage)}>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}</select></FormField>
              <FormField id="lead-status-note" label={"Note for "+stageLabel(editStage)}>
@@ -334,7 +359,7 @@ export default function LeadsPage(){
            </div>}
          </div>)}</div>
        </Card>}
-       {canBulk&&<Card title="CSV import" description="Upload up to 50 phone numbers per batch. CSV requires a phone column.">
+       {canBulk&&<Card title="CSV import" description="Import up to 50 leads. CSV requires phone and may include source (COLD_CALL or META_LEADS). Missing source defaults to Cold Call.">
          <label htmlFor="lead-import-file" className="block text-sm font-semibold">Select CSV</label>
          <input id="lead-import-file" type="file" accept=".csv,text/csv" onChange={e=>void readCSV(e.target.files?.[0])}
            className="mt-2 block w-full text-sm"/>
