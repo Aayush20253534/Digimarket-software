@@ -2,13 +2,22 @@
 
 import { LockKeyhole, LogOut, Shield, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, PageHeader, StatusBadge } from "@/components/ui";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { session, logout } = useAuth();
+  const { session, logout, request } = useAuth();
+  const [avatar,setAvatar] = useState<string|null>(null);
+  const [uploading,setUploading] = useState(false);
+  useEffect(()=>{if(session)void request<{avatarData:string|null}>("/profile/avatar").then(x=>setAvatar(x.avatarData)).catch(()=>{});},[session,request]);
+  const uploadAvatar=async(file?:File)=>{if(!file)return;setError("");setUploading(true);
+   try{if(!["image/png","image/jpeg","image/webp"].includes(file.type))throw new Error("Use PNG, JPEG or WebP");
+    const data=await new Promise<string>((resolve,reject)=>{const image=new Image();image.onload=()=>{const canvas=document.createElement("canvas");const size=256;canvas.width=size;canvas.height=size;const ctx=canvas.getContext("2d");if(!ctx)return reject(new Error("Image canvas unavailable"));ctx.drawImage(image,0,0,size,size);resolve(canvas.toDataURL("image/jpeg",0.7));};image.onerror=()=>reject(new Error("Invalid image"));image.src=URL.createObjectURL(file);});
+    if(data.length>135000)throw new Error("Image too large");await request("/profile/avatar",{method:"PUT",body:{avatarData:data}});setAvatar(data);
+   }catch(e){setError(e instanceof Error?e.message:"Upload failed");}finally{setUploading(false);}
+  };
   const [error, setError] = useState("");
   if (!session) return null;
   const { user, identity } = session;
@@ -16,6 +25,9 @@ export default function ProfilePage() {
     <PageHeader eyebrow="Account settings" title="My profile" description="Identity and granted permissions are obtained from the authenticated API." />
     <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
       <Card title="Account details">
+        <div className="mb-6 flex items-center gap-4">{avatar?<img src={avatar} alt="Profile photo" className="h-20 w-20 rounded-full object-cover"/>:<UserRound className="h-20 w-20 rounded-full bg-purple-100 p-3"/>}
+         <label className="btn-secondary cursor-pointer">{uploading?"Uploading...":"Upload profile photo"}<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={e=>void uploadAvatar(e.target.files?.[0])}/></label>
+         {avatar&&<button className="btn-secondary" onClick={async()=>{await request("/profile/avatar",{method:"DELETE"});setAvatar(null);}}>Remove</button>}</div>
         <dl className="space-y-5 text-sm">
           <div><dt className="text-slate-500">Display name</dt><dd className="mt-1 font-semibold text-slate-900">{user.displayName}</dd></div>
           <div><dt className="text-slate-500">Login ID</dt><dd className="mt-1 font-semibold text-slate-900">{user.loginId}</dd></div>
