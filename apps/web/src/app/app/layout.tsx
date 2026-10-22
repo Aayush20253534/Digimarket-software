@@ -86,7 +86,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
- return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/finance","/app/billing","/app/reports","/app/settings","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes"].includes(pathname)?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
+ return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/reports","/app/settings","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes"].includes(pathname)?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
   <a href="#workspace-content" className="aw-skip-link">Skip to workspace content</a>
   <aside aria-label="Workspace sidebar" className="aw-work-sidebar">
    <div className="aw-work-sidehead">{brand}
@@ -128,7 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      </div>
     </div>
     <div className="aw-work-topactions">
-     {!isAdmin&&<Link href="/app/notes" aria-label="Open saved notes" title="My notes" className="aw-work-icon"><NotebookPen size={19} aria-hidden="true"/></Link>}
+     {<Link href="/app/notes" aria-label="Open saved notes" title="My notes" className="aw-work-icon"><NotebookPen size={19} aria-hidden="true"/></Link>}
      {canSearch&&<Link href="/app/search" aria-label="Search workspace" className="aw-work-search">
       <Search size={17} aria-hidden="true"/><span>Search workspace</span>
      </Link>}
@@ -140,7 +140,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <main id="workspace-content" className="aw-work-content">
     <div className="aw-work-content-width">
      {signOutError&&<div className="mb-5"><AWNotice tone="error">{signOutError}</AWNotice></div>}
-     {isAdmin&&["/app/notes","/app/search","/app/content","/app/assets"].some(p=>pathname===p||pathname.startsWith(p+"/"))?<AWNotice tone="error">This operational module is not available to administrator accounts.</AWNotice>:children}
+     {isAdmin&&["/app/search","/app/content","/app/assets"].some(p=>pathname===p||pathname.startsWith(p+"/"))?<AWNotice tone="error">This operational module is not available to administrator accounts.</AWNotice>:children}
     </div>
    </main>
   </div>
