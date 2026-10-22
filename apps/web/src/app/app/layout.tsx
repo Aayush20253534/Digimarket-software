@@ -121,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      </button>
     </div>
     <WorkspaceNav groups={groups} pathname={pathname} onNavigate={()=>setMobileOpen(false)}/>
-    <SidebarFooter name={name} roles={session.identity.roles} busy={signingOut}
+    <SidebarFooter name={name} photo={photo} roles={session.identity.roles} busy={signingOut}
      close={()=>setMobileOpen(false)} logout={()=>void signOut()}/>
    </aside>
   </dialog>
@@ -144,7 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Search size={17} aria-hidden="true"/><span>Search workspace</span>
      </Link>}
      <AWNotificationBell/>
-     <Link href="/app/profile" aria-label="Open my account" className="aw-work-header-avatar"><Avatar name={name}/></Link>
+     <Link href="/app/profile" aria-label="Open my account" className="aw-work-header-avatar"><Avatar name={name} photo={photo}/></Link>
     </div>
    </header>
    {/* Legacy module surfaces remain light until page migrations (Phases 4-6). */}
