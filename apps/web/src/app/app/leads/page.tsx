@@ -24,6 +24,7 @@ type Metrics={total:number;pending:number;meetingProcess:number;approved:number;
 type LeadSource="COLD_CALL"|"META_LEADS";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value;
+const draftKey=(id:string)=>"amplifyworld:lead-stage-note:"+id;
 type NewLead={phone:string;source:LeadSource};
 const blank:NewLead={phone:"",source:"COLD_CALL"};
 const errText=(e:unknown)=>e instanceof ApiError?e.message:"Lead request failed.";
@@ -71,6 +72,10 @@ export default function LeadsPage(){
  const [editStage,setEditStage]=useState<Stage>("PENDING");
  const [editSource,setEditSource]=useState<LeadSource>("COLD_CALL");
  const [stageNote,setStageNote]=useState("");
+ const [noteSaveState,setNoteSaveState]=useState<"idle"|"saving"|"saved"|"error">("idle");
+ const noteWriteQueue=useRef<Promise<unknown>>(Promise.resolve());
+ const latestStageNote=useRef("");
+ const activeLeadId=useRef<string|null>(null);
  const [owner,setOwner]=useState("");
  const [note,setNote]=useState("");
  const [staff,setStaff]=useState<StaffUser[]>([]);
@@ -103,12 +108,36 @@ export default function LeadsPage(){
  const open=async(id:string)=>{
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
+     activeLeadId.current=id;
      setSelected(detail);setEditStage(detail.status);setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
-     setNote("");setStageNote(detail.stageNote??"");
+     let draft:string|null=null;try{draft=window.localStorage.getItem(draftKey(id));}catch{}
+     latestStageNote.current=draft??detail.stageNote??"";
+     setNote("");setStageNote(latestStageNote.current);setNoteSaveState(draft===null?"idle":"saving");
      setUpdating({businessName:detail.businessName.startsWith("Lead ")? "":detail.businessName,
        contactName:detail.contactName??"",businessType:detail.businessType??""});
    }catch(e){setError(errText(e));}
  };
+ useEffect(()=>{
+  if(!selected?.canEdit||isAdmin||stageNote===(selected.stageNote??""))return;
+  const leadId=selected.id,noteText=stageNote;
+  const timer=window.setTimeout(()=>{
+   if(activeLeadId.current===leadId)setNoteSaveState("saving");
+   const write=noteWriteQueue.current.catch(()=>{}).then(()=>
+     request<Lead>("/leads/"+leadId+"/stage-note",{method:"PUT",body:{note:noteText}}));
+   noteWriteQueue.current=write;
+   void write.then(saved=>{
+     setSelected(current=>current?.id===leadId?{...current,stageNote:saved.stageNote??""}:current);
+     setItems(current=>current.map(x=>x.id===leadId?{...x,stageNote:saved.stageNote??""}:x));
+     if(activeLeadId.current===leadId&&latestStageNote.current===noteText){
+       try{if(window.localStorage.getItem(draftKey(leadId))===noteText)window.localStorage.removeItem(draftKey(leadId));}catch{}
+       setNoteSaveState("saved");
+     }
+   }).catch(e=>{
+     if(activeLeadId.current===leadId){setNoteSaveState("error");setError(errText(e));}
+   });
+  },800);
+  return ()=>window.clearTimeout(timer);
+ },[selected?.id,selected?.canEdit,selected?.stageNote,stageNote,isAdmin,request]);
  useEffect(()=>{
   if(focusedRef.current||!canRead)return;
   const id=new URLSearchParams(window.location.search).get("focus");
@@ -126,8 +155,10 @@ export default function LeadsPage(){
  async function edit(e:FormEvent){
    e.preventDefault();if(!selected)return;setBusy(true);setError("");
    try{
+     await noteWriteQueue.current;
      await request("/leads/"+selected.id,{method:"PUT",body:{...updating,source:editSource,status:editStage,
        stageNote,version:selected.version}});
+     try{window.localStorage.removeItem(draftKey(selected.id));}catch{}
      setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":"Shared lead and status note saved.");await open(selected.id);await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
@@ -262,11 +293,12 @@ export default function LeadsPage(){
          {loading&&<Spinner label="Loading leads…"/>}
           {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory">
-            <thead><tr><th>Phone</th><th>Contact / business</th><th>Business type</th><th>Source</th><th>Stage</th><th>Details</th></tr></thead>
+            <thead><tr><th>Phone</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Meeting / status notes</th><th>Details</th></tr></thead>
             <tbody>{sorted.map(l=><tr key={l.id} className={selected?.id===l.id?"aw-register-selected":""}>
              <td><strong>{l.phone||"—"}</strong></td>
-             <td>{l.contactName||"Name pending"}<span>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</span></td>
+             <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
              <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular/></td>
+             <td className="aw-lead-notes-cell"><div className={"aw-lead-notes-preview"+(!l.stageNote?.trim()?" aw-lead-notes-empty":"")} title={l.stageNote||"No notes yet"}>{l.stageNote?.trim()||"No notes yet"}</div></td>
              <td><button type="button" className="aw-register-open" onClick={()=>void open(l.id)}>Open</button></td>
             </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
@@ -317,7 +349,8 @@ export default function LeadsPage(){
              <FormField id="lead-status-note" label={"Note for "+stageLabel(editStage)}>
                <textarea id="lead-status-note" className="field min-h-20" maxLength={2000}
                  placeholder="Call summary, meeting outcome, or reason for approval"
-                 value={stageNote} onChange={e=>setStageNote(e.target.value)}/>
+                 value={stageNote} onChange={e=>{const value=e.target.value;latestStageNote.current=value;setStageNote(value);setNoteSaveState("idle");try{window.localStorage.setItem(draftKey(selected.id),value);}catch{}}}/>
+               <p className="aw-lead-note-save-state" data-state={noteSaveState} role="status">{noteSaveState==="saving"?"Saving to CRM…":noteSaveState==="saved"?"Saved to CRM":noteSaveState==="error"?"Save failed; draft retained on this device.":"Notes save automatically."}</p>
              </FormField>
              <button className="btn-primary" type="submit" disabled={busy}>Save details and stage</button>
            </form>:<p className="text-sm text-slate-600">Basic lead details are shared; editing and private activity require assignment or permission.</p>}

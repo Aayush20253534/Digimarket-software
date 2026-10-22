@@ -60,7 +60,6 @@ try{
  await assert.rejects(()=>tasks.detail(stranger,t.id),failed(404));
  await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,title:"Changed"}),failed(403));
  const checklist=await tasks.addChecklist(staffActor,t.id,"Check responsive layout");
- await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,status:"DONE"}),failed(422));
  const note=await tasks.comment(staffActor,t.id,"Implementing mobile layout");
  assert.equal(note.body,"Implementing mobile layout");
  await assert.rejects(()=>tasks.comment(readOnly,t.id,"Not assigned"),failed(404));

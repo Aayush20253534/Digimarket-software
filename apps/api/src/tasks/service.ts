@@ -125,10 +125,6 @@ export class TasksService {
     if(input.dueAt!==undefined&&(!input.dueAt||!Number.isFinite(Date.parse(input.dueAt))))
       throw invalid("Task expiry date and time cannot be removed");
     if(existing.status==="CANCELLED"&&!manager(a))throw forbidden();
-    if(input.status==="DONE"){
-      const left=await this.db.taskChecklistItem.count({where:{taskId:id,completed:false}});
-      if(left)throw invalid("Complete checklist before marking task done");
-    }
     return this.db.$transaction(async tx=>{
       const updated=await tx.task.updateMany({where:{id,organizationId:a.organizationId,version:input.version},data:{
         version:{increment:1},

@@ -43,6 +43,11 @@ try{
  const meeting=await crm.update(employee,first.id,{version:first.version,status:"MEETING_PROCESS",
   stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe"});
  assert.equal(meeting.status,"MEETING_PROCESS");
+ assert.equal((await crm.list(founder,{limit:30})).items[0]?.stageNote,"Discussed the social media package");
+ const autosaved=await crm.saveStageNote(employee,first.id,"Meeting on Friday");
+ assert.equal(autosaved.stageNote,"Meeting on Friday");
+ assert.equal(autosaved.version,meeting.version);
+ assert.equal((await crm.detail(founder,first.id)).stageNote,"Meeting on Friday");
  assert.equal((await crm.detail(founder,first.id)).activities[0]?.note,"Discussed the social media package");
  await assert.rejects(()=>crm.update(employee,first.id,{version:1,status:"APPROVED"}),fail(409));
  const approved=await crm.update(employee,first.id,{version:meeting.version,status:"APPROVED",
@@ -63,6 +68,11 @@ try{
  assert.equal((await db.lead.findUniqueOrThrow({where:{id:incoming.id}})).source,"META_LEADS");
  assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919999887766")).created,false);
  assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);
+ const attributed=await db.lead.findUniqueOrThrow({where:{id:first.id}});
+ assert.equal(attributed.source,"META_LEADS");
+ assert.equal(attributed.businessName,"Big Mo Cafe");
+ assert.equal(attributed.stageNote,"Agreement signed, ready to onboard");
+ assert.equal(attributed.version,approved.version+1);
  assert.equal((await db.lead.count({where:{organizationId:org.id,normalizedPhone:"919999887766"}})),1);
  const batch=randomUUID();
  assert.equal((await crm.import(founder,batch,[{phone:"919111111111"},{phone:"919222222222",source:"META_LEADS"}])).count,2);
@@ -72,9 +82,9 @@ try{
  assert.equal(await db.lead.count({where:{organizationId:org.id}}),before);
  assert.equal((await crm.list(founder,{stage:"PENDING",limit:30})).items.length,3);
  assert.equal((await crm.list(founder,{stage:"APPROVED",limit:30})).items.length,1);
- assert.equal((await crm.list(founder,{source:"META_LEADS",limit:30})).items.length,2);
- assert.equal((await crm.list(founder,{source:"COLD_CALL",limit:30})).items.length,2);
- assert.equal((await db.lead.count({where:{organizationId:org.id,source:"META_LEADS"}})),2);
+ assert.equal((await crm.list(founder,{source:"META_LEADS",limit:30})).items.length,3);
+ assert.equal((await crm.list(founder,{source:"COLD_CALL",limit:30})).items.length,1);
+ assert.equal((await db.lead.count({where:{organizationId:org.id,source:"META_LEADS"}})),3);
  const pagination=await crm.list(founder,{limit:1});
  assert.ok(pagination.nextCursor);
  const next=await crm.list(founder,{limit:1,cursor:pagination.nextCursor!});
@@ -108,7 +118,7 @@ try{
  assert.equal(afterDelete.total,beforeDelete.total-1);
  assert.equal(afterDelete.converted,1);
  // A founder may remove an approved lead without deleting a client, FK or history.
- const removedApproved=await crm.delete(founder,approved.id,approved.version);
+ const removedApproved=await crm.delete(founder,approved.id,attributed.version);
  assert.equal(removedApproved.deleted,true);
  assert.equal((await db.client.findUniqueOrThrow({where:{sourceLeadId:approved.id}})).id,client.id);
  assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);

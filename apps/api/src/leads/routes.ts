@@ -13,6 +13,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T {
 const id=z.uuid();
 export function registerLeadRoutes(app:Express,auth:AuthService){
  const svc=new LeadsService(auth.database);
+ const stageNoteBody=z.strictObject({note:z.string().trim().max(2000)});
  const authenticated=async(req:Request,res:Response,next:NextFunction)=>{
    try{
      const token=req.get("authorization");
@@ -69,6 +70,11 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
  app.put(root+"/:id/assign",authenticated,async(req,res)=>{
    const input=parse(leadAssignSchema,req.body);
    res.json({data:await svc.assign(actor(res),parse(id,req.params.id),input.version,input.assignedToId)});
+ });
+ app.put(root+"/:id/stage-note",authenticated,async(req,res)=>{
+   const {note}=parse(stageNoteBody,req.body);
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.saveStageNote(actor(res),parse(id,req.params.id),note)});
  });
  app.post(root+"/:id/notes",authenticated,async(req,res)=>{
    res.status(201).json({data:await svc.note(actor(res),parse(id,req.params.id),parse(leadNoteSchema,req.body).note)});

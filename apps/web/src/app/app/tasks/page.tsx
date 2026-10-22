@@ -9,11 +9,10 @@ type Status="TODO"|"IN_PROGRESS"|"BLOCKED"|"IN_REVIEW"|"DONE"|"CANCELLED";
 type Priority="LOW"|"MEDIUM"|"HIGH"|"URGENT";
 type User={id:string;displayName:string};
 type Member={userId:string;user:{displayName:string}};
-type Checklist={id:string;label:string;completed:boolean};
 type Comment={id:string;body:string;author:{displayName:string};createdAt:string};
 type Task={id:string;title:string;description:string|null;status:Status;priority:Priority;
  dueAt:string|null;createdAt:string;projectId:string|null;version:number;recurrenceId:string|null;
- assignees:Member[];project?:{id?:string;name:string}|null;checklist?:Checklist[];comments?:Comment[]};
+ assignees:Member[];project?:{id?:string;name:string}|null;comments?:Comment[]};
 type Recurrence={id:string;title:string;frequency:"DAILY"|"WEEKLY"|"MONTHLY";interval:number;
  nextRunAt:string;enabled:boolean;version:number;timezone:string;assigneeIds:string[]};
 type Project={id:string;name:string};
@@ -48,7 +47,6 @@ export default function TasksPage(){
  const [statusFilter,setStatusFilter]=useState("");
  const [cursor,setCursor]=useState<string|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
- const [checkLabel,setCheckLabel]=useState("");
  const [comment,setComment]=useState("");
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true);
  const [error,setError]=useState(""),[message,setMessage]=useState("");
@@ -115,7 +113,7 @@ export default function TasksPage(){
  if(!canRead)return <><PageHeader title="Task access denied"/><Notice kind="error">Task read permission required.</Notice></>;
  return <div data-aw-module="tasks" className="aw-module-root space-y-6">
   <PageHeader eyebrow="Delivery operations" title="Tasks & recurring work"
-   description="Assign team work, maintain checklists, review progress and schedule automatic occurrences."/>
+   description="Assign team work, track progress through comments and schedule automatic occurrences."/>
   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Task management</span><span className="aw-module-count">{tasks.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="mine"?"My tasks":"Team tasks"}</span></div>}
   {error&&<Notice kind="error">{error}</Notice>}
   {message&&<Notice kind="success">{message}</Notice>}
@@ -188,19 +186,6 @@ export default function TasksPage(){
     }}><label className="text-sm">Update expiry date and time<input name="deadline" type="datetime-local" required className="field mt-1 w-full"
       defaultValue={selected.dueAt?new Date(new Date(selected.dueAt).getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):""}/></label>
       <button className="btn-secondary" type="submit" disabled={busy}>Save expiry</button></form>}
-    <section><h3 className="text-sm font-bold">Checklist</h3>
-     <ul className="my-3 space-y-2">{selected.checklist?.map(c=><li key={c.id} className="flex items-center gap-2 text-sm">
-      <input type="checkbox" aria-label={c.label} checked={c.completed} disabled={!canWrite||busy||selected.status==="DONE"}
-       onChange={e=>void run(()=>request("/tasks/"+selected.id+"/checklist/"+c.id,{method:"PUT",
-         body:{completed:e.target.checked}}),"Checklist updated.")}/>{c.label}
-     </li>)}</ul>
-     {canWrite&&<form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();void run(async()=>{
-       await request("/tasks/"+selected.id+"/checklist",{method:"POST",body:{label:checkLabel}});setCheckLabel("");
-     },"Checklist item added.");}}>
-      <input className="field flex-1" aria-label="New checklist item" placeholder="New checklist item" minLength={2} maxLength={240}
-       required value={checkLabel} onChange={e=>setCheckLabel(e.target.value)}/>
-      <button className="btn-secondary" disabled={busy}>Add</button></form>}
-    </section>
     <section><h3 className="text-sm font-bold">Comments</h3>
      <ul className="my-3 space-y-3">{selected.comments?.map(c=><li key={c.id} className="rounded-lg bg-slate-50 p-3 text-sm">
        <b>{c.author.displayName}</b><span className="ml-2 text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</span>

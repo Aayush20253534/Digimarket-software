@@ -120,7 +120,18 @@ export class LeadsService {
      // One sender can trigger concurrent Meta deliveries; serialize by tenant and phone.
      await tx.$queryRaw`SELECT 1 AS acquired FROM (SELECT pg_advisory_xact_lock(hashtextextended(${organizationId+":"+normalized},0))) AS lock_row`;
      const previous=await tx.lead.findFirst({where:{organizationId,normalizedPhone:normalized}});
-     if(previous)return {id:previous.id,created:false};
+     if(previous){
+       // Preserve an existing lead and notes when its number later contacts us on WhatsApp.
+       if(!previous.deletedAt&&previous.source!=="META_LEADS"){
+         await tx.lead.update({where:{id:previous.id},data:{source:"META_LEADS",version:{increment:1}}});
+         await tx.leadActivity.create({data:{leadId:previous.id,actorId:createdById,
+           kind:"DETAILS_UPDATED",metadata:{source:"META_LEADS",reason:"whatsapp_inbound"}}});
+         await tx.auditLog.create({data:{organizationId,actorId:createdById,
+           action:"leads.whatsapp_source_attributed",entityType:"Lead",entityId:previous.id,
+           afterRedacted:{source:"META_LEADS"}}});
+       }
+       return {id:previous.id,created:false};
+     }
      const client=await tx.client.findFirst({where:{organizationId,OR:[
        {phone:"+"+normalized},{phone:normalized},
      ]},select:{id:true}});
@@ -146,7 +157,7 @@ export class LeadsService {
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
      orderBy:[{[input.sort??"createdAt"]:input.direction??"desc"} as Prisma.LeadOrderByWithRelationInput,{id:input.direction??"desc"}],
      select:{id:true,businessName:true,contactName:true,phone:true,businessType:true,location:true,
-       websiteUrl:true,instagramUrl:true,source:true,status:true,assignedToId:true,createdById:true,
+       websiteUrl:true,instagramUrl:true,source:true,status:true,stageNote:true,assignedToId:true,createdById:true,
        nextFollowUpAt:true,version:true,createdAt:true,updatedAt:true,
        assignee:{select:{displayName:true}},_count:{select:{duplicateMatches:true,duplicateCandidates:true}}}});
    const hasMore=rows.length>input.limit;
@@ -239,6 +250,21 @@ export class LeadsService {
        metadata:{assignedToId}}});
      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
        action:"leads.assigned",entityType:"Lead",entityId:id,afterRedacted:{assignedToId}}});
+     return tx.lead.findUniqueOrThrow({where:{id}});
+   });
+ }
+ // Autosaved notes do not increment the lead's details form version.
+ async saveStageNote(a:Principal,id:string,note:string){
+   const current=await this.find(a,id);
+   if(!this.canEdit(a,current))throw forbidden();
+   if(current.stageNote===note)return current;
+   return this.db.$transaction(async tx=>{
+     const updated=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null},data:{stageNote:note}});
+     if(updated.count!==1)throw missing();
+     await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,kind:"NOTE",
+       note:note.trim()||null,metadata:{field:"stageNote",autoSaved:true}}});
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.stage_note_saved",entityType:"Lead",entityId:id}});
      return tx.lead.findUniqueOrThrow({where:{id}});
    });
  }
