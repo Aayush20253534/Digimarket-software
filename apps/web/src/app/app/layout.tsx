@@ -86,7 +86,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
- return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/reports","/app/settings","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes"].includes(pathname)?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
+ return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/reports","/app/settings","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].includes(pathname)?"true":"false"}>
   <a href="#workspace-content" className="aw-skip-link">Skip to workspace content</a>
   <aside aria-label="Workspace sidebar" className="aw-work-sidebar">
    <div className="aw-work-sidehead">{brand}
