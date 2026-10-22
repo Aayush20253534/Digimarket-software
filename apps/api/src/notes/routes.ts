@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import type { AuthService, Principal } from "../auth/service";
-import { AuthError, unauthorized, forbidden } from "../auth/errors";
+import { AuthError, unauthorized } from "../auth/errors";
 
 const uuid=z.uuid();
 const content=z.strictObject({
