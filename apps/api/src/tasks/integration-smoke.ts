@@ -59,11 +59,13 @@ try{
  assert.equal(note.body,"Implementing mobile layout");
  await assert.rejects(()=>tasks.comment(readOnly,t.id,"Not assigned"),failed(404));
  await tasks.checklistStatus(staffActor,t.id,checklist.id,true);
- const done=await tasks.update(staffActor,t.id,{version:1,status:"DONE"});
+ const started=await tasks.update(staffActor,t.id,{version:1,status:"IN_PROGRESS"});
+ assert.equal(started.status,"IN_PROGRESS");
+ const done=await tasks.update(staffActor,t.id,{version:2,status:"DONE"});
  assert.equal(done.status,"DONE");
  await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,status:"TODO"}),failed(409));
  await assert.rejects(()=>tasks.checklistStatus(staffActor,t.id,checklist.id,false),failed(422));
- const updated=await tasks.assign(mgr,t.id,2,[staff.id,admin.id]);
+ const updated=await tasks.assign(mgr,t.id,3,[staff.id,admin.id]);
  assert.equal(updated.assignees.length,2);
  await assert.rejects(()=>tasks.assign(mgr,t.id,2,[staff.id]),failed(409));
  assert.equal((await tasks.detail(mgr,t.id)).comments.length,1);
