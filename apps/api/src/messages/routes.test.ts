@@ -21,6 +21,7 @@ function makeApp(){
  })} as unknown as AuthService;
  registerWorkspaceMessages(app,auth);
  app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
+  void _next;
   if(error instanceof AuthError)return res.status(error.status).json({error:{code:error.code}});
   return res.status(500).json({error:{code:"INTERNAL_ERROR"}});
  });
