@@ -43,7 +43,7 @@ export function registerWorkspaceMessages(app:Express, auth:AuthService){
   if(v.recipientId===p.userId)throw new AuthError(422,"VALIDATION_ERROR","Cannot message yourself");
   const target=await db.user.findFirst({where:{id:v.recipientId,organizationId:p.organizationId,status:"ACTIVE"},select:{id:true}});
   if(!target)throw new AuthError(404,"NOT_FOUND","Recipient unavailable");
-  let noteSnapshot:object|null=null;
+  let noteSnapshot:Record<string,string>|undefined;
   if(v.noteId){
    const note=await db.personalNote.findFirst({where:{id:v.noteId,organizationId:p.organizationId,ownerId:p.userId,deletedAt:null}});
    if(!note)throw new AuthError(404,"NOT_FOUND","Note not found");
@@ -51,9 +51,17 @@ export function registerWorkspaceMessages(app:Express, auth:AuthService){
   }
   if(!v.text&&!noteSnapshot&&!v.attachment)throw new AuthError(422,"VALIDATION_ERROR","Empty message");
   const item=await db.workspaceMessage.create({data:{organizationId:p.organizationId,senderId:p.userId,
-   recipientId:target.id,text:v.text,noteSnapshot:noteSnapshot??undefined,
+   recipientId:target.id,text:v.text,noteSnapshot,
    attachment:v.attachment??undefined}});
   res.status(201).set("Cache-Control","no-store").json({data:item});
+ });
+ app.get(route+"/:id/note",authenticate,async(req,res)=>{
+  const p=principal(res),id=uuid.safeParse(req.params.id);
+  if(!id.success)throw new AuthError(422,"VALIDATION_ERROR","Invalid message ID");
+  const message=await db.workspaceMessage.findFirst({where:{id:id.data,organizationId:p.organizationId,
+   OR:[{recipientId:p.userId},{senderId:p.userId}]},select:{noteSnapshot:true}});
+  if(!message?.noteSnapshot)throw new AuthError(404,"NOT_FOUND","Shared note not found");
+  res.set("Cache-Control","no-store").json({data:message.noteSnapshot});
  });
  app.post(route+"/:id/save-note",authenticate,async(req,res)=>{
   const p=principal(res);const id=uuid.safeParse(req.params.id);
