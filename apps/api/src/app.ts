@@ -32,7 +32,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
   // Register webhook before JSON parsing: signature verification requires raw bytes.
   if(authService)registerWhatsAppWebhook(app,authService);
   if(authService)registerVGrapleWebhook(app,authService);
-  app.use(express.json({ limit: "128kb" }));
+  app.use(express.json({ limit: "2mb" }));
   app.use((req,res,next)=>{
     const id=crypto.randomUUID();
     res.set("X-Request-ID",id);
