@@ -109,21 +109,40 @@ try{
  const admin=actor(owner.id,org.id,["ADMIN"],grants);
  await assert.rejects(()=>crm.delete(employee,rejected.id,rejected.version),fail(403));
  await assert.rejects(()=>crm.delete(admin,rejected.id,rejected.version-1),fail(409));
+ // Duplicate candidates may point to both lead roles; deletion clears them.
+ const pair=[rejected.id,first.id].sort();
+ await db.leadDuplicateCandidate.create({data:{
+   organizationId:org.id,leadId:pair[0],candidateId:pair[1],reason:"BUSINESS_MATCH",
+ }});
  assert.deepEqual(await crm.delete(admin,rejected.id,rejected.version),{id:rejected.id,deleted:true});
+ assert.equal(await db.lead.count({where:{id:rejected.id}}),0);
+ assert.equal(await db.leadActivity.count({where:{leadId:rejected.id}}),0);
+ assert.equal(await db.leadDuplicateCandidate.count({where:{OR:[
+   {leadId:rejected.id},{candidateId:rejected.id},
+ ]}}),0);
  await assert.rejects(()=>crm.detail(founder,rejected.id),fail(404));
  await assert.rejects(()=>crm.delete(admin,rejected.id,rejected.version+1),fail(404));
  assert.equal((await crm.list(founder,{limit:50})).items.some(x=>x.id===rejected.id),false);
- assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919555001122")).created,false);
- await assert.rejects(()=>crm.create(founder,{phone:"919555001122"}),fail(409));
  const afterDelete=await crm.metrics(founder);
  assert.equal(afterDelete.rejected,0);
  assert.equal(afterDelete.total,beforeDelete.total-1);
  assert.equal(afterDelete.converted,1);
- // A founder may remove an approved lead without deleting a client, FK or history.
+ // The deleted phone becomes reusable; subsequent WhatsApp attribution updates
+ // the newly created lead rather than resurrecting the removed record.
+ const again=await crm.create(founder,{phone:"919555001122",source:"COLD_CALL"});
+ assert.notEqual(again.id,rejected.id);
+ assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919555001122")).created,false);
+ assert.equal((await db.lead.findUniqueOrThrow({where:{id:again.id}})).source,"META_LEADS");
+ // A founder may remove an approved lead without deleting the client.
  const removedApproved=await crm.delete(founder,approved.id,attributed.version);
  assert.equal(removedApproved.deleted,true);
- assert.equal((await db.client.findUniqueOrThrow({where:{sourceLeadId:approved.id}})).id,client.id);
+ const preservedClient=await db.client.findUniqueOrThrow({where:{id:client.id}});
+ assert.equal(preservedClient.sourceLeadId,null);
+ assert.equal(preservedClient.businessName,"Big Mo Cafe");
+ assert.equal(await db.lead.count({where:{id:approved.id}}),0);
+ assert.equal(await db.leadActivity.count({where:{leadId:approved.id}}),0);
  assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);
+ assert.equal(await db.lead.count({where:{id:approved.id}}),0);
  assert.equal((await crm.metrics(founder)).converted,0);
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,action:"leads.deleted"}}))>=2);
  // Cold-call outcomes are real persisted statuses; pending notes survive reopening.

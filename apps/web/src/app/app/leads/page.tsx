@@ -164,12 +164,12 @@ export default function LeadsPage(){
  }
  async function deleteLead(){
    if(!selected||!canDelete)return;
-   if(!window.confirm("Delete this lead from the shared CRM? Its history remains archived and any converted client is preserved."))return;
+   if(!window.confirm("Permanently delete this lead from the database? Its lead notes and activity will be removed. Converted client records are preserved. This cannot be undone."))return;
    setBusy(true);setError("");setMessage("");
    try{
      await request("/leads/"+selected.id,{method:"DELETE",body:{version:selected.version}});
      setSelected(null);setCursor(null);setHistory([]);
-     setMessage("Lead removed from the active CRM. Linked clients are preserved.");
+     setMessage("Lead permanently deleted from the database. Linked clients are preserved.");
      await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
@@ -358,7 +358,7 @@ export default function LeadsPage(){
              <button type="button" className="btn-secondary" disabled={busy} onClick={()=>void deleteLead()}>
                <Trash2 className="mr-2 inline h-4 w-4"/>Delete lead
              </button>
-             <p className="mt-2 text-xs text-slate-500">Removes this lead from the active list. An approved client and audit history are retained.</p>
+             <p className="mt-2 text-xs text-slate-500">Permanently removes the lead and its CRM activity. Converted clients and deletion audit records remain.</p>
            </div>}
            {canAssign&&<form className="space-y-2 border-t pt-4" onSubmit={assign}>
              <FormField id="lead-owner" label="Assigned owner"><select id="lead-owner" className="field" value={owner} onChange={e=>setOwner(e.target.value)}>

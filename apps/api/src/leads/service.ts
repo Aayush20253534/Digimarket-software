@@ -84,15 +84,29 @@ export class LeadsService {
  }
  async delete(a:Principal,id:string,version:number){
    if(!a.roles.some(role=>role==="FOUNDER"||role==="ADMIN"||role==="SUPER_ADMIN"))throw forbidden();
-   await this.find(a,id);
+   const existing=await this.find(a,id);
+   // Match manual creation and Meta ingestion's tenant+phone advisory lock.
+   // A deleted number can then be added again without a stale duplicate.
    return this.db.$transaction(async tx=>{
-     const change=await tx.lead.updateMany({where:{
-       id,organizationId:a.organizationId,deletedAt:null,version,
-     },data:{deletedAt:new Date(),deletedById:a.userId,version:{increment:1}}});
-     if(change.count!==1)throw clash();
+     if(existing.normalizedPhone)await tx.$queryRaw`SELECT 1 AS acquired FROM (SELECT pg_advisory_xact_lock(hashtextextended(${a.organizationId+":"+existing.normalizedPhone},0))) AS lock_row`;
+     const rows=await tx.$queryRaw<{id:string;version:number}[]>`
+       SELECT "id","version" FROM "Lead"
+       WHERE "id"=${id}::uuid AND "organizationId"=${a.organizationId}::uuid
+         AND "deletedAt" IS NULL FOR UPDATE
+     `;
+     if(!rows.length)throw missing();
+     if(rows[0].version!==version)throw clash();
+     // Converted clients are separate business records and must survive.
+     await tx.client.updateMany({where:{organizationId:a.organizationId,sourceLeadId:id},
+       data:{sourceLeadId:null}});
+     await tx.leadDuplicateCandidate.deleteMany({where:{organizationId:a.organizationId,
+       OR:[{leadId:id},{candidateId:id}]}});
+     await tx.leadActivity.deleteMany({where:{leadId:id}});
+     const deleted=await tx.lead.deleteMany({where:{id,organizationId:a.organizationId,version}});
+     if(deleted.count!==1)throw clash();
      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
        action:"leads.deleted",entityType:"Lead",entityId:id,
-       afterRedacted:{softDeleted:true}}});
+       afterRedacted:{hardDeleted:true}}});
      return {id,deleted:true};
    });
  }

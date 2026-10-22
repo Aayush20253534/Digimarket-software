@@ -260,7 +260,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("table",{name:"Clients directory"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add client"})).toHaveCount(0);
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
-  // Confirm the frontend gateway supports metrics and soft-deletion, and that
+  // Confirm the frontend gateway supports metrics and hard-deletion, and that
   // deleting an approved lead never removes its linked client.
   await page.goto("/app/leads");
   await expect(page.getByRole("region",{name:"Lead conversion metrics"})).toBeVisible();
@@ -269,7 +269,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("button",{name:"Delete lead"})).toBeVisible();
   page.once("dialog",dialog=>{void dialog.accept();});
   await page.getByRole("button",{name:"Delete lead"}).click();
-  await expect(page.getByText("Lead removed from the active CRM. Linked clients are preserved.")).toBeVisible();
+  await expect(page.getByText("Lead permanently deleted from the database. Linked clients are preserved.")).toBeVisible();
   await page.goto("/app/clients");
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
   await page.getByRole("button",{name:"Sign out"}).click();
