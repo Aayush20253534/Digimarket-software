@@ -6,6 +6,9 @@ export const dynamic = "force-dynamic";
 const endpoints: Record<string, string[]> = {
   "health": ["GET"],
   "notes": ["GET","POST"],
+  "messages": ["GET","POST"],
+  "messages/users": ["GET"],
+  "profile/avatar": ["GET","PUT","DELETE"],
   "notes/notebooks": ["GET","POST"],
   "asset-folders": ["GET","POST"],
   "finance/proof-intent": ["POST"],
@@ -62,6 +65,8 @@ const folderArchivePattern=/^asset-folders\/[0-9a-fA-F-]{36}\/download$/;
 const folderDetailPattern=/^asset-folders\/[0-9a-fA-F-]{36}$/;
 const financeProofPattern=/^finance\/entries\/[0-9a-fA-F-]{36}\/proof$/;
 const assetOrganizePattern=/^assets\/[0-9a-fA-F-]{36}\/organize$/;
+const messageNotePattern=/^messages\/[0-9a-fA-F-]{36}\/note$/;
+const messageSavePattern=/^messages\/[0-9a-fA-F-]{36}\/save-note$/;
 const noteDetailPattern=/^notes\/[0-9a-fA-F-]{36}$/;
 const notebookDetailPattern=/^notes\/notebooks\/[0-9a-fA-F-]{36}$/;
 const noteMetadataPattern=/^notes\/[0-9a-fA-F-]{36}\/metadata$/;
@@ -106,6 +111,8 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  if(messageNotePattern.test(path))return method==="GET";
+  if(messageSavePattern.test(path))return method==="POST";
   if(financeProofPattern.test(path))return method==="GET";
   if(folderArchivePattern.test(path))return method==="POST";
   if(folderDetailPattern.test(path))return ["PUT","DELETE"].includes(method);
@@ -215,6 +222,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if(noteDetailPattern.test(path)&&request.method==="DELETE"){
     const version=request.nextUrl.searchParams.get("version");
     if(version!==null)url.searchParams.set("version",version);
+  }
+  if(path==="messages"){
+    const peer=request.nextUrl.searchParams.get("with");
+    if(peer && /^[0-9a-fA-F-]{36}$/.test(peer))url.searchParams.set("with",peer);
   }
   if(path==="search"){
     const q=request.nextUrl.searchParams.get("q");
