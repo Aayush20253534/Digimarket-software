@@ -306,3 +306,9 @@
 .aw-notes-list-card small,.aw-notes-list-card time{font-size:11px;color:#bba8c9}
 .aw-notes-list-empty{display:grid;justify-items:center;gap:10px;padding:70px 10px;color:#c6b0d8}
 @media(max-width:700px){.aw-notes-list-page{padding:15px}.aw-notes-list-header{gap:12px}}
+
+/* Keep inspector tools available without blocking header or Undo/Redo controls. */
+@media (min-width:921px) and (max-width:1400px){
+ .aw-studio-inspector{top:185px!important;bottom:0!important;max-height:calc(100% - 185px)!important}
+ .aw-studio-inspector-open{box-shadow:-8px 10px 25px #0007}
+}
