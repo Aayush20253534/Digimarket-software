@@ -1,0 +1,1 @@
+ALTER TABLE "WorkspaceMessage" ADD COLUMN "readAt" TIMESTAMPTZ(6);
