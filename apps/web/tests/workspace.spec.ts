@@ -41,7 +41,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
-  for(const label of ["My notes","Global search","Content calendar","Files & assets"])
+  for(const label of ["Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
@@ -52,7 +52,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:"Past deadline"})).toHaveCount(0);
   await page.goto("/app/notes");
-  await expect(page.getByText("This operational module is not available to administrator accounts.")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Start a new note"})).toBeVisible();
   await page.goto("/app/tasks");
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
   await page.goto("/app/approvals");
