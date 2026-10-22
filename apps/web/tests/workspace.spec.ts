@@ -48,7 +48,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
-  const statusMetrics=page.getByRole("region",{name:"Lead status metrics"});
+  const statusMetrics=page.getByRole("region",{name:"CRM pipeline summary"});
   await expect(statusMetrics).toBeVisible();
   await expect(statusMetrics.getByText("YET TO CALL",{exact:true})).toBeVisible();
   await expect(statusMetrics.getByText("MEETING PROCESS",{exact:true})).toBeVisible();
@@ -258,10 +258,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Sort leads on this page").selectOption("businessName");
   await page.getByRole("button",{name:"Reverse lead sort"}).click();
   await expect.poll(()=>page.evaluate(()=>{
-    const key=Object.keys(localStorage).find(value=>value.startsWith("amplifyworld:leads:preferences:"));
-    return key?JSON.parse(localStorage.getItem(key)??"{}"):{};
-  })).toMatchObject({stage:"FOLLOW_UP",sourceFilter:"META_LEADS",
-    search:"Persist this CRM search",sortBy:"businessName",descending:true});
+    const keys=Object.keys(localStorage).filter(value=>value.startsWith("amplifyworld:leads:preferences:"));
+    return keys.some(key=>{
+      const value=JSON.parse(localStorage.getItem(key)??"{}");
+      return value.stage==="FOLLOW_UP"&&value.sourceFilter==="META_LEADS"&&
+        value.search==="Persist this CRM search"&&value.sortBy==="businessName"&&value.descending===true;
+    });
+  })).toBe(true);
   await page.reload();
   await expect(page.getByLabel("Filter by stage")).toHaveValue("FOLLOW_UP");
   await expect(page.getByLabel("Filter by lead source")).toHaveValue("META_LEADS");
@@ -356,7 +359,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // Confirm the frontend gateway supports metrics and hard-deletion, and that
   // deleting an approved lead never removes its linked client.
   await page.goto("/app/leads");
-  await expect(page.getByRole("region",{name:"Lead status metrics"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"CRM pipeline summary"})).toBeVisible();
   await expect(page.getByText("Conversion rate",{exact:true})).toBeVisible();
   const reopenLeadRow=page.getByRole("table",{name:"Leads directory"}).getByRole("row").filter({hasText:"Founder CI Lead"});
   await reopenLeadRow.click();

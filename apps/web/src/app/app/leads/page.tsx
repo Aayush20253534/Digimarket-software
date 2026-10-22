@@ -231,7 +231,7 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   {metrics&&<section aria-label="Lead status metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+   {metrics&&<section aria-label="CRM pipeline summary" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
      {([["Total leads",metrics.total],["Approved clients",metrics.converted],
        ["REJECTED",metrics.rejected],["YET TO CALL",metrics.yetToCall],
        ["MEETING PROCESS",metrics.meetingProcess],
