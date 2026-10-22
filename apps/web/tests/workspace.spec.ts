@@ -54,6 +54,14 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(leadsRegister.getByRole("columnheader",{name:"Call"})).toBeVisible();
   await expect(leadsRegister.getByRole("columnheader",{name:"Location"})).toBeVisible();
   await expect(leadsRegister.getByRole("columnheader",{name:"Details"})).toHaveCount(0);
+  await expect(page.getByText("Potential duplicates",{exact:true})).toHaveCount(0);
+  await expect(page.getByText("CSV import",{exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Load suspected duplicates"})).toHaveCount(0);
+  await expect(page.locator("#lead-import-file")).toHaveCount(0);
+  const leadTableViewport=page.locator('[data-aw-module="leads"] .aw-register-scroll');
+  await expect(leadTableViewport).toHaveCSS("max-height","none");
+  expect(await leadTableViewport.evaluate(el=>el.scrollHeight<=el.clientHeight+1),
+    "All ten rows should fit without an internal vertical scrollbar").toBe(true);
   expect(await leadsRegister.locator("tbody tr").count()).toBeLessThanOrEqual(10);
   await expect(page.getByText(/^Page 1 · \d+ leads? \(max 10\)$/)).toBeVisible();
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
@@ -233,6 +241,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("button",{name:"Delete empty folder CI Brand Designs"})).toHaveCount(0); // Founder cannot bypass assets.delete permissions.
   await page.goto("/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toBeVisible();
+  await expect(page.getByText("Potential duplicates",{exact:true})).toHaveCount(0);
+  await expect(page.getByText("CSV import",{exact:true})).toHaveCount(0);
   await page.getByRole("button",{name:"Add lead"}).click();
   const leadDialog=page.getByRole("dialog",{name:"Add lead"});
   await expect(leadDialog).toBeVisible();
@@ -261,6 +271,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(dateAdded).toHaveAttribute("dateTime",/^20\d{2}-/);
   expect(Number.isNaN(Date.parse(await dateAdded.getAttribute("dateTime")??""))).toBe(false);
   expect(await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").count()).toBeLessThanOrEqual(10);
+  const visibleLeadTable=page.locator('[data-aw-module="leads"] .aw-register-scroll');
+  expect(await visibleLeadTable.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
   await page.getByLabel("Lead status").selectOption("YET_TO_CALL");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})

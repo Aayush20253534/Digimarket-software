@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, MapPin, PhoneCall, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { Download, MapPin, PhoneCall, Plus, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryModal } from "@/components/directory-modal";
@@ -16,9 +16,7 @@ type Lead={id:string;businessName:string;contactName:string|null;phone:string|nu
  status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
  version:number;createdAt:string;canEdit?:boolean;assignee?:{displayName:string}|null};
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
-type Duplicate={id:string;reason:string;resolution:string;lead:{id:string;businessName:string;phone:string|null};
- candidate:{id:string;businessName:string;phone:string|null}};
-type Detail=Lead&{activities:Activity[];duplicates:Duplicate[];canEdit:boolean};
+type Detail=Lead&{activities:Activity[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null};
 type Metrics={total:number;pending:number;meetingProcess:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS";
@@ -30,20 +28,6 @@ type NewLead={phone:string;source:LeadSource};
 const blank:NewLead={phone:"",source:"COLD_CALL"};
 const errText=(e:unknown)=>e instanceof ApiError?e.message:"Lead request failed.";
 function fmt(date:string|null){return date?new Date(date).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"Not set";}
-function decodeCSV(text:string){
- const rows:string[][]=[];let row:string[]=[],field="",quoted=false;
- for(let i=0;i<text.length;i++){
-   const c=text[i];
-   if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}
-   else if(!quoted&&c===","){row.push(field);field="";}
-   else if(!quoted&&(c==="\n"||c==="\r")){if(c==="\r"&&text[i+1]==="\n")i++;row.push(field);if(row.some(x=>x.trim()))rows.push(row);row=[];field="";}
-   else field+=c;
- }
- if(quoted)throw new Error("Unclosed CSV quoted field");
- row.push(field);if(row.some(x=>x.trim()))rows.push(row);
- return rows;
-}
-const headers:Record<string,string>={phone:"phone",phone_number:"phone",mobile:"phone",source:"source",lead_source:"source"};
 export default function LeadsPage(){
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("leads.read");
@@ -52,7 +36,6 @@ export default function LeadsPage(){
  const canCreate=!isAdmin&&!!session?.identity.permissions.includes("leads.create");
  const canAssign=!isAdmin&&!!session?.identity.permissions.includes("leads.assign");
  const canBulk=!isAdmin&&!!session?.identity.permissions.includes("leads.bulk");
- const canReview=!isAdmin&&!!session?.identity.permissions.includes("leads.duplicates.review");
  const [items,setItems]=useState<Lead[]>([]);
  const [metrics,setMetrics]=useState<Metrics|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
@@ -80,10 +63,6 @@ export default function LeadsPage(){
  const [owner,setOwner]=useState("");
  const [note,setNote]=useState("");
  const [staff,setStaff]=useState<StaffUser[]>([]);
- const [duplicates,setDuplicates]=useState<Duplicate[]>([]);
- const [csvRows,setCsvRows]=useState<NewLead[]>([]);
- const [batchId,setBatchId]=useState<string>("");
- const [csvError,setCsvError]=useState("");
  const [updating,setUpdating]=useState({businessName:"",contactName:"",businessType:"",googleMapsUrl:""});
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
@@ -189,55 +168,6 @@ export default function LeadsPage(){
      setMessage("Activity note added.");await open(selected.id);
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
- async function loadDuplicates(){
-   try{setDuplicates(await request<Duplicate[]>("/leads/duplicates"));setError("");}
-   catch(e){setError(errText(e));}
- }
- async function review(id:string,resolution:"CONFIRMED"|"DISMISSED"){
-   setBusy(true);
-   try{
-     await request("/leads/duplicates/"+id+"/review",{method:"POST",body:{resolution}});
-     setMessage("Duplicate signal reviewed. No leads were automatically merged.");
-     await loadDuplicates();if(selected)await open(selected.id);
-   }catch(e){setError(errText(e));}finally{setBusy(false);}
- }
- async function readCSV(file:File|undefined){
-   if(!file)return;
-   setCsvError("");
-   try{
-     if(file.size>100_000)throw new Error("CSV must be under 100 KB");
-     const rows=decodeCSV(await file.text());
-     if(rows.length<2)throw new Error("Provide CSV headers and at least one lead");
-     if(rows.length>51)throw new Error("Import up to 50 leads per batch");
-     const header=rows[0].map(x=>headers[x.trim().replace(/^\uFEFF/,"")]??"");
-     if(!header.includes("phone"))throw new Error("CSV needs a phone column");
-     const data=rows.slice(1).map(columns=>{
-       const obj:NewLead={...blank};
-       for(let i=0;i<header.length;i++){
-         const k=header[i];
-         const raw=(columns[i]??"").trim();
-         if(k==="phone")obj.phone=raw;
-         if(k==="source"&&raw){
-           const normalized=raw.toUpperCase().replace(/[ -]+/g,"_");
-           if(normalized!=="COLD_CALL"&&normalized!=="META_LEADS")
-             throw new Error("CSV source must be COLD_CALL or META_LEADS");
-           obj.source=normalized;
-         }
-       }
-       return obj;
-     });
-     if(data.some(r=>r.phone.replace(/\D/g,"").length<7))throw new Error("Every lead needs a valid phone number");
-     setCsvRows(data);setBatchId(crypto.randomUUID());
-   }catch(e){setCsvError(e instanceof Error?e.message:"Invalid CSV");setCsvRows([]);}
- }
- async function importRows(){
-   if(!csvRows.length||!batchId)return;setBusy(true);setError("");
-   try{
-     const result=await request<{count:number}>("/leads/import",{method:"POST",body:{batchId,rows:csvRows}});
-     setMessage("Imported "+result.count+" leads. Possible duplicates are flagged, not merged.");
-     setCsvRows([]);setBatchId("");setCursor(null);await load();
-   }catch(e){setError(errText(e));}finally{setBusy(false);}
- }
  async function download(){
    setBusy(true);setError("");
    try{
@@ -277,7 +207,7 @@ export default function LeadsPage(){
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Lead register" description="10 leads per page. Dates are recorded automatically when each lead enters the CRM.">
+       <Card title="Lead register" description="Ten leads per page, with automatic creation dates and click-to-open rows. Use Next page for more leads.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
@@ -409,27 +339,7 @@ export default function LeadsPage(){
            </div>}
          </div>
        </Card>:null}
-       {canReview&&<Card title="Potential duplicates" description="Matches use normalized phone or business name. Reviewing never merges records.">
-         <button type="button" className="btn-secondary" onClick={()=>void loadDuplicates()}>Load suspected duplicates</button>
-         <div className="mt-3 space-y-3">{duplicates.map(d=><div key={d.id} className="rounded-lg border p-3 text-sm">
-           <p className="font-semibold">{d.lead.businessName} / {d.candidate.businessName}</p>
-           <p className="text-xs text-slate-500">{d.reason} · {d.resolution}</p>
-           {d.resolution==="OPEN"&&<div className="mt-2 flex gap-2">
-             <button className="btn-secondary" disabled={busy} onClick={()=>void review(d.id,"CONFIRMED")}>Confirm match</button>
-             <button className="btn-secondary" disabled={busy} onClick={()=>void review(d.id,"DISMISSED")}>Not a duplicate</button>
-           </div>}
-         </div>)}</div>
-       </Card>}
-       {canBulk&&<Card title="CSV import" description="Import up to 50 leads. CSV requires phone and may include source (COLD_CALL or META_LEADS). Missing source defaults to Cold Call.">
-         <label htmlFor="lead-import-file" className="block text-sm font-semibold">Select CSV</label>
-         <input id="lead-import-file" type="file" accept=".csv,text/csv" onChange={e=>void readCSV(e.target.files?.[0])}
-           className="mt-2 block w-full text-sm"/>
-         {csvError&&<Notice kind="error">{csvError}</Notice>}
-         {csvRows.length>0&&<p className="mt-2 text-sm">{csvRows.length} lead rows ready for import</p>}
-         <button className="btn-primary mt-3" type="button" disabled={busy||!csvRows.length} onClick={()=>void importRows()}>
-           <Upload className="h-4 w-4"/>Import validated rows
-         </button>
-       </Card>}
+
      </div>
    </div>
  </div>;

@@ -438,17 +438,17 @@ body:has(.aw-workspace){background:#09070e}
 /* Prevent inherited rectangular image styles from altering workspace avatar geometry. */
 .aw-workspace img.aw-work-avatar{aspect-ratio:1/1!important;object-fit:cover!important;object-position:center!important;border-radius:50%!important}
 
-/* Lead register: blue meetings, fixed scroll area, dedicated meeting note column. */
+/* Lead register: ten full-height rows per page, horizontal overflow only. */
 [data-aw-module="leads"] .aw-status-meeting{background:#174c9a!important;color:#e2f3ff!important;border:1px solid #4598ef!important}
 [data-aw-module="leads"] .aw-status-not-picking{background:#FF00FF!important;color:#fff!important;border:1px solid #FF00FF!important}
 [data-aw-module="leads"] .aw-status-rejected{background:#FF0000!important;color:#fff!important;border:1px solid #FF0000!important}
 [data-aw-module="leads"] .aw-status-yet-to-call{background:#000!important;color:#fff!important;border:1px solid #71717a!important}
-[data-aw-module="leads"] .aw-register-scroll{max-width:100%;max-height:min(64dvh,690px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-color:#8052a0 #21172b}
+[data-aw-module="leads"] .aw-register-scroll{max-width:100%;height:auto;max-height:none;overflow-x:auto;overflow-y:visible;overscroll-behavior-x:contain;scrollbar-gutter:auto;scrollbar-color:#8052a0 #21172b}
 [data-aw-module="leads"] .aw-register-table{min-width:1400px}
 [data-aw-module="leads"] .aw-register-table thead th{position:sticky;top:0;z-index:3}
 [data-aw-module="leads"] .aw-register-table td{white-space:nowrap}
 [data-aw-module="leads"] .aw-register-table .aw-lead-notes-cell{min-width:240px;max-width:310px;white-space:normal}
-[data-aw-module="leads"] .aw-lead-notes-preview{max-height:5.5em;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;color:#e8d8f4}
+[data-aw-module="leads"] .aw-lead-notes-preview{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;color:#e8d8f4}
 [data-aw-module="leads"] .aw-lead-notes-empty{color:#a995ba;font-style:italic}
 [data-aw-module="leads"] .aw-lead-note-save-state{font-size:.75rem;color:#bfb0d5;line-height:1.5}
 [data-aw-module="leads"] .aw-lead-note-save-state[data-state="error"]{color:#ffb1b1}
