@@ -31,8 +31,8 @@ function partialErase(stroke:Stroke,point:Point,radius:number):Stroke[]{
  }
  push();return parts.map(points=>({...stroke,points}));
 }
-type Note={id:string;title:string;body:string;strokes:string;pages:string;starred:boolean;notebookId:string|null;deletedAt:string|null;version:number;updatedAt:string};
-type NoteSummary=Pick<Note,"id"|"title"|"strokes"|"starred"|"notebookId"|"deletedAt"|"version"|"updatedAt">;
+type Note={kind:"typed"|"handwritten";id:string;title:string;body:string;strokes:string;pages:string;starred:boolean;notebookId:string|null;deletedAt:string|null;version:number;updatedAt:string};
+type NoteSummary=Pick<Note,"kind"|"id"|"title"|"strokes"|"starred"|"notebookId"|"deletedAt"|"version"|"updatedAt">;
 type Notebook={id:string;name:string;color:string};
 type NotePage={id:string;strokes:string;paper:"blank"|"ruled"|"grid"|"dotted"};
 type Draft={title:string;body:string;strokes:string;pages:string};
@@ -127,6 +127,9 @@ export default function NotesPage(){
  const [pen,setPen]=useState("#D18CFF"),[width,setWidth]=useState(3),[eraserSize,setEraserSize]=useState(16);
  const [tool,setTool]=useState<Tool>("pen");
  const [mode,setMode]=useState<"handwritten"|"typed">("handwritten");
+ const [gridOpen,setGridOpen]=useState(false);
+ const [shareTarget,setShareTarget]=useState("");
+ const [shareUsers,setShareUsers]=useState<{id:string;displayName:string}[]>([]);
  const [paper,setPaper]=useState<"dotted"|"blank"|"ruled"|"grid">("dotted");
  const [zoom,setZoom]=useState(100);
  const [panel,setPanel]=useState<"tools"|"page"|"layers">("tools");
@@ -207,7 +210,7 @@ export default function NotesPage(){
    setActivePage(0);setPaper(pages[0]?.paper??"dotted");
    const next={title:note.title,body:note.body,strokes:pages[0]?.strokes??note.strokes,pages:note.pages??"[]"};
    dirty.current=false;draftRef.current=next;setDraft(next);setSaveState("saved");
-   setMode(note.body.trim()&&!parseStrokes(note.strokes).length?"typed":"handwritten");
+   setMode(note.kind??(note.body.trim()&&!parseStrokes(note.strokes).length?"typed":"handwritten"));
    setDrawing(null);drawingRef.current=null;
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  },[request,ensureSavedForSwitch]);
@@ -247,7 +250,7 @@ export default function NotesPage(){
   try{
    // Old Notes APIs validate fields strictly and reject the modern 'pages' key.
    const note=await request<Note>("/notes",{method:"POST",body:{
-     title:blank.title,body:blank.body,strokes:blank.strokes,
+     title:blank.title,body:blank.body,strokes:blank.strokes,kind,
    }});
    pagesSupported.current=typeof note.pages==="string";
    setModernNotesApi(pagesSupported.current);
@@ -264,7 +267,7 @@ export default function NotesPage(){
      throw new Error("The deployed Notes API cannot save multiple pages. Keep this tab open until the Render backend is updated.");
    const snapshot=draftRef.current;
    const note=await request<Note>("/notes",{method:"POST",body:{
-     title:snapshot.title.slice(0,167)+" (recovered)",body:snapshot.body,strokes:snapshot.strokes,
+     title:snapshot.title.slice(0,167)+" (recovered)",body:snapshot.body,strokes:snapshot.strokes,kind:mode,
      ...(pagesSupported.current?{pages:snapshot.pages}:{}),
    }});
    await listNotes();selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
@@ -501,6 +504,13 @@ export default function NotesPage(){
   document.addEventListener("keydown",esc);
   return()=>document.removeEventListener("keydown",esc);
  },[expanded]);
+ const shareNote=async()=>{
+  if(!selected||!shareTarget)return;
+  if(!await ensureSavedForSwitch())return;
+  try{await request("/messages",{method:"POST",body:{recipientId:shareTarget,noteId:selected}});setShareTarget("");setError("");window.alert("Note shared in Messages.");}
+  catch(e){setError(explanation(e));}
+ };
+ useEffect(()=>{if(!session)return;void request<{items:{id:string;displayName:string}[]}>("/messages/users").then(d=>setShareUsers(d.items)).catch(()=>{});},[session,request]);
  const downloadNote=(format:"png"|"md")=>{
   const a=document.createElement("a");
   const filename=(draft.title||"Untitled").replace(/[^a-z0-9 _-]/gi,"").slice(0,64)||"note";
@@ -538,6 +548,7 @@ export default function NotesPage(){
       <BookOpen size={17} color={book.color}/>{book.name}
      </button><button type="button" aria-label={"Rename notebook "+book.name} title="Rename notebook" onClick={()=>void renameNotebook(book)}><PenLine size={13}/></button>
     </div>)}</div>
+    <button type="button" className="aw-studio-new" onClick={()=>setGridOpen(v=>!v)}><BookOpen size={16}/> {gridOpen?"Hide Notes List":"Notes List (Grid)"}</button>
     <div className="aw-studio-section-title">RECENT NOTES</div>
     {loadState==="loading"&&<p role="status" className="aw-notes-muted">Loading notes…</p>}
     {!list.length&&loadState==="ready"&&<p className="aw-notes-muted">No saved notes. Create one to begin.</p>}
@@ -576,6 +587,7 @@ export default function NotesPage(){
      </div>}
     <div className="aw-studio-head-actions">
      {selected&&<button type="button" onClick={()=>void flush()} disabled={saveState==="saved"||saveState==="saving"||saveState==="conflict"} aria-label="Save note"><Save size={18}/><span>Save</span></button>}
+     {selected&&<div style={{display:"flex",gap:6,alignItems:"center"}}><select aria-label="Share note recipient" value={shareTarget} onChange={e=>setShareTarget(e.target.value)} style={{maxWidth:135,background:"#211630",color:"#fff",borderRadius:8,padding:7}}><option value="">Share with...</option>{shareUsers.map(u=><option key={u.id} value={u.id}>{u.displayName}</option>)}</select><button type="button" disabled={!shareTarget||actionBusy} onClick={()=>void shareNote()}>Share</button></div>}
      {selected&&<div className="aw-studio-export">
       <button type="button" aria-label="Export drawing as PNG" onClick={()=>downloadNote("png")}><Download size={17}/> Export PNG</button>
       <button type="button" aria-label="Export typed notes as Markdown" onClick={()=>downloadNote("md")}>MD</button>
@@ -586,6 +598,7 @@ export default function NotesPage(){
    </header>
    {!modernNotesApi&&<AWNotice tone="error">The Notes API on Render is outdated. Single-page notes can still be saved, but notebooks and multi-page persistence require deploying the latest backend.</AWNotice>}
    {error&&<AWNotice tone="error">{error} {saveState==="conflict"&&"Unsaved work remains here."}</AWNotice>}
+   {gridOpen&&<section aria-label="Notes list grid" style={{padding:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:12}}>{visibleNotes.map(n=><button key={n.id} type="button" onClick={()=>{void open(n.id);setGridOpen(false);}} style={{minHeight:128,border:"1px solid #7d4eae",borderRadius:14,padding:15,background:"#211630",color:"white",textAlign:"left",display:"flex",flexDirection:"column",gap:12}}><strong>{n.title}</strong><span>{n.kind==="typed"?"Typed document":"Handwritten document"}</span><small>{new Date(n.updatedAt).toLocaleString()}</small></button>)}</section>}
    {!selected?<div className="aw-notes-home" aria-label="Choose a note type">
      <NotebookPen size={35}/>
      <h2>Start a new note</h2>
@@ -598,8 +611,8 @@ export default function NotesPage(){
     </div>:<>
     <div className="aw-studio-modebar">
      <div className="aw-studio-mode-switch" role="group" aria-label="Note mode">
-      <button type="button" aria-pressed={mode==="handwritten"} onClick={()=>setMode("handwritten")}><PenLine size={18}/> Handwritten Note</button>
-      <button type="button" aria-pressed={mode==="typed"} onClick={()=>setMode("typed")}><Type size={18}/> Typed Note</button>
+      {mode==="handwritten"&&<span style={{padding:"8px 12px",color:"#d9baff"}}><PenLine size={18}/> Handwritten Note</span>}
+      {mode==="typed"&&<span style={{padding:"8px 12px",color:"#d9baff"}}><Type size={18}/> Typed Note</span>}
      </div>
      <div className="aw-studio-utility">
       {mode==="handwritten"&&<><button type="button" aria-label="Previous page" onClick={()=>changePage(activePage-1)} disabled={activePage===0}><ChevronLeft size={17}/></button>
