@@ -26,7 +26,6 @@ export default function MessagesPage(){
  const upload=(f:File|undefined)=>{if(!f)return;if(f.size>1024*1024){setError("Maximum attachment size is 1 MB");return;}
   const reader=new FileReader();reader.onload=()=>setFile({name:f.name,mime:f.type||"application/octet-stream",data:String(reader.result)});reader.readAsDataURL(f);
  };
- const saveNote=async(id:string)=>{try{const n=await request<{id:string}>("/messages/"+id+"/save-note",{method:"POST"});window.location.href="/app/notes?note="+encodeURIComponent(n.id);}catch(e){setError(String(e));}};
  return <div style={{display:"grid",gridTemplateColumns:"minmax(180px,260px) 1fr",gap:16,minHeight:"70vh",color:"#f3e9ff"}}>
   <aside style={{background:"#170e26",borderRadius:18,padding:14}}>
    <h1 style={{fontSize:20,fontWeight:700,marginBottom:16}}>Messages</h1>
