@@ -227,9 +227,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toBeVisible();
   await page.getByRole("button",{name:"Add lead"}).click();
-  const leadDialog=page.getByRole("dialog",{name:"Add phone-only lead"});
+  const leadDialog=page.getByRole("dialog",{name:"Add lead"});
   await expect(leadDialog).toBeVisible();
   await expect(leadDialog.getByLabel("Phone number")).toBeVisible();
+  await expect(leadDialog.getByLabel("Lead source")).toHaveValue("COLD_CALL");
   await expect(leadDialog.getByLabel("Business name")).toHaveCount(0);
   const leadPosition=await leadDialog.boundingBox();
   expect(leadPosition).not.toBeNull();
@@ -239,9 +240,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(leadDialog).toHaveCount(0);
   await page.getByRole("button",{name:"Add lead"}).click();
   await leadDialog.getByLabel("Phone number").fill("9876543210");
+  await leadDialog.getByLabel("Lead source").selectOption("META_LEADS");
   await leadDialog.getByRole("button",{name:"Add to Pending"}).click();
-  await expect(page.getByRole("dialog",{name:"Add phone-only lead"})).toHaveCount(0);
+  await expect(page.getByRole("dialog",{name:"Add lead"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:/Lead: Lead/})).toBeVisible();
+  await expect(page.getByText(/Source: Meta Leads/)).toBeVisible();
   await page.getByLabel("Contact name",{exact:true}).fill("CI Contact");
   await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
   await page.getByLabel("Business type",{exact:true}).fill("Retail");
