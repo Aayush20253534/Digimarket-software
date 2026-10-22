@@ -101,6 +101,11 @@ export class TasksService {
     const existing=await this.editable(a,id);
     if(!manager(a)&&(input.title!==undefined||input.description!==undefined||
       input.priority!==undefined||input.dueAt!==undefined))throw forbidden();
+    if(!manager(a)&&input.status!==undefined){
+      const permitted=existing.status==="TODO"&&input.status==="IN_PROGRESS" ||
+        existing.status==="IN_PROGRESS"&&input.status==="DONE";
+      if(!permitted)throw invalid("Assigned members can only progress Pending to In Progress to Completed");
+    }
     if(existing.status==="CANCELLED"&&!manager(a))throw forbidden();
     if(input.status==="DONE"){
       const left=await this.db.taskChecklistItem.count({where:{taskId:id,completed:false}});
