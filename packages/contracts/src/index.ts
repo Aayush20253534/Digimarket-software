@@ -80,7 +80,7 @@ export const financeCategoryStatusSchema = z.strictObject({active:z.boolean()});
 export const financeViewSchema = z.enum(["mine","all"]);
 
 // A phone number is all that is required to create a prospect.
-export const leadStageSchema = z.enum(["PENDING","MEETING_PROCESS","APPROVED","REJECTED"]);
+export const leadStageSchema = z.enum(["PENDING","CALL_NOT_PICKING","CALL_BUSY","MEETING_PROCESS","APPROVED","REJECTED"]);
 export const leadSourceSchema = z.enum(["COLD_CALL","META_LEADS"]);
 export const leadCreateSchema = z.strictObject({
  phone:z.string().trim().min(7).max(40),

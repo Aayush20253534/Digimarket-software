@@ -187,6 +187,7 @@ export class LeadsService {
    if(changes.businessType!==undefined)data.businessType=urlOrNull(changes.businessType);
    if(changes.source!==undefined)data.source=changes.source;
    if(changes.status!==undefined)data.status=changes.status;
+   if(stageNote!==undefined)data.stageNote=stageNote;
    return this.db.$transaction(async tx=>{
      const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null,version},data});
      if(changedCount.count!==1)throw clash();

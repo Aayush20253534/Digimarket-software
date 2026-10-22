@@ -49,6 +49,9 @@ try{
  const t=await tasks.create(mgr,{title:"Launch homepage",description:"Build first view",priority:"HIGH",
    projectId:project.id,dueAt:deadline,assigneeIds:[staff.id]});
  assert.equal(t.organizationId,org.id);
+ assert.equal(await db.notification.count({where:{organizationId:org.id,recipientId:staff.id,
+   kind:"TASK_ASSIGNED",href:"/app/tasks?task="+t.id}}),1);
+
  assert.equal((await tasks.list(mgr,{view:"team",limit:30})).items.length,1);
  assert.equal((await tasks.list(staffActor,{view:"mine",limit:30})).items.length,1);
  assert.equal((await tasks.list(readOnly,{view:"mine",limit:30})).items.length,0);
@@ -70,6 +73,9 @@ try{
  await assert.rejects(()=>tasks.checklistStatus(staffActor,t.id,checklist.id,false),failed(422));
  const updated=await tasks.assign(mgr,t.id,3,[staff.id,admin.id]);
  assert.equal(updated.assignees.length,2);
+ assert.equal(await db.notification.count({where:{organizationId:org.id,recipientId:admin.id,
+   kind:"TASK_ASSIGNED",href:"/app/tasks?task="+t.id}}),1);
+
  await assert.rejects(()=>tasks.assign(mgr,t.id,2,[staff.id]),failed(409));
  assert.equal((await tasks.detail(mgr,t.id)).comments.length,1);
  const start=new Date(Date.now()-120000).toISOString();
@@ -84,6 +90,9 @@ try{
  assert.equal((await sweepRecurrences(db,new Date(),100)).created,0);
  const generated=await db.task.findMany({where:{recurrenceId:repeat.id}});
  assert.equal(generated.length,1);
+ assert.equal(await db.notification.count({where:{organizationId:org.id,recipientId:staff.id,
+   kind:"TASK_ASSIGNED",href:"/app/tasks?task="+generated[0].id}}),1);
+
  assert.equal(generated[0].scheduledFor?.toISOString(),new Date(start).toISOString());
  const anchor=new Date("2026-01-31T10:00:00.000Z");
  const feb=nextOccurrence({frequency:"MONTHLY",interval:1,timezone:"UTC",anchorAt:anchor},anchor);

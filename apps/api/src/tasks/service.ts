@@ -2,6 +2,7 @@ import type { PrismaClient, Prisma } from "@digimarket/db";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 import type { TaskCreateInput, TaskUpdateInput, TaskListInput, TaskRecurrenceCreateInput } from "@digimarket/contracts";
+import {sendTaskPush} from "../insights/push";
 
 const need=(a:Principal,k:string)=>{if(!a.permissions.has(k))throw forbidden();};
 const notFound=()=>new AuthError(404,"NOT_FOUND","Task not found");
@@ -90,7 +91,7 @@ export class TasksService {
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
     if(!input.dueAt||!Number.isFinite(Date.parse(input.dueAt))||Date.parse(input.dueAt)<=Date.now())
       throw invalid("A future expiry date and time are required for every assigned task");
-    return this.db.$transaction(async tx=>{
+    const task=await this.db.$transaction(async tx=>{
       const t=await tx.task.create({data:{
         organizationId:a.organizationId,projectId:input.projectId??null,createdById:a.userId,
         title:input.title,description:clean(input.description),priority:input.priority,
@@ -98,11 +99,19 @@ export class TasksService {
       }});
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
         action:"tasks.created",entityType:"Task",entityId:t.id}});
+      if(input.assigneeIds.length)await tx.notification.createMany({data:[...new Set(input.assigneeIds)].map(recipientId=>({
+       organizationId:a.organizationId,recipientId,dedupeKey:"task.assigned:"+t.id,
+       kind:"TASK_ASSIGNED",title:"New task assigned",
+       body:"You have been assigned: "+t.title.slice(0,250),
+       href:"/app/tasks?task="+t.id,
+      })),skipDuplicates:true});
       await tx.outboxEvent.create({data:{organizationId:a.organizationId,
         eventKey:"task.created."+t.id,kind:"tasks.created",aggregateType:"Task",aggregateId:t.id,
         payloadMinimal:{taskId:t.id,projectId:t.projectId}}});
       return t;
     });
+    await sendTaskPush(this.db,a.organizationId,input.assigneeIds);
+    return task;
   }
   async update(a:Principal,id:string,input:TaskUpdateInput){
     const existing=await this.editable(a,id);
@@ -144,7 +153,10 @@ export class TasksService {
     const existing=await this.allowed(a,id);
     await this.ensureAssignment(a,existing.projectId,assigneeIds);
     if(!existing.dueAt)throw invalid("Set a task expiry date and time before assigning employees");
-    return this.db.$transaction(async tx=>{
+    const previous=await this.db.taskAssignment.findMany({where:{taskId:id},select:{userId:true}});
+    const existingSet=new Set(previous.map(r=>r.userId));
+    const newRecipients=[...new Set(assigneeIds)].filter(uid=>!existingSet.has(uid));
+    const task=await this.db.$transaction(async tx=>{
       const changed=await tx.task.updateMany({where:{id,version,organizationId:a.organizationId},
         data:{version:{increment:1}}});
       if(changed.count!==1)throw conflict();
@@ -153,8 +165,16 @@ export class TasksService {
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
         action:"tasks.reassigned",entityType:"Task",entityId:id,
         afterRedacted:{assigneeCount:assigneeIds.length}}});
+      if(newRecipients.length)await tx.notification.createMany({data:newRecipients.map(recipientId=>({
+       organizationId:a.organizationId,recipientId,dedupeKey:"task.assigned:"+id,
+       kind:"TASK_ASSIGNED",title:"New task assigned",
+       body:"You have been assigned: "+existing.title.slice(0,250),
+       href:"/app/tasks?task="+id,
+      })),skipDuplicates:true});
       return tx.task.findUniqueOrThrow({where:{id},include:{assignees:true}});
     });
+    await sendTaskPush(this.db,a.organizationId,newRecipients);
+    return task;
   }
   async addChecklist(a:Principal,id:string,label:string){
     const task=await this.editable(a,id);

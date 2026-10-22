@@ -114,6 +114,21 @@ try{
  assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);
  assert.equal((await crm.metrics(founder)).converted,0);
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,action:"leads.deleted"}}))>=2);
+ // Cold-call outcomes are real persisted statuses; pending notes survive reopening.
+ const call=await crm.create(founder,{phone:"919555000111",source:"COLD_CALL"});
+ const pendingNote=await crm.update(employee,call.id,{version:call.version,status:"PENDING",
+  stageNote:"Call scheduled for tomorrow"});
+ assert.equal(pendingNote.stageNote,"Call scheduled for tomorrow");
+ assert.equal((await crm.detail(founder,call.id)).stageNote,"Call scheduled for tomorrow");
+ const busyCall=await crm.update(employee,call.id,{version:pendingNote.version,
+  status:"CALL_BUSY",stageNote:"Line busy, retry this evening"});
+ assert.equal(busyCall.status,"CALL_BUSY");
+ assert.equal((await crm.detail(founder,call.id)).stageNote,"Line busy, retry this evening");
+ const notPicking=await crm.update(employee,call.id,{version:busyCall.version,
+  status:"CALL_NOT_PICKING",stageNote:"No answer on follow-up"});
+ assert.equal(notPicking.status,"CALL_NOT_PICKING");
+ assert.equal((await crm.list(founder,{stage:"CALL_NOT_PICKING",limit:30})).items[0]?.id,call.id);
+
 
  console.info("Module 7 PASS: phone-only lead, shared editing, atomic Approved conversion, history, webhook dedupe, tenant isolation and import.");
 }finally{await db.$disconnect();}

@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@digimarket/db";
+import {sendTaskPush} from "../../api/src/insights/push";
 
 type Rule={frequency:"DAILY"|"WEEKLY"|"MONTHLY";interval:number;timezone:string;anchorAt:Date};
 type Civil={year:number;month:number;day:number;hour:number;minute:number};
@@ -90,14 +91,23 @@ export async function sweepRecurrences(db:PrismaClient,now=new Date(),limit=100)
      await tx.auditLog.create({data:{organizationId:current.organizationId,actorId:null,
        action:"tasks.recurrence_generated",entityType:"Task",entityId:task.id,
        afterRedacted:{recurrenceId:current.id}}});
+     if(current.assigneeIds.length)await tx.notification.createMany({data:current.assigneeIds.map(recipientId=>({
+       organizationId:current.organizationId,recipientId,
+       dedupeKey:"task.assigned:"+task.id,kind:"TASK_ASSIGNED",
+       title:"New recurring task assigned",body:"You have been assigned: "+task.title.slice(0,250),
+       href:"/app/tasks?task="+task.id,
+     })),skipDuplicates:true});
      await tx.outboxEvent.create({data:{
        organizationId:current.organizationId,eventKey:"task.recurrence."+current.id+"."+current.nextRunAt.toISOString(),
        kind:"tasks.recurrence_generated",aggregateType:"Task",aggregateId:task.id,
        payloadMinimal:{taskId:task.id,recurrenceId:current.id},
      }});
-     return "created" as const;
+     return {kind:"created" as const,taskId:task.id,assignees:current.assigneeIds,organizationId:current.organizationId};
    });
-   if(result==="created")created++;
+   if(typeof result==="object"&&result.kind==="created"){
+     created++;
+     await sendTaskPush(db,result.organizationId,result.assignees);
+   }
    else if(result==="disabled")disabled++;
    else skipped++;
  }

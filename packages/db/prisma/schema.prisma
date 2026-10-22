@@ -85,6 +85,8 @@ enum LeadStage {
   MEETING_PROCESS
   APPROVED
   REJECTED
+  CALL_NOT_PICKING
+  CALL_BUSY
 }
 enum LeadActivityKind {
   CREATED
@@ -268,6 +270,7 @@ model User {
   billingSchedulesCreated BillingSchedule[]
   revenueRecognitionsCreated RevenueRecognition[]
 
+  pushSubscriptions WebPushSubscription[]
   leadsCreated Lead[] @relation("LeadCreator")
   leadsAssigned Lead[] @relation("LeadAssignee")
   leadActivities LeadActivity[] @relation("LeadActivityActor")
@@ -535,6 +538,7 @@ model Lead {
   websiteUrl        String?     @db.VarChar(500)
   instagramUrl      String?     @db.VarChar(500)
   source            String?     @db.VarChar(120)
+  stageNote         String      @default("") @db.Text
   status            LeadStage   @default(PENDING)
   assignedToId      String?     @db.Uuid
   createdById       String      @db.Uuid
@@ -1152,6 +1156,17 @@ model Notification {
 }
 
 // Module 17: deployment/worker liveness, never customer data.
+model WebPushSubscription {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  userId String @db.Uuid
+  endpoint String @db.Text
+  endpointHash String @unique @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  @@index([organizationId,userId])
+}
+
 model ServiceHeartbeat {
   service String @id @db.VarChar(40)
   startedAt DateTime @default(now()) @db.Timestamptz(6)

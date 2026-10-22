@@ -16,6 +16,8 @@ const endpoints: Record<string, string[]> = {
   "search": ["GET"],
   "reports/overview": ["GET"],
   "notifications": ["GET"],
+  "notifications/push-key": ["GET"],
+  "notifications/push-subscription": ["POST","DELETE"],
   "notifications/read-all": ["POST"],
   "founders": ["GET","POST"],
   "founders/eligible-staff": ["GET"],

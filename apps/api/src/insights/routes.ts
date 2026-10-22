@@ -1,5 +1,6 @@
 import type {Express,Request,Response,NextFunction} from "express";
 import {z} from "zod";
+import {webPushPublicKey,subscriptionHash,validPushEndpoint} from "./push";
 import {searchQuerySchema,reportsPeriodSchema,notificationListSchema} from "@digimarket/contracts";
 import {AuthService,type Principal} from "../auth/service";
 import {AuthError,unauthorized} from "../auth/errors";
@@ -28,6 +29,35 @@ export function registerInsightsRoutes(app:Express,auth:AuthService){
   res.set("Cache-Control","no-store");
   const p=parse(reportsPeriodSchema,req.query);
   res.json({data:await insights.report(actor(res),p.from,p.to)});
+ });
+ const pushSubscription=z.strictObject({endpoint:z.string().url().max(2048)});
+ app.get(base+"/notifications/push-key",authenticate,(req,res)=>{
+  void req;
+  const principal=actor(res);
+  if(!principal.permissions.has("notifications.read"))throw new AuthError(403,"FORBIDDEN","No notification access");
+  res.set("Cache-Control","no-store").json({data:{publicKey:webPushPublicKey()}});
+ });
+ app.post(base+"/notifications/push-subscription",authenticate,async(req,res)=>{
+  const principal=actor(res);
+  if(!principal.permissions.has("notifications.read"))throw new AuthError(403,"FORBIDDEN","No notification access");
+  if(!webPushPublicKey())throw new AuthError(503,"PUSH_UNCONFIGURED","Phone alerts are not configured");
+  const input=parse(pushSubscription,req.body);
+  if(!validPushEndpoint(input.endpoint))throw new AuthError(422,"VALIDATION_ERROR","Unsupported push provider");
+  const hash=subscriptionHash(input.endpoint);
+  await auth.database.webPushSubscription.upsert({where:{endpointHash:hash},
+   create:{organizationId:principal.organizationId,userId:principal.userId,endpoint:input.endpoint,endpointHash:hash},
+   update:{organizationId:principal.organizationId,userId:principal.userId,endpoint:input.endpoint},
+  });
+  res.status(201).set("Cache-Control","no-store").json({data:{enabled:true}});
+ });
+ app.delete(base+"/notifications/push-subscription",authenticate,async(req,res)=>{
+  const principal=actor(res);
+  if(!principal.permissions.has("notifications.read"))throw new AuthError(403,"FORBIDDEN","No notification access");
+  const input=parse(pushSubscription,req.body);
+  await auth.database.webPushSubscription.deleteMany({where:{
+   organizationId:principal.organizationId,userId:principal.userId,endpointHash:subscriptionHash(input.endpoint),
+  }});
+  res.status(204).end();
  });
  app.get(base+"/notifications",authenticate,async(req,res)=>{
   res.set("Cache-Control","no-store");

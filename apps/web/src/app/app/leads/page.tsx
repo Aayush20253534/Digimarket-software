@@ -8,12 +8,12 @@ import { DirectoryModal } from "@/components/directory-modal";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
-type Stage="PENDING"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
-const stages:Stage[]=["PENDING","MEETING_PROCESS","APPROVED","REJECTED"];
-const stageLabel=(s:Stage)=>s==="MEETING_PROCESS"?"Meeting Process":s==="APPROVED"?"Approved":s==="REJECTED"?"Rejected":"Pending";
+type Stage="PENDING"|"CALL_NOT_PICKING"|"CALL_BUSY"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
+const stages:Stage[]=["PENDING","CALL_NOT_PICKING","CALL_BUSY","MEETING_PROCESS","APPROVED","REJECTED"];
+const stageLabel=(s:Stage)=>s==="MEETING_PROCESS"?"Meeting Process":s==="CALL_NOT_PICKING"?"Call Not Picking":s==="CALL_BUSY"?"Call Busy":s==="APPROVED"?"Approved":s==="REJECTED"?"Rejected":"Pending";
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
- status:Stage;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
+ status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
  version:number;createdAt:string;canEdit?:boolean;assignee?:{displayName:string}|null};
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Duplicate={id:string;reason:string;resolution:string;lead:{id:string;businessName:string;phone:string|null};
@@ -104,7 +104,7 @@ export default function LeadsPage(){
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
      setSelected(detail);setEditStage(detail.status);setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
-     setNote("");setStageNote("");
+     setNote("");setStageNote(detail.stageNote??"");
      setUpdating({businessName:detail.businessName.startsWith("Lead ")? "":detail.businessName,
        contactName:detail.contactName??"",businessType:detail.businessType??""});
    }catch(e){setError(errText(e));}

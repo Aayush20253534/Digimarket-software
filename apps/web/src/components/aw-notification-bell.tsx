@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
-import {Bell,CheckCheck,RefreshCw,X} from "lucide-react";
+import {Bell,CheckCheck,RefreshCw,Smartphone,X} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 type Notification={id:string;title:string;body:string;kind:string;href:string;readAt:string|null;createdAt:string};
 type Response={items:Notification[];unreadCount:number};
@@ -10,7 +10,40 @@ export function AWNotificationBell(){
  const [open,setOpen]=useState(false),[rows,setRows]=useState<Notification[]>([]),[unread,setUnread]=useState(0);
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const panel=useRef<HTMLDivElement>(null);
+ const [phoneAlerts,setPhoneAlerts]=useState<"unknown"|"enabled"|"disabled"|"unsupported"|"unconfigured">("unknown");
+ const [pushBusy,setPushBusy]=useState(false);
+ const [pushKey,setPushKey]=useState<string|null>(null);
  const allowed=!!session?.identity.permissions.includes("notifications.read");
+ const pushSupported=typeof window!=="undefined"&&window.isSecureContext&&"serviceWorker" in navigator&&"PushManager" in window&&"Notification" in window;
+ const bytes=(key:string)=>{
+  const base64=key.replace(/-/g,"+").replace(/_/g,"/");
+  const binary=atob(base64.padEnd(Math.ceil(base64.length/4)*4,"="));
+  return Uint8Array.from(binary,c=>c.charCodeAt(0));
+ };
+ useEffect(()=>{
+  if(!allowed)return;
+  if(!pushSupported){setPhoneAlerts("unsupported");return;}
+  void request<{publicKey:string|null}>("/notifications/push-key").then(async data=>{
+   setPushKey(data.publicKey);
+   if(!data.publicKey){setPhoneAlerts("unconfigured");return;}
+   const worker=await navigator.serviceWorker.ready;
+   setPhoneAlerts(await worker.pushManager.getSubscription()?"enabled":"disabled");
+  }).catch(()=>setPhoneAlerts("unconfigured"));
+ },[allowed,pushSupported,request]);
+ const enablePhoneAlerts=async()=>{
+  if(!pushKey||!pushSupported||pushBusy)return;
+  setPushBusy(true);setError("");
+  try{
+   const permission=await Notification.requestPermission();
+   if(permission!=="granted")throw new Error("Notification permission was not granted");
+   const worker=await navigator.serviceWorker.ready;
+   let sub=await worker.pushManager.getSubscription();
+   if(!sub)sub=await worker.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes(pushKey)});
+   await request("/notifications/push-subscription",{method:"POST",body:{endpoint:sub.endpoint}});
+   setPhoneAlerts("enabled");
+  }catch(e){setError(e instanceof Error?e.message:"Unable to enable phone notifications");}
+  finally{setPushBusy(false);}
+ };
  const load=useCallback(async()=>{
   if(!allowed){setLoading(false);return;}
   try{
@@ -41,6 +74,13 @@ export function AWNotificationBell(){
     <button type="button" disabled={busy||!unread} onClick={()=>void action("/notifications/read-all")}><CheckCheck size={15}/> Mark all read</button>
     <button type="button" disabled={busy} aria-label="Refresh notifications" onClick={()=>void load()}><RefreshCw size={15}/> Refresh</button>
    </div>
+   {phoneAlerts!=="unsupported"&&<div className="aw-bell-actions">
+    {phoneAlerts==="unconfigured"?<span>Phone push alerts require VAPID configuration on the backend.</span>:
+     phoneAlerts==="enabled"?<span><Smartphone size={15}/> Phone notifications enabled</span>:
+     <button type="button" disabled={pushBusy||!pushKey} onClick={()=>void enablePhoneAlerts()}>
+      <Smartphone size={15}/> {pushBusy?"Enabling...":"Enable phone alerts"}
+     </button>}
+   </div>}
    {error&&<p role="alert" className="aw-bell-error">{error}</p>}
    <div className="aw-bell-list" role="list" aria-label="Recent notifications">
     {loading&&!rows.length?<p className="aw-bell-empty">Loading notifications…</p>:
