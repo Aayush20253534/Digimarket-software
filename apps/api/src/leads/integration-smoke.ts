@@ -48,7 +48,9 @@ try{
  assert.equal(autosaved.stageNote,"Meeting on Friday");
  assert.equal(autosaved.version,meeting.version);
  assert.equal((await crm.detail(founder,first.id)).stageNote,"Meeting on Friday");
- assert.equal((await crm.detail(founder,first.id)).activities[0]?.note,"Discussed the social media package");
+ const notes=(await crm.detail(founder,first.id)).activities.map(activity=>activity.note);
+ assert.equal(notes[0],"Meeting on Friday");
+ assert.ok(notes.includes("Discussed the social media package"));
  await assert.rejects(()=>crm.update(employee,first.id,{version:1,status:"APPROVED"}),fail(409));
  const approved=await crm.update(employee,first.id,{version:meeting.version,status:"APPROVED",
   stageNote:"Agreement signed, ready to onboard"});
