@@ -659,7 +659,7 @@ export default function NotesPage(){
         <option value="">Unfiled</option>{notebooks.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
        </select>
      </label>
-     <button type="button" aria-label="Reload note" onClick={()=>void open(selected,true)} disabled={saveState!=="saved"}><RefreshCw size={16}/> Reload</button>
+     <button type="button" aria-label="Reload note" onClick={()=>{if(selected)void open(selected,true);}} disabled={saveState!=="saved"}><RefreshCw size={16}/> Reload</button>
      <button type="button" className="danger" onClick={()=>void remove()} disabled={actionBusy||saveState==="saving"}><Trash2 size={16}/> Move to Trash</button>
     </div>
    </>}
