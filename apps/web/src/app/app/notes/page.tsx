@@ -496,7 +496,8 @@ export default function NotesPage(){
   catch(e){setError(explanation(e));}
  };
  const selectedSummary=list.find(n=>n.id===selected);
- const visibleNotes=list.filter(n=>(collection!=="starred"||n.starred)&&
+ const visibleNotes=list.filter(n=>(collection==="trash"?Boolean(n.deletedAt):!n.deletedAt)&&
+   (collection!=="starred"||n.starred)&&
    (!notebookFilter||n.notebookId===notebookFilter)&&
    n.title.toLowerCase().includes(noteQuery.trim().toLowerCase())&&
    (collection!=="recent"||Date.now()-new Date(n.updatedAt).getTime()<30*86400000));

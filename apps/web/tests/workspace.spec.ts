@@ -177,6 +177,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // Trash is recoverable; permanent deletion is routed through the authenticated web gateway.
   page.once("dialog",dialog=>void dialog.accept());
   await page.getByRole("button",{name:"Move CI Notes Studio to Trash"}).click();
+  // Wait for the DELETE and All Notes refresh before requesting the Trash collection.
+  await expect(page.getByRole("button",{name:"Move CI Notes Studio to Trash"})).toHaveCount(0,{timeout:30000});
   await page.getByRole("button",{name:"Trash",exact:true}).click();
   await expect(page.getByRole("button",{name:"Permanently delete CI Notes Studio"})).toBeVisible();
   page.once("dialog",dialog=>void dialog.accept());
