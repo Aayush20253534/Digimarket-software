@@ -150,12 +150,15 @@ export default function NotesPage(){
  const drawingRef=useRef<Stroke|null>(null),canvasRef=useRef<HTMLCanvasElement>(null);
  const inFlight=useRef(false), dirty=useRef(false), selectedRef=useRef<string|null>(null);
  const [actionBusy,setActionBusy]=useState(false);
+ const notesListRequestId=useRef(0);
  const setEdited=useCallback((next:Draft)=>{
   draftRef.current=next;setDraft(next);dirty.current=true;setSaveState("unsaved");
  },[]);
  const listNotes=useCallback(async()=>{
+  // Prevent stale All Notes responses from overwriting a newer Trash refresh.
+  const requestId=++notesListRequestId.current;
   const result=await request<{items:NoteSummary[];limited:boolean}>("/notes"+(collection==="trash"?"?trash=true":""));
-  setList(result.items);
+  if(requestId===notesListRequestId.current)setList(result.items);
  },[request,collection]);
  const flush=useCallback(async():Promise<boolean>=>{
   const id=selectedRef.current;
