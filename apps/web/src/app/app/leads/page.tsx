@@ -8,9 +8,9 @@ import { DirectoryModal } from "@/components/directory-modal";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
-type Stage="PENDING"|"CALL_NOT_PICKING"|"CALL_BUSY"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
-const stages:Stage[]=["PENDING","CALL_NOT_PICKING","CALL_BUSY","MEETING_PROCESS","APPROVED","REJECTED"];
-const stageLabel=(s:Stage)=>s==="MEETING_PROCESS"?"Meeting Process":s==="CALL_NOT_PICKING"?"Call Not Picking":s==="CALL_BUSY"?"Call Busy":s==="APPROVED"?"Approved":s==="REJECTED"?"Rejected":"Pending";
+type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
+const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","MEETING_PROCESS","APPROVED","REJECTED"];
+const stageLabel=(s:Stage)=>s==="YET_TO_CALL"?"Yet to Call":s==="MEETING_PROCESS"?"Meeting Process":s==="CALL_NOT_PICKING"?"Call Not Picking":s==="CALL_BUSY"?"Call Busy":s==="APPROVED"?"Approved":s==="REJECTED"?"Rejected":"Pending";
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
  status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;

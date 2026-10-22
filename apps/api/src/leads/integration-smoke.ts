@@ -40,7 +40,12 @@ try{
  await assert.rejects(()=>crm.create(employee,{phone:"919876543210"}),fail(409));
  await assert.rejects(()=>crm.detail(foreign,first.id),fail(404));
  await assert.rejects(()=>crm.update(foreign,first.id,{version:first.version,status:"APPROVED"}),fail(404));
- const meeting=await crm.update(employee,first.id,{version:first.version,status:"MEETING_PROCESS",
+ const yetToCall=await crm.update(employee,first.id,{version:first.version,status:"YET_TO_CALL",
+  stageNote:"Outreach not started"});
+ assert.equal(yetToCall.status,"YET_TO_CALL");
+ assert.equal((await crm.list(founder,{stage:"YET_TO_CALL",limit:30})).items[0]?.id,first.id);
+ assert.equal((await crm.detail(founder,first.id)).stageNote,"Outreach not started");
+ const meeting=await crm.update(employee,first.id,{version:yetToCall.version,status:"MEETING_PROCESS",
   stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe"});
  assert.equal(meeting.status,"MEETING_PROCESS");
  assert.equal((await crm.list(founder,{limit:30})).items[0]?.stageNote,"Discussed the social media package");

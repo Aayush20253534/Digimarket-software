@@ -245,6 +245,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("dialog",{name:"Add lead"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:/Lead: Lead/})).toBeVisible();
   await expect(page.getByText(/Source: Meta Leads/)).toBeVisible();
+  await page.getByLabel("Lead status").selectOption("YET_TO_CALL");
+  await page.getByRole("button",{name:"Save details and stage"}).click();
+  const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
+    .getByRole("row").filter({hasText:"9876543210"}).locator(".aw-status-yet-to-call");
+  await expect(yetToCallBadge).toHaveText("Yet to Call");
+  await expect(yetToCallBadge).toHaveCSS("background-color","rgb(0, 0, 0)");
+  await expect(yetToCallBadge).toHaveCSS("color","rgb(255, 255, 255)");
   await page.getByLabel("Contact name",{exact:true}).fill("CI Contact");
   await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
   await page.getByLabel("Business type",{exact:true}).fill("Retail");
