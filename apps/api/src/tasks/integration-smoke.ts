@@ -63,7 +63,7 @@ try{
  assert.equal(started.status,"IN_PROGRESS");
  const done=await tasks.update(staffActor,t.id,{version:2,status:"DONE"});
  assert.equal(done.status,"DONE");
- await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,status:"TODO"}),failed(409));
+ await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,status:"TODO"}),failed(422));
  await assert.rejects(()=>tasks.checklistStatus(staffActor,t.id,checklist.id,false),failed(422));
  const updated=await tasks.assign(mgr,t.id,3,[staff.id,admin.id]);
  assert.equal(updated.assignees.length,2);
