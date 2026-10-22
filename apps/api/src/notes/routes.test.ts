@@ -30,7 +30,8 @@ function app(){
 }
 beforeEach(()=>{vi.resetAllMocks();});
 describe("private notes API isolation and version protection",()=>{
- it("blocks administrators from personal notes even with a valid session",async()=>{
+ it("allows administrators to access only their own personal notes",async()=>{
+  db.personalNote.findMany.mockResolvedValue([]);
   const expressApp=express();
   const auth={database:db,authenticate:vi.fn().mockResolvedValue({...principal,roles:["ADMIN"]})} as unknown as AuthService;
   registerNotesRoutes(expressApp,auth);
@@ -40,8 +41,8 @@ describe("private notes API isolation and version protection",()=>{
     return res.status(500).json({});
   });
   const result=await request(expressApp).get("/api/v1/notes").set("Authorization","Bearer token");
-  expect(result.status).toBe(403);
-  expect(db.personalNote.findMany).not.toHaveBeenCalled();
+  expect(result.status).toBe(200);
+  expect(db.personalNote.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{organizationId,ownerId:userId,deletedAt:null}}));
  });
  it("rejects missing access token",async()=>{
   const response=await request(app()).get("/api/v1/notes");
@@ -70,7 +71,7 @@ describe("private notes API isolation and version protection",()=>{
   db.personalNote.create.mockResolvedValue({id:noteId,...valid,version:1});
   const good=await request(app()).post("/api/v1/notes").set("Authorization","Bearer token").send(valid);
   expect(good.status).toBe(201);
-  expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,organizationId,ownerId:userId}});
+  expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,organizationId,ownerId:userId,kind:"typed"}});
  });
  it("supports expanded drawn shapes within persisted note pages",async()=>{
   const forms=["triangle","diamond","star","pentagon","hexagon","circle","roundedRectangle"];
@@ -91,7 +92,7 @@ describe("private notes API isolation and version protection",()=>{
     .set("Authorization","Bearer token").send({...valid,pages});
   expect(created.status).toBe(201);
   expect(db.personalNote.create).toHaveBeenCalledWith({
-    data:{...valid,pages,organizationId,ownerId:userId}
+    data:{...valid,pages,organizationId,ownerId:userId,kind:"typed"}
   });
   const broken=await request(app()).post("/api/v1/notes")
     .set("Authorization","Bearer token").send({...valid,pages:"broken-json"});
@@ -108,7 +109,7 @@ describe("private notes API isolation and version protection",()=>{
   const ok=await request(app()).post("/api/v1/notes").set("Authorization","Bearer token")
    .send({...valid,strokes:ink});
   expect(ok.status).toBe(201);
-  expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,strokes:ink,organizationId,ownerId:userId}});
+  expect(db.personalNote.create).toHaveBeenCalledWith({data:{...valid,strokes:ink,organizationId,ownerId:userId,kind:"typed"}});
   const invalid=await request(app()).post("/api/v1/notes").set("Authorization","Bearer token")
    .send({...valid,strokes:JSON.stringify([{color:"#123ABC",width:3,tool:"pen",points:[[.1,.2,null]]}])});
   expect(invalid.status).toBe(422);
