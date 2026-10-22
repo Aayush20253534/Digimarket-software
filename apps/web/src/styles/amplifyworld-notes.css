@@ -312,3 +312,10 @@
  .aw-studio-inspector{top:185px!important;bottom:0!important;max-height:calc(100% - 185px)!important}
  .aw-studio-inspector-open{box-shadow:-8px 10px 25px #0007}
 }
+
+/* Full bleed dark notes grid, including its workspace container. */
+.aw-workspace:has(.aw-notes-list-page) .aw-work-content,
+.aw-workspace:has(.aw-notes-list-page) .aw-work-content-width{background:#100b1c!important;min-height:calc(100dvh - 100px)!important}
+.aw-workspace:has(.aw-notes-list-page) .aw-work-content{padding:0!important}
+.aw-workspace:has(.aw-notes-list-page) .aw-work-content-width{width:100%!important;max-width:none!important;padding:0!important;margin:0!important}
+.aw-notes-list-page{min-height:calc(100dvh - 95px);padding:clamp(18px,2.2vw,36px);border:0;max-width:none}
