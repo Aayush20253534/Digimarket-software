@@ -138,7 +138,7 @@ function permitted(path: string, method: string): boolean {
   if(billingSchedulePattern.test(path))return method==="PUT";
   if(contentDetailPattern.test(path))return ["GET","PUT"].includes(method);
   if(contentActionPattern.test(path))return method==="POST";
-  if(taskDetailPattern.test(path))return ["GET","PUT"].includes(method);
+  if(taskDetailPattern.test(path))return ["GET","PUT","DELETE"].includes(method);
   if(taskActionPattern.test(path))return path.endsWith("/assignees")?method==="PUT":method==="POST";
   if(taskChecklistItemPattern.test(path))return method==="PUT";
   if(taskRecurrencePattern.test(path))return method==="PUT";

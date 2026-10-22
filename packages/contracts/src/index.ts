@@ -250,6 +250,7 @@ export const taskUpdateSchema=z.strictObject({
  dueAt:taskOptionalTimestamp,status:taskStatusSchema.optional(),
 });
 export type TaskUpdateInput=z.infer<typeof taskUpdateSchema>;
+export const taskDeleteSchema=z.strictObject({version:z.number().int().positive()});
 export const taskAssigneesSchema=z.strictObject({
  version:z.number().int().positive(),
  assigneeIds:z.array(z.uuid()).min(1).max(30).refine(x=>new Set(x).size===x.length,"Duplicate assignee"),

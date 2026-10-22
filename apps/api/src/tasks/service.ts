@@ -144,6 +144,35 @@ export class TasksService {
       return tx.task.findUniqueOrThrow({where:{id}});
     });
   }
+  // Hard-delete a task throughout this tenant. Database cascades remove its
+  // assignees, comments and checklist; prune dangling assignment alerts and
+  // queued events in the same transaction. Preserve only an audit tombstone.
+  async delete(a:Principal,id:string,version:number){
+    requireAdministrator(a);need(a,"tasks.manage");
+    const exists=await this.db.task.findFirst({
+      where:{id,organizationId:a.organizationId},select:{id:true,version:true},
+    });
+    if(!exists)throw notFound();
+    if(exists.version!==version)throw conflict();
+    return this.db.$transaction(async tx=>{
+      const removed=await tx.task.deleteMany({where:{id,organizationId:a.organizationId,version}});
+      if(removed.count!==1)throw conflict();
+      await tx.notification.deleteMany({where:{organizationId:a.organizationId,OR:[
+        {dedupeKey:"task.assigned:"+id},
+        {href:"/app/tasks?task="+id},
+        {href:"/app/tasks?focus="+id},
+      ]}});
+      await tx.outboxEvent.deleteMany({where:{
+        organizationId:a.organizationId,aggregateType:"Task",aggregateId:id,
+      }});
+      await tx.auditLog.create({data:{
+        organizationId:a.organizationId,actorId:a.userId,
+        action:"tasks.deleted",entityType:"Task",entityId:id,
+        afterRedacted:{hardDeleted:true},
+      }});
+      return {id,deleted:true};
+    });
+  }
   async assign(a:Principal,id:string,version:number,assigneeIds:string[]){
     requireAdministrator(a);need(a,"tasks.manage");
     const existing=await this.allowed(a,id);

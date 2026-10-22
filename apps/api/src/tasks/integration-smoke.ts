@@ -77,6 +77,13 @@ try{
 
  await assert.rejects(()=>tasks.assign(mgr,t.id,2,[staff.id]),failed(409));
  assert.equal((await tasks.detail(mgr,t.id)).comments.length,1);
+ // Only a tenant admin with task management can delete a shared task.
+ await assert.rejects(()=>tasks.delete(staffActor,t.id,updated.version),failed(403));
+ await assert.rejects(()=>tasks.delete(founder,t.id,updated.version),failed(403));
+ await assert.rejects(()=>tasks.delete(stranger,t.id,updated.version),failed(404));
+ const limitedAdmin=actor(admin.id,org.id,["tasks.read"]);
+ await assert.rejects(()=>tasks.delete(limitedAdmin,t.id,updated.version),failed(403));
+ await assert.rejects(()=>tasks.delete(mgr,t.id,updated.version-1),failed(409));
  const start=new Date(Date.now()-120000).toISOString();
  const repeat=await tasks.createRecurrence(mgr,{title:"Daily campaign check",priority:"MEDIUM",
    frequency:"DAILY",interval:1,timezone:"Asia/Kolkata",startAt:start,
@@ -119,5 +126,26 @@ try{
  assert.equal(await db.task.count({where:{recurrenceId:repeat.id}}),1);
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,entityType:"Task"}}))>=4);
  assert.equal(await db.outboxEvent.count({where:{kind:"tasks.recurrence_generated",organizationId:org.id}}),1);
+ // A deleted task disappears from every assignee's list, notifications, and
+ // the task tables. Audit evidence remains without an active task record.
+ assert.deepEqual(await tasks.delete(mgr,t.id,updated.version),{id:t.id,deleted:true});
+ assert.equal(await db.task.count({where:{id:t.id}}),0);
+ assert.equal(await db.taskAssignment.count({where:{taskId:t.id}}),0);
+ assert.equal(await db.taskChecklistItem.count({where:{taskId:t.id}}),0);
+ assert.equal(await db.taskComment.count({where:{taskId:t.id}}),0);
+ assert.equal(await db.notification.count({where:{href:"/app/tasks?task="+t.id}}),0);
+ assert.equal(await db.outboxEvent.count({where:{aggregateType:"Task",aggregateId:t.id}}),0);
+ assert.equal((await tasks.list(staffActor,{view:"mine",limit:30})).items.length,1);
+ assert.equal((await tasks.list(mgr,{view:"team",limit:30})).items.length,1);
+ await assert.rejects(()=>tasks.detail(staffActor,t.id),failed(404));
+ await assert.rejects(()=>tasks.delete(mgr,t.id,updated.version),failed(404));
+ assert.equal(await db.auditLog.count({where:{entityType:"Task",entityId:t.id,action:"tasks.deleted"}}),1);
+ // Generated occurrences may be removed without deleting the recurrence rule.
+ assert.deepEqual(await tasks.delete(mgr,generated[0].id,generated[0].version),{id:generated[0].id,deleted:true});
+ assert.equal((await tasks.list(staffActor,{view:"mine",limit:30})).items.length,0);
+ assert.equal((await tasks.list(mgr,{view:"team",limit:30})).items.length,0);
+ assert.equal(await db.notification.count({where:{href:"/app/tasks?task="+generated[0].id}}),0);
+ assert.equal(await db.outboxEvent.count({where:{aggregateType:"Task",aggregateId:generated[0].id}}),0);
+ assert.equal(await db.taskRecurrence.count({where:{id:repeat.id}}),1);
  console.info("Module 11 PASS: private task scope, assignments, checklist/comments, versions, recurrence, DST, monthly clamping, retry dedupe and auto-pause");
 }finally{await db.$disconnect();}

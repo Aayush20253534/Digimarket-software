@@ -1,6 +1,6 @@
 import type { Express,Request,Response,NextFunction } from "express";
 import { z } from "zod";
-import { taskCreateSchema,taskUpdateSchema,taskListSchema,
+import { taskCreateSchema,taskUpdateSchema,taskDeleteSchema,taskListSchema,
  taskAssigneesSchema,taskChecklistCreateSchema,taskChecklistUpdateSchema,taskCommentSchema,
  taskRecurrenceCreateSchema,taskRecurrenceUpdateSchema } from "@digimarket/contracts";
 import { AuthService,type Principal } from "../auth/service";
@@ -33,6 +33,11 @@ export function registerTaskRoutes(app:Express,auth:AuthService){
    res.json({data:await svc.detail(a(res),parse(uid,req.params.id))});});
  app.put(root+"/:id",authenticated,async(req,res)=>{res.json({data:await svc.update(a(res),
    parse(uid,req.params.id),parse(taskUpdateSchema,req.body))});});
+ app.delete(root+"/:id",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   const {version}=parse(taskDeleteSchema,req.body);
+   res.json({data:await svc.delete(a(res),parse(uid,req.params.id),version)});
+ });
  app.put(root+"/:id/assignees",authenticated,async(req,res)=>{
    const input=parse(taskAssigneesSchema,req.body);
    res.json({data:await svc.assign(a(res),parse(uid,req.params.id),input.version,input.assigneeIds)});

@@ -3,6 +3,7 @@ import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { TeamMultiSelect } from "@/components/team-multi-select";
+import { Trash2 } from "lucide-react";
 import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
 
 type Status="TODO"|"IN_PROGRESS"|"BLOCKED"|"IN_REVIEW"|"DONE"|"CANCELLED";
@@ -84,6 +85,25 @@ export default function TasksPage(){
    await action();if(reopen&&selected)await open(selected.id);
    await Promise.all([load(),loadRecurrences()]);
    setMessage(done);
+  }catch(e){setError(err(e));}finally{setBusy(false);}
+ }
+ async function deleteTask(){
+  if(!canManage||!selected||busy)return;
+  const task=selected;
+  if(!window.confirm("Permanently delete task \""+task.title+"\" for everyone? This removes its assignments, comments and notifications. This cannot be undone."))return;
+  setBusy(true);setError("");setMessage("");
+  try{
+   await request("/tasks/"+task.id,{method:"DELETE",body:{version:task.version}});
+   setSelected(null);setComment("");
+   setTasks(current=>current.filter(item=>item.id!==task.id));
+   setCursor(null);
+   const url=new URL(window.location.href);
+   if(url.searchParams.get("task")===task.id||url.searchParams.get("focus")===task.id){
+    url.searchParams.delete("task");url.searchParams.delete("focus");
+    window.history.replaceState(null,"",url.pathname+url.search+url.hash);
+   }
+   setMessage("Task permanently deleted from all workspaces.");
+   await load();
   }catch(e){setError(err(e));}finally{setBusy(false);}
  }
  async function submitTask(e:FormEvent){
@@ -177,6 +197,12 @@ export default function TasksPage(){
         {selected.status==="TODO"?"✓ Move to In Process":"✓ Mark Completed"}
        </button>:<StatusBadge status={selected.status}/> )}
     </div>
+    {canManage&&<div className="flex justify-end border-t border-slate-200/20 pt-3">
+      <button type="button" className="btn-secondary inline-flex items-center gap-2 border-red-500/50 text-red-300"
+        aria-label="Permanently delete task" disabled={busy} onClick={()=>void deleteTask()}>
+        <Trash2 aria-hidden="true" className="h-4 w-4"/>Delete task permanently
+      </button>
+    </div>}
     {selected.dueAt&&<p className="text-sm">Expiry: <strong>{new Date(selected.dueAt).toLocaleString()}</strong> · <span className={expired(selected)?"text-red-400":""}>{displayStatus(selected)}</span></p>}
     {canManage&&<form className="flex flex-wrap items-end gap-3" onSubmit={e=>{
       e.preventDefault();
