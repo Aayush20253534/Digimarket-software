@@ -41,12 +41,13 @@ export function AWPersonalTasks(){
   finally{setBusy(false);}
  };
  const lists=useMemo(()=>{
-  const pending=items.filter(t=>t.status==="TODO").sort(due);
-  const inProgress=items.filter(t=>t.status==="IN_PROGRESS").sort(due);
-  const outstanding=items.filter(t=>!done.has(t.status)).sort(due);
+  const hasExpired=(t:Task)=>Boolean(t.dueAt)&&Date.parse(t.dueAt!)<clock&&!done.has(t.status);
+  const pending=items.filter(t=>t.status==="TODO"&&!hasExpired(t)).sort(due);
+  const inProgress=items.filter(t=>t.status==="IN_PROGRESS"&&!hasExpired(t)).sort(due);
+  const outstanding=items.filter(t=>hasExpired(t)).sort(due);
   return [{title:"Pending tasks",test:"personal-pending",tone:"pending",icon:ClipboardList,rows:pending},
    {title:"In Process",test:"personal-in-process",tone:"pending",icon:RefreshCw,rows:inProgress},
-   {title:"Expired / overdue tasks",test:"personal-overdue",tone:"overdue",icon:CalendarClock,rows:outstanding.filter(t=>t.dueAt&&Date.parse(t.dueAt)<clock)},
+   {title:"Expired / overdue tasks",test:"personal-overdue",tone:"overdue",icon:CalendarClock,rows:outstanding},
    {title:"Completed tasks",test:"personal-completed",tone:"completed",icon:CheckCircle2,rows:items.filter(t=>t.status==="DONE").sort(due)}];
  },[items,clock]);
  return <div className="aw-personal-dashboard space-y-6" data-testid="personal-task-dashboard">

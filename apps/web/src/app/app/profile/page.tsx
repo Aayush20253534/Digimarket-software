@@ -25,7 +25,7 @@ export default function ProfilePage() {
     <PageHeader eyebrow="Account settings" title="My profile" description="Identity and granted permissions are obtained from the authenticated API." />
     <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
       <Card title="Account details">
-        <div className="mb-6 flex items-center gap-4">{avatar?<img src={avatar} alt="Profile photo" className="h-20 w-20 rounded-full object-cover"/>:<UserRound className="h-20 w-20 rounded-full bg-purple-100 p-3"/>}
+        <div className="aw-profile-photo-section mb-7 flex flex-wrap items-center gap-5"><div className="aw-profile-photo-frame">{avatar?<img src={avatar} alt="Profile photo" className="aw-profile-photo-large"/>:<UserRound aria-label="Profile photo placeholder" className="aw-profile-photo-placeholder"/>}</div>
          <label className="btn-secondary cursor-pointer">{uploading?"Uploading...":"Upload profile photo"}<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={e=>void uploadAvatar(e.target.files?.[0])}/></label>
          {avatar&&<button className="btn-secondary" onClick={async()=>{await request("/profile/avatar",{method:"DELETE"});setAvatar(null);}}>Remove</button>}</div>
         <dl className="space-y-5 text-sm">

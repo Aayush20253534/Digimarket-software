@@ -18,7 +18,10 @@ type Recurrence={id:string;title:string;frequency:"DAILY"|"WEEKLY"|"MONTHLY";int
  nextRunAt:string;enabled:boolean;version:number;timezone:string;assigneeIds:string[]};
 type Project={id:string;name:string};
 type Result<T>={items:T[];nextCursor:string|null};
-const statuses:Status[]=["TODO","IN_PROGRESS","BLOCKED","IN_REVIEW","DONE","CANCELLED"];
+const visibleStatuses=[{value:"TODO",label:"Pending"},{value:"IN_PROGRESS",label:"In Process"},{value:"DONE",label:"Completed"},{value:"EXPIRED",label:"Expired"}] as const;
+const editableStatuses:Status[]=["TODO","IN_PROGRESS","DONE"];
+const expired=(task:Task)=>task.status!=="DONE"&&task.status!=="CANCELLED"&&Boolean(task.dueAt)&&new Date(task.dueAt!).getTime()<Date.now();
+const displayStatus=(task:Task)=>expired(task)?"Expired":task.status==="TODO"?"Pending":task.status==="IN_PROGRESS"?"In Process":task.status==="DONE"?"Completed":task.status;
 const priorities:Priority[]=["LOW","MEDIUM","HIGH","URGENT"];
 const err=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Request failed";
 const initial={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",dueAt:"",assigneeIds:[] as string[]};
@@ -88,9 +91,12 @@ export default function TasksPage(){
  async function submitTask(e:FormEvent){
   e.preventDefault();
   if(!create.assigneeIds.length){setError("Select at least one employee.");return;}
+  if(!create.dueAt||!Number.isFinite(new Date(create.dueAt).getTime())||new Date(create.dueAt).getTime()<=Date.now()){
+   setError("Choose a future task expiry date and time.");return;
+  }
   await run(async()=>{
    const task=await request<Task>("/tasks",{method:"POST",body:{
-    ...create,projectId:create.projectId||null,dueAt:create.dueAt?new Date(create.dueAt).toISOString():null}});
+    ...create,projectId:create.projectId||null,dueAt:new Date(create.dueAt).toISOString()}});
    setCreate(initial);await open(task.id);
   },"Task created.",false);
  }
@@ -121,7 +127,7 @@ export default function TasksPage(){
       onChange={e=>{setSearch(e.target.value);setCursor(null);}}/>
     <select className="field" aria-label="Task status filter" value={statusFilter}
       onChange={e=>{setStatusFilter(e.target.value);setCursor(null);}}>
-     <option value="">All statuses</option>{statuses.map(v=><option key={v}>{v}</option>)}
+     <option value="">All statuses</option>{visibleStatuses.map(v=><option key={v.value} value={v.value}>{v.label}</option>)}
     </select>
    </div>
    {loading?<Spinner label="Loading tasks…"/>:tasks.length? <div className="space-y-2">
@@ -130,7 +136,7 @@ export default function TasksPage(){
        <div><p className="text-sm font-semibold">{task.title}</p>
          <p className="mt-1 text-xs text-slate-500">{task.project?.name||"General"} · {task.priority}
            {task.dueAt?" · Due "+new Date(task.dueAt).toLocaleString():""}</p></div>
-       <StatusBadge status={task.status}/>
+       <span className={"aw-task-state"+(expired(task)?" aw-task-expired":"")}>{displayStatus(task)}</span>
      </button>)}
    </div>:<EmptyState title="No tasks found" description="Tasks assigned to you will appear here."/>}
    <div className="mt-4 flex justify-between">
@@ -148,7 +154,7 @@ export default function TasksPage(){
      <label className="text-sm">Project<select className="field mt-1 w-full" value={create.projectId}
        onChange={e=>setCreate(p=>({...p,projectId:e.target.value}))}>
        <option value="">General task</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-     <label className="text-sm">Due date/time<input type="datetime-local" className="field mt-1 w-full"
+     <label className="text-sm">Expiry date and time <span className="text-red-400">*</span><input type="datetime-local" required className="field mt-1 w-full" aria-label="Task expiry date and time"
        value={create.dueAt} onChange={e=>setCreate(p=>({...p,dueAt:e.target.value}))}/></label>
      <div className="md:col-span-2"><TeamMultiSelect label="Assign employees" options={staff} value={create.assigneeIds}
        onChange={ids=>setCreate(p=>({...p,assigneeIds:ids}))}/></div>
@@ -165,13 +171,23 @@ export default function TasksPage(){
      {canWrite&&(canManage?<select aria-label="Update task status" className="field" value={selected.status} disabled={busy}
        onChange={e=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",
          body:{version:selected.version,status:e.target.value}}),"Task status updated.")}>
-       {statuses.map(v=><option key={v}>{v}</option>)}</select>:selected.status==="TODO"||selected.status==="IN_PROGRESS"?
+       {editableStatuses.map(v=><option key={v} value={v}>{v==="TODO"?"Pending":v==="IN_PROGRESS"?"In Process":"Completed"}</option>)}
+       {!editableStatuses.includes(selected.status)&&<option value={selected.status}>{selected.status}</option>}</select>:selected.status==="TODO"||selected.status==="IN_PROGRESS"?
        <button type="button" className="btn-primary" disabled={busy} onClick={()=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",body:{
         version:selected.version,status:selected.status==="TODO"?"IN_PROGRESS":"DONE"
        }}),selected.status==="TODO"?"Task moved to In Process.":"Task completed.")}>
-        {selected.status==="TODO"?"✓ Start task":"✓ Complete task"}
+        {selected.status==="TODO"?"✓ Move to In Process":"✓ Mark Completed"}
        </button>:<StatusBadge status={selected.status}/> )}
     </div>
+    {selected.dueAt&&<p className="text-sm">Expiry: <strong>{new Date(selected.dueAt).toLocaleString()}</strong> · <span className={expired(selected)?"text-red-400":""}>{displayStatus(selected)}</span></p>}
+    {canManage&&<form className="flex flex-wrap items-end gap-3" onSubmit={e=>{
+      e.preventDefault();
+      const input=e.currentTarget.elements.namedItem("deadline") as HTMLInputElement|null;
+      if(!input?.value)return;
+      void run(()=>request("/tasks/"+selected.id,{method:"PUT",body:{version:selected.version,dueAt:new Date(input.value).toISOString()}}),"Task expiry updated.");
+    }}><label className="text-sm">Update expiry date and time<input name="deadline" type="datetime-local" required className="field mt-1 w-full"
+      defaultValue={selected.dueAt?new Date(new Date(selected.dueAt).getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):""}/></label>
+      <button className="btn-secondary" type="submit" disabled={busy}>Save expiry</button></form>}
     <section><h3 className="text-sm font-bold">Checklist</h3>
      <ul className="my-3 space-y-2">{selected.checklist?.map(c=><li key={c.id} className="flex items-center gap-2 text-sm">
       <input type="checkbox" aria-label={c.label} checked={c.completed} disabled={!canWrite||busy||selected.status==="DONE"}

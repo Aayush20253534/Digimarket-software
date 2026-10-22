@@ -336,3 +336,46 @@
 .aw-studio-shape-grid button:hover,.aw-studio-shape-grid button[aria-pressed=true]{background:#52316b;border-color:#be82e9;color:#fff}
 .aw-studio-page-switcher{margin-top:8px;border-top:1px solid #3f2d51}
 .aw-studio-inspector .aw-studio-settings{padding-top:14px}
+
+/* Complete Notes library view, including the lower viewport. */
+.aw-workspace:has(.aw-notes-list-page),.aw-workspace:has(.aw-notes-list-page) .aw-work-main,
+.aw-workspace:has(.aw-notes-list-page) .aw-work-content,
+.aw-workspace:has(.aw-notes-list-page) .aw-work-content-width{background:#100b1c!important}
+.aw-workspace:has(.aw-notes-list-page) .aw-work-content{min-height:calc(100dvh - 60px)!important;overflow:visible!important}
+.aw-notes-list-page{min-height:calc(100dvh - 60px);background:#100b1c!important;padding-bottom:65px}
+.aw-notes-list-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));align-items:stretch}
+.aw-notes-list-card{display:flex;gap:10px;min-height:245px;padding:13px;border-radius:15px;overflow:hidden}
+.aw-notes-list-card:hover{transform:translateY(-2px);box-shadow:0 12px 30px #0005}
+.aw-notes-list-thumbnail{height:155px;overflow:hidden;position:relative}
+.aw-notes-list-thumbnail svg[role=img]{display:block;width:100%;height:100%;object-fit:contain}
+.aw-notes-thumb-ink{background:radial-gradient(#ddd5ef 1px,transparent 1px) 0 0 / 12px 12px,#fcfaff}
+.aw-notes-thumb-text{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:12px;padding:19px}
+.aw-notes-typed-lines{width:95%;display:flex;flex-direction:column;gap:8px}
+.aw-notes-typed-lines i{height:5px;width:100%;background:#d7cae5;border-radius:5px}
+.aw-notes-typed-lines i:last-child{width:64%}
+.aw-notes-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#c9a6dd}
+.aw-notes-list-card strong{font-size:15px;order:0}
+.aw-notes-list-card time{margin-top:auto}
+@media(max-width:620px){.aw-notes-list-grid{grid-template-columns:repeat(auto-fill,minmax(155px,1fr))}.aw-notes-list-thumbnail{height:120px}}
+/* Stable circular avatar crops regardless of original aspect ratio. */
+.aw-workspace img.aw-work-avatar,.aw-workspace .aw-work-header-avatar img.aw-work-avatar,
+.aw-workspace .aw-work-profile img.aw-work-avatar{display:block;aspect-ratio:1/1;object-fit:cover;object-position:center;width:38px;height:38px;max-width:none;border-radius:50%!important;flex-shrink:0}
+.aw-workspace .aw-work-header-avatar img.aw-work-avatar{width:38px;height:38px}
+.aw-workspace .aw-work-profile img.aw-work-avatar{width:40px;height:40px}
+@media(max-width:639px){.aw-workspace .aw-work-header-avatar img.aw-work-avatar{width:36px;height:36px}}
+/* Large, square-cropped profile photograph. */
+.aw-profile-photo-section{min-height:156px}
+.aw-profile-photo-frame{width:156px;height:156px;aspect-ratio:1;border-radius:50%;overflow:hidden;flex:0 0 156px;border:3px solid #bd76e8;background:#39234b;box-shadow:0 0 0 5px #8654ae24}
+.aw-profile-photo-large,.aw-profile-photo-placeholder{display:block;width:100%!important;height:100%!important;aspect-ratio:1/1;border-radius:50%!important;object-fit:cover;object-position:center}
+.aw-profile-photo-placeholder{padding:25px;color:#d6b1f5}
+@media(max-width:620px){.aw-profile-photo-frame{width:124px;height:124px;flex-basis:124px}.aw-profile-photo-section{min-height:124px}}
+/* Four explicit displayed task states. Expired is calculated from deadline. */
+.aw-task-state{display:inline-flex;border:1px solid #7c5499;background:#362048;color:#f3e1fd;padding:6px 10px;border-radius:99px;font-size:11px;font-weight:750;white-space:nowrap}
+.aw-task-state.aw-task-expired{border-color:#a64d68;background:#492136;color:#ffbecf}
+
+/* Desktop workspace uses 75% zoom; compensate its effective height. */
+@media(min-width:1024px){
+ .aw-workspace:has(.aw-notes-list-page) .aw-work-content,
+ .aw-workspace:has(.aw-notes-list-page) .aw-work-content-width,
+ .aw-workspace:has(.aw-notes-list-page) .aw-notes-list-page{min-height:calc(133.3334dvh - 72px)!important}
+}

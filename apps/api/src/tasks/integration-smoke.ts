@@ -43,8 +43,11 @@ try{
  await assert.rejects(()=>tasks.create(mgr,{title:"Wrong org",priority:"MEDIUM",assigneeIds:[foreign.id]}),failed(422));
  await assert.rejects(()=>tasks.create(mgr,{title:"Wrong project assignee",priority:"MEDIUM",
    projectId:project.id,assigneeIds:[other.id]}),failed(422));
+ const deadline=new Date(Date.now()+86400000).toISOString();
+ await assert.rejects(()=>tasks.create(mgr,{title:"Missing expiry",priority:"MEDIUM",assigneeIds:[staff.id]}),failed(422));
+ await assert.rejects(()=>tasks.create(mgr,{title:"Expired at assignment",priority:"MEDIUM",dueAt:new Date(Date.now()-60000).toISOString(),assigneeIds:[staff.id]}),failed(422));
  const t=await tasks.create(mgr,{title:"Launch homepage",description:"Build first view",priority:"HIGH",
-   projectId:project.id,assigneeIds:[staff.id]});
+   projectId:project.id,dueAt:deadline,assigneeIds:[staff.id]});
  assert.equal(t.organizationId,org.id);
  assert.equal((await tasks.list(mgr,{view:"team",limit:30})).items.length,1);
  assert.equal((await tasks.list(staffActor,{view:"mine",limit:30})).items.length,1);

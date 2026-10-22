@@ -252,7 +252,7 @@ export const taskAssigneesSchema=z.strictObject({
 });
 export const taskListSchema=z.strictObject({
  view:z.enum(["mine","team"]).default("mine"),
- status:taskStatusSchema.optional(),projectId:z.uuid().optional(),
+ status:z.enum(["TODO","IN_PROGRESS","BLOCKED","IN_REVIEW","DONE","CANCELLED","EXPIRED"]).optional(),projectId:z.uuid().optional(),
  q:z.string().trim().max(100).optional(),cursor:z.uuid().optional(),
  limit:z.coerce.number().int().min(1).max(100).default(30),
 });

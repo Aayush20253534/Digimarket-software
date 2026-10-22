@@ -431,3 +431,6 @@ body:has(.aw-workspace){background:#09070e}
   .aw-personal-shortcut strong{font-size:.7rem}
   .aw-personal-shortcut small{font-size:.61rem}
 }
+
+/* Account avatar should not inherit rectangular image dimensions. */
+.aw-work-avatar:is(img){aspect-ratio:1/1!important;object-fit:cover!important;object-position:center;border-radius:50%!important;flex-shrink:0}

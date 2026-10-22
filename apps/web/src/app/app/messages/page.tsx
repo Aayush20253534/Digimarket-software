@@ -55,7 +55,7 @@ export default function MessagesPage(){
    if(selectedRef.current!==target)return;
    setItems(data.items);
    if(document.visibilityState==="visible"){
-    await request("/messages/read/"+target,{method:"POST"});
+    await request("/messages/read/"+target,{method:"POST",body:{}});
     if(selectedRef.current===target)setPeople(prev=>prev.map(p=>p.id===target?{...p,unreadCount:0}:p));
    }
    setError("");

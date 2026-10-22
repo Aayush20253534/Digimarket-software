@@ -53,7 +53,12 @@ export class TasksService {
     const where:Prisma.TaskWhereInput={
       organizationId:a.organizationId,
       ...(input.view==="team"&&manager(a)?{}:own(a)),
-      ...(input.status?{status:input.status}:{}),
+      ...(input.status==="EXPIRED"
+        ?{dueAt:{lt:new Date()},status:{notIn:["DONE" as const,"CANCELLED" as const]}}
+        :input.status
+          ?{status:input.status,...(["TODO","IN_PROGRESS"].includes(input.status)
+              ?{AND:[{OR:[{dueAt:null},{dueAt:{gte:new Date()}}]}]}:{})}
+          :{}),
       ...(input.projectId?{projectId:input.projectId}:{}),
       ...(input.q?{title:{contains:input.q,mode:"insensitive"}}:{}),
     };
@@ -83,6 +88,8 @@ export class TasksService {
   async create(a:Principal,input:TaskCreateInput){
     requireAdministrator(a);need(a,"tasks.create");need(a,"tasks.read");
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
+    if(!input.dueAt||!Number.isFinite(Date.parse(input.dueAt))||Date.parse(input.dueAt)<=Date.now())
+      throw invalid("A future expiry date and time are required for every assigned task");
     return this.db.$transaction(async tx=>{
       const t=await tx.task.create({data:{
         organizationId:a.organizationId,projectId:input.projectId??null,createdById:a.userId,
@@ -106,6 +113,8 @@ export class TasksService {
         existing.status==="IN_PROGRESS"&&input.status==="DONE";
       if(!permitted)throw invalid("Assigned members can only progress Pending to In Progress to Completed");
     }
+    if(input.dueAt!==undefined&&(!input.dueAt||!Number.isFinite(Date.parse(input.dueAt))))
+      throw invalid("Task expiry date and time cannot be removed");
     if(existing.status==="CANCELLED"&&!manager(a))throw forbidden();
     if(input.status==="DONE"){
       const left=await this.db.taskChecklistItem.count({where:{taskId:id,completed:false}});
@@ -134,6 +143,7 @@ export class TasksService {
     requireAdministrator(a);need(a,"tasks.manage");
     const existing=await this.allowed(a,id);
     await this.ensureAssignment(a,existing.projectId,assigneeIds);
+    if(!existing.dueAt)throw invalid("Set a task expiry date and time before assigning employees");
     return this.db.$transaction(async tx=>{
       const changed=await tx.task.updateMany({where:{id,version,organizationId:a.organizationId},
         data:{version:{increment:1}}});
