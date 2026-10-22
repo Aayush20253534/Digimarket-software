@@ -20,7 +20,26 @@ export function registerWorkspaceMessages(app:Express, auth:AuthService){
   const p=principal(res);
   const users=await db.user.findMany({where:{organizationId:p.organizationId,status:"ACTIVE",id:{not:p.userId}},
    select:{id:true,displayName:true,loginId:true,avatarData:true},orderBy:{displayName:"asc"},take:200});
-  res.set("Cache-Control","no-store").json({data:{items:users}});
+  const unread=await db.workspaceMessage.groupBy({by:["senderId"],where:{
+   organizationId:p.organizationId,recipientId:p.userId,readAt:null
+  },_count:{_all:true}});
+  const unreadMap=new Map(unread.map(item=>[item.senderId,item._count._all]));
+  res.set("Cache-Control","no-store").json({data:{items:users.map(user=>({
+   ...user,unreadCount:unreadMap.get(user.id)??0
+  }))}});
+ });
+ // Explicit acknowledgement by the recipient. Viewing another conversation never marks messages as read.
+ app.post(route+"/read/:peerId",authenticate,async(req,res)=>{
+  const p=principal(res),peer=uuid.safeParse(req.params.peerId);
+  if(!peer.success)throw new AuthError(422,"VALIDATION_ERROR","Invalid conversation");
+  const sender=await db.user.findFirst({where:{
+   id:peer.data,organizationId:p.organizationId,status:"ACTIVE"
+  },select:{id:true}});
+  if(!sender)throw new AuthError(404,"NOT_FOUND","Conversation unavailable");
+  const changed=await db.workspaceMessage.updateMany({where:{
+   organizationId:p.organizationId,senderId:sender.id,recipientId:p.userId,readAt:null
+  },data:{readAt:new Date()}});
+  res.set("Cache-Control","no-store").json({data:{marked:changed.count}});
  });
  app.get(route,authenticate,async(req,res)=>{
   const p=principal(res);const peer=uuid.safeParse(req.query.with);
