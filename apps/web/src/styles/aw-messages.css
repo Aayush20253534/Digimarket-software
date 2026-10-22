@@ -67,3 +67,15 @@
  .aw-chat-attach{width:34px}.aw-chat-send{width:38px}
 }
 @media(prefers-reduced-motion:reduce){.aw-chat-contact{transition:none}}
+
+.aw-chat-back{display:none;place-items:center;width:34px;height:34px;flex:none;color:#e6c9f7;border:1px solid #65467c;border-radius:8px}
+@media(max-width:580px){
+ .aw-messages-page{grid-template-columns:minmax(0,1fr)}
+ .aw-messages-page:has(.aw-chat-conversation-header) .aw-chat-directory{display:none}
+ .aw-messages-page:has(.aw-chat-conversation-header) .aw-chat-conversation{display:flex}
+ .aw-messages-page:not(:has(.aw-chat-conversation-header)) .aw-chat-conversation{display:none}
+ .aw-chat-back{display:grid}
+ .aw-chat-directory-header{padding:17px}.aw-chat-contact{padding:12px}
+ .aw-chat-directory-caption{padding-left:18px}
+ .aw-chat-conversation-header{min-height:68px}
+}
