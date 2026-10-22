@@ -9,7 +9,7 @@ import { AWNotice } from "@/components/aw-ui";
 
 type Tool="pen"|"pencil"|"highlighter"|"marker"|"eraser"|"brush"|"fountain"|"select"|"shape"|"text"|"sticky";
 type Point=[number,number,number?];
-type Stroke={color:string;width:number;points:Point[];tool?:Exclude<Tool,"eraser"|"select">;opacity?:number;style?:"solid"|"dashed"|"dotted";shape?:"line"|"rectangle"|"roundedRectangle"|"ellipse"|"circle"|"triangle"|"diamond"|"pentagon"|"hexagon"|"star"|"arrow";text?:string};
+type Stroke={color:string;width:number;points:Point[];tool?:Exclude<Tool,"eraser"|"select">;opacity?:number;style?:"solid"|"dashed"|"dotted";shape?:"line"|"square"|"rectangle"|"roundedRectangle"|"ellipse"|"circle"|"triangle"|"diamond"|"pentagon"|"hexagon"|"star"|"arrow";text?:string};
 function partialErase(stroke:Stroke,point:Point,radius:number):Stroke[]{
  const old=stroke.points;if(!old.length)return[];if(stroke.tool==="sticky"||stroke.tool==="text")return[stroke];
  const cx=point[0]*W,cy=point[1]*H;
@@ -77,7 +77,8 @@ function draw(ctx:CanvasRenderingContext2D,strokes:Stroke[]){
   if(stroke.tool==="shape"&&pts.length>=2){
     const x=pts[0][0]*W,y=pts[0][1]*H,dx=pts[1][0]*W-x,dy=pts[1][1]*H-y;
     ctx.lineWidth=stroke.width;ctx.beginPath();
-    if(stroke.shape==="rectangle")ctx.rect(x,y,dx,dy);
+    if(stroke.shape==="square"){const side=Math.min(Math.abs(dx),Math.abs(dy));ctx.rect(x,y,(dx<0?-1:1)*side,(dy<0?-1:1)*side);}
+    else if(stroke.shape==="rectangle")ctx.rect(x,y,dx,dy);
     else if(stroke.shape==="roundedRectangle")ctx.roundRect(x,y,dx,dy,Math.min(18,Math.abs(dx)/5,Math.abs(dy)/5));
     else if(stroke.shape==="ellipse"||stroke.shape==="circle"){
       const radiusX=Math.max(1,Math.abs(dx)/2),radiusY=stroke.shape==="circle"?radiusX:Math.max(1,Math.abs(dy)/2);
@@ -666,6 +667,43 @@ export default function NotesPage(){
    </>:null}
   </main>
   <aside className={"aw-studio-inspector"+(inspectorOpen?" aw-studio-inspector-open":"")} aria-label="Tool inspector">
+   <div className="aw-studio-inspector-tabs" role="tablist" aria-label="Inspector tabs">
+    <button type="button" role="tab" aria-selected={panel==="tools"} onClick={()=>setPanel("tools")}>Tool Settings</button>
+    <button type="button" role="tab" aria-selected={panel==="page"} onClick={()=>setPanel("page")}>Page</button>
+    <button type="button" role="tab" aria-selected={panel==="layers"} onClick={()=>setPanel("layers")}>Layers</button>
+   </div>
+   {panel==="tools"?<div className="aw-studio-settings">
+    <div className="aw-studio-tool-summary"><strong>{tools.find(x=>x.id===tool)?.label} settings</strong>
+     <span>{tool==="eraser"?"Adjust eraser size and remove strokes":tool==="shape"?"Choose a shape, color, outline and stroke size":tool==="select"?"Select an object on the canvas":"Customize this drawing tool"}</span></div>
+    {tool!=="eraser"&&tool!=="select"&&<>
+    <label htmlFor="aw-pen-color">Color</label><div className="aw-studio-picker"><input id="aw-pen-color" aria-label="Ink color" type="color" value={pen} onChange={e=>setPen(e.target.value)}/><span>{pen.toUpperCase()}</span></div>
+    <div className="aw-studio-swatches">{["#181321","#FFFFFF","#F9A37E","#FF8E36","#F9DC4D","#54DF92","#3064F5","#9D43EA","#FF54B7"].map(c=>
+     <button key={c} type="button" style={{background:c}} aria-label={"Select color "+c} aria-pressed={pen.toLowerCase()===c.toLowerCase()} onClick={()=>setPen(c)}/>)}</div>
+    <label htmlFor="aw-pen-width">{tool==="shape"?"Outline width":"Brush size"}</label><div className="aw-studio-range"><input id="aw-pen-width" aria-label="Brush size" type="range" min={1} max={18} value={width} onChange={e=>setWidth(Number(e.target.value))}/><span>{width} px</span></div>
+    <div className="aw-studio-width-presets">{[1,2,4,8,12,18].map(value=><button type="button" key={value} aria-label={"Set brush size "+value} aria-pressed={width===value} onClick={()=>setWidth(value)}><span style={{height:Math.max(2,value/2),background:pen}}/>{value}</button>)}</div>
+    <label htmlFor="aw-opacity">Opacity</label><div className="aw-studio-range"><input id="aw-opacity" type="range" min={10} max={100} value={opacity} onChange={e=>setOpacity(Number(e.target.value))}/><span>{opacity}%</span></div>
+    </>}
+    {tool==="eraser"&&<><label htmlFor="aw-eraser-width">Eraser size</label><div className="aw-studio-range"><input id="aw-eraser-width" aria-label="Eraser size" type="range" min={4} max={80} step={2} value={eraserSize} onChange={e=>setEraserSize(Number(e.target.value))}/><span>{eraserSize} px</span></div>
+    <div className="aw-studio-width-presets">{[4,8,16,32,48,80].map(value=><button type="button" key={value} aria-label={"Set eraser size "+value} aria-pressed={eraserSize===value} onClick={()=>setEraserSize(value)}>{value}</button>)}</div></>}
+    {tool!=="eraser"&&tool!=="select"&&<>
+    <p className="aw-studio-label">Stroke Style</p><div className="aw-studio-options">{(["solid","dashed","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={strokeStyle===s} onClick={()=>setStrokeStyle(s)}>{s}</button>)}</div>
+    {tool==="shape"&&<><p className="aw-studio-label">Choose shape</p>
+    <div className="aw-studio-shape-grid">{([
+      ["line","Line","／"],["square","Square","□"],["rectangle","Rectangle","▭"],
+      ["roundedRectangle","Rounded","▢"],["circle","Circle","○"],["ellipse","Oval","⬭"],
+      ["triangle","Triangle","△"],["star","Star","☆"],["diamond","Diamond","◇"],
+      ["pentagon","Pentagon","⬠"],["hexagon","Hexagon","⬡"],["arrow","Arrow","➜"]
+     ] as const).map(([id,label,glyph])=><button key={id} type="button" aria-pressed={shape===id}
+       aria-label={label+" shape"} onClick={()=>setShape(id)}><span aria-hidden="true">{glyph}</span><small>{label}</small></button>)}</div></>}
+    </>}
+    <p className="aw-studio-label">Paper Style</p><div className="aw-studio-paper-options">{(["blank","ruled","grid","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={paper===s} onClick={()=>choosePaper(s)}><span className={"paper-"+s}/>{s}</button>)}</div>
+    <button type="button" className="aw-studio-clear" onClick={()=>{if(window.confirm("Clear the entire drawing?"))setStrokes([]);}} disabled={!parseStrokes(draft.strokes).length}><Eraser size={16}/> Clear drawing</button>
+   </div>:panel==="page"?<div className="aw-studio-settings"><p className="aw-studio-label">Pages: {pageCount}</p>
+    <div className="aw-studio-options"><button type="button" onClick={addPage}>Add page</button>
+    <button type="button" onClick={duplicatePage}>Duplicate</button>
+    <button type="button" onClick={deletePage} disabled={pageCount===1}>Delete</button></div>
+    <p className="aw-studio-label">Page appearance</p><div className="aw-studio-paper-options">{(["blank","ruled","grid","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={paper===s} onClick={()=>choosePaper(s)}>{s}</button>)}</div></div>:
+   <div className="aw-studio-settings"><p className="aw-notes-muted">The current page contains {parseStrokes(draft.strokes).length} saved drawing objects. Layer reordering is not yet available.</p></div>}
    {selected&&<section className="aw-studio-page-switcher" aria-label="Note pages">
     <div className="aw-studio-page-switcher-head"><strong>All pages ({pageCount})</strong><button type="button" onClick={addPage} aria-label="Add note page">+ Add</button></div>
     <div className="aw-studio-page-grid">
@@ -683,28 +721,6 @@ export default function NotesPage(){
      })}
     </div>
    </section>}
-   <div className="aw-studio-inspector-tabs" role="tablist" aria-label="Inspector tabs">
-    <button type="button" role="tab" aria-selected={panel==="tools"} onClick={()=>setPanel("tools")}>Tool Settings</button>
-    <button type="button" role="tab" aria-selected={panel==="page"} onClick={()=>setPanel("page")}>Page</button>
-    <button type="button" role="tab" aria-selected={panel==="layers"} onClick={()=>setPanel("layers")}>Layers</button>
-   </div>
-   {panel==="tools"?<div className="aw-studio-settings">
-    <label htmlFor="aw-pen-color">Color</label><div className="aw-studio-picker"><input id="aw-pen-color" aria-label="Ink color" type="color" value={pen} onChange={e=>setPen(e.target.value)}/><span>{pen.toUpperCase()}</span></div>
-    <div className="aw-studio-swatches">{["#181321","#FFFFFF","#F9A37E","#FF8E36","#F9DC4D","#54DF92","#3064F5","#9D43EA","#FF54B7"].map(c=>
-     <button key={c} type="button" style={{background:c}} aria-label={"Select color "+c} aria-pressed={pen.toLowerCase()===c.toLowerCase()} onClick={()=>setPen(c)}/>)}</div>
-    <label htmlFor="aw-pen-width">Brush Size</label><div className="aw-studio-range"><input id="aw-pen-width" aria-label="Brush size" type="range" min={1} max={18} value={width} onChange={e=>setWidth(Number(e.target.value))}/><span>{width} mm</span></div>
-    <label htmlFor="aw-opacity">Opacity</label><div className="aw-studio-range"><input id="aw-opacity" type="range" min={10} max={100} value={opacity} onChange={e=>setOpacity(Number(e.target.value))}/><span>{opacity}%</span></div>
-    <label htmlFor="aw-eraser-width">Eraser Size</label><div className="aw-studio-range"><input id="aw-eraser-width" aria-label="Eraser size" type="range" min={4} max={80} step={2} value={eraserSize} onChange={e=>setEraserSize(Number(e.target.value))}/><span>{eraserSize} mm</span></div>
-    <p className="aw-studio-label">Stroke Style</p><div className="aw-studio-options">{(["solid","dashed","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={strokeStyle===s} onClick={()=>setStrokeStyle(s)}>{s}</button>)}</div>
-    {tool==="shape"&&<><p className="aw-studio-label">Shape</p><div className="aw-studio-options">{(["line","rectangle","roundedRectangle","ellipse","circle","triangle","diamond","pentagon","hexagon","star","arrow"] as const).map(s=><button key={s} type="button" aria-pressed={shape===s} onClick={()=>setShape(s)}>{s}</button>)}</div></>}
-    <p className="aw-studio-label">Paper Style</p><div className="aw-studio-paper-options">{(["blank","ruled","grid","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={paper===s} onClick={()=>choosePaper(s)}><span className={"paper-"+s}/>{s}</button>)}</div>
-    <button type="button" className="aw-studio-clear" onClick={()=>{if(window.confirm("Clear the entire drawing?"))setStrokes([]);}} disabled={!parseStrokes(draft.strokes).length}><Eraser size={16}/> Clear drawing</button>
-   </div>:panel==="page"?<div className="aw-studio-settings"><p className="aw-studio-label">Pages: {pageCount}</p>
-    <div className="aw-studio-options"><button type="button" onClick={addPage}>Add page</button>
-    <button type="button" onClick={duplicatePage}>Duplicate</button>
-    <button type="button" onClick={deletePage} disabled={pageCount===1}>Delete</button></div>
-    <p className="aw-studio-label">Page appearance</p><div className="aw-studio-paper-options">{(["blank","ruled","grid","dotted"] as const).map(s=><button key={s} type="button" aria-pressed={paper===s} onClick={()=>choosePaper(s)}>{s}</button>)}</div></div>:
-   <div className="aw-studio-settings"><p className="aw-notes-muted">The current page contains {parseStrokes(draft.strokes).length} saved drawing objects. Layer reordering is not yet available.</p></div>}
   </aside>
  </div>;
 }
