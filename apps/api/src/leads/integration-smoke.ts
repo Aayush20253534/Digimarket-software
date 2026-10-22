@@ -141,8 +141,11 @@ try{
  assert.equal(preservedClient.businessName,"Big Mo Cafe");
  assert.equal(await db.lead.count({where:{id:approved.id}}),0);
  assert.equal(await db.leadActivity.count({where:{leadId:approved.id}}),0);
- assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919876543210")).created,false);
+ const knownClient=await crm.ingestWhatsApp(org.id,owner.id,"919876543210");
+ assert.equal(knownClient.created,false);
+ assert.equal(knownClient.id,client.id);
  assert.equal(await db.lead.count({where:{id:approved.id}}),0);
+ assert.equal(await db.lead.count({where:{organizationId:org.id,normalizedPhone:"919876543210"}}),0);
  assert.equal((await crm.metrics(founder)).converted,0);
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,action:"leads.deleted"}}))>=2);
  // Cold-call outcomes are real persisted statuses; pending notes survive reopening.

@@ -146,9 +146,20 @@ export class LeadsService {
        }
        return {id:previous.id,created:false};
      }
-     const client=await tx.client.findFirst({where:{organizationId,OR:[
+     let client=await tx.client.findFirst({where:{organizationId,OR:[
        {phone:"+"+normalized},{phone:normalized},
      ]},select:{id:true}});
+     // Converted clients may retain formatted numbers such as "+91 98765 43210".
+     // Deduplicate against them before creating a new lead.
+     if(!client){
+       const matches=await tx.$queryRaw<{id:string}[]>`
+         SELECT "id" FROM "Client"
+         WHERE "organizationId"=${organizationId}::uuid
+           AND REGEXP_REPLACE(COALESCE("phone",''),'[^0-9]','','g')=${normalized}
+         LIMIT 1
+       `;
+       client=matches[0]??null;
+     }
      if(client)return {id:client.id,created:false};
      const lead=await this.addIn(tx,actor,{phone:"+"+normalized,source:"META_LEADS"});
      return {id:lead.id,created:true};
