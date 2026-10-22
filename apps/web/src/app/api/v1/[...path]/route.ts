@@ -110,6 +110,7 @@ const assetActionPattern = /^assets\/[0-9a-fA-F-]{36}\/(authorized-download|link
 const leadDetailPattern = /^leads\/[0-9a-fA-F-]{36}$/;
 const leadAssignPattern = /^leads\/[0-9a-fA-F-]{36}\/assign$/;
 const leadNotesPattern = /^leads\/[0-9a-fA-F-]{36}\/notes$/;
+const leadStageNotePattern = /^leads\/[0-9a-fA-F-]{36}\/stage-note$/;
 const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review$/;
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
@@ -154,6 +155,7 @@ function permitted(path: string, method: string): boolean {
   if (clientConvertPattern.test(path)) return method === "POST";
   if (leadDetailPattern.test(path)) return ["GET","PUT","DELETE"].includes(method);
   if (leadAssignPattern.test(path)) return method === "PUT";
+  if (leadStageNotePattern.test(path)) return method === "PUT";
   if (leadNotesPattern.test(path)||leadDuplicateReviewPattern.test(path)) return method === "POST";
   if (financeCategoryDetailPattern.test(path)||financeEntryDetailPattern.test(path)) return ["PUT","DELETE"].includes(method);
   if (financeCategoryStatusPattern.test(path)) return method === "PUT";
