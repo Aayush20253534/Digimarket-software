@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { BookOpen, Check, Cloud, CloudOff, Eraser, FilePlus2, NotebookPen, PenLine, RefreshCw, Maximize2, Minimize2, Redo2, Save, Trash2, Undo2, Brush, Highlighter, Pencil, MousePointer2, Shapes, Type, StickyNote, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Settings2, Download, Search, FolderPlus, Star, Clock3 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -127,7 +128,7 @@ export default function NotesPage(){
  const [pen,setPen]=useState("#D18CFF"),[width,setWidth]=useState(3),[eraserSize,setEraserSize]=useState(16);
  const [tool,setTool]=useState<Tool>("pen");
  const [mode,setMode]=useState<"handwritten"|"typed">("handwritten");
- const [gridOpen,setGridOpen]=useState(false);
+
  const [shared,setShared]=useState<{id:string;title:string;kind:"typed"|"handwritten";body:string;strokes:string;pages:string}|null>(null);
  const [shareTarget,setShareTarget]=useState("");
  const [shareUsers,setShareUsers]=useState<{id:string;displayName:string}[]>([]);
@@ -211,7 +212,8 @@ export default function NotesPage(){
    setActivePage(0);setPaper(pages[0]?.paper??"dotted");
    const next={title:note.title,body:note.body,strokes:pages[0]?.strokes??note.strokes,pages:note.pages??"[]"};
    dirty.current=false;draftRef.current=next;setDraft(next);setSaveState("saved");
-   setMode(note.kind??(note.body.trim()&&!parseStrokes(note.strokes).length?"typed":"handwritten"));
+   const restoredKind=note.kind??(note.body.trim()&&!parseStrokes(note.strokes).length?"typed":"handwritten");
+   setMode(restoredKind);setInspectorOpen(restoredKind==="handwritten");setPanel("tools");
    setDrawing(null);drawingRef.current=null;
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  },[request,ensureSavedForSwitch]);
@@ -259,7 +261,7 @@ export default function NotesPage(){
    setModernNotesApi(pagesSupported.current);
    await listNotes();
    selectedRef.current=note.id;setSelected(note.id);versionRef.current=note.version;
-   setMode(kind);draftRef.current=blank;setDraft(blank);setActivePage(0);setPaper("dotted");dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];history.current=[];
+   setMode(kind);setInspectorOpen(kind==="handwritten");setPanel("tools");draftRef.current=blank;setDraft(blank);setActivePage(0);setPaper("dotted");dirty.current=false;setSaveState("saved");setPreview(false);redoStack.current=[];history.current=[];
   }catch(e){setError(explanation(e));}finally{setActionBusy(false);}
  };
  const saveConflictCopy=async()=>{
@@ -551,7 +553,7 @@ export default function NotesPage(){
       <BookOpen size={17} color={book.color}/>{book.name}
      </button><button type="button" aria-label={"Rename notebook "+book.name} title="Rename notebook" onClick={()=>void renameNotebook(book)}><PenLine size={13}/></button>
     </div>)}</div>
-    <button type="button" className="aw-studio-new" onClick={()=>setGridOpen(v=>!v)}><BookOpen size={16}/> {gridOpen?"Hide Notes List":"Notes List (Grid)"}</button>
+    <Link className="aw-studio-new" href="/app/notes/list"><BookOpen size={16}/> Notes List (Grid)</Link>
     <div className="aw-studio-section-title">RECENT NOTES</div>
     {loadState==="loading"&&<p role="status" className="aw-notes-muted">Loading notes…</p>}
     {!list.length&&loadState==="ready"&&<p className="aw-notes-muted">No saved notes. Create one to begin.</p>}
@@ -601,7 +603,6 @@ export default function NotesPage(){
    </header>
    {!modernNotesApi&&<AWNotice tone="error">The Notes API on Render is outdated. Single-page notes can still be saved, but notebooks and multi-page persistence require deploying the latest backend.</AWNotice>}
    {error&&<AWNotice tone="error">{error} {saveState==="conflict"&&"Unsaved work remains here."}</AWNotice>}
-   {gridOpen&&<section aria-label="Notes list grid" style={{padding:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",gap:12}}>{visibleNotes.map(n=><button key={n.id} type="button" onClick={()=>{void open(n.id);setGridOpen(false);}} style={{minHeight:128,border:"1px solid #7d4eae",borderRadius:14,padding:15,background:"#211630",color:"white",textAlign:"left",display:"flex",flexDirection:"column",gap:12}}><strong>{n.title}</strong><span>{n.kind==="typed"?"Typed document":"Handwritten document"}</span><small>{new Date(n.updatedAt).toLocaleString()}</small></button>)}</section>}
    {!selected&&shared&&<section aria-label="Shared note preview" style={{padding:25,color:"#e9dcfa"}}><h2 style={{fontSize:24,fontWeight:700,marginBottom:12}}>{shared.title}</h2><p>Shared {shared.kind} note. Read-only until you save your own copy.</p>{shared.kind==="typed"?<pre style={{whiteSpace:"pre-wrap",background:"#f9f7fd",color:"#171225",padding:20,borderRadius:12,marginTop:20}}>{shared.body}</pre>:<div style={{background:"white",padding:15,borderRadius:12,marginTop:20,color:"#24162f"}}>Handwritten document with {parseStrokes(shared.strokes).length} strokes. Save a copy to open its drawing pages.</div>}<button type="button" className="aw-studio-new" style={{marginTop:20}} onClick={async()=>{try{const n=await request<{id:string}>("/messages/"+shared.id+"/save-note",{method:"POST"});setShared(null);await listNotes();window.history.replaceState(null,"","/app/notes?note="+n.id);void open(n.id);}catch(e){setError(explanation(e));}}}>Save to My Notes</button></section>}
    {!selected&&!shared?<div className="aw-notes-home" aria-label="Choose a note type">
      <NotebookPen size={35}/>
@@ -632,7 +633,7 @@ export default function NotesPage(){
     </div>
     {mode==="handwritten"?<>
      <div className="aw-studio-tools" role="group" aria-label="Drawing tools">
-      {tools.map(({id,label,icon:Icon})=><button key={id} type="button" aria-pressed={tool===id} onClick={()=>setTool(id)}>
+      {tools.map(({id,label,icon:Icon})=><button key={id} type="button" aria-pressed={tool===id} onClick={()=>{setTool(id);setInspectorOpen(true);setPanel("tools");}}>
        <Icon size={22} strokeWidth={1.8}/><span>{label}</span></button>)}
      </div>
      <div className="aw-studio-sheet-scroll"><div className={"aw-studio-sheet paper-"+paper} style={{width:zoom+"%"}}>
