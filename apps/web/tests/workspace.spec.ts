@@ -253,9 +253,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:/Lead: Lead/})).toBeVisible();
   await expect(page.getByText(/Source: Meta Leads/)).toBeVisible();
   const freshLeadRow=page.getByRole("table",{name:"Leads directory"}).locator("tbody tr")
-    .filter({has:page.getByRole("link",{name:"Call 9876543210"})});
+    .filter({has:page.getByRole("table",{name:"Leads directory"}).getByRole("link",{name:"Call 9876543210"})});
   await expect(freshLeadRow).toHaveCount(1);
-  await expect(page.getByRole("link",{name:"Call 9876543210"})).toHaveAttribute("href","tel:9876543210");
+  await expect(page.getByRole("table",{name:"Leads directory"}).getByRole("link",{name:"Call 9876543210"})).toHaveAttribute("href","tel:9876543210");
   await expect(freshLeadRow.getByRole("button",{name:"Open"})).toHaveCount(0);
   const dateAdded=freshLeadRow.locator("time");
   await expect(dateAdded).toHaveAttribute("dateTime",/^20\d{2}-/);
@@ -264,19 +264,19 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Lead status").selectOption("YET_TO_CALL");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
-    .locator("tbody tr").filter({has:page.getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-yet-to-call");
+    .locator("tbody tr").filter({has:page.getByRole("table",{name:"Leads directory"}).getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-yet-to-call");
   await expect(yetToCallBadge).toHaveText("Yet to Call");
   await expect(yetToCallBadge).toHaveCSS("background-color","rgb(0, 0, 0)");
   await expect(yetToCallBadge).toHaveCSS("color","rgb(255, 255, 255)");
   await page.getByLabel("Lead status").selectOption("CALL_NOT_PICKING");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
-    .locator("tbody tr").filter({has:page.getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-not-picking");
+    .locator("tbody tr").filter({has:page.getByRole("table",{name:"Leads directory"}).getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-not-picking");
   await expect(notPickingBadge).toHaveCSS("background-color","rgb(255, 0, 255)");
   await page.getByLabel("Lead status").selectOption("REJECTED");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const rejectedBadge=page.getByRole("table",{name:"Leads directory"})
-    .locator("tbody tr").filter({has:page.getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-rejected");
+    .locator("tbody tr").filter({has:page.getByRole("table",{name:"Leads directory"}).getByRole("link",{name:"Call 9876543210"})}).locator(".aw-status-rejected");
   await expect(rejectedBadge).toHaveCSS("background-color","rgb(255, 0, 0)");
   await page.getByLabel("Contact name",{exact:true}).fill("CI Contact");
   await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
