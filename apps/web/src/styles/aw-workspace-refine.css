@@ -440,6 +440,7 @@ body:has(.aw-workspace){background:#09070e}
 
 /* Lead register: blue meetings, fixed scroll area, dedicated meeting note column. */
 [data-aw-module="leads"] .aw-status-meeting{background:#174c9a!important;color:#e2f3ff!important;border:1px solid #4598ef!important}
+[data-aw-module="leads"] .aw-status-not-picking{background:#9d174d!important;color:#fce7f3!important;border:1px solid #ec4899!important}
 [data-aw-module="leads"] .aw-register-scroll{max-width:100%;max-height:min(64dvh,690px);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-color:#8052a0 #21172b}
 [data-aw-module="leads"] .aw-register-table{min-width:1230px}
 [data-aw-module="leads"] .aw-register-table thead th{position:sticky;top:0;z-index:3}
