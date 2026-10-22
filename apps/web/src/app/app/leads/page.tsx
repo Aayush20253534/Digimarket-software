@@ -110,7 +110,7 @@ export default function LeadsPage(){
      const detail=await request<Detail>("/leads/"+id);
      activeLeadId.current=id;
      setSelected(detail);setEditStage(detail.status);setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
-     let draft:string|null=null;try{draft=window.localStorage.getItem(draftKey(id));}catch{}
+     let draft:string|null=null;try{draft=window.localStorage.getItem(draftKey(id));}catch{ /* Browser storage may be unavailable. */ }
      latestStageNote.current=draft??detail.stageNote??"";
      setNote("");setStageNote(latestStageNote.current);setNoteSaveState(draft===null?"idle":"saving");
      setUpdating({businessName:detail.businessName.startsWith("Lead ")? "":detail.businessName,
@@ -129,7 +129,7 @@ export default function LeadsPage(){
      setSelected(current=>current?.id===leadId?{...current,stageNote:saved.stageNote??""}:current);
      setItems(current=>current.map(x=>x.id===leadId?{...x,stageNote:saved.stageNote??""}:x));
      if(activeLeadId.current===leadId&&latestStageNote.current===noteText){
-       try{if(window.localStorage.getItem(draftKey(leadId))===noteText)window.localStorage.removeItem(draftKey(leadId));}catch{}
+       try{if(window.localStorage.getItem(draftKey(leadId))===noteText)window.localStorage.removeItem(draftKey(leadId));}catch{ /* Browser storage may be unavailable. */ }
        setNoteSaveState("saved");
      }
    }).catch(e=>{
@@ -158,7 +158,7 @@ export default function LeadsPage(){
      await noteWriteQueue.current;
      await request("/leads/"+selected.id,{method:"PUT",body:{...updating,source:editSource,status:editStage,
        stageNote,version:selected.version}});
-     try{window.localStorage.removeItem(draftKey(selected.id));}catch{}
+     try{window.localStorage.removeItem(draftKey(selected.id));}catch{ /* Browser storage may be unavailable. */ }
      setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":"Shared lead and status note saved.");await open(selected.id);await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
@@ -349,7 +349,7 @@ export default function LeadsPage(){
              <FormField id="lead-status-note" label={"Note for "+stageLabel(editStage)}>
                <textarea id="lead-status-note" className="field min-h-20" maxLength={2000}
                  placeholder="Call summary, meeting outcome, or reason for approval"
-                 value={stageNote} onChange={e=>{const value=e.target.value;latestStageNote.current=value;setStageNote(value);setNoteSaveState("idle");try{window.localStorage.setItem(draftKey(selected.id),value);}catch{}}}/>
+                 value={stageNote} onChange={e=>{const value=e.target.value;latestStageNote.current=value;setStageNote(value);setNoteSaveState("idle");try{window.localStorage.setItem(draftKey(selected.id),value);}catch{ /* Browser storage may be unavailable. */ }}}/>
                <p className="aw-lead-note-save-state" data-state={noteSaveState} role="status">{noteSaveState==="saving"?"Saving to CRM…":noteSaveState==="saved"?"Saved to CRM":noteSaveState==="error"?"Save failed; draft retained on this device.":"Notes save automatically."}</p>
              </FormField>
              <button className="btn-primary" type="submit" disabled={busy}>Save details and stage</button>
