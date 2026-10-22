@@ -162,10 +162,15 @@ export default function TasksPage(){
    <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
      <span className="text-sm text-slate-500">Assigned: {selected.assignees.map(a=>a.user.displayName).join(", ")}</span>
-     {canWrite&&<select aria-label="Update task status" className="field" value={selected.status} disabled={busy}
+     {canWrite&&(canManage?<select aria-label="Update task status" className="field" value={selected.status} disabled={busy}
        onChange={e=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",
          body:{version:selected.version,status:e.target.value}}),"Task status updated.")}>
-       {statuses.map(v=><option key={v}>{v}</option>)}</select>}
+       {statuses.map(v=><option key={v}>{v}</option>)}</select>:selected.status==="TODO"||selected.status==="IN_PROGRESS"?
+       <button type="button" className="btn-primary" disabled={busy} onClick={()=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",body:{
+        version:selected.version,status:selected.status==="TODO"?"IN_PROGRESS":"DONE"
+       }}),selected.status==="TODO"?"Task moved to In Process.":"Task completed.")}>
+        {selected.status==="TODO"?"✓ Start task":"✓ Complete task"}
+       </button>:<StatusBadge status={selected.status}/> )}
     </div>
     <section><h3 className="text-sm font-bold">Checklist</h3>
      <ul className="my-3 space-y-2">{selected.checklist?.map(c=><li key={c.id} className="flex items-center gap-2 text-sm">
