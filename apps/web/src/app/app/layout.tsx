@@ -10,7 +10,7 @@ import { currentSection, permittedGroups, WorkspaceNav } from "@/components/work
 import { AWNotificationBell } from "@/components/aw-notification-bell";
 
 function Avatar({ name, photo }: { name: string; photo?:string|null }) {
- if(photo)return <img src={photo} alt="" className="aw-work-avatar" style={{objectFit:"cover",borderRadius:"50%"}}/>;
+ if(photo)return <img src={photo} alt="" width={64} height={64} className="aw-work-avatar" style={{objectFit:"cover",objectPosition:"center",borderRadius:"50%"}}/>;
  const initials=name.trim().split(/\s+/).slice(0,2).map(w=>w.charAt(0)).join("").toUpperCase();
  return <span className="aw-work-avatar" aria-hidden="true">{initials}</span>;
 }
@@ -50,10 +50,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  useEffect(()=>{
   if(!session)return;
   let mounted=true;
-  void request<{avatarData:string|null}>("/profile/avatar")
-   .then(data=>{if(mounted)setPhoto(data.avatarData);})
-   .catch(()=>{if(mounted)setPhoto(null);});
-  return()=>{mounted=false;};
+  const refreshPhoto=()=>{
+   void request<{avatarData:string|null}>("/profile/avatar")
+    .then(data=>{if(mounted)setPhoto(data.avatarData);})
+    .catch(()=>{if(mounted)setPhoto(null);});
+  };
+  refreshPhoto();
+  window.addEventListener("aw-profile-avatar-updated",refreshPhoto);
+  return()=>{mounted=false;window.removeEventListener("aw-profile-avatar-updated",refreshPhoto);};
  },[session?.identity.userId,pathname,request]);
  useEffect(()=>{
   const dialog=dialogRef.current;

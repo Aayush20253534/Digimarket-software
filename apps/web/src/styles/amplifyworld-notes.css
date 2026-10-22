@@ -379,3 +379,16 @@
  .aw-workspace:has(.aw-notes-list-page) .aw-work-content-width,
  .aw-workspace:has(.aw-notes-list-page) .aw-notes-list-page{min-height:calc(133.3334dvh - 72px)!important}
 }
+
+/* Profile photo: proportional crop + circular mask; account page uses 75% workspace zoom. */
+.aw-workspace .aw-profile-photo-section{min-height:220px;align-items:center;gap:24px}
+.aw-workspace .aw-profile-photo-frame{width:220px;height:220px;min-width:220px;min-height:220px;flex:0 0 220px;aspect-ratio:1/1;overflow:hidden;border-radius:50%;border:3px solid #bd76e8}
+.aw-workspace .aw-profile-photo-frame .aw-profile-photo-large{display:block;width:100%!important;height:100%!important;max-width:none;aspect-ratio:1/1;object-fit:cover;object-position:center;border-radius:50%!important}
+.aw-profile-photo-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;flex:1;min-width:180px}
+.aw-profile-photo-hint{width:100%;max-width:350px;color:#bda8cc;font-size:12px;line-height:1.5}
+.aw-workspace img.aw-work-avatar{aspect-ratio:1/1!important;object-fit:cover!important;object-position:center!important;border-radius:50%!important}
+@media(max-width:620px){
+ .aw-workspace .aw-profile-photo-frame{width:160px;height:160px;min-width:160px;min-height:160px;flex-basis:160px}
+ .aw-workspace .aw-profile-photo-section{min-height:160px;gap:16px}
+ .aw-profile-photo-actions{min-width:0}
+}

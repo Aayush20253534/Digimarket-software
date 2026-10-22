@@ -79,3 +79,6 @@
  .aw-chat-directory-caption{padding-left:18px}
  .aw-chat-conversation-header{min-height:68px}
 }
+
+/* Chat avatars retain their proportions regardless of uploaded photo dimensions. */
+.aw-messages-page img.aw-chat-avatar{aspect-ratio:1/1!important;object-fit:cover!important;object-position:center!important;border-radius:50%!important}

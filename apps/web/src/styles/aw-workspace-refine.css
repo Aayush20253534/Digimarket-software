@@ -434,3 +434,6 @@ body:has(.aw-workspace){background:#09070e}
 
 /* Account avatar should not inherit rectangular image dimensions. */
 .aw-work-avatar:is(img){aspect-ratio:1/1!important;object-fit:cover!important;object-position:center;border-radius:50%!important;flex-shrink:0}
+
+/* Prevent inherited rectangular image styles from altering workspace avatar geometry. */
+.aw-workspace img.aw-work-avatar{aspect-ratio:1/1!important;object-fit:cover!important;object-position:center!important;border-radius:50%!important}

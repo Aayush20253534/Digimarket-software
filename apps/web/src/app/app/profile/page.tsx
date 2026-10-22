@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, PageHeader, StatusBadge } from "@/components/ui";
+import { prepareAvatarImage } from "@/lib/avatar-image";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -12,11 +13,27 @@ export default function ProfilePage() {
   const [avatar,setAvatar] = useState<string|null>(null);
   const [uploading,setUploading] = useState(false);
   useEffect(()=>{if(session)void request<{avatarData:string|null}>("/profile/avatar").then(x=>setAvatar(x.avatarData)).catch(()=>{});},[session,request]);
-  const uploadAvatar=async(file?:File)=>{if(!file)return;setError("");setUploading(true);
-   try{if(!["image/png","image/jpeg","image/webp"].includes(file.type))throw new Error("Use PNG, JPEG or WebP");
-    const data=await new Promise<string>((resolve,reject)=>{const image=new Image();image.onload=()=>{const canvas=document.createElement("canvas");const size=256;canvas.width=size;canvas.height=size;const ctx=canvas.getContext("2d");if(!ctx)return reject(new Error("Image canvas unavailable"));ctx.drawImage(image,0,0,size,size);resolve(canvas.toDataURL("image/jpeg",0.7));};image.onerror=()=>reject(new Error("Invalid image"));image.src=URL.createObjectURL(file);});
-    if(data.length>135000)throw new Error("Image too large");await request("/profile/avatar",{method:"PUT",body:{avatarData:data}});setAvatar(data);
-   }catch(e){setError(e instanceof Error?e.message:"Upload failed");}finally{setUploading(false);}
+  const uploadAvatar=async(file?:File)=>{
+   if(!file)return;
+   setError("");setUploading(true);
+   try{
+    const data=await prepareAvatarImage(file);
+    await request("/profile/avatar",{method:"PUT",body:{avatarData:data}});
+    setAvatar(data);
+    window.dispatchEvent(new Event("aw-profile-avatar-updated"));
+   }catch(e){
+    setError(e instanceof Error?e.message:"Profile photo upload failed");
+   }finally{setUploading(false);}
+  };
+  const removeAvatar=async()=>{
+   if(uploading)return;
+   setError("");setUploading(true);
+   try{
+    await request("/profile/avatar",{method:"DELETE"});
+    setAvatar(null);
+    window.dispatchEvent(new Event("aw-profile-avatar-updated"));
+   }catch(e){setError(e instanceof Error?e.message:"Failed to remove profile photo");}
+   finally{setUploading(false);}
   };
   const [error, setError] = useState("");
   if (!session) return null;
@@ -25,9 +42,15 @@ export default function ProfilePage() {
     <PageHeader eyebrow="Account settings" title="My profile" description="Identity and granted permissions are obtained from the authenticated API." />
     <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
       <Card title="Account details">
-        <div className="aw-profile-photo-section mb-7 flex flex-wrap items-center gap-5"><div className="aw-profile-photo-frame">{avatar?<img src={avatar} alt="Profile photo" className="aw-profile-photo-large"/>:<UserRound aria-label="Profile photo placeholder" className="aw-profile-photo-placeholder"/>}</div>
-         <label className="btn-secondary cursor-pointer">{uploading?"Uploading...":"Upload profile photo"}<input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={e=>void uploadAvatar(e.target.files?.[0])}/></label>
-         {avatar&&<button className="btn-secondary" onClick={async()=>{await request("/profile/avatar",{method:"DELETE"});setAvatar(null);}}>Remove</button>}</div>
+        <div className="aw-profile-photo-section mb-7 flex flex-wrap items-center gap-5"><div className="aw-profile-photo-frame">{avatar?<img src={avatar} alt="Profile photo" width={512} height={512} className="aw-profile-photo-large"/>:<UserRound aria-label="Profile photo placeholder" className="aw-profile-photo-placeholder"/>}</div>
+         <div className="aw-profile-photo-actions">
+          <label className={"btn-secondary cursor-pointer"+(uploading?" pointer-events-none opacity-60":"")} aria-disabled={uploading}>
+            {uploading?"Processing photo...":"Upload profile photo"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} className="hidden" onChange={e=>{void uploadAvatar(e.target.files?.[0]);e.target.value="";}}/>
+          </label>
+          {avatar&&<button type="button" className="btn-secondary" disabled={uploading} onClick={()=>void removeAvatar()}>Remove</button>}
+          <p className="aw-profile-photo-hint">Photos are cropped without stretching. Re-upload the original photo if a previous upload looks distorted.</p>
+         </div></div>
         <dl className="space-y-5 text-sm">
           <div><dt className="text-slate-500">Display name</dt><dd className="mt-1 font-semibold text-slate-900">{user.displayName}</dd></div>
           <div><dt className="text-slate-500">Login ID</dt><dd className="mt-1 font-semibold text-slate-900">{user.loginId}</dd></div>
