@@ -1,0 +1,53 @@
+/* Task status surfaces for founders and employees. Administrator pages are unchanged. */
+.aw-personal-dashboard [data-testid="personal-pending"]{--aw-task-card-bg:#B91C1C}
+.aw-personal-dashboard [data-testid="personal-in-process"]{--aw-task-card-bg:#C2410C}
+.aw-personal-dashboard [data-testid="personal-completed"]{--aw-task-card-bg:#15803D}
+.aw-personal-dashboard [data-testid="personal-overdue"]{--aw-task-card-bg:#000000}
+.aw-personal-dashboard .aw-personal-task-section{
+  background:var(--aw-task-card-bg);
+  border-color:rgba(255,255,255,.4);
+  color:#FFFFFF;
+}
+.aw-personal-dashboard .aw-personal-task-section .aw-personal-task-item{
+  background:rgba(0,0,0,.17);
+  border-color:rgba(255,255,255,.33);
+  color:#FFFFFF;
+}
+.aw-personal-dashboard .aw-personal-task-section :is(
+  .aw-personal-task-heading,.aw-personal-task-heading h2,.aw-personal-task-count,
+  .aw-personal-task-link,.aw-personal-task-description,.aw-action-meta,
+  .aw-action-status,.aw-action-item-link,.aw-badge
+){color:#FFFFFF}
+.aw-personal-dashboard .aw-personal-task-section .aw-personal-task-icon{
+  background:rgba(0,0,0,.17);
+  color:#FFFFFF;
+}
+.aw-personal-dashboard .aw-personal-task-section :is(.aw-badge,.aw-action-item-link){
+  background:rgba(0,0,0,.21);
+  border-color:rgba(255,255,255,.4);
+}
+.aw-personal-dashboard [data-testid="personal-completed"] > p,
+.aw-personal-dashboard [data-testid="personal-completed"] > p a{
+  color:#FFFFFF;
+}
+/* The status-colored register rows are only rendered for non-admin accounts. */
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-pending{--aw-task-card-bg:#B91C1C}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-in-process{--aw-task-card-bg:#C2410C}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-completed{--aw-task-card-bg:#15803D}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-expired{--aw-task-card-bg:#000000}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-card{
+  background:var(--aw-task-card-bg);
+  border-color:rgba(255,255,255,.5);
+  color:#FFFFFF;
+}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-card :is(p,.aw-task-state){
+  color:#FFFFFF;
+}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-card .aw-task-state{
+  background:rgba(0,0,0,.25);
+  border-color:rgba(255,255,255,.45);
+}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-card:hover{
+  border-color:#FFFFFF;
+  filter:brightness(1.07);
+}

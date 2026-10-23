@@ -29,6 +29,8 @@ const editableStatuses:{value:Status;label:string}[]=[
 ];
 const expired=(task:Task)=>task.status!=="DONE"&&task.status!=="CANCELLED"&&Boolean(task.dueAt)&&new Date(task.dueAt!).getTime()<Date.now();
 const displayStatus=(task:Task)=>expired(task)?"Expired":task.status==="TODO"?"Pending":task.status==="IN_PROGRESS"?"In Process":task.status==="DONE"?"Completed":task.status;
+// Only non-admin task cards use the role-specific status palette.
+const taskCardTone=(task:Task)=>expired(task)?"expired":task.status==="DONE"?"completed":task.status==="TODO"?"pending":task.status==="IN_PROGRESS"?"in-process":"";
 const priorities:Priority[]=["LOW","MEDIUM","HIGH","URGENT"];
 const err=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Request failed";
 const initial={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",dueAt:"",assigneeIds:[] as string[]};
@@ -194,7 +196,7 @@ export default function TasksPage(){
    </div>
    {loading?<Spinner label="Loading tasks…"/>:tasks.length? <div className="space-y-2" data-testid="task-register-list">
      {tasks.map(task=><button type="button" key={task.id} onClick={()=>void open(task.id)}
-       className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-indigo-400">
+       className={"flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-indigo-400"+(!isAdmin&&taskCardTone(task)?" aw-assignee-task-card aw-assignee-task-"+taskCardTone(task):"")}>
        <div><p className="text-sm font-semibold">{task.title}</p>
          <p className="mt-1 text-xs text-slate-500">{task.project?.name||"General"} · {task.priority}
            {task.dueAt?" · Due "+new Date(task.dueAt).toLocaleString():""}</p></div>
