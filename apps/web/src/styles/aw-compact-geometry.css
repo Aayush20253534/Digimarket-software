@@ -67,7 +67,7 @@
 ) { border-radius: 50% !important; }
 
 /* Compact status labels no longer read as oval pills. */
-.aw-theme :where(.aw-badge, .aw-module-pill, .aw-module-count, .aw-status-badge) {
+:is(#aw-compact-geometry, .aw-theme) :where(.aw-badge, .aw-module-pill, .aw-module-count, .aw-status-badge) {
   border-radius: 3px !important;
 }
 .aw-theme :where(.aw-module-pill, .aw-module-count) { padding-block: 4px; }
