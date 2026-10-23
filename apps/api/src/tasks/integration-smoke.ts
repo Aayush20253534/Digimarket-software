@@ -85,9 +85,10 @@ try{
    {version:updated.version,status:"IN_PROGRESS"}),failed(422));
  await assert.rejects(()=>tasks.update(founder,t.id,
    {version:updated.version,status:"IN_PROGRESS"}),failed(404));
- const limitedManager=actor(admin.id,org.id,["tasks.read","tasks.update.own"]);
- await assert.rejects(()=>tasks.update(limitedManager,t.id,
-   {version:updated.version,status:"IN_PROGRESS"}),failed(403));
+ // An assigned admin without tasks.manage has only ordinary assignee rights.
+ const limitedAssignee=actor(admin.id,org.id,["tasks.read","tasks.update.own"]);
+ await assert.rejects(()=>tasks.update(limitedAssignee,t.id,
+   {version:updated.version,status:"IN_PROGRESS"}),failed(422));
  let statusTask=await tasks.update(mgr,t.id,{version:updated.version,status:"IN_PROGRESS"});
  assert.equal(statusTask.status,"IN_PROGRESS");
  assert.equal(statusTask.completedAt,null);
