@@ -113,7 +113,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(expenseLink).toBeVisible();
   const reportFrom=await page.getByRole("region",{name:"Reporting period"}).getByLabel("From").inputValue();
   const reportTo=await page.getByRole("region",{name:"Reporting period"}).getByLabel("Through").inputValue();
+  const incomeResponse=page.waitForResponse(response=>
+    response.url().includes("/api/v1/finance/report-breakdown?")&&
+    response.request().method()==="GET");
   await incomeLink.click();
+  const resolvedIncome=await incomeResponse;
+  expect(resolvedIncome.status(),"Income breakdown API must accept inherited dates").toBe(200);
   await expect(page).toHaveURL(/\/app\/reports\/income\?/);
   await expect(page.getByRole("heading",{name:"Income Breakdown"})).toBeVisible();
   await expect(page.getByLabel("Breakdown from date")).toHaveValue(reportFrom);
@@ -129,7 +134,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("link",{name:"Back to Reports"}).click();
   await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
   await expect(page.getByRole("link",{name:"View Expenses breakdown"})).toBeVisible();
+  const expenseResponse=page.waitForResponse(response=>
+    response.url().includes("/api/v1/finance/report-breakdown?")&&
+    response.request().method()==="GET");
   await page.getByRole("link",{name:"View Expenses breakdown"}).click();
+  const resolvedExpense=await expenseResponse;
+  expect(resolvedExpense.status(),"Expense breakdown API must accept inherited dates").toBe(200);
   await expect(page).toHaveURL(/\/app\/reports\/expenses\?/);
   await expect(page.getByRole("heading",{name:"Expense Breakdown"})).toBeVisible();
   await expect(page.getByLabel("Breakdown from date")).toHaveValue(reportFrom);

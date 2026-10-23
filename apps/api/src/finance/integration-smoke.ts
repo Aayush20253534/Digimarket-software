@@ -113,7 +113,9 @@ try{
   const reports=await new InsightsService(db).report(reportingAdmin,period.from,period.to);
   const reportLedger=(reports.sections.cashLedger as {posted:{kind:string;amount:string}[]}).posted;
   for(const [kind,total] of [["INCOME",incomeDetails.total],["EXPENSE",expenseDetails.total]]){
-    assert.equal(Number(reportLedger.find(x=>x.kind===kind)?.amount),Number(total));
+    // Reports displays 2 decimal places; the underlying finance ledger
+    // retains 4. Match presentation precision without losing stored cents.
+    assert.equal(reportLedger.find(x=>x.kind===kind)?.amount,Number(total).toFixed(2));
   }
   const searched=await finance.breakdown(reportingAdmin,{...period,kind:"EXPENSE",q:"Rapido"});
   assert.equal(searched.total,expenseDetails.total);

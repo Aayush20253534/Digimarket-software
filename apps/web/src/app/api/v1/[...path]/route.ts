@@ -248,6 +248,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       if(v!==null)url.searchParams.set(key,v);
     }
   }
+  // Preserve the validated drill-down filters through the Next.js gateway.
+  // The backend still validates kind, dates, search and pagination.
+  if(path==="finance/report-breakdown"||path==="finance/report-breakdown/export"){
+    for(const key of ["kind","from","to","q","page","limit"]){
+      const v=request.nextUrl.searchParams.get(key);
+      if(v!==null)url.searchParams.set(key,v);
+    }
+  }
   if(path==="notifications"){
     for(const key of ["unread","limit"]){
       const v=request.nextUrl.searchParams.get(key);
