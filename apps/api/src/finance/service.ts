@@ -370,7 +370,7 @@ export class FinanceService {
       select:{id:true,amount:true,occurredOn:true,method:true,
         merchantOrSource:true,description:true,postedAt:true,
         category:{select:{name:true}},enteredBy:{select:{displayName:true,loginId:true}}},
-    }});
+    });
     if(rows.length>5000)throw new AuthError(422,"EXPORT_LIMIT",
       "This export exceeds 5,000 transactions. Select a shorter date range or refine your search.");
     const header=["id","kind","occurred_on","amount_inr","category","payment_method",
