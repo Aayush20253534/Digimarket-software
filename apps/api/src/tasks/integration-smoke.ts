@@ -100,6 +100,40 @@ try{
  assert.equal((await tasks.detail(staffActor,t.id)).comments.length,2);
  await assert.rejects(()=>tasks.update(mgr,t.id,
    {version:updated.version,status:"TODO"}),failed(409));
+
+ // Only an authorized admin may atomically edit all task details and assignees.
+ const nextDeadline=new Date(Date.now()+7*86400000).toISOString();
+ const editedInput={
+   version:statusTask.version,title:"Launch redesigned homepage",
+   description:"Updated scope and review checklist",priority:"URGENT" as const,
+   dueAt:nextDeadline,projectId:null,assigneeIds:[staff.id,other.id],
+ };
+ await assert.rejects(()=>tasks.edit(staffActor,t.id,editedInput),failed(403));
+ await assert.rejects(()=>tasks.edit(founder,t.id,editedInput),failed(403));
+ await assert.rejects(()=>tasks.edit(stranger,t.id,editedInput),failed(404));
+ await assert.rejects(()=>tasks.edit(mgr,t.id,{...editedInput,
+   projectId:project.id,assigneeIds:[foreign.id]}),failed(422));
+ const edited=await tasks.edit(mgr,t.id,editedInput);
+ assert.equal(edited.title,"Launch redesigned homepage");
+ assert.equal(edited.description,"Updated scope and review checklist");
+ assert.equal(edited.priority,"URGENT");
+ assert.equal(edited.projectId,null);
+ assert.equal(edited.status,"IN_PROGRESS");
+ assert.equal(edited.dueAt?.toISOString(),nextDeadline);
+ assert.deepEqual(edited.assignees.map(a=>a.userId).sort(),[other.id,staff.id].sort());
+ assert.equal(edited.version,statusTask.version+1);
+ assert.equal((await tasks.detail(staffActor,t.id)).comments.length,2);
+ assert.equal(await db.notification.count({where:{
+   organizationId:org.id,recipientId:admin.id,kind:"TASK_ASSIGNED",dedupeKey:"task.assigned:"+t.id,
+ }}),0);
+ assert.equal(await db.notification.count({where:{
+   organizationId:org.id,recipientId:other.id,kind:"TASK_ASSIGNED",dedupeKey:"task.assigned:"+t.id,
+ }}),1);
+ assert.equal(await db.auditLog.count({where:{organizationId:org.id,entityId:t.id,
+   action:"tasks.edited"}}),1);
+ await assert.rejects(()=>tasks.edit(mgr,t.id,editedInput),failed(409));
+ assert.equal((await tasks.detail(mgr,t.id)).title,"Launch redesigned homepage");
+ statusTask=edited;
  // Only a tenant admin with task management can delete a shared task.
  await assert.rejects(()=>tasks.delete(staffActor,t.id,statusTask.version),failed(403));
  await assert.rejects(()=>tasks.delete(founder,t.id,statusTask.version),failed(403));

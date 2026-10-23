@@ -3,7 +3,7 @@ import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { TeamMultiSelect } from "@/components/team-multi-select";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
 
 type Status="TODO"|"IN_PROGRESS"|"BLOCKED"|"IN_REVIEW"|"DONE"|"CANCELLED";
@@ -32,6 +32,13 @@ const displayStatus=(task:Task)=>expired(task)?"Expired":task.status==="TODO"?"P
 const priorities:Priority[]=["LOW","MEDIUM","HIGH","URGENT"];
 const err=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Request failed";
 const initial={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",dueAt:"",assigneeIds:[] as string[]};
+type EditDraft=typeof initial;
+const localDeadline=(value:string|null)=>{
+ if(!value)return "";
+ const date=new Date(value);
+ if(Number.isNaN(date.getTime()))return "";
+ return new Date(date.getTime()-date.getTimezoneOffset()*60_000).toISOString().slice(0,16);
+};
 const initialSchedule={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",
  assigneeIds:[] as string[],frequency:"DAILY" as "DAILY"|"WEEKLY"|"MONTHLY",interval:1,
  startAt:"",dueOffsetDays:0};
@@ -50,6 +57,8 @@ export default function TasksPage(){
  const [projects,setProjects]=useState<Project[]>([]);
  const [recurrences,setRecurrences]=useState<Recurrence[]>([]);
  const [create,setCreate]=useState(initial);
+ const [editing,setEditing]=useState(false);
+ const [editDraft,setEditDraft]=useState<EditDraft>(initial);
  const [schedule,setSchedule]=useState(initialSchedule);
  const [search,setSearch]=useState("");
  const [statusFilter,setStatusFilter]=useState("");
@@ -72,7 +81,10 @@ export default function TasksPage(){
   }catch(e){setError(err(e));}finally{setLoading(false);}
  },[canRead,canManage,view,request,search,statusFilter,cursor]);
  const open=useCallback(async(id:string)=>{
-  try{setSelected(await request<Task>("/tasks/"+id));}catch(e){setError(err(e));}
+  try{
+   const detail=await request<Task>("/tasks/"+id);
+   setSelected(detail);setEditing(false);
+  }catch(e){setError(err(e));}
  },[request]);
  const loadRecurrences=useCallback(async()=>{
   if(!canRepeat)return;
@@ -82,10 +94,10 @@ export default function TasksPage(){
  useEffect(()=>{void load();},[load]);
   useEffect(()=>{const params=new URLSearchParams(window.location.search);const id=params.get("focus")??params.get("task");if(id&&/^[0-9a-f-]{36}$/i.test(id))void open(id);},[open]);
  useEffect(()=>{
-  if(canCreate)void request<User[]>("/tasks/team").then(setStaff).catch(()=>{});
+  if(canCreate||canManage)void request<User[]>("/tasks/team").then(setStaff).catch(()=>{});
   if(grants.includes("projects.read"))void request<Result<Project>>("/projects?limit=100").then(r=>setProjects(r.items)).catch(()=>{});
   if(canRepeat)void loadRecurrences();
- },[canCreate,canRepeat,request,loadRecurrences,session?.identity.userId]);
+ },[canCreate,canManage,canRepeat,request,loadRecurrences,session?.identity.userId]);
  async function run(action:()=>Promise<unknown>,done:string,reopen=true){
   setBusy(true);setError("");setMessage("");
   try{
@@ -94,6 +106,31 @@ export default function TasksPage(){
    setMessage(done);
   }catch(e){setError(err(e));}finally{setBusy(false);}
  }
+ function beginEdit(task:Task){
+  if(!canManage||busy)return;
+  setError("");setMessage("");
+  setEditDraft({
+   title:task.title,description:task.description??"",priority:task.priority,
+   projectId:task.projectId??"",dueAt:localDeadline(task.dueAt),
+   assigneeIds:task.assignees.map(a=>a.userId),
+  });
+  setEditing(true);
+ }
+ async function saveEdit(e:FormEvent){
+  e.preventDefault();
+  if(!canManage||!selected||busy)return;
+  if(!editDraft.assigneeIds.length){setError("Select at least one employee.");return;}
+  const due=new Date(editDraft.dueAt);
+  if(!editDraft.dueAt||!Number.isFinite(due.getTime())){
+   setError("A valid task expiry date and time is required.");return;
+  }
+  const task=selected;
+  await run(()=>request("/tasks/"+task.id+"/edit",{method:"PUT",body:{
+   version:task.version,title:editDraft.title.trim(),description:editDraft.description.trim(),
+   priority:editDraft.priority,dueAt:due.toISOString(),
+   projectId:editDraft.projectId||null,assigneeIds:editDraft.assigneeIds,
+  }}),"Task edited successfully. Assigned team members have been updated.");
+ }
  async function deleteTask(){
   if(!canManage||!selected||busy)return;
   const task=selected;
@@ -101,7 +138,7 @@ export default function TasksPage(){
   setBusy(true);setError("");setMessage("");
   try{
    await request("/tasks/"+task.id,{method:"DELETE",body:{version:task.version}});
-   setSelected(null);setComment("");
+   setSelected(null);setComment("");setEditing(false);
    setTasks(current=>current.filter(item=>item.id!==task.id));
    setCursor(null);
    const url=new URL(window.location.href);
@@ -210,21 +247,62 @@ export default function TasksPage(){
         {selected.status==="TODO"?"✓ Move to In Process":"✓ Mark Completed"}
        </button>:<StatusBadge status={selected.status}/> )}
     </div>
-    {canManage&&<div className="flex justify-end border-t border-slate-200/20 pt-3">
+    {canManage&&<div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/20 pt-3">
+      <button type="button" className="btn-primary inline-flex items-center gap-2"
+        aria-label="Edit task" disabled={busy||editing} onClick={()=>beginEdit(selected)}>
+        <Pencil aria-hidden="true" className="h-4 w-4"/>Edit task
+      </button>
       <button type="button" className="btn-secondary inline-flex items-center gap-2 border-red-500/50 text-red-300"
         aria-label="Permanently delete task" disabled={busy} onClick={()=>void deleteTask()}>
         <Trash2 aria-hidden="true" className="h-4 w-4"/>Delete task permanently
       </button>
     </div>}
+    {canManage&&editing&&<form className="grid gap-3 rounded-xl border border-violet-500/30 bg-violet-950/10 p-4 md:grid-cols-2"
+      aria-label="Edit task details" onSubmit={e=>void saveEdit(e)}>
+      <h3 className="text-base font-bold md:col-span-2">Edit task details</h3>
+      <label className="text-sm font-semibold">Task title
+        <input aria-label="Edit task title" className="field mt-1 w-full" required minLength={2} maxLength={180}
+          value={editDraft.title} onChange={e=>setEditDraft(x=>({...x,title:e.target.value}))}/>
+      </label>
+      <label className="text-sm font-semibold">Priority
+        <select aria-label="Edit task priority" className="field mt-1 w-full" value={editDraft.priority}
+          onChange={e=>setEditDraft(x=>({...x,priority:e.target.value as Priority}))}>
+          {priorities.map(p=><option key={p} value={p}>{p}</option>)}
+        </select>
+      </label>
+      <label className="text-sm font-semibold">Project
+        <select aria-label="Edit task project" className="field mt-1 w-full" value={editDraft.projectId}
+          onChange={e=>setEditDraft(x=>({...x,projectId:e.target.value}))}>
+          <option value="">General task</option>
+          {editDraft.projectId&&!projects.some(p=>p.id===editDraft.projectId)&&
+            <option value={editDraft.projectId}>{selected.project?.name||"Current project"}</option>}
+          {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </label>
+      <label className="text-sm font-semibold">Expiry date and time
+        <input aria-label="Edit task expiry date and time" className="field mt-1 w-full" type="datetime-local"
+          required value={editDraft.dueAt}
+          onChange={e=>setEditDraft(x=>({...x,dueAt:e.target.value}))}/>
+      </label>
+      <label className="text-sm font-semibold md:col-span-2">Description
+        <textarea aria-label="Edit task description" className="field mt-1 w-full" rows={3} maxLength={2000}
+          value={editDraft.description}
+          onChange={e=>setEditDraft(x=>({...x,description:e.target.value}))}/>
+      </label>
+      <div className="md:col-span-2">
+        <TeamMultiSelect label="Edit task assignees"
+          options={[...staff,...selected.assignees.filter(a=>!staff.some(u=>u.id===a.userId))
+            .map(a=>({id:a.userId,displayName:a.user.displayName}))]}
+          value={editDraft.assigneeIds}
+          onChange={ids=>setEditDraft(x=>({...x,assigneeIds:ids}))}/>
+      </div>
+      <p className="text-xs text-slate-500 md:col-span-2">Changes are saved together. Newly assigned staff receive a task notification. Existing comments and task status are preserved.</p>
+      <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+        <button className="btn-primary" type="submit" disabled={busy||!editDraft.assigneeIds.length}>Save task changes</button>
+        <button className="btn-secondary" type="button" disabled={busy} onClick={()=>setEditing(false)}>Cancel editing</button>
+      </div>
+    </form>}
     {selected.dueAt&&<p className="text-sm">Expiry: <strong>{new Date(selected.dueAt).toLocaleString()}</strong> · <span className={expired(selected)?"text-red-400":""}>{displayStatus(selected)}</span></p>}
-    {canManage&&<form className="flex flex-wrap items-end gap-3" onSubmit={e=>{
-      e.preventDefault();
-      const input=e.currentTarget.elements.namedItem("deadline") as HTMLInputElement|null;
-      if(!input?.value)return;
-      void run(()=>request("/tasks/"+selected.id,{method:"PUT",body:{version:selected.version,dueAt:new Date(input.value).toISOString()}}),"Task expiry updated.");
-    }}><label className="text-sm">Update expiry date and time<input name="deadline" type="datetime-local" required className="field mt-1 w-full"
-      defaultValue={selected.dueAt?new Date(new Date(selected.dueAt).getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):""}/></label>
-      <button className="btn-secondary" type="submit" disabled={busy}>Save expiry</button></form>}
     <section><h3 className="text-sm font-bold">Task comments and progress updates</h3>
      <p className="mt-1 text-xs text-slate-500">Add updates while a task is In Process. Comments stay with the task when an admin reopens it.</p>
      <ul className="my-3 space-y-3">{selected.comments?.map(c=><li key={c.id} className="rounded-lg bg-slate-50 p-3 text-sm">

@@ -1,7 +1,7 @@
 import type { PrismaClient, Prisma } from "@digimarket/db";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
-import type { TaskCreateInput, TaskUpdateInput, TaskListInput, TaskRecurrenceCreateInput } from "@digimarket/contracts";
+import type { TaskCreateInput, TaskUpdateInput, TaskEditInput, TaskListInput, TaskRecurrenceCreateInput } from "@digimarket/contracts";
 import {sendTaskPush} from "../insights/push";
 
 const need=(a:Principal,k:string)=>{if(!a.permissions.has(k))throw forbidden();};
@@ -143,6 +143,56 @@ export class TasksService {
         aggregateType:"Task",aggregateId:id,payloadMinimal:{taskId:id,status:input.status??existing.status}}});
       return tx.task.findUniqueOrThrow({where:{id}});
     });
+  }
+  // Atomic admin edit: core details, project, and assignees share a single
+  // optimistic version lock. Existing comments/checklists/status are preserved.
+  async edit(a:Principal,id:string,input:TaskEditInput){
+    requireAdministrator(a);need(a,"tasks.manage");need(a,"tasks.read");
+    const existing=await this.allowed(a,id);
+    await this.ensureAssignment(a,input.projectId,input.assigneeIds);
+    const nextDueAt=new Date(input.dueAt);
+    if(!Number.isFinite(nextDueAt.getTime()))throw invalid("Task expiry date and time is invalid");
+    // Determine added/removed assignees only after the version-guarded update,
+    // inside the same transaction, to avoid stale notifications.
+    const result=await this.db.$transaction(async tx=>{
+      const changed=await tx.task.updateMany({
+        where:{id,organizationId:a.organizationId,version:input.version},
+        data:{version:{increment:1},title:input.title,description:clean(input.description),
+          priority:input.priority,dueAt:nextDueAt,projectId:input.projectId},
+      });
+      if(changed.count!==1)throw conflict();
+      const current=await tx.taskAssignment.findMany({where:{taskId:id},select:{userId:true}});
+      const oldIds=new Set(current.map(row=>row.userId));
+      const nextIds=new Set(input.assigneeIds);
+      const added=input.assigneeIds.filter(userId=>!oldIds.has(userId));
+      const removed=current.filter(row=>!nextIds.has(row.userId)).map(row=>row.userId);
+      if(removed.length)await tx.taskAssignment.deleteMany({where:{taskId:id,userId:{in:removed}}});
+      if(added.length)await tx.taskAssignment.createMany({
+        data:added.map(userId=>({taskId:id,userId})),
+      });
+      if(removed.length)await tx.notification.deleteMany({where:{
+        organizationId:a.organizationId,recipientId:{in:removed},
+        kind:"TASK_ASSIGNED",dedupeKey:"task.assigned:"+id,
+      }});
+      if(added.length)await tx.notification.createMany({data:added.map(recipientId=>({
+        organizationId:a.organizationId,recipientId,dedupeKey:"task.assigned:"+id,
+        kind:"TASK_ASSIGNED",title:"New task assigned",
+        body:"You have been assigned: "+input.title.slice(0,250),
+        href:"/app/tasks?task="+id,
+      })),skipDuplicates:true});
+      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+        action:"tasks.edited",entityType:"Task",entityId:id,
+        afterRedacted:{priority:input.priority,projectId:input.projectId,assigneeCount:nextIds.size}}});
+      await tx.outboxEvent.create({data:{
+        organizationId:a.organizationId,eventKey:"task.edited."+id+"."+input.version,
+        kind:"tasks.updated",aggregateType:"Task",aggregateId:id,
+        payloadMinimal:{taskId:id,status:existing.status},
+      }});
+      return {task:await tx.task.findUniqueOrThrow({where:{id},
+        include:{assignees:{include:{user:{select:{id:true,displayName:true}}}}}}),added};
+    });
+    if(result.added.length)await sendTaskPush(this.db,a.organizationId,result.added);
+    return result.task;
   }
   // Hard-delete a task throughout this tenant. Database cascades remove its
   // assignees, comments and checklist; prune dangling assignment alerts and

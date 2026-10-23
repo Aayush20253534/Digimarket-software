@@ -93,6 +93,7 @@ const billingSchedulePattern=/^billing-schedules\/[0-9a-fA-F-]{36}$/;
 const contentDetailPattern=/^content\/[0-9a-fA-F-]{36}$/;
 const contentActionPattern=/^content\/[0-9a-fA-F-]{36}\/(submit|schedule|publish|cancel)$/;
 const taskDetailPattern=/^tasks\/[0-9a-fA-F-]{36}$/;
+const taskEditPattern=/^tasks\/[0-9a-fA-F-]{36}\/edit$/;
 const taskActionPattern=/^tasks\/[0-9a-fA-F-]{36}\/(assignees|checklist|comments)$/;
 const taskChecklistItemPattern=/^tasks\/[0-9a-fA-F-]{36}\/checklist\/[0-9a-fA-F-]{36}$/;
 const taskRecurrencePattern=/^task-recurrences\/[0-9a-fA-F-]{36}$/;
@@ -139,6 +140,7 @@ function permitted(path: string, method: string): boolean {
   if(contentDetailPattern.test(path))return ["GET","PUT"].includes(method);
   if(contentActionPattern.test(path))return method==="POST";
   if(taskDetailPattern.test(path))return ["GET","PUT","DELETE"].includes(method);
+  if(taskEditPattern.test(path))return method==="PUT";
   if(taskActionPattern.test(path))return path.endsWith("/assignees")?method==="PUT":method==="POST";
   if(taskChecklistItemPattern.test(path))return method==="PUT";
   if(taskRecurrencePattern.test(path))return method==="PUT";

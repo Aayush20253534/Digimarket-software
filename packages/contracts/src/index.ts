@@ -261,6 +261,18 @@ export const taskUpdateSchema=z.strictObject({
  dueAt:taskOptionalTimestamp,status:taskStatusSchema.optional(),
 });
 export type TaskUpdateInput=z.infer<typeof taskUpdateSchema>;
+// A complete, atomic edit: administrators can change details, project and assignees
+// without leaving partially saved state if another operation fails.
+export const taskEditSchema=z.strictObject({
+ version:z.number().int().positive(),
+ title:z.string().trim().min(2).max(180),
+ description:z.string().trim().max(2000),
+ priority:taskPrioritySchema,
+ dueAt:z.iso.datetime({offset:true}),
+ projectId:z.uuid().nullable(),
+ assigneeIds:z.array(z.uuid()).min(1).max(30).refine(x=>new Set(x).size===x.length,"Duplicate assignee"),
+});
+export type TaskEditInput=z.infer<typeof taskEditSchema>;
 export const taskDeleteSchema=z.strictObject({version:z.number().int().positive()});
 export const taskAssigneesSchema=z.strictObject({
  version:z.number().int().positive(),

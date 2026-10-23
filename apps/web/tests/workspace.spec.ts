@@ -137,6 +137,43 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByText("Routing policy saved.")).toBeVisible();
   const founderInitial=await createUser(page,"ci-founder","CI Founder","FOUNDER");
   const employeeInitial=await createUser(page,"ci-employee","CI Employee","EMPLOYEE");
+
+  // An administrator can revise task fields and assignments in one save.
+  await page.goto("/app/tasks");
+  await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
+  await page.getByLabel("Task view").selectOption("team");
+  await page.getByLabel("Task title",{exact:true}).fill("CI Original Task");
+  await page.getByLabel("Task expiry date and time").fill(
+    await page.evaluate(()=>{const d=new Date(Date.now()+72*60*60*1000);
+      return new Date(d.getTime()-d.getTimezoneOffset()*60*1000).toISOString().slice(0,16);}));
+  await page.getByRole("button",{name:"Assign employees"}).click();
+  await page.getByRole("checkbox",{name:"CI Founder"}).check();
+  await page.getByRole("button",{name:/Done · 1 selected/}).click();
+  await page.getByRole("button",{name:"Create task"}).click();
+  await expect(page.getByRole("button",{name:"Edit task"})).toBeVisible();
+  await page.getByRole("button",{name:"Edit task"}).click();
+  const taskEdit=page.getByRole("form",{name:"Edit task details"});
+  await expect(taskEdit).toBeVisible();
+  await taskEdit.getByLabel("Edit task title").fill("CI Updated Task");
+  await taskEdit.getByLabel("Edit task description").fill("Revised scope and deadline");
+  await taskEdit.getByLabel("Edit task priority").selectOption("URGENT");
+  await taskEdit.getByLabel("Edit task expiry date and time").fill(
+    await page.evaluate(()=>{const d=new Date(Date.now()+96*60*60*1000);
+      return new Date(d.getTime()-d.getTimezoneOffset()*60*1000).toISOString().slice(0,16);}));
+  await taskEdit.getByRole("button",{name:"Edit task assignees"}).click();
+  await taskEdit.getByRole("checkbox",{name:"CI Employee"}).check();
+  await taskEdit.getByRole("button",{name:/Done · 2 selected/}).click();
+  await taskEdit.getByRole("button",{name:"Save task changes"}).click();
+  await expect(page.getByText("Task edited successfully. Assigned team members have been updated.")).toBeVisible();
+  await expect(page.getByText("Assigned: CI Founder, CI Employee")).toBeVisible();
+  await expect(page.getByRole("button",{name:"CI Updated Task"})).toBeVisible();
+  // Reopening must retrieve the persisted task fields, not unsaved form state.
+  await page.getByRole("button",{name:"CI Updated Task"}).click();
+  await page.getByRole("button",{name:"Edit task"}).click();
+  await expect(taskEdit.getByLabel("Edit task title")).toHaveValue("CI Updated Task");
+  await expect(taskEdit.getByLabel("Edit task description")).toHaveValue("Revised scope and deadline");
+  await expect(taskEdit.getByLabel("Edit task priority")).toHaveValue("URGENT");
+  await taskEdit.getByRole("button",{name:"Cancel editing"}).click();
   await page.getByRole("button",{name:"Sign out"}).click();
   await expect(page).toHaveURL(/\/login/);
 
