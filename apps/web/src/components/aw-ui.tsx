@@ -72,7 +72,7 @@ export function AWStatusBadge({ status, className }: { status: string; className
   const tone: AWTone = ["ACTIVE","APPROVED","PAID","DONE","SUCCESS","PUBLISHED"].includes(upper) ? "success"
     : ["PENDING","INVITED","DRAFT","IN_REVIEW","SUBMITTED"].includes(upper) ? "warning"
     : ["DISABLED","REJECTED","FAILED","OVERDUE","VOID"].includes(upper) ? "danger" : "neutral";
-  return <AWBadge className={className} tone={tone}>{status.replaceAll("_", " ")}</AWBadge>;
+  return <AWBadge className={join(className, upper === "AGREEMENT_PENDING" && "aw-status-agreement-pending")} tone={tone}>{status.replaceAll("_", " ")}</AWBadge>;
 }
 
 export function AWTable({ children, label, className, tableClassName, ...props }:

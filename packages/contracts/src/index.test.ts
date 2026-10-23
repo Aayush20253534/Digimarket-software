@@ -40,6 +40,14 @@ describe("lead acquisition sources",()=>{
  });
 });
 
+describe("lead agreement pending stage",()=>{
+ it("supports stage edits and list filtering",()=>{
+  expect(leadStageSchema.parse("AGREEMENT_PENDING")).toBe("AGREEMENT_PENDING");
+  expect(leadUpdateSchema.parse({version:2,status:"AGREEMENT_PENDING",stageNote:"Contract sent"}).status).toBe("AGREEMENT_PENDING");
+  expect(leadListQuerySchema.parse({stage:"AGREEMENT_PENDING"}).stage).toBe("AGREEMENT_PENDING");
+ });
+});
+
 describe("lead decision pending stage",()=>{
  it("accepts decision pending in status edits and filters",()=>{
   expect(leadStageSchema.parse("DECISION_PENDING")).toBe("DECISION_PENDING");

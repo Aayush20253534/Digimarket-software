@@ -85,7 +85,7 @@ export class InsightsService{
   const work:Promise<void>[]=[];
   if(can(a,"leads.read"))work.push((async()=>{
     const scope={organizationId:org,deletedAt:null,createdAt:{gte:start,lte:end}};
-    const [created,converted,rejected,approved,pending,meetingProcess,decisionPending,followUp,overdue]=await Promise.all([
+    const [created,converted,rejected,approved,pending,meetingProcess,decisionPending,agreementPending,followUp,overdue]=await Promise.all([
       this.db.lead.count({where:scope}),
       this.db.client.count({where:{organizationId:org,sourceLead:{...scope,status:"APPROVED"}}}),
       this.db.lead.count({where:{...scope,status:"REJECTED"}}),
@@ -93,11 +93,12 @@ export class InsightsService{
       this.db.lead.count({where:{...scope,status:"PENDING"}}),
       this.db.lead.count({where:{...scope,status:"MEETING_PROCESS"}}),
       this.db.lead.count({where:{...scope,status:"DECISION_PENDING"}}),
+      this.db.lead.count({where:{...scope,status:"AGREEMENT_PENDING"}}),
       this.db.lead.count({where:{...scope,status:"FOLLOW_UP"}}),
       this.db.lead.count({where:{organizationId:org,deletedAt:null,nextFollowUpAt:{lt:new Date()},
-        status:{in:["PENDING","MEETING_PROCESS","DECISION_PENDING","FOLLOW_UP"]}}}),
+        status:{in:["PENDING","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","FOLLOW_UP"]}}}),
     ]);
-    sections.leads={created,converted,approved,rejected,pending,meetingProcess,decisionPending,followUp,
+    sections.leads={created,converted,approved,rejected,pending,meetingProcess,decisionPending,agreementPending,followUp,
       conversionRatePercent:created?Math.round(converted/created*10000)/100:0,
       overdueFollowUps:overdue};
   })());

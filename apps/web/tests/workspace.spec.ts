@@ -470,6 +470,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Filter by stage").selectOption("DECISION_PENDING");
   await expect(page.getByRole("table",{name:"Leads directory"}).getByText("DECISION PENDING")).toBeVisible();
   await page.getByLabel("Filter by stage").selectOption("");
+  await page.getByLabel("Lead status").selectOption("AGREEMENT_PENDING");
+  await page.getByLabel("Note for AGREEMENT PENDING").fill("Agreement awaiting signature");
+  await page.getByRole("button",{name:"Save details and stage"}).click();
+  const agreementBadge=page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-agreement-pending");
+  await expect(agreementBadge).toHaveText("AGREEMENT PENDING");
+  await expect(agreementBadge).toHaveCSS("background-color","rgb(14, 246, 188)");
+  await expect(agreementBadge).toHaveCSS("color","rgb(255, 255, 255)");
+  await page.getByLabel("Filter by stage").selectOption("AGREEMENT_PENDING");
+  await expect(page.getByRole("table",{name:"Leads directory"}).getByText("AGREEMENT PENDING")).toBeVisible();
+  await page.getByLabel("Filter by stage").selectOption("");
   await page.getByLabel("Lead status").selectOption("APPROVED");
   await page.getByLabel("Note for APPROVED").fill("Agreed to onboard");
   await page.getByRole("button",{name:"Save details and stage"}).click();

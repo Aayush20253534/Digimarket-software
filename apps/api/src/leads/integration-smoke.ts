@@ -85,7 +85,15 @@ try{
  assert.equal((await crm.metrics(founder)).meetingProcess,0);
  assert.equal((await crm.list(founder,{stage:"DECISION_PENDING",limit:10})).items[0]?.id,first.id);
  assert.equal((await crm.detail(founder,first.id)).stageNote,"Proposal sent; waiting for the client's decision");
- const approved=await crm.update(employee,first.id,{version:decision.version,status:"APPROVED",
+ const agreement=await crm.update(employee,first.id,{version:decision.version,status:"AGREEMENT_PENDING",
+   stageNote:"Contract sent for signature"});
+  assert.equal(agreement.status,"AGREEMENT_PENDING");
+  assert.equal((await crm.metrics(founder)).agreementPending,1);
+  assert.equal((await crm.metrics(founder)).decisionPending,0);
+  assert.equal((await crm.list(founder,{stage:"AGREEMENT_PENDING",limit:10})).items[0]?.id,first.id);
+  assert.equal((await crm.detail(founder,first.id)).stageNote,"Contract sent for signature");
+  assert.equal(await db.client.count({where:{sourceLeadId:agreement.id}}),0);
+  const approved=await crm.update(employee,first.id,{version:agreement.version,status:"APPROVED",
   stageNote:"Agreement signed, ready to onboard"});
  assert.equal(approved.status,"APPROVED");
  assert.equal(await db.client.count({where:{sourceLeadId:approved.id}}),1);
