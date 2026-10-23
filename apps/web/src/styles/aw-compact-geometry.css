@@ -1,0 +1,74 @@
+/*
+ * Compact, squared-off geometry across AmplifyWorld's public, login and
+ * authenticated modules. This final import owns the UI corner policy.
+ * Historical module styles and utility classes sometimes specify large
+ * hardcoded corners with !important; :is() gives the final policy precedence
+ * while leaving all hit targets, layouts, and semantic states intact.
+ */
+.aw-theme {
+  --aw-radius-xs: 2px;
+  --aw-radius-sm: 3px;
+  --aw-radius-md: 4px;
+  --aw-radius-lg: 5px;
+  --aw-radius-xl: 6px;
+  --aw-compact-corner: 4px;
+}
+
+/* Normalize panels, tables, menus, action buttons, inputs, tags, and cards.
+ * Preserve purposeful circles: real avatars, swatches, orbs, loading spinners,
+ * radio inputs, and sliding switch controls.
+ */
+:is(#aw-compact-geometry, .aw-theme) :where(*):not(:where(
+  .aw-work-avatar,
+  .aw-chat-avatar,
+  .aw-profile-photo-frame,
+  .aw-profile-photo-large,
+  .aw-profile-photo-placeholder,
+  [class*="avatar"],
+  img.rounded-full,
+  input[type="radio"],
+  input[type="color"],
+  .aw-notes-swatch,
+  .aw-notes-swatch *,
+  .aw-studio-swatches button,
+  [role="switch"],
+  [role="switch"] *,
+  .aw-hero-orb,
+  .aw-hero-orb-ring,
+  .aw-preview-dot,
+  .aw-bell-dot,
+  .aw-bell-unread,
+  .animate-spin,
+  [class*="spinner"],
+  [class*="orb"],
+  [class*="loader-dot"],
+  .aw-studio-fullscreen
+)) {
+  border-radius: var(--aw-compact-corner) !important;
+}
+
+/* User photography and small functional indicators must retain round crops. */
+.aw-theme :where(
+  .aw-work-avatar,
+  .aw-chat-avatar,
+  .aw-profile-photo-frame,
+  .aw-profile-photo-large,
+  .aw-profile-photo-placeholder,
+  [class*="avatar"],
+  img.rounded-full,
+  .aw-notes-swatch,
+  .aw-notes-swatch span,
+  .aw-studio-swatches button,
+  .aw-bell-dot,
+  .aw-bell-unread,
+  input[type="radio"],
+  input[type="color"],
+  .animate-spin
+) { border-radius: 50% !important; }
+
+/* Compact status labels no longer read as oval pills. */
+.aw-theme :where(.aw-badge, .aw-module-pill, .aw-module-count, .aw-status-badge) {
+  border-radius: 3px !important;
+}
+.aw-theme :where(.aw-module-pill, .aw-module-count) { padding-block: 4px; }
+.aw-theme .aw-studio-fullscreen { border-radius: 0 !important; }

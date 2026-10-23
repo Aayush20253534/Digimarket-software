@@ -7,11 +7,15 @@ test("public AmplifyWorld homepage and login have no viewport overflow", async (
     await expect(page.getByRole("heading", { name: /Every moving part/i })).toBeVisible();
     await expect(page.getByText("AmplifyWorld", { exact: false }).first()).toBeVisible();
     await expect(page.getByTestId("api-health-status")).toBeVisible();
+    await expect(page.locator(".aw-feature-card").first()).toHaveCSS("border-radius","4px");
+    await expect(page.locator(".aw-button").first()).toHaveCSS("border-radius","4px");
     const homeBounds = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
     expect(homeBounds.scroll, "Home document overflow at " + width).toBeLessThanOrEqual(homeBounds.view + 1);
     await page.goto("/login");
     await expect(page.getByRole("heading", { name: "Sign in to your workspace" })).toBeVisible();
     await expect(page.getByLabel("Login ID")).toBeVisible();
+    await expect(page.locator(".aw-auth-form-panel")).toHaveCSS("border-radius","4px");
+    await expect(page.getByLabel("Login ID")).toHaveCSS("border-radius","4px");
     const loginBounds = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
     expect(loginBounds.scroll, "Login document overflow at " + width).toBeLessThanOrEqual(loginBounds.view + 1);
     if(width>=1024){

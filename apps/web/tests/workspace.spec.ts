@@ -41,12 +41,27 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
+  const compactCorners=await page.evaluate(()=>{
+    const radius=(selector:string)=>getComputedStyle(document.querySelector(selector)!).borderTopLeftRadius;
+    return {
+      navigation:radius(".aw-nav-item"),
+      shortcut:radius(".aw-personal-shortcut"),
+      taskPanel:radius(".aw-personal-task-section"),
+      avatar:radius(".aw-work-header-avatar .aw-work-avatar"),
+    };
+  });
+  expect(compactCorners.navigation).toBe("4px");
+  expect(compactCorners.shortcut).toBe("4px");
+  expect(compactCorners.taskPanel).toBe("4px");
+  expect(compactCorners.avatar).toBe("50%");
   for(const label of ["Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
   await page.goto("/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
+  await expect(page.locator(".aw-module-pill").first()).toHaveCSS("border-radius","3px");
+  await expect(page.locator('[class*="rounded-2xl"]').first()).toHaveCSS("border-radius","4px");
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
   const statusMetrics=page.getByRole("region",{name:"CRM pipeline summary"});
   await expect(statusMetrics).toBeVisible();
