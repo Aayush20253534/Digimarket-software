@@ -1,0 +1,51 @@
+.aw-finance-breakdown{min-width:0;color:#f3e8fb}
+.aw-finance-breakdown .aw-report-back{display:inline-flex;align-items:center;gap:7px;border:1px solid #79528d;border-radius:4px;padding:9px 12px;font-weight:700;font-size:.82rem;background:#251734}
+.aw-finance-breakdown .aw-report-back:hover{background:#46305b}
+.aw-finance-breakdown .aw-report-breakdown-filter,.aw-finance-breakdown .aw-finance-panel,.aw-finance-breakdown .aw-finance-stat{min-width:0;border:1px solid #6d4a81;border-radius:4px;background:linear-gradient(125deg,#291a3b,#1d132b);padding:18px}
+.aw-finance-breakdown .aw-report-breakdown-filter{display:grid;gap:13px}
+.aw-finance-breakdown .aw-report-preset-row,.aw-finance-breakdown .aw-report-breakdown-fields{display:flex;align-items:end;flex-wrap:wrap;gap:10px}
+.aw-finance-breakdown .aw-report-preset-row button,.aw-finance-breakdown .aw-finance-pagination button{border:1px solid #7b568f;background:#2b1d3b;border-radius:4px;padding:9px 11px;font-size:.79rem;font-weight:700}
+.aw-finance-breakdown button:hover:not(:disabled){filter:brightness(1.17)}
+.aw-finance-breakdown button:disabled{opacity:.44;cursor:not-allowed}
+.aw-finance-breakdown .aw-report-breakdown-fields label{display:grid;gap:5px;color:#d9c0e8;font-size:.77rem}
+.aw-finance-breakdown .aw-report-breakdown-fields input{color-scheme:dark;min-width:154px;background:#190f26}
+.aw-finance-breakdown .aw-report-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#7c3ab4;color:white;border-radius:4px;padding:10px 14px;font-size:.83rem;font-weight:750;min-height:39px}
+.aw-finance-breakdown .aw-finance-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.aw-finance-breakdown .aw-finance-stat{display:grid;gap:9px}
+.aw-finance-breakdown .aw-finance-stat p{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#d7abea}
+.aw-finance-breakdown .aw-finance-stat strong{font-size:clamp(1.3rem,2.5vw,2.1rem);letter-spacing:-.03em;overflow-wrap:anywhere}
+.aw-finance-breakdown .aw-finance-stat .aw-finance-stat-range{font-size:clamp(.94rem,1.3vw,1.24rem)}
+.aw-finance-breakdown .aw-finance-stat span,.aw-finance-breakdown .aw-finance-panel-caption{color:#cbb4da;font-size:.75rem}
+.aw-finance-breakdown .aw-finance-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.aw-finance-breakdown .aw-finance-panel-heading{display:flex;align-items:center;gap:9px;margin-bottom:7px;color:#e1b9ff}
+.aw-finance-breakdown .aw-finance-panel h2{font-size:1.05rem;font-weight:800;color:#f7e9ff}
+.aw-finance-breakdown .aw-finance-trend{display:flex;align-items:stretch;gap:8px;overflow-x:auto;margin-top:21px;padding-bottom:8px;min-height:190px}
+.aw-finance-breakdown .aw-finance-trend-item{min-width:55px;flex:1 0 55px;display:flex;flex-direction:column;align-items:center;justify-content:end;gap:8px;font-size:.69rem;color:#d9c6e9}
+.aw-finance-breakdown .aw-finance-trend-column{height:118px;width:100%;max-width:36px;display:flex;align-items:end}
+.aw-finance-breakdown .aw-finance-trend-bar{width:100%;background:linear-gradient(#d188fd,#7034a9);border-radius:3px 3px 0 0}
+.aw-finance-breakdown .aw-finance-trend-item small{white-space:nowrap;font-size:.62rem;color:#e8dbf0}
+.aw-finance-breakdown .aw-finance-categories{display:grid;gap:16px;margin-top:20px;max-height:360px;overflow-y:auto}
+.aw-finance-breakdown .aw-finance-category-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:.78rem}
+.aw-finance-breakdown .aw-finance-category-head strong{overflow-wrap:anywhere}
+.aw-finance-breakdown .aw-finance-category-head span{color:#d1bcd9;text-align:right;white-space:nowrap}
+.aw-finance-breakdown .aw-finance-category-track{height:8px;border-radius:3px;background:#170d22;margin-top:7px;overflow:hidden}
+.aw-finance-breakdown .aw-finance-category-track>div{height:100%;background:#b66fe7;border-radius:3px}
+.aw-finance-breakdown .aw-finance-ledger-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px}
+.aw-finance-breakdown .aw-finance-ledger-heading p{margin-top:4px;font-size:.73rem;color:#c9b8d6}
+.aw-finance-breakdown .aw-finance-ledger-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0 12px;color:#d7c4e2;font-size:.78rem}
+.aw-finance-breakdown .aw-finance-search{display:flex;align-items:center;gap:9px;border:1px solid #6d4a81;border-radius:4px;background:#150e20;padding:0 12px;min-width:min(100%,320px);flex:1 1 320px}
+.aw-finance-breakdown .aw-finance-search input{background:none;width:100%;min-width:0;padding:11px 0;color:#f5eafa;outline:none}
+.aw-finance-breakdown .aw-finance-table-scroller{width:100%;overflow-x:auto}
+.aw-finance-breakdown .aw-finance-table{width:100%;min-width:790px;border-collapse:collapse;font-size:.79rem}
+.aw-finance-breakdown .aw-finance-table th{text-align:left;color:#d9bae8;background:#392446;font-size:.7rem;text-transform:uppercase;letter-spacing:.07em}
+.aw-finance-breakdown .aw-finance-table th,.aw-finance-breakdown .aw-finance-table td{padding:13px 10px;border-bottom:1px solid #5a3b6a;vertical-align:top}
+.aw-finance-breakdown .aw-finance-table tbody tr:hover{background:#3d2850}
+.aw-finance-breakdown .aw-finance-table td strong{display:block;color:#fff}
+.aw-finance-breakdown .aw-finance-table td small{display:block;max-width:260px;margin-top:3px;color:#c1a9d2;overflow-wrap:anywhere}
+.aw-finance-breakdown .aw-finance-table .aw-finance-amount{text-align:right;font-weight:800;color:#fff;white-space:nowrap}
+.aw-finance-breakdown .aw-finance-empty{padding:22px;text-align:center;color:#cdbadd;font-size:.82rem}
+.aw-finance-breakdown .aw-finance-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;margin-top:17px;color:#d6c1e5;font-size:.77rem}
+.aw-report-ledger-link{display:flex;align-items:center;justify-content:space-between;gap:10px;text-decoration:none;transition:background .15s}
+.aw-report-ledger-link:hover,.aw-report-ledger-link:focus-visible{background:#5b317380;outline:2px solid #b97deb;outline-offset:2px}
+@media(max-width:870px){.aw-finance-breakdown .aw-finance-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.aw-finance-breakdown .aw-finance-panels{grid-template-columns:1fr}}
+@media(max-width:520px){.aw-finance-breakdown .aw-finance-summary{grid-template-columns:1fr}.aw-finance-breakdown .aw-report-breakdown-fields label{flex:1 1 145px}.aw-finance-breakdown .aw-report-breakdown-fields input{width:100%;min-width:0}.aw-finance-breakdown .aw-finance-category-head{display:grid}.aw-finance-breakdown .aw-finance-category-head span{text-align:left}}

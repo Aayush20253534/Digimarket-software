@@ -78,6 +78,15 @@ export type FinanceEntryAdminEdit=z.infer<typeof financeEntryAdminEditSchema>;
 
 export const financeCategoryStatusSchema = z.strictObject({active:z.boolean()});
 export const financeViewSchema = z.enum(["mine","all"]);
+export const financeBreakdownQuerySchema=z.strictObject({
+ kind:financeKindSchema,
+ from:z.iso.date(),
+ to:z.iso.date(),
+ q:z.string().trim().max(100).default(""),
+ page:z.coerce.number().int().min(1).max(100000).default(1),
+ limit:z.coerce.number().int().min(1).max(100).default(20),
+}).refine(x=>x.from<=x.to,{message:"Invalid reporting date range"});
+export type FinanceBreakdownQuery=z.infer<typeof financeBreakdownQuerySchema>;
 
 // A phone number is all that is required to create a prospect.
 export const leadStageSchema = z.enum(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","APPROVED","REJECTED"]);

@@ -1,7 +1,7 @@
 import type { Express,Request,Response,NextFunction } from "express";
 import { z } from "zod";
 import {
-  financeCategoryInputSchema,financeCategoryStatusSchema,financeCategoryEditSchema,financeEntryAdminEditSchema,financeEntryInputSchema,financeViewSchema,
+  financeCategoryInputSchema,financeCategoryStatusSchema,financeCategoryEditSchema,financeEntryAdminEditSchema,financeEntryInputSchema,financeViewSchema,financeBreakdownQuerySchema,
 } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
@@ -80,6 +80,14 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   app.get("/api/v1/finance/summary",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({data:await finance.totals(actor(res),view(req))});
+  });
+  app.get("/api/v1/finance/report-breakdown",authenticate,async(req,res)=>{
+    res.set("Cache-Control","no-store");
+    res.json({data:await finance.breakdown(actor(res),parse(financeBreakdownQuerySchema,req.query))});
+  });
+  app.get("/api/v1/finance/report-breakdown/export",authenticate,async(req,res)=>{
+    res.set("Cache-Control","no-store");
+    res.json({data:await finance.exportBreakdown(actor(res),parse(financeBreakdownQuerySchema,req.query))});
   });
   app.get("/api/v1/finance/export",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");

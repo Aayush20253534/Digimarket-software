@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
 import { founderPolicy, isFounder } from "../approvals/founder";
-import type { FinanceCategoryInput, FinanceEntryInput, FinanceEntryAdminEdit, FinanceKind } from "@digimarket/contracts";
+import type { FinanceCategoryInput, FinanceEntryInput, FinanceEntryAdminEdit, FinanceKind, FinanceBreakdownQuery } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 
@@ -279,6 +279,108 @@ export class FinanceService {
       if((error as {code?:string}).code==="P2002")throw duplicate();
       throw error;
     }
+  }
+
+  // Use the identical posted, occurredOn UTC calendar-day scope as
+  // InsightsService.report cashLedger. Search applies to ledger/CSV only;
+  // summary, category and monthly totals always reconcile to Reports.
+  private breakdownScope(actor:Principal,input:FinanceBreakdownQuery){
+    need(actor,"reports.business.read");
+    need(actor,"finance.read.all");
+    const period={organizationId:actor.organizationId,kind:input.kind,status:"POSTED" as const,
+      occurredOn:{gte:new Date(input.from+"T00:00:00.000Z"),lte:new Date(input.to+"T23:59:59.999Z")}};
+    const query=input.q.trim();
+    // Only match enum-valued methods when the query is itself a valid
+    // method. Passing arbitrary search strings to a Prisma enum filter
+    // would cause a runtime error and break otherwise valid text searches.
+    const normalizedMethod=query.toUpperCase().replaceAll(" ","_");
+    const methods=["CASH","UPI","BANK_TRANSFER","CARD","OTHER"] as const;
+    const method=methods.find(value=>value===normalizedMethod);
+    const search=query?{OR:[
+      {merchantOrSource:{contains:query,mode:"insensitive" as const}},
+      {description:{contains:query,mode:"insensitive" as const}},
+      {category:{name:{contains:query,mode:"insensitive" as const}}},
+      {enteredBy:{displayName:{contains:query,mode:"insensitive" as const}}},
+      ...(method?[{method}]:[]),
+    ]}: {};
+    return {period,where:{...period,...search}};
+  }
+  async breakdown(actor:Principal,input:FinanceBreakdownQuery){
+    const {period,where}=this.breakdownScope(actor,input);
+    const [categories,months,transactions,count,filteredSum]=await Promise.all([
+      this.db.financialTransaction.groupBy({by:["categoryId"],where:period,
+        _sum:{amount:true},_count:{_all:true}}),
+      this.db.financialTransaction.groupBy({by:["occurredOn"],where:period,
+        _sum:{amount:true},_count:{_all:true},orderBy:{occurredOn:"asc"}}),
+      this.db.financialTransaction.findMany({where,orderBy:[{occurredOn:"desc"},{id:"desc"}],
+        skip:(input.page-1)*input.limit,take:input.limit,
+        select:{id:true,amount:true,occurredOn:true,method:true,
+          merchantOrSource:true,description:true,postedAt:true,
+          category:{select:{name:true}},
+          enteredBy:{select:{displayName:true,loginId:true}}},
+      }),
+      this.db.financialTransaction.count({where}),
+      this.db.financialTransaction.aggregate({where,_sum:{amount:true}}),
+    ]);
+    const categoryIds=categories.map(c=>c.categoryId);
+    const names=categoryIds.length?await this.db.financialCategory.findMany({
+      where:{organizationId:actor.organizationId,id:{in:categoryIds}},
+      select:{id:true,name:true},
+    }):[];
+    const categoryNames=new Map(names.map(c=>[c.id,c.name]));
+    const fullTotal=categories.reduce((sum,c)=>sum.plus(c._sum.amount??0),new Prisma.Decimal(0));
+    const monthly=new Map<string,{amount:Prisma.Decimal,count:number}>();
+    for(const group of months){
+      const month=group.occurredOn.toISOString().slice(0,7);
+      const existing=monthly.get(month)??{amount:new Prisma.Decimal(0),count:0};
+      existing.amount=existing.amount.plus(group._sum.amount??0);
+      existing.count+=group._count._all;
+      monthly.set(month,existing);
+    }
+    const series:{month:string;total:string;count:number}[]=[];
+    const start=new Date(input.from+"T00:00:00.000Z"),end=new Date(input.to+"T00:00:00.000Z");
+    const cursor=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth(),1));
+    for(let i=0;i<1200&&cursor<=end;i++){
+      const month=cursor.toISOString().slice(0,7),entry=monthly.get(month);
+      series.push({month,total:(entry?.amount??new Prisma.Decimal(0)).toFixed(4),
+        count:entry?.count??0});
+      cursor.setUTCMonth(cursor.getUTCMonth()+1);
+    }
+    return {kind:input.kind,from:input.from,to:input.to,currency:"INR",
+      total:fullTotal.toFixed(4),transactionCount:categories.reduce((n,c)=>n+c._count._all,0),
+      categories:categories.map(c=>({id:c.categoryId,
+        name:categoryNames.get(c.categoryId)??"Uncategorized",
+        total:(c._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:c._count._all}))
+        .sort((a,b)=>new Prisma.Decimal(b.total).cmp(a.total)),
+      monthly:series,search:input.q,matchingTotal:(filteredSum._sum.amount??new Prisma.Decimal(0)).toFixed(4),
+      matchingCount:count,page:input.page,limit:input.limit,
+      hasMore:input.page*input.limit<count,
+      transactions:transactions.map(t=>({
+        id:t.id,amount:t.amount.toFixed(4),occurredOn:t.occurredOn.toISOString().slice(0,10),
+        method:t.method,merchantOrSource:t.merchantOrSource,description:t.description,
+        postedAt:t.postedAt?.toISOString()??null,
+        category:t.category.name,enteredBy:t.enteredBy.displayName,
+      })),
+    };
+  }
+  async exportBreakdown(actor:Principal,input:FinanceBreakdownQuery){
+    const {where}=this.breakdownScope(actor,input);
+    const rows=await this.db.financialTransaction.findMany({where,
+      orderBy:[{occurredOn:"desc"},{id:"desc"}],take:5001,
+      select:{id:true,amount:true,occurredOn:true,method:true,
+        merchantOrSource:true,description:true,postedAt:true,
+        category:{select:{name:true}},enteredBy:{select:{displayName:true,loginId:true}}},
+    }});
+    if(rows.length>5000)throw new AuthError(422,"EXPORT_LIMIT",
+      "This export exceeds 5,000 transactions. Select a shorter date range or refine your search.");
+    const header=["id","kind","occurred_on","amount_inr","category","payment_method",
+      "merchant_or_source","description","recorded_by","login_id","posted_at"];
+    const lines=rows.map(t=>[t.id,input.kind,t.occurredOn.toISOString().slice(0,10),
+      t.amount.toFixed(4),t.category.name,t.method,t.merchantOrSource??"",
+      t.description??"",t.enteredBy.displayName,t.enteredBy.loginId,
+      t.postedAt?.toISOString()??""].map(csvCell).join(","));
+    return {filename:"amplifyworld-"+input.kind.toLowerCase()+"-"+input.from+"-to-"+input.to+".csv",
+      csv:[header.map(csvCell).join(","),...lines].join("\r\n")+"\r\n",count:rows.length};
   }
 
   private present(row:{id:string;kind:FinanceKind;amount:Prisma.Decimal;currencyCode:string;occurredOn:Date;status:string;

@@ -1,5 +1,6 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
+import Link from "next/link";
 import {Activity,ArrowUpRight,BarChart3,CalendarDays,ChartNoAxesCombined,RefreshCcw,ShieldCheck,TrendingUp,Users,Wallet} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
@@ -16,7 +17,15 @@ const format=(value:MetricValue)=>Array.isArray(value)?value.map(v=>v.kind+": "+
 export default function ReportsPage(){
  const {session,request}=useAuth();
  const can=!!session?.identity.permissions.includes("reports.business.read");
- const [from,setFrom]=useState(first),[to,setTo]=useState(today),[report,setReport]=useState<Report|null>(null);
+ const [from,setFrom]=useState(()=>{
+   if(typeof window==="undefined")return first();
+   const candidate=new URLSearchParams(window.location.search).get("from");
+   return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:first();
+ }),[to,setTo]=useState(()=>{
+   if(typeof window==="undefined")return today();
+   const candidate=new URLSearchParams(window.location.search).get("to");
+   return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:today();
+ }),[report,setReport]=useState<Report|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
  const reportSequence=useRef(0);
  const load=useCallback(async()=>{
@@ -79,10 +88,13 @@ export default function ReportsPage(){
        {(["INCOME","EXPENSE"] as const).map(kind=>{
         const row=ledger.find(item=>item.kind===kind);
         const amount=Number(row?.amount??0);
-        return <div key={kind} className={"aw-cash-ledger-line aw-cash-"+kind.toLowerCase()}>
-         <span>{kind==="INCOME"?"Income":"Expense"}</span>
+        const detailPath="/app/reports/"+(kind==="INCOME"?"income":"expenses")+"?"+new URLSearchParams({from:report.from,to:report.to}).toString();
+        return <Link key={kind} href={detailPath}
+         aria-label={"View "+(kind==="INCOME"?"Income":"Expenses")+" breakdown"}
+         className={"aw-cash-ledger-line aw-cash-"+kind.toLowerCase()+" aw-report-ledger-link"}>
+         <span>{kind==="INCOME"?"Income":"Expense"} <ArrowUpRight size={14} className="inline" aria-hidden="true"/></span>
          <strong>{new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)}</strong>
-        </div>;
+        </Link>;
        })}
       </div>:<>
        {spot&&<><div className="aw-report-hero-value">{format(spot[1])}</div>

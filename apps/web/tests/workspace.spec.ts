@@ -105,6 +105,39 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   }
   await page.setViewportSize({width:1366,height:768});
   await page.goto("/app/reports");
+  // Both cash ledger totals open their own full breakdown, preserving the
+  // selected report period in the URL and the drill-down date controls.
+  const incomeLink=page.getByRole("link",{name:"View Income breakdown"});
+  const expenseLink=page.getByRole("link",{name:"View Expenses breakdown"});
+  await expect(incomeLink).toBeVisible();
+  await expect(expenseLink).toBeVisible();
+  const reportFrom=await page.getByRole("region",{name:"Reporting period"}).getByLabel("From").inputValue();
+  const reportTo=await page.getByRole("region",{name:"Reporting period"}).getByLabel("Through").inputValue();
+  await incomeLink.click();
+  await expect(page).toHaveURL(/\/app\/reports\/income\?/);
+  await expect(page.getByRole("heading",{name:"Income Breakdown"})).toBeVisible();
+  await expect(page.getByLabel("Breakdown from date")).toHaveValue(reportFrom);
+  await expect(page.getByLabel("Breakdown to date")).toHaveValue(reportTo);
+  await expect(page.getByRole("region",{name:"Finance summary"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Monthly financial trend"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Category financial breakdown"})).toBeVisible();
+  await expect(page.getByRole("table",{name:"Financial breakdown transactions"})).toBeVisible();
+  const financeGateway=page.waitForResponse(response=>
+    response.url().includes("/api/v1/finance/report-breakdown/export")&&response.status()===200);
+  await page.getByRole("button",{name:"Export filtered CSV"}).click();
+  await financeGateway;
+  await page.getByRole("link",{name:"Back to Reports"}).click();
+  await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
+  await expect(page.getByRole("link",{name:"View Expenses breakdown"})).toBeVisible();
+  await page.getByRole("link",{name:"View Expenses breakdown"}).click();
+  await expect(page).toHaveURL(/\/app\/reports\/expenses\?/);
+  await expect(page.getByRole("heading",{name:"Expense Breakdown"})).toBeVisible();
+  await expect(page.getByLabel("Breakdown from date")).toHaveValue(reportFrom);
+  await expect(page.getByLabel("Breakdown to date")).toHaveValue(reportTo);
+  await page.getByLabel("Search financial transactions").fill("nonexistent CI phrase");
+  await expect(page.getByText("0 matching")).toBeVisible();
+  await page.getByRole("link",{name:"Back to Reports"}).click();
+  await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
   const desktopZoom=await page.locator(".aw-workspace").evaluate(
     element=>Number.parseFloat(getComputedStyle(element).zoom)
   );

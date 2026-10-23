@@ -4,7 +4,8 @@ import { createDatabaseClient } from "@digimarket/db";
 import type { Principal } from "../auth/service";
 import { FinanceService } from "./service";
 import { ApprovalService } from "../approvals/service";
-import { financeEntryInputSchema } from "@digimarket/contracts";
+import { financeEntryInputSchema,financeBreakdownQuerySchema } from "@digimarket/contracts";
+import {InsightsService} from "../insights/insights";
 import { randomUUID } from "node:crypto";
 
 if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarket_ci")) {
@@ -78,6 +79,60 @@ try{
   await approvals.decide(manager,income.approvalRequestId,{outcome:"APPROVED"});
   const postedIncome=(await finance.totals(manager,"all")).postedIncome;
   assert.equal(postedIncome,"1000.0000");
+
+  // The breakdown must use the exact posted/occurredOn scope of Reports.
+  // Pending transactions and other organizations cannot leak into totals.
+  const reportingAdmin=principal(admin.id,org.id,["ADMIN"],[...adminKeys,"reports.business.read"]);
+  const reportingOutsider=principal(outsider.id,other.id,["ADMIN"],[...adminKeys,"reports.business.read"]);
+  const period={from:"2026-10-01",to:"2026-10-31",q:"",page:1,limit:20};
+  assert.equal(financeBreakdownQuerySchema.safeParse({...period,kind:"EXPENSE"}).success,true);
+  assert.equal(financeBreakdownQuerySchema.safeParse({...period,kind:"EXPENSE",from:"2026-11-01"}).success,false);
+  await assert.rejects(()=>finance.breakdown(manager,{...period,kind:"EXPENSE"}),
+    (error:{status?:number})=>error.status===403);
+  const reportOnly=principal(admin.id,org.id,["ADMIN"],["reports.business.read"]);
+  await assert.rejects(()=>finance.breakdown(reportOnly,{...period,kind:"EXPENSE"}),
+    (error:{status?:number})=>error.status===403);
+  await assert.rejects(()=>finance.exportBreakdown(staff,{...period,kind:"EXPENSE"}),
+    (error:{status?:number})=>error.status===403);
+  const expenseDetails=await finance.breakdown(reportingAdmin,{...period,kind:"EXPENSE"});
+  assert.equal(expenseDetails.total,"150.2545");
+  assert.equal(expenseDetails.transactionCount,1);
+  assert.equal(expenseDetails.categories.length,1);
+  assert.equal(expenseDetails.categories[0].name,"Rapido");
+  assert.equal(expenseDetails.categories[0].total,expenseDetails.total);
+  assert.deepEqual(expenseDetails.monthly.map(x=>x.month),["2026-10"]);
+  assert.equal(expenseDetails.monthly[0].total,expenseDetails.total);
+  assert.equal(expenseDetails.transactions.length,1);
+  assert.equal(expenseDetails.transactions[0].amount,"150.2545");
+  assert.equal(expenseDetails.transactions[0].method,"UPI");
+  const incomeDetails=await finance.breakdown(reportingAdmin,{...period,kind:"INCOME"});
+  assert.equal(incomeDetails.total,"1000.0000");
+  assert.equal(incomeDetails.categories[0].name,"Agency retainer");
+  assert.equal(incomeDetails.transactions[0].merchantOrSource,"Client payment");
+  assert.equal((await finance.breakdown(reportingOutsider,{...period,kind:"INCOME"})).total,"0.0000");
+  const reports=await new InsightsService(db).report(reportingAdmin,period.from,period.to);
+  const reportLedger=(reports.sections.cashLedger as {posted:{kind:string;amount:string}[]}).posted;
+  for(const [kind,total] of [["INCOME",incomeDetails.total],["EXPENSE",expenseDetails.total]]){
+    assert.equal(Number(reportLedger.find(x=>x.kind===kind)?.amount),Number(total));
+  }
+  const searched=await finance.breakdown(reportingAdmin,{...period,kind:"EXPENSE",q:"Rapido"});
+  assert.equal(searched.total,expenseDetails.total);
+  assert.equal(searched.matchingCount,1);
+  assert.equal(searched.matchingTotal,expenseDetails.total);
+  assert.equal(searched.transactions.length,1);
+  const unmatched=await finance.breakdown(reportingAdmin,{...period,kind:"EXPENSE",q:"nonexistent category"});
+  assert.equal(unmatched.total,expenseDetails.total);
+  assert.equal(unmatched.matchingCount,0);
+  assert.deepEqual(unmatched.transactions,[]);
+  assert.equal((await finance.breakdown(reportingAdmin,{...period,kind:"EXPENSE",page:2,limit:1})).transactions.length,0);
+  assert.equal((await finance.breakdown(reportingAdmin,{...period,kind:"EXPENSE",
+    from:"2026-09-01",to:"2026-09-30"})).total,"0.0000");
+  const exportExpense=await finance.exportBreakdown(reportingAdmin,{...period,kind:"EXPENSE",q:"Rapido"});
+  assert.equal(exportExpense.count,1);
+  assert.ok(exportExpense.csv.includes('"150.2545"'));
+  assert.ok(exportExpense.csv.includes('"Rapido"'));
+  assert.ok(exportExpense.filename.includes("expense"));
+  assert.equal((await finance.exportBreakdown(reportingAdmin,{...period,kind:"EXPENSE",q:"nonexistent category"})).count,0);
   // Admin can correct income submitted by another user. Never alter the original
   // approval requester, and never permit wrong-category or cross-org reassignment.
   const incomeEdit={categoryId:inc.id,amount:"1234.50",occurredOn:"2026-10-18",
