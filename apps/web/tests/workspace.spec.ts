@@ -462,6 +462,18 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(columns.nth(0).locator('[data-testid="personal-overdue"]')).toBeVisible();
   await expect(columns.nth(1).locator('[data-testid="personal-in-process"]')).toBeVisible();
   await expect(columns.nth(1).locator('[data-testid="personal-completed"]')).toBeVisible();
+  // Use a temporary index when this test account has no active task yet.
+  // This verifies the actual applied CSS, not just the stylesheet text.
+  const inProgressNumberColor=await page.getByTestId("personal-in-process").evaluate(section=>{
+    const index=document.createElement("span");
+    index.className="aw-personal-task-index";
+    index.textContent="1";
+    section.appendChild(index);
+    const color=getComputedStyle(index).color;
+    index.remove();
+    return color;
+  });
+  expect(inProgressNumberColor).toBe("rgb(255, 0, 0)");
   const cardGeometry=await page.evaluate(()=>{
     const box=(testid:string)=>document.querySelector<HTMLElement>('[data-testid="'+testid+'"]')!.getBoundingClientRect();
     const pending=box("personal-pending"),inProcess=box("personal-in-process"),completed=box("personal-completed");
