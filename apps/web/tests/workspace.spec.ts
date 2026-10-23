@@ -45,8 +45,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // assertion waits for the actual component before measuring its corners.
   await expect(page.getByRole("navigation",{name:"Workspace navigation"})
     .locator(".aw-nav-item").first()).toHaveCSS("border-radius","4px");
-  await expect(page.locator(".aw-personal-shortcut").first()).toHaveCSS("border-radius","4px");
-  await expect(page.locator(".aw-personal-task-section").first()).toHaveCSS("border-radius","4px");
+  await expect(page.locator(".aw-stat").first()).toHaveCSS("border-radius","4px");
+  await expect(page.locator(".aw-panel").first()).toHaveCSS("border-radius","4px");
   await expect(page.locator(".aw-work-profile .aw-work-avatar").first()).toHaveCSS("border-radius","50%");
   for(const label of ["Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
