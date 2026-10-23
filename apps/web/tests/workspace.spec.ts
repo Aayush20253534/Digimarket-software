@@ -41,19 +41,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
-  const compactCorners=await page.evaluate(()=>{
-    const radius=(selector:string)=>getComputedStyle(document.querySelector(selector)!).borderTopLeftRadius;
-    return {
-      navigation:radius(".aw-nav-item"),
-      shortcut:radius(".aw-personal-shortcut"),
-      taskPanel:radius(".aw-personal-task-section"),
-      avatar:radius(".aw-work-header-avatar .aw-work-avatar"),
-    };
-  });
-  expect(compactCorners.navigation).toBe("4px");
-  expect(compactCorners.shortcut).toBe("4px");
-  expect(compactCorners.taskPanel).toBe("4px");
-  expect(compactCorners.avatar).toBe("50%");
+  // Dashboard cards load asynchronously: Playwright's computed-style
+  // assertion waits for the actual component before measuring its corners.
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"})
+    .locator(".aw-nav-item").first()).toHaveCSS("border-radius","4px");
+  await expect(page.locator(".aw-personal-shortcut").first()).toHaveCSS("border-radius","4px");
+  await expect(page.locator(".aw-personal-task-section").first()).toHaveCSS("border-radius","4px");
+  await expect(page.locator(".aw-work-profile .aw-work-avatar").first()).toHaveCSS("border-radius","50%");
   for(const label of ["Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Leads CRM"})).toBeVisible();
