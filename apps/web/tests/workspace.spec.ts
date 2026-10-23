@@ -468,6 +468,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     ["personal-pending","rgb(255, 255, 0)"],
     ["personal-in-process","rgb(255, 0, 0)"],
     ["personal-completed","rgb(0, 255, 0)"],
+    ["personal-overdue","rgb(0, 0, 0)"],
   ] as const){
     const numberStyles=await page.getByTestId(section).evaluate(element=>{
       const index=document.createElement("span");

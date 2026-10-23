@@ -8,6 +8,7 @@
 .aw-personal-task-grid [data-testid="personal-pending"] .aw-personal-task-index{background:#FFFF00;color:#FFFFFF;border-color:#FFFF00}
 .aw-personal-task-grid [data-testid="personal-in-process"] .aw-personal-task-index{background:#FF0000;color:#FFFFFF;border-color:#FF0000}
 .aw-personal-task-grid [data-testid="personal-completed"] .aw-personal-task-index{background:#00FF00;color:#FFFFFF;border-color:#00FF00}
+.aw-personal-task-grid [data-testid="personal-overdue"] .aw-personal-task-index{background:#000000;color:#FFFFFF;border-color:#000000}
 .aw-personal-progress-comment{flex:1 0 100%;display:grid;gap:8px;min-width:0;padding:11px;margin-top:4px;border-radius:12px;border:1px solid #644a78;background:#251731}
 .aw-personal-progress-comment label{font-size:.78rem;font-weight:750;color:#f0d8ff}
 .aw-personal-comment-input{width:100%;min-width:0;resize:vertical;padding:10px 12px;border-radius:9px;border:1px solid #795b91;background:#160e21;color:#f7ecff;font-size:.81rem;line-height:1.45}
