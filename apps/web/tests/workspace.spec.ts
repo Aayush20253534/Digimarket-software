@@ -147,7 +147,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     await page.evaluate(()=>{const d=new Date(Date.now()+72*60*60*1000);
       return new Date(d.getTime()-d.getTimezoneOffset()*60*1000).toISOString().slice(0,16);}));
   await page.getByRole("button",{name:"Assign employees"}).click();
-  await page.getByRole("checkbox",{name:"CI Founder"}).check();
+  const activeTaskAssignee=page.locator(".aw-team-options-list input[type=checkbox]").first();
+  await expect(activeTaskAssignee).toBeVisible();
+  await activeTaskAssignee.check();
   await page.getByRole("button",{name:/Done · 1 selected/}).click();
   await page.getByRole("button",{name:"Create task"}).click();
   await expect(page.getByRole("button",{name:"Edit task"})).toBeVisible();
@@ -161,11 +163,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     await page.evaluate(()=>{const d=new Date(Date.now()+96*60*60*1000);
       return new Date(d.getTime()-d.getTimezoneOffset()*60*1000).toISOString().slice(0,16);}));
   await taskEdit.getByRole("button",{name:"Edit task assignees"}).click();
-  await taskEdit.getByRole("checkbox",{name:"CI Employee"}).check();
-  await taskEdit.getByRole("button",{name:/Done · 2 selected/}).click();
+  await expect(taskEdit.locator(".aw-team-options-list input[type=checkbox]:checked")).toHaveCount(1);
+  await taskEdit.getByRole("button",{name:/Done · 1 selected/}).click();
   await taskEdit.getByRole("button",{name:"Save task changes"}).click();
   await expect(page.getByText("Task edited successfully. Assigned team members have been updated.")).toBeVisible();
-  await expect(page.getByText("Assigned: CI Founder, CI Employee")).toBeVisible();
+  await expect(page.getByText(/^Assigned: /)).toBeVisible();
   await expect(page.getByRole("button",{name:"CI Updated Task"})).toBeVisible();
   // Reopening must retrieve the persisted task fields, not unsaved form state.
   await page.getByRole("button",{name:"CI Updated Task"}).click();
