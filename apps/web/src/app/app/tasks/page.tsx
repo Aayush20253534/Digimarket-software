@@ -19,7 +19,14 @@ type Recurrence={id:string;title:string;frequency:"DAILY"|"WEEKLY"|"MONTHLY";int
 type Project={id:string;name:string};
 type Result<T>={items:T[];nextCursor:string|null};
 const visibleStatuses=[{value:"TODO",label:"Pending"},{value:"IN_PROGRESS",label:"In Process"},{value:"DONE",label:"Completed"},{value:"EXPIRED",label:"Expired"}] as const;
-const editableStatuses:Status[]=["TODO","IN_PROGRESS","DONE"];
+const editableStatuses:{value:Status;label:string}[]=[
+ {value:"TODO",label:"Pending"},
+ {value:"IN_PROGRESS",label:"In Process"},
+ {value:"BLOCKED",label:"Blocked"},
+ {value:"IN_REVIEW",label:"In Review"},
+ {value:"DONE",label:"Completed"},
+ {value:"CANCELLED",label:"Cancelled"},
+];
 const expired=(task:Task)=>task.status!=="DONE"&&task.status!=="CANCELLED"&&Boolean(task.dueAt)&&new Date(task.dueAt!).getTime()<Date.now();
 const displayStatus=(task:Task)=>expired(task)?"Expired":task.status==="TODO"?"Pending":task.status==="IN_PROGRESS"?"In Process":task.status==="DONE"?"Completed":task.status;
 const priorities:Priority[]=["LOW","MEDIUM","HIGH","URGENT"];
@@ -186,11 +193,17 @@ export default function TasksPage(){
    <div className="space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
      <span className="text-sm text-slate-500">Assigned: {selected.assignees.map(a=>a.user.displayName).join(", ")}</span>
-     {canWrite&&(canManage?<select aria-label="Update task status" className="field" value={selected.status} disabled={busy}
-       onChange={e=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",
-         body:{version:selected.version,status:e.target.value}}),"Task status updated.")}>
-       {editableStatuses.map(v=><option key={v} value={v}>{v==="TODO"?"Pending":v==="IN_PROGRESS"?"In Process":"Completed"}</option>)}
-       {!editableStatuses.includes(selected.status)&&<option value={selected.status}>{selected.status}</option>}</select>:selected.status==="TODO"||selected.status==="IN_PROGRESS"?
+     {canWrite&&(canManage?<label className="flex flex-col gap-1 text-sm font-semibold">
+       Admin: change task status
+       <select aria-label="Admin task status" className="field" value={selected.status} disabled={busy}
+        onChange={e=>{const status=e.target.value as Status;if(status===selected.status)return;
+         void run(()=>request("/tasks/"+selected.id,{method:"PUT",
+          body:{version:selected.version,status}}),
+          status==="IN_PROGRESS"&&selected.status==="DONE"?"Task reopened in In Process.":"Task status updated.");}}>
+        {editableStatuses.map(v=><option key={v.value} value={v.value}>{v.label}</option>)}
+       </select>
+       <span className="text-xs font-normal text-slate-500">Admins may reopen completed work or move tasks between any statuses.</span>
+      </label>:selected.status==="TODO"||selected.status==="IN_PROGRESS"?
        <button type="button" className="btn-primary" disabled={busy} onClick={()=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",body:{
         version:selected.version,status:selected.status==="TODO"?"IN_PROGRESS":"DONE"
        }}),selected.status==="TODO"?"Task moved to In Process.":"Task completed.")}>
@@ -212,16 +225,18 @@ export default function TasksPage(){
     }}><label className="text-sm">Update expiry date and time<input name="deadline" type="datetime-local" required className="field mt-1 w-full"
       defaultValue={selected.dueAt?new Date(new Date(selected.dueAt).getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):""}/></label>
       <button className="btn-secondary" type="submit" disabled={busy}>Save expiry</button></form>}
-    <section><h3 className="text-sm font-bold">Comments</h3>
+    <section><h3 className="text-sm font-bold">Task comments and progress updates</h3>
+     <p className="mt-1 text-xs text-slate-500">Add updates while a task is In Process. Comments stay with the task when an admin reopens it.</p>
      <ul className="my-3 space-y-3">{selected.comments?.map(c=><li key={c.id} className="rounded-lg bg-slate-50 p-3 text-sm">
        <b>{c.author.displayName}</b><span className="ml-2 text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</span>
        <p className="mt-1 whitespace-pre-wrap">{c.body}</p></li>)}</ul>
      {grants.includes("tasks.comment")&&<form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();void run(async()=>{
        await request("/tasks/"+selected.id+"/comments",{method:"POST",body:{body:comment}});setComment("");
      },"Comment added.");}}>
-      <input className="field flex-1" required aria-label="New comment" maxLength={2000} value={comment}
-       onChange={e=>setComment(e.target.value)} placeholder="Update your team"/>
-      <button className="btn-secondary" disabled={busy}>Comment</button>
+      <textarea className="field min-w-[210px] flex-1" required aria-label="New comment" maxLength={2000}
+       rows={2} value={comment} onChange={e=>setComment(e.target.value)}
+       placeholder="Share progress, blockers, or next steps"/>
+      <button className="btn-secondary" type="submit" disabled={busy||!comment.trim()}>Post comment</button>
      </form>}
     </section>
    </div>

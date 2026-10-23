@@ -66,6 +66,9 @@ try{
  await tasks.checklistStatus(staffActor,t.id,checklist.id,true);
  const started=await tasks.update(staffActor,t.id,{version:1,status:"IN_PROGRESS"});
  assert.equal(started.status,"IN_PROGRESS");
+ const progressComment=await tasks.comment(staffActor,t.id,"In progress: final review of landing page");
+ assert.equal(progressComment.body,"In progress: final review of landing page");
+ assert.equal((await tasks.detail(staffActor,t.id)).comments.length,2);
  const done=await tasks.update(staffActor,t.id,{version:2,status:"DONE"});
  assert.equal(done.status,"DONE");
  await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,status:"TODO"}),failed(422));
@@ -76,14 +79,33 @@ try{
    kind:"TASK_ASSIGNED",href:"/app/tasks?task="+t.id}}),1);
 
  await assert.rejects(()=>tasks.assign(mgr,t.id,2,[staff.id]),failed(409));
- assert.equal((await tasks.detail(mgr,t.id)).comments.length,1);
+ assert.equal((await tasks.detail(mgr,t.id)).comments.length,2);
+ // A completed task may only be reopened by an administrator with tasks.manage.
+ await assert.rejects(()=>tasks.update(staffActor,t.id,
+   {version:updated.version,status:"IN_PROGRESS"}),failed(422));
+ await assert.rejects(()=>tasks.update(founder,t.id,
+   {version:updated.version,status:"IN_PROGRESS"}),failed(404));
+ const limitedManager=actor(admin.id,org.id,["tasks.read","tasks.update.own"]);
+ await assert.rejects(()=>tasks.update(limitedManager,t.id,
+   {version:updated.version,status:"IN_PROGRESS"}),failed(403));
+ let statusTask=await tasks.update(mgr,t.id,{version:updated.version,status:"IN_PROGRESS"});
+ assert.equal(statusTask.status,"IN_PROGRESS");
+ assert.equal(statusTask.completedAt,null);
+ for(const state of ["TODO","BLOCKED","IN_REVIEW","CANCELLED","DONE","IN_PROGRESS"] as const){
+  statusTask=await tasks.update(mgr,t.id,{version:statusTask.version,status:state});
+  assert.equal(statusTask.status,state);
+ }
+ assert.equal(statusTask.completedAt,null);
+ assert.equal((await tasks.detail(staffActor,t.id)).comments.length,2);
+ await assert.rejects(()=>tasks.update(mgr,t.id,
+   {version:updated.version,status:"TODO"}),failed(409));
  // Only a tenant admin with task management can delete a shared task.
- await assert.rejects(()=>tasks.delete(staffActor,t.id,updated.version),failed(403));
- await assert.rejects(()=>tasks.delete(founder,t.id,updated.version),failed(403));
- await assert.rejects(()=>tasks.delete(stranger,t.id,updated.version),failed(404));
+ await assert.rejects(()=>tasks.delete(staffActor,t.id,statusTask.version),failed(403));
+ await assert.rejects(()=>tasks.delete(founder,t.id,statusTask.version),failed(403));
+ await assert.rejects(()=>tasks.delete(stranger,t.id,statusTask.version),failed(404));
  const limitedAdmin=actor(admin.id,org.id,["tasks.read"]);
- await assert.rejects(()=>tasks.delete(limitedAdmin,t.id,updated.version),failed(403));
- await assert.rejects(()=>tasks.delete(mgr,t.id,updated.version-1),failed(409));
+ await assert.rejects(()=>tasks.delete(limitedAdmin,t.id,statusTask.version),failed(403));
+ await assert.rejects(()=>tasks.delete(mgr,t.id,statusTask.version-1),failed(409));
  const start=new Date(Date.now()-120000).toISOString();
  const repeat=await tasks.createRecurrence(mgr,{title:"Daily campaign check",priority:"MEDIUM",
    frequency:"DAILY",interval:1,timezone:"Asia/Kolkata",startAt:start,
@@ -128,7 +150,7 @@ try{
  assert.equal(await db.outboxEvent.count({where:{kind:"tasks.recurrence_generated",organizationId:org.id}}),1);
  // A deleted task disappears from every assignee's list, notifications, and
  // the task tables. Audit evidence remains without an active task record.
- assert.deepEqual(await tasks.delete(mgr,t.id,updated.version),{id:t.id,deleted:true});
+ assert.deepEqual(await tasks.delete(mgr,t.id,statusTask.version),{id:t.id,deleted:true});
  assert.equal(await db.task.count({where:{id:t.id}}),0);
  assert.equal(await db.taskAssignment.count({where:{taskId:t.id}}),0);
  assert.equal(await db.taskChecklistItem.count({where:{taskId:t.id}}),0);
@@ -138,7 +160,7 @@ try{
  assert.equal((await tasks.list(staffActor,{view:"mine",limit:30})).items.length,1);
  assert.equal((await tasks.list(mgr,{view:"team",limit:30})).items.length,1);
  await assert.rejects(()=>tasks.detail(staffActor,t.id),failed(404));
- await assert.rejects(()=>tasks.delete(mgr,t.id,updated.version),failed(404));
+ await assert.rejects(()=>tasks.delete(mgr,t.id,statusTask.version),failed(404));
  assert.equal(await db.auditLog.count({where:{entityType:"Task",entityId:t.id,action:"tasks.deleted"}}),1);
  // Generated occurrences may be removed without deleting the recurrence rule.
  assert.deepEqual(await tasks.delete(mgr,generated[0].id,generated[0].version),{id:generated[0].id,deleted:true});

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, CalendarClock, CheckCircle2, ClipboardList, NotebookPen, RefreshCw, BriefcaseBusiness, Users, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, ClipboardList, MessageSquarePlus, NotebookPen, RefreshCw, BriefcaseBusiness, Users, Wallet } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWNotice, AWStatusBadge } from "@/components/aw-ui";
 type Task={id:string;version:number;title:string;description:string|null;status:string;dueAt:string|null;project:{name:string}|null;assignees:{userId:string}[]};
@@ -13,6 +13,10 @@ export function AWPersonalTasks(){
  const id=session?.identity.userId,allowed=!!session?.identity.permissions.includes("tasks.read");
  const [items,setItems]=useState<Task[]>([]),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false);
  const [partial,setPartial]=useState(false),[error,setError]=useState(""),[clock,setClock]=useState(()=>Date.now());
+ const [commentTaskId,setCommentTaskId]=useState<string|null>(null);
+ const [commentDraft,setCommentDraft]=useState("");
+ const [feedback,setFeedback]=useState("");
+ const canComment=!!session?.identity.permissions.includes("tasks.comment");
  const load=useCallback(async()=>{
   if(!id||!allowed){setLoaded(true);return;}
   setBusy(true);setError("");
@@ -40,6 +44,18 @@ export function AWPersonalTasks(){
   catch(e){setError(e instanceof Error?e.message:"Unable to update task");}
   finally{setBusy(false);}
  };
+ const postProgressComment=async(task:Task)=>{
+  const body=commentDraft.trim();
+  if(!canComment||busy||!body)return;
+  setBusy(true);setError("");setFeedback("");
+  try{
+   await request("/tasks/"+task.id+"/comments",{method:"POST",body:{body}});
+   setCommentTaskId(null);setCommentDraft("");
+   await load();
+   setFeedback("Comment saved to "+task.title+".");
+  }catch(e){setError(e instanceof Error?e.message:"Unable to save comment");}
+  finally{setBusy(false);}
+ };
  const lists=useMemo(()=>{
   const hasExpired=(t:Task)=>Boolean(t.dueAt)&&Date.parse(t.dueAt!)<clock&&!done.has(t.status);
   const pending=items.filter(t=>t.status==="TODO"&&!hasExpired(t)).sort(due);
@@ -63,6 +79,7 @@ export function AWPersonalTasks(){
    </div>
   </header>
   {error&&<AWNotice tone="error">{error}</AWNotice>}
+  {feedback&&<AWNotice tone="success">{feedback}</AWNotice>}
   {partial&&<AWNotice tone="info">Additional records exist beyond the loaded pages. Open Tasks to see more.</AWNotice>}
   {!allowed&&<AWNotice tone="info">Your account does not have task access.</AWNotice>}
   <section className="aw-personal-quick" aria-label="Quick access"><h2>Quick access</h2>
@@ -85,8 +102,29 @@ export function AWPersonalTasks(){
       {t.description&&<p className="aw-personal-task-description">{t.description}</p>}
       <p className="aw-action-meta">{t.project?.name||"General task"} · {t.dueAt?new Date(t.dueAt).toLocaleString():"No deadline"}</p>
       <AWStatusBadge status={group.tone==="overdue"?"OVERDUE":t.status}/></div>
+      {group.test==="personal-in-process"&&canComment&&<button type="button"
+       className="aw-action-item-link" disabled={busy}
+       aria-label={"Comment on "+t.title} title="Add progress comment"
+       aria-expanded={commentTaskId===t.id}
+       onClick={()=>{setCommentTaskId(current=>current===t.id?null:t.id);setCommentDraft("");setFeedback("");}}>
+       <MessageSquarePlus size={18} aria-hidden="true"/></button>}
       {(group.test==="personal-pending"||group.test==="personal-in-process")&&<button type="button" className="aw-action-item-link" disabled={busy} aria-label={group.test==="personal-pending"?"Start "+t.title:"Complete "+t.title} title={group.test==="personal-pending"?"Move to In Process":"Mark completed"} onClick={()=>void progress(t)}><CheckCircle2 size={18}/></button>}
       <Link className="aw-action-item-link" href={"/app/tasks?task="+t.id} aria-label={"Open "+t.title}><ArrowRight size={16}/></Link>
+      {group.test==="personal-in-process"&&commentTaskId===t.id&&canComment&&
+       <form className="aw-personal-progress-comment" aria-label={"Progress comment for "+t.title}
+        onSubmit={e=>{e.preventDefault();void postProgressComment(t);}}>
+        <label htmlFor={"task-comment-"+t.id}>Progress update</label>
+        <textarea id={"task-comment-"+t.id} className="aw-personal-comment-input"
+          value={commentDraft} minLength={1} maxLength={2000} required rows={2}
+          onChange={e=>setCommentDraft(e.target.value)}
+          placeholder="Add an update for the assigned team…"/>
+        <div className="aw-personal-comment-actions">
+         <button type="button" className="aw-action-item-link" disabled={busy}
+           onClick={()=>{setCommentTaskId(null);setCommentDraft("");}}>Cancel</button>
+         <button type="submit" className="aw-personal-comment-save"
+           disabled={busy||!commentDraft.trim()}>Post comment</button>
+        </div>
+       </form>}
      </li>)}</ol>:<p className="aw-action-status">{error?"Unable to verify tasks.":"No "+group.title.toLowerCase()+"."}</p>}
    </section>)}</div>)}</div>
   <Link className="aw-dashboard-refresh w-fit" href="/app/tasks">Task management <ArrowRight size={16}/></Link>
