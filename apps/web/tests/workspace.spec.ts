@@ -464,19 +464,25 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(columns.nth(1).locator('[data-testid="personal-completed"]')).toBeVisible();
   // Use a temporary index when this test account has no active task yet.
   // This verifies the actual applied CSS, not just the stylesheet text.
-  const inProgressNumberStyles=await page.getByTestId("personal-in-process").evaluate(section=>{
-    const index=document.createElement("span");
-    index.className="aw-personal-task-index";
-    index.textContent="1";
-    section.appendChild(index);
-    const style=getComputedStyle(index);
-    const styles={color:style.color,background:style.backgroundColor,border:style.borderTopColor};
-    index.remove();
-    return styles;
-  });
-  expect(inProgressNumberStyles).toEqual({
-    color:"rgb(255, 255, 255)",background:"rgb(255, 0, 0)",border:"rgb(255, 0, 0)",
-  });
+  for(const [section,background] of [
+    ["personal-pending","rgb(255, 255, 0)"],
+    ["personal-in-process","rgb(255, 0, 0)"],
+    ["personal-completed","rgb(0, 255, 0)"],
+  ] as const){
+    const numberStyles=await page.getByTestId(section).evaluate(element=>{
+      const index=document.createElement("span");
+      index.className="aw-personal-task-index";
+      index.textContent="1";
+      element.appendChild(index);
+      const style=getComputedStyle(index);
+      const colors={color:style.color,background:style.backgroundColor,border:style.borderTopColor};
+      index.remove();
+      return colors;
+    });
+    expect(numberStyles).toEqual({
+      color:"rgb(255, 255, 255)",background,border:background,
+    });
+  }
   const cardGeometry=await page.evaluate(()=>{
     const box=(testid:string)=>document.querySelector<HTMLElement>('[data-testid="'+testid+'"]')!.getBoundingClientRect();
     const pending=box("personal-pending"),inProcess=box("personal-in-process"),completed=box("personal-completed");
