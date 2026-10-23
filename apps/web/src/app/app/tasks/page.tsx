@@ -72,14 +72,14 @@ export default function TasksPage(){
   if(!canRead){setLoading(false);return;}
   setLoading(true);
   try{
-   const params=new URLSearchParams({view:canManage?view:"mine",limit:"40"});
+   const params=new URLSearchParams({view:canManage?view:"mine",limit:isAdmin?"5":"40"});
    if(search.trim())params.set("q",search.trim());
    if(statusFilter)params.set("status",statusFilter);
    if(cursor)params.set("cursor",cursor);
    const data=await request<Result<Task>>("/tasks?"+params);
    setTasks(data.items);setNextCursor(data.nextCursor);setError("");
   }catch(e){setError(err(e));}finally{setLoading(false);}
- },[canRead,canManage,view,request,search,statusFilter,cursor]);
+ },[canRead,canManage,isAdmin,view,request,search,statusFilter,cursor]);
  const open=useCallback(async(id:string)=>{
   try{
    const detail=await request<Task>("/tasks/"+id);
@@ -192,7 +192,7 @@ export default function TasksPage(){
      <option value="">All statuses</option>{visibleStatuses.map(v=><option key={v.value} value={v.value}>{v.label}</option>)}
     </select>
    </div>
-   {loading?<Spinner label="Loading tasks…"/>:tasks.length? <div className="space-y-2">
+   {loading?<Spinner label="Loading tasks…"/>:tasks.length? <div className="space-y-2" data-testid="task-register-list">
      {tasks.map(task=><button type="button" key={task.id} onClick={()=>void open(task.id)}
        className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-indigo-400">
        <div><p className="text-sm font-semibold">{task.title}</p>

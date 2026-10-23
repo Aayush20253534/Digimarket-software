@@ -193,7 +193,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // An administrator can revise task fields and assignments in one save.
   await page.goto("/app/tasks");
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
+  const teamTasksRequest=page.waitForRequest(req=>{
+    const url=new URL(req.url());
+    return url.pathname==="/api/v1/tasks"&&url.searchParams.get("view")==="team";
+  });
   await page.getByLabel("Task view").selectOption("team");
+  expect(new URL((await teamTasksRequest).url()).searchParams.get("limit")).toBe("5");
+  await expect.poll(async()=>page.getByTestId("task-register-list").locator(":scope > button").count()).toBeLessThanOrEqual(5);
   await page.getByLabel("Task title",{exact:true}).fill("CI Original Task");
   await page.getByLabel("Task expiry date and time").fill(
     await page.evaluate(()=>{const d=new Date(Date.now()+72*60*60*1000);
