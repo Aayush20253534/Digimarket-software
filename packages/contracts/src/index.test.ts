@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -37,5 +37,13 @@ describe("lead acquisition sources",()=>{
  it("accepts source edits and source-filtered queries",()=>{
   expect(leadUpdateSchema.parse({version:1,source:"META_LEADS"}).source).toBe("META_LEADS");
   expect(leadListQuerySchema.parse({source:"COLD_CALL"}).source).toBe("COLD_CALL");
+ });
+});
+
+describe("lead decision pending stage",()=>{
+ it("accepts decision pending in status edits and filters",()=>{
+  expect(leadStageSchema.parse("DECISION_PENDING")).toBe("DECISION_PENDING");
+  expect(leadUpdateSchema.parse({version:2,status:"DECISION_PENDING",stageNote:"Awaiting confirmation"}).status).toBe("DECISION_PENDING");
+  expect(leadListQuerySchema.parse({stage:"DECISION_PENDING"}).stage).toBe("DECISION_PENDING");
  });
 });

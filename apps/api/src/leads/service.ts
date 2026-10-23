@@ -70,18 +70,19 @@ export class LeadsService {
  async metrics(a:Principal){
    deny(a,"leads.read");
    const where={organizationId:a.organizationId,deletedAt:null};
-   const [total,pending,yetToCall,meetingProcess,followUp,approved,rejected,converted]=await Promise.all([
+   const [total,pending,yetToCall,meetingProcess,decisionPending,followUp,approved,rejected,converted]=await Promise.all([
      this.db.lead.count({where}),
      this.db.lead.count({where:{...where,status:"PENDING"}}),
      this.db.lead.count({where:{...where,status:"YET_TO_CALL"}}),
      this.db.lead.count({where:{...where,status:"MEETING_PROCESS"}}),
+     this.db.lead.count({where:{...where,status:"DECISION_PENDING"}}),
      this.db.lead.count({where:{...where,status:"FOLLOW_UP"}}),
      this.db.lead.count({where:{...where,status:"APPROVED"}}),
      this.db.lead.count({where:{...where,status:"REJECTED"}}),
      this.db.client.count({where:{organizationId:a.organizationId,
        sourceLead:{deletedAt:null,status:"APPROVED"}}}),
    ]);
-   return {total,pending,yetToCall,meetingProcess,followUp,approved,rejected,converted,
+   return {total,pending,yetToCall,meetingProcess,decisionPending,followUp,approved,rejected,converted,
      conversionRatePercent:total?Math.round(converted/total*10000)/100:0};
  }
  async delete(a:Principal,id:string,version:number){

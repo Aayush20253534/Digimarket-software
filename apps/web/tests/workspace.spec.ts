@@ -459,6 +459,17 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const savedMap=page.getByRole("link",{name:"Open Google Maps for CI Contact"});
   await expect(savedMap).toHaveAttribute("href","https://maps.app.goo.gl/abcdEFG123");
   await expect(savedMap).toHaveAttribute("target","_blank");
+  await page.getByLabel("Lead status").selectOption("DECISION_PENDING");
+  await page.getByLabel("Note for DECISION PENDING").fill("Awaiting customer confirmation");
+  await page.getByRole("button",{name:"Save details and stage"}).click();
+  const decisionBadge=page.getByRole("table",{name:"Leads directory"})
+    .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-decision-pending");
+  await expect(decisionBadge).toHaveText("DECISION PENDING");
+  await expect(decisionBadge).toHaveCSS("background-color","rgb(164, 130, 242)");
+  await expect(decisionBadge).toHaveCSS("color","rgb(255, 255, 255)");
+  await page.getByLabel("Filter by stage").selectOption("DECISION_PENDING");
+  await expect(page.getByRole("table",{name:"Leads directory"}).getByText("DECISION PENDING")).toBeVisible();
+  await page.getByLabel("Filter by stage").selectOption("");
   await page.getByLabel("Lead status").selectOption("APPROVED");
   await page.getByLabel("Note for APPROVED").fill("Agreed to onboard");
   await page.getByRole("button",{name:"Save details and stage"}).click();

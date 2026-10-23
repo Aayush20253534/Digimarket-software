@@ -440,6 +440,7 @@ body:has(.aw-workspace){background:#09070e}
 
 /* Lead register: ten full-height rows per page, horizontal overflow only. */
 [data-aw-module="leads"] .aw-status-meeting{background:#174c9a!important;color:#e2f3ff!important;border:1px solid #4598ef!important}
+[data-aw-module="leads"] .aw-status-decision-pending{background:#A482F2!important;color:#FFFFFF!important;border:1px solid #A482F2!important}
 [data-aw-module="leads"] .aw-status-not-picking{background:#FF00FF!important;color:#fff!important;border:1px solid #FF00FF!important}
 [data-aw-module="leads"] .aw-status-rejected{background:#FF0000!important;color:#fff!important;border:1px solid #FF0000!important}
 [data-aw-module="leads"] .aw-status-yet-to-call{background:#000!important;color:#fff!important;border:1px solid #71717a!important}

@@ -78,7 +78,14 @@ try{
  assert.equal(notes[0],"Meeting on Friday");
  assert.ok(notes.includes("Discussed the social media package"));
  await assert.rejects(()=>crm.update(employee,first.id,{version:1,status:"APPROVED"}),fail(409));
- const approved=await crm.update(employee,first.id,{version:meeting.version,status:"APPROVED",
+ const decision=await crm.update(employee,first.id,{version:meeting.version,status:"DECISION_PENDING",
+   stageNote:"Proposal sent; waiting for the client's decision"});
+ assert.equal(decision.status,"DECISION_PENDING");
+ assert.equal((await crm.metrics(founder)).decisionPending,1);
+ assert.equal((await crm.metrics(founder)).meetingProcess,0);
+ assert.equal((await crm.list(founder,{stage:"DECISION_PENDING",limit:10})).items[0]?.id,first.id);
+ assert.equal((await crm.detail(founder,first.id)).stageNote,"Proposal sent; waiting for the client's decision");
+ const approved=await crm.update(employee,first.id,{version:decision.version,status:"APPROVED",
   stageNote:"Agreement signed, ready to onboard"});
  assert.equal(approved.status,"APPROVED");
  assert.equal(await db.client.count({where:{sourceLeadId:approved.id}}),1);

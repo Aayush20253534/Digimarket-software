@@ -8,8 +8,8 @@ import { DirectoryModal } from "@/components/directory-modal";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
-type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"FOLLOW_UP"|"MEETING_PROCESS"|"APPROVED"|"REJECTED";
-const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","APPROVED","REJECTED"];
+type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"FOLLOW_UP"|"MEETING_PROCESS"|"DECISION_PENDING"|"APPROVED"|"REJECTED";
+const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","APPROVED","REJECTED"];
 const stageLabel=(s:Stage)=>s.replaceAll("_"," ");
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;googleMapsUrl:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
@@ -18,7 +18,7 @@ type Lead={id:string;businessName:string;contactName:string|null;phone:string|nu
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null};
-type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
+type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value;
@@ -231,10 +231,10 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   {metrics&&<section aria-label="CRM pipeline summary" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+   {metrics&&<section aria-label="CRM pipeline summary" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
      {([["Total leads",metrics.total],["Approved clients",metrics.converted],
        ["REJECTED",metrics.rejected],["YET TO CALL",metrics.yetToCall],
-       ["MEETING PROCESS",metrics.meetingProcess],
+       ["MEETING PROCESS",metrics.meetingProcess],["DECISION PENDING",metrics.decisionPending],
        ["FOLLOW UP",metrics.followUp]] as const).map(([label,value])=>
        <div key={label} className="rounded-xl border border-slate-200/15 p-3">
          <p className="text-xs text-slate-500">{label}</p>
