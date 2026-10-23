@@ -1,7 +1,7 @@
 import type { PrismaClient, Prisma } from "@digimarket/db";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
-import type { TaskCreateInput, TaskUpdateInput, TaskEditInput, TaskListInput, TaskRecurrenceCreateInput } from "@digimarket/contracts";
+import type { TaskCreateInput, TaskUpdateInput, TaskEditInput, TaskListInput, TaskHistoryInput, TaskRecurrenceCreateInput } from "@digimarket/contracts";
 import {sendTaskPush} from "../insights/push";
 
 const need=(a:Principal,k:string)=>{if(!a.permissions.has(k))throw forbidden();};
@@ -66,12 +66,37 @@ export class TasksService {
     const rows=await this.db.task.findMany({
       where,orderBy:[{createdAt:"desc"},{id:"desc"}],
       take:input.limit+1,...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
-      select:{id:true,title:true,description:true,status:true,priority:true,dueAt:true,
+      select:{id:true,title:true,description:true,status:true,priority:true,dueAt:true,completedAt:true,
         version:true,createdAt:true,projectId:true,recurrenceId:true,scheduledFor:true,
         project:{select:{name:true}},assignees:{select:{userId:true,user:{select:{displayName:true}}}},
         _count:{select:{comments:true,checklist:true}}},
     });
     return {items:rows.slice(0,input.limit),nextCursor:rows.length>input.limit?rows[input.limit-1].id:null};
+  }
+  // Completed task history is readable for one's own work. Administrators
+  // with tasks.manage may request the full organization history instead.
+  // Use the completion timestamp, not the task creation date, for ordering.
+  async history(a:Principal,input:TaskHistoryInput){
+    need(a,"tasks.read");
+    if(input.view==="team"&&!manager(a))throw forbidden();
+    const where:Prisma.TaskWhereInput={
+      organizationId:a.organizationId,status:"DONE",
+      ...(input.view==="team"?{}:own(a)),
+      ...(input.q?{title:{contains:input.q,mode:"insensitive"}}:{}),
+    };
+    const rows=await this.db.task.findMany({
+      where,orderBy:[{completedAt:"desc"},{id:"desc"}],
+      take:input.limit+1,
+      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
+      select:{id:true,title:true,description:true,status:true,priority:true,dueAt:true,
+        completedAt:true,createdAt:true,projectId:true,version:true,
+        project:{select:{name:true}},
+        assignees:{select:{userId:true,user:{select:{displayName:true}}}},
+        _count:{select:{comments:true}},
+      },
+    });
+    return {items:rows.slice(0,input.limit),
+      nextCursor:rows.length>input.limit?rows[input.limit-1].id:null};
   }
   async detail(a:Principal,id:string){
     await this.allowed(a,id);

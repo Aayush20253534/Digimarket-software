@@ -185,6 +185,24 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(taskEdit.getByLabel("Edit task description")).toHaveValue("Revised scope and deadline");
   await expect(taskEdit.getByLabel("Edit task priority")).toHaveValue("URGENT");
   await taskEdit.getByRole("button",{name:"Cancel editing"}).click();
+  // Completed items are preserved in the dedicated history and disappear if
+  // an admin reopens them, rather than being permanently archived.
+  await page.getByLabel("Admin task status").selectOption("DONE");
+  await expect(page.getByText("Task status updated.")).toBeVisible();
+  await page.goto("/app/task-history");
+  await expect(page.getByTestId("task-history-page")).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"})
+    .getByRole("link",{name:"Task history"})).toBeVisible();
+  await page.getByLabel("Task history scope").selectOption("team");
+  await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toBeVisible();
+  await expect(page.getByText(/Completed:/)).toBeVisible();
+  await page.getByRole("link",{name:"Open completed task CI Updated Task"}).click();
+  await expect(page.getByLabel("Admin task status")).toHaveValue("DONE");
+  await page.getByLabel("Admin task status").selectOption("IN_PROGRESS");
+  await expect(page.getByText("Task reopened in In Process.")).toBeVisible();
+  await page.goto("/app/task-history");
+  await page.getByLabel("Task history scope").selectOption("team");
+  await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toHaveCount(0);
   await page.getByRole("button",{name:"Sign out"}).click();
   await expect(page).toHaveURL(/\/login/);
 
@@ -428,6 +446,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await finishPasswordRotation(page,employeePassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
+  await expect(page.getByTestId("personal-completed").getByText("Completed within the last 24 hours.")).toBeVisible();
+  await expect(page.getByRole("link",{name:"Task history",exact:true}).first()).toBeVisible();
+  await page.goto("/app/task-history");
+  await expect(page.getByTestId("task-history-page")).toBeVisible();
+  await expect(page.getByLabel("Task history scope")).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"Tasks",exact:true}).last()).toBeVisible();
+  await page.goto("/app/dashboard");
   // Masonry-style task columns: Completed starts immediately under In Process,
   // not below the height of the much taller Pending tasks card.
   await page.setViewportSize({width:1366,height:812});

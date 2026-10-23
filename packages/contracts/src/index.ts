@@ -285,6 +285,13 @@ export const taskListSchema=z.strictObject({
  limit:z.coerce.number().int().min(1).max(100).default(30),
 });
 export type TaskListInput=z.infer<typeof taskListSchema>;
+export const taskHistorySchema=z.strictObject({
+ view:z.enum(["mine","team"]).default("mine"),
+ q:z.string().trim().max(100).optional(),
+ cursor:z.uuid().optional(),
+ limit:z.coerce.number().int().min(1).max(100).default(20),
+});
+export type TaskHistoryInput=z.infer<typeof taskHistorySchema>;
 export const taskChecklistCreateSchema=z.strictObject({label:z.string().trim().min(2).max(240)});
 export const taskChecklistUpdateSchema=z.strictObject({completed:z.boolean()});
 export const taskCommentSchema=z.strictObject({body:z.string().trim().min(1).max(2000)});

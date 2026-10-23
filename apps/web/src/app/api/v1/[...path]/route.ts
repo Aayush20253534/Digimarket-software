@@ -55,6 +55,7 @@ const endpoints: Record<string, string[]> = {
   "profitability/recognitions": ["GET","POST"],
   "content/staff": ["GET"],
   "tasks/team": ["GET"],
+  "tasks/history": ["GET"],
   "task-recurrences": ["GET","POST"],
   "assets/upload-intent": ["POST"],
   "assets/confirm": ["POST"],

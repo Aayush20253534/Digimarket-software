@@ -71,6 +71,29 @@ try{
  assert.equal((await tasks.detail(staffActor,t.id)).comments.length,2);
  const done=await tasks.update(staffActor,t.id,{version:2,status:"DONE"});
  assert.equal(done.status,"DONE");
+ assert.ok(done.completedAt,"Completion must be timestamped");
+ const historicCompletion=new Date(Date.now()-49*60*60*1000);
+ await db.task.update({where:{id:t.id},data:{completedAt:historicCompletion}});
+ const storedForOverview=await tasks.list(staffActor,{view:"mine",status:"DONE",limit:10});
+ assert.equal(storedForOverview.items[0]?.completedAt?.toISOString(),historicCompletion.toISOString());
+ const fresh=await tasks.create(mgr,{title:"Fresh completed archive entry",
+   priority:"LOW",dueAt:deadline,assigneeIds:[other.id]});
+ const finishedFresh=await tasks.update(mgr,fresh.id,{version:fresh.version,status:"DONE"});
+ assert.ok(finishedFresh.completedAt);
+ const firstHistory=await tasks.history(mgr,{view:"team",limit:1});
+ assert.equal(firstHistory.items[0]?.id,fresh.id);
+ assert.ok(firstHistory.nextCursor);
+ const nextHistory=await tasks.history(mgr,{view:"team",cursor:firstHistory.nextCursor!,limit:1});
+ assert.equal(nextHistory.items[0]?.id,t.id);
+ assert.equal(nextHistory.items[0]?.completedAt?.toISOString(),historicCompletion.toISOString());
+ assert.equal((await tasks.history(staffActor,{view:"mine",limit:20})).items[0]?.id,t.id);
+ assert.equal((await tasks.history(readOnly,{view:"mine",limit:20})).items[0]?.id,fresh.id);
+ assert.deepEqual((await tasks.history(stranger,{view:"mine",limit:20})).items,[]);
+ assert.equal((await tasks.history(mgr,{view:"team",q:"Fresh completed",limit:20})).items.length,1);
+ await assert.rejects(()=>tasks.history(staffActor,{view:"team",limit:20}),failed(403));
+ await assert.rejects(()=>tasks.history(founder,{view:"team",limit:20}),failed(403));
+ await tasks.delete(mgr,fresh.id,finishedFresh.version);
+ assert.equal((await tasks.history(mgr,{view:"team",limit:20})).items.length,1);
  await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,status:"TODO"}),failed(422));
  await assert.rejects(()=>tasks.checklistStatus(staffActor,t.id,checklist.id,false),failed(422));
  const updated=await tasks.assign(mgr,t.id,3,[staff.id,admin.id]);
@@ -97,6 +120,7 @@ try{
   assert.equal(statusTask.status,state);
  }
  assert.equal(statusTask.completedAt,null);
+ assert.equal((await tasks.history(mgr,{view:"team",limit:20})).items.length,0);
  assert.equal((await tasks.detail(staffActor,t.id)).comments.length,2);
  await assert.rejects(()=>tasks.update(mgr,t.id,
    {version:updated.version,status:"TODO"}),failed(409));

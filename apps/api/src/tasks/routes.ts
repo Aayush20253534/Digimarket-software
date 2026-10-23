@@ -1,6 +1,6 @@
 import type { Express,Request,Response,NextFunction } from "express";
 import { z } from "zod";
-import { taskCreateSchema,taskUpdateSchema,taskEditSchema,taskDeleteSchema,taskListSchema,
+import { taskCreateSchema,taskUpdateSchema,taskEditSchema,taskDeleteSchema,taskListSchema,taskHistorySchema,
  taskAssigneesSchema,taskChecklistCreateSchema,taskChecklistUpdateSchema,taskCommentSchema,
  taskRecurrenceCreateSchema,taskRecurrenceUpdateSchema } from "@digimarket/contracts";
 import { AuthService,type Principal } from "../auth/service";
@@ -25,6 +25,8 @@ export function registerTaskRoutes(app:Express,auth:AuthService){
  const root="/api/v1/tasks",recur="/api/v1/task-recurrences";
  app.get(root,authenticated,async(req,res)=>{res.set("Cache-Control","no-store");
    res.json({data:await svc.list(a(res),parse(taskListSchema,req.query))});});
+ app.get(root+"/history",authenticated,async(req,res)=>{res.set("Cache-Control","no-store");
+   res.json({data:await svc.history(a(res),parse(taskHistorySchema,req.query))});});
  app.get(root+"/team",authenticated,async(_req,res)=>{res.set("Cache-Control","no-store");
    res.json({data:await svc.team(a(res))});});
  app.post(root,authenticated,async(req,res)=>{res.status(201).json({data:await svc.create(a(res),

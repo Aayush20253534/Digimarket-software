@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
  BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CheckSquare2,
- FileStack, FolderKanban, LayoutDashboard, NotebookPen, MessageCircle, Search, Settings2,
+ FileStack, FolderKanban, LayoutDashboard, NotebookPen, MessageCircle, Search, Settings2, History,
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
 
@@ -23,6 +23,7 @@ const sections:readonly Group[]=[
  {title:"Delivery",items:[
   {label:"Projects",href:"/app/projects",icon:FolderKanban,permits:["projects.read"]},
   {label:"Tasks",href:"/app/tasks",icon:CheckSquare2,permits:["tasks.read"]},
+  {label:"Task history",href:"/app/task-history",icon:History,permits:["tasks.read"]},
   {label:"Content calendar",operational:true,href:"/app/content",icon:CalendarDays,permits:["content.read"]},
   {label:"Files & assets",operational:true,href:"/app/assets",icon:FileStack,permits:["assets.read"]},
   {label:"Approvals",href:"/app/approvals",icon:CheckSquare2,permits:["approvals.read"]}

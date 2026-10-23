@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, CalendarClock, CheckCircle2, ClipboardList, MessageSquarePlus, NotebookPen, RefreshCw, BriefcaseBusiness, Users, Wallet } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWNotice, AWStatusBadge } from "@/components/aw-ui";
-type Task={id:string;version:number;title:string;description:string|null;status:string;dueAt:string|null;project:{name:string}|null;assignees:{userId:string}[]};
+type Task={id:string;version:number;title:string;description:string|null;status:string;dueAt:string|null;completedAt:string|null;project:{name:string}|null;assignees:{userId:string}[]};
 type Page={items:Task[];nextCursor:string|null};
 const done=new Set(["DONE","CANCELLED"]);
 const due=(a:Task,b:Task)=>(a.dueAt?Date.parse(a.dueAt):Infinity)-(b.dueAt?Date.parse(b.dueAt):Infinity);
@@ -64,7 +64,11 @@ export function AWPersonalTasks(){
   return [{title:"Pending tasks",test:"personal-pending",tone:"pending",icon:ClipboardList,rows:pending},
    {title:"In Process",test:"personal-in-process",tone:"pending",icon:RefreshCw,rows:inProgress},
    {title:"Expired / overdue tasks",test:"personal-overdue",tone:"overdue",icon:CalendarClock,rows:outstanding},
-   {title:"Completed tasks",test:"personal-completed",tone:"completed",icon:CheckCircle2,rows:items.filter(t=>t.status==="DONE").sort(due)}];
+   {title:"Completed tasks",test:"personal-completed",tone:"completed",icon:CheckCircle2,
+    rows:items.filter(t=>t.status==="DONE"&&t.completedAt&&
+      Number.isFinite(Date.parse(t.completedAt))&&
+      Date.parse(t.completedAt)<=clock&&Date.parse(t.completedAt)>clock-24*60*60*1000)
+      .sort((a,b)=>Date.parse(b.completedAt!)-Date.parse(a.completedAt!))}];
  },[items,clock]);
  // Stack task sections independently. A tall Pending list should never leave
  // a blank grid-row gap beneath the shorter In Process section.
@@ -72,9 +76,10 @@ export function AWPersonalTasks(){
  return <div className="aw-personal-dashboard space-y-6" data-testid="personal-task-dashboard">
   <header className="aw-dashboard-hero">
    <div><p className="aw-eyebrow">MY WORKSPACE</p><h1 className="aw-dashboard-title">My assignments</h1>
-    <p className="aw-dashboard-subtitle">Pending, in-process, completed and overdue tasks assigned to {session?.user.displayName}.</p></div>
+    <p className="aw-dashboard-subtitle">Pending, in-process, completed in the past 24 hours and overdue tasks assigned to {session?.user.displayName}.</p></div>
    <div className="flex flex-wrap gap-2">
     <Link href="/app/notes" className="aw-dashboard-refresh"><NotebookPen size={16}/>My notes</Link>
+    <Link href="/app/task-history" className="aw-dashboard-refresh"><CheckCircle2 size={16}/>Task history</Link>
     <button type="button" className="aw-dashboard-refresh" disabled={busy} onClick={()=>void load()}><RefreshCw size={16}/>Refresh tasks</button>
    </div>
   </header>
@@ -95,12 +100,17 @@ export function AWPersonalTasks(){
    {groups.map(group=><section key={group.test} data-testid={group.test} className={"aw-personal-task-section aw-personal-"+group.tone}>
     <div className="aw-personal-task-heading"><span className="aw-personal-task-icon"><group.icon size={20}/></span>
      <h2>{group.title}</h2><strong className="aw-personal-task-count">{loaded?group.rows.length:"…"}</strong></div>
+    {group.test==="personal-completed"&&<p className="mb-3 text-xs text-[#BFAAD1]">
+      Completed within the last 24 hours. <Link href="/app/task-history" className="font-semibold text-[#E2B5FF] underline underline-offset-2">View full history</Link>
+    </p>}
     {!loaded?<p role="status" className="aw-action-status">Loading assignments…</p>:
      group.rows.length?<ol className="aw-personal-task-list">{group.rows.map((t,index)=><li key={t.id} className="aw-personal-task-item">
       <span className="aw-personal-task-index">{index+1}</span><div className="min-w-0 flex-1">
       <Link className="aw-action-name aw-personal-task-link" href={"/app/tasks?task="+t.id}>{t.title}</Link>
       {t.description&&<p className="aw-personal-task-description">{t.description}</p>}
-      <p className="aw-action-meta">{t.project?.name||"General task"} · {t.dueAt?new Date(t.dueAt).toLocaleString():"No deadline"}</p>
+      <p className="aw-action-meta">{t.project?.name||"General task"} · {group.test==="personal-completed"&&t.completedAt
+        ?"Completed "+new Date(t.completedAt).toLocaleString()
+        :t.dueAt?new Date(t.dueAt).toLocaleString():"No deadline"}</p>
       <AWStatusBadge status={group.tone==="overdue"?"OVERDUE":t.status}/></div>
       {group.test==="personal-in-process"&&canComment&&<button type="button"
        className="aw-action-item-link" disabled={busy}
@@ -127,6 +137,9 @@ export function AWPersonalTasks(){
        </form>}
      </li>)}</ol>:<p className="aw-action-status">{error?"Unable to verify tasks.":"No "+group.title.toLowerCase()+"."}</p>}
    </section>)}</div>)}</div>
-  <Link className="aw-dashboard-refresh w-fit" href="/app/tasks">Task management <ArrowRight size={16}/></Link>
+  <div className="flex flex-wrap gap-2">
+    <Link className="aw-dashboard-refresh w-fit" href="/app/tasks">Task management <ArrowRight size={16}/></Link>
+    <Link className="aw-dashboard-refresh w-fit" href="/app/task-history">View task history <ArrowRight size={16}/></Link>
+  </div>
  </div>;
 }
