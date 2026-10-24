@@ -14,6 +14,20 @@ function phone(value?:string){
   if(digits.length<7||digits.length>15)throw invalid("Phone number must contain 7 to 15 digits");
   return digits;
 }
+// Meeting form fields use agency-local civil time in Asia/Kolkata (UTC+05:30).
+const indiaOffset=330*60_000;
+const meetingLocal=(instant:Date)=>{
+ const local=new Date(instant.getTime()+indiaOffset).toISOString();
+ return {on:local.slice(0,10),time:local.slice(11,16)};
+};
+function meetingInstant(on:string,time:string){
+ const [year,month,day]=on.split("-").map(Number);
+ const [hour,minute]=time.split(":").map(Number);
+ const result=new Date(Date.UTC(year,month-1,day,hour,minute)-indiaOffset);
+ const roundtrip=meetingLocal(result);
+ if(roundtrip.on!==on||roundtrip.time!==time)throw invalid("Invalid meeting date or time");
+ return result;
+}
 const safeCSV=(s:string)=>'"'+(/^[\s]*[=+@\-\t\r]/.test(s)?"'":"")+s.replaceAll('"','""')+'"';
 const urlOrNull=(s?:string)=>s?.trim()||null;
 const keyFor=(batch:string,i:number)=>{
@@ -189,12 +203,28 @@ export class LeadsService {
      orderBy:[{[input.sort??"createdAt"]:input.direction??"desc"} as Prisma.LeadOrderByWithRelationInput,{id:input.direction??"desc"}],
      select:{id:true,businessName:true,contactName:true,phone:true,businessType:true,location:true,
        websiteUrl:true,instagramUrl:true,googleMapsUrl:true,source:true,status:true,stageNote:true,assignedToId:true,createdById:true,
-       nextFollowUpAt:true,version:true,createdAt:true,updatedAt:true,
+       nextFollowUpAt:true,meetingAt:true,version:true,createdAt:true,updatedAt:true,
        assignee:{select:{displayName:true}},_count:{select:{duplicateMatches:true,duplicateCandidates:true}}}}),
    ]);
    const hasMore=rows.length>input.limit;
    const page=rows.slice(0,input.limit);
    return {items:page,total,nextCursor:hasMore?page.at(-1)?.id??null:null};
+ }
+ // Exactly today's meeting calendar in agency-local time. Unscheduled
+ // historical meetings and leads moved out of Meeting Process do not appear.
+ async meetingsOn(a:Principal,on:string){
+   deny(a,"leads.read");
+   const start=new Date(Date.parse(on+"T00:00:00.000Z")-indiaOffset);
+   const end=new Date(start.getTime()+86_400_000);
+   const where:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,
+     status:"MEETING_PROCESS",meetingAt:{gte:start,lt:end}};
+   const [total,items]=await Promise.all([
+     this.db.lead.count({where}),
+     this.db.lead.findMany({where,orderBy:[{meetingAt:"asc"},{id:"asc"}],take:100,
+       select:{id:true,businessName:true,contactName:true,phone:true,stageNote:true,
+         meetingAt:true,assignedToId:true,assignee:{select:{displayName:true}}}}),
+   ]);
+   return {date:on,total,items,hasMore:total>items.length};
  }
  // Dated register for the sidebar. Fetch only the four requested display fields
  // and a stable id for navigation/pagination. Never load other tenants or cleared schedules.
@@ -245,7 +275,7 @@ export class LeadsService {
  async update(a:Principal,id:string,input:LeadUpdateInput){
    const current=await this.find(a,id);
    if(!this.canEdit(a,current))throw forbidden();
-   const {version,stageNote,followUpOn,...changes}=input;
+   const {version,stageNote,followUpOn,meetingOn:meetingOnInput,meetingTime:meetingTimeInput,...changes}=input;
    const stageChanged=changes.status!==undefined&&changes.status!==current.status;
    const targetStatus=changes.status??current.status;
    // A follow-up is a calendar-day appointment. Do not accept a status without a date.
@@ -253,10 +283,17 @@ export class LeadsService {
    const scheduledOn=followUpOn===undefined?current.nextFollowUpAt?.toISOString().slice(0,10):followUpOn;
    if(targetStatus==="FOLLOW_UP"&&!scheduledOn)throw invalid("Choose a follow-up date before saving Follow Up status");
    if(targetStatus!=="FOLLOW_UP"&&followUpOn)throw invalid("A follow-up date requires Follow Up status");
+   const oldMeeting=current.meetingAt?meetingLocal(current.meetingAt):null;
+   const meetingOn=meetingOnInput===undefined?oldMeeting?.on:meetingOnInput;
+   const meetingTime=meetingTimeInput===undefined?oldMeeting?.time:meetingTimeInput;
+   if(targetStatus==="MEETING_PROCESS"&&(!meetingOn||!meetingTime))
+     throw invalid("Choose both a meeting date and time before saving Meeting Process status");
+   if(targetStatus!=="MEETING_PROCESS"&&(meetingOnInput||meetingTimeInput))
+     throw invalid("A meeting schedule requires Meeting Process status");
    if(current.status==="APPROVED"&&stageChanged)
      throw new AuthError(409,"ALREADY_APPROVED","Approved leads cannot return to the lead pipeline");
    if(changes.status==="APPROVED"&&!a.permissions.has("leads.convert"))throw forbidden();
-   if(Object.keys(changes).length===0&&followUpOn===undefined&&!stageNote?.trim())throw invalid("No changes provided");
+   if(Object.keys(changes).length===0&&followUpOn===undefined&&meetingOnInput===undefined&&meetingTimeInput===undefined&&!stageNote?.trim())throw invalid("No changes provided");
    const data:Prisma.LeadUpdateManyMutationInput={version:{increment:1}};
    if(changes.businessName!==undefined){
      const name=changes.businessName.trim()||"Lead "+current.normalizedPhone;
@@ -271,6 +308,8 @@ export class LeadsService {
    // Leaving FOLLOW_UP removes its schedule, so it cannot appear on a later overview.
    if(targetStatus==="FOLLOW_UP")data.nextFollowUpAt=new Date(scheduledOn!+"T12:00:00.000Z");
    else if(current.nextFollowUpAt)data.nextFollowUpAt=null;
+   if(targetStatus==="MEETING_PROCESS")data.meetingAt=meetingInstant(meetingOn!,meetingTime!);
+   else if(current.meetingAt)data.meetingAt=null;
    if(stageNote!==undefined)data.stageNote=stageNote;
    return this.db.$transaction(async tx=>{
      const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null,version},data});
@@ -278,11 +317,14 @@ export class LeadsService {
      const changed=await tx.lead.findUniqueOrThrow({where:{id}});
      const scheduleChanged=(current.nextFollowUpAt?.toISOString().slice(0,10)??null)!==
        (changed.nextFollowUpAt?.toISOString().slice(0,10)??null);
+     const meetingChanged=(current.meetingAt?.getTime()??null)!==(changed.meetingAt?.getTime()??null);
      await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,
        kind:stageChanged?"STAGE_CHANGED":scheduleChanged?"FOLLOW_UP_SET":stageNote?.trim()?"NOTE":"DETAILS_UPDATED",
        note:stageNote?.trim()||null,
        metadata:{fromStatus:current.status,toStatus:changed.status,version:changed.version,
-         ...(scheduleChanged?{followUpOn:changed.nextFollowUpAt?.toISOString().slice(0,10)??null}:{})}}});
+         ...(scheduleChanged?{followUpOn:changed.nextFollowUpAt?.toISOString().slice(0,10)??null}:{}),
+         ...(meetingChanged?{meetingOn:changed.meetingAt?meetingLocal(changed.meetingAt).on:null,
+           meetingTime:changed.meetingAt?meetingLocal(changed.meetingAt).time:null}:{})}}});
      if(changes.status==="APPROVED"){
        const existing=await tx.client.findUnique({where:{sourceLeadId:id}});
        if(!existing){

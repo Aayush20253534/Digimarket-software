@@ -548,6 +548,7 @@ model Lead {
   assignedToId      String?     @db.Uuid
   createdById       String      @db.Uuid
   nextFollowUpAt    DateTime?   @db.Timestamptz(6)
+  meetingAt         DateTime?   @db.Timestamptz(6)
   importKey         String?     @db.Uuid
   deletedAt         DateTime?   @db.Timestamptz(6)
   deletedById       String?     @db.Uuid
@@ -565,6 +566,7 @@ model Lead {
   @@index([organizationId, status, updatedAt])
   @@index([organizationId, deletedAt, createdAt])
   @@index([organizationId, assignedToId, nextFollowUpAt])
+  @@index([organizationId, status, meetingAt])
   @@index([organizationId, normalizedPhone])
   @@index([organizationId, normalizedBusinessName])
 }

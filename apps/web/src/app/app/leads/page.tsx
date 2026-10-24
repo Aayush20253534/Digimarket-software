@@ -13,7 +13,7 @@ const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FO
 const stageLabel=(s:Stage)=>s.replaceAll("_"," ");
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;googleMapsUrl:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
- status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;
+ status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;meetingAt:string|null;
  version:number;createdAt:string;canEdit?:boolean;assignee?:{displayName:string}|null};
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
@@ -61,6 +61,8 @@ export default function LeadsPage(){
  const [selected,setSelected]=useState<Detail|null>(null);
  const [editStage,setEditStage]=useState<Stage>("PENDING");
  const [followUpOn,setFollowUpOn]=useState("");
+ const [meetingOn,setMeetingOn]=useState("");
+ const [meetingTime,setMeetingTime]=useState("");
  const [editSource,setEditSource]=useState<LeadSource>("COLD_CALL");
  const [stageNote,setStageNote]=useState("");
  const [noteSaveState,setNoteSaveState]=useState<"idle"|"saving"|"saved"|"error">("idle");
@@ -130,7 +132,9 @@ export default function LeadsPage(){
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
      activeLeadId.current=id;
-     setSelected(detail);setEditStage(detail.status);setFollowUpOn(detail.nextFollowUpAt?.slice(0,10)??"");setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
+     setSelected(detail);setEditStage(detail.status);setFollowUpOn(detail.nextFollowUpAt?.slice(0,10)??"");
+     const savedMeeting=detail.meetingAt?new Date(new Date(detail.meetingAt).getTime()+330*60_000).toISOString().slice(0,16):"";
+     setMeetingOn(savedMeeting.slice(0,10));setMeetingTime(savedMeeting.slice(11,16));setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
      let draft:string|null=null;try{draft=window.localStorage.getItem(draftKey(id));}catch{ /* Browser storage may be unavailable. */ }
      latestStageNote.current=draft??detail.stageNote??"";
      setNote("");setStageNote(latestStageNote.current);setNoteSaveState(draft===null?"idle":"saving");
@@ -176,11 +180,16 @@ export default function LeadsPage(){
  async function edit(e:FormEvent){
    e.preventDefault();if(!selected)return;
    if(editStage==="FOLLOW_UP"&&!followUpOn){setError("Select a follow-up date before saving.");return;}
+   if(editStage==="MEETING_PROCESS"&&(!meetingOn||!meetingTime)){
+     setError("Select both a meeting date and time before saving.");return;
+   }
    setBusy(true);setError("");
    try{
      await noteWriteQueue.current;
      await request("/leads/"+selected.id,{method:"PUT",body:{...updating,source:editSource,status:editStage,
        followUpOn:editStage==="FOLLOW_UP"?followUpOn:null,
+       meetingOn:editStage==="MEETING_PROCESS"?meetingOn:null,
+       meetingTime:editStage==="MEETING_PROCESS"?meetingTime:null,
        stageNote,version:selected.version}});
      try{window.localStorage.removeItem(draftKey(selected.id));}catch{ /* Browser storage may be unavailable. */ }
      setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":"Shared lead and status note saved.");await open(selected.id);await load();
@@ -335,6 +344,8 @@ export default function LeadsPage(){
              target="_blank" rel="noopener noreferrer"><MapPin size={16} aria-hidden="true"/>Open location in Google Maps</a>}
            {selected.status==="FOLLOW_UP"&&selected.nextFollowUpAt&&
              <p className="aw-lead-followup-scheduled">Follow-up scheduled for <strong>{new Date(selected.nextFollowUpAt.slice(0,10)+"T12:00:00Z").toLocaleDateString("en-IN",{timeZone:"UTC",dateStyle:"long"})}</strong></p>}
+           {selected.status==="MEETING_PROCESS"&&selected.meetingAt&&
+             <p className="aw-lead-meeting-scheduled">Meeting scheduled for <strong>{new Date(selected.meetingAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",dateStyle:"long",timeStyle:"short"})} IST</strong></p>}
            {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href="/app/clients">client record</Link>.</p>}
            {selected.canEdit&&!isAdmin?<form onSubmit={edit} className="space-y-3">
              {(["contactName","businessName","businessType"] as const).map(k=>
@@ -367,6 +378,17 @@ export default function LeadsPage(){
                    onChange={e=>setFollowUpOn(e.target.value)}/>
                </FormField>
                <p>Shown in Overview only on the selected calendar date. Change this date to reschedule.</p>
+             </section>}
+             {editStage==="MEETING_PROCESS"&&<section className="aw-lead-meeting-field" aria-label="Meeting schedule">
+               <FormField id="lead-meeting-on" label="Meeting date">
+                 <input id="lead-meeting-on" type="date" className="field" required
+                   aria-label="Meeting date" value={meetingOn} onChange={e=>setMeetingOn(e.target.value)}/>
+               </FormField>
+               <FormField id="lead-meeting-time" label="Meeting time">
+                 <input id="lead-meeting-time" type="time" className="field" required
+                   aria-label="Meeting time" value={meetingTime} onChange={e=>setMeetingTime(e.target.value)}/>
+               </FormField>
+               <p>India Standard Time (IST). This meeting appears in Overview only on its scheduled date.</p>
              </section>}
              <FormField id="lead-status-note" label={"Note for "+stageLabel(editStage)}>
                <textarea id="lead-status-note" className="field min-h-20" maxLength={2000}

@@ -116,6 +116,9 @@ export const leadUpdateSchema = z.strictObject({
  status:leadStageSchema.optional(),
  // Calendar date, not browser-local timestamp; persisted in the existing nextFollowUpAt field.
  followUpOn:z.iso.date().nullable().optional(),
+ // India-local calendar date and 24-hour time, converted to UTC by the API.
+ meetingOn:z.iso.date().nullable().optional(),
+ meetingTime:z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
  stageNote:z.string().trim().max(2000).optional(),
 });
 export type LeadUpdateInput = z.infer<typeof leadUpdateSchema>;

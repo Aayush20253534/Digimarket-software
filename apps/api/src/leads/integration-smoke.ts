@@ -81,10 +81,29 @@ try{
  assert.equal((await crm.metrics(founder)).followUp,1);
  assert.equal((await crm.list(founder,{stage:"FOLLOW_UP",limit:10})).items[0]?.id,first.id);
  assert.equal((await crm.detail(founder,first.id)).stageNote,"Call again on Tuesday");
+ const meetingOn="2026-10-25",meetingTime="00:15";
+ assert.equal(leadUpdateSchema.safeParse({version:followUp.version,status:"MEETING_PROCESS",meetingOn,meetingTime}).success,true);
+ for(const time of ["25:00","14:77","2:30","14:30Z"])
+   assert.equal(leadUpdateSchema.safeParse({version:followUp.version,status:"MEETING_PROCESS",meetingOn,meetingTime:time}).success,false);
+ await assert.rejects(()=>crm.update(employee,first.id,{version:followUp.version,status:"MEETING_PROCESS"}),fail(422));
+ await assert.rejects(()=>crm.update(employee,first.id,{version:followUp.version,status:"MEETING_PROCESS",meetingOn}),fail(422));
  const meeting=await crm.update(employee,first.id,{version:followUp.version,status:"MEETING_PROCESS",
-  stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"});
+  meetingOn,meetingTime,stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",
+  businessType:"Cafe",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"});
  assert.equal(meeting.status,"MEETING_PROCESS");
  assert.equal(meeting.nextFollowUpAt,null);
+ assert.equal(meeting.meetingAt?.toISOString(),"2026-10-24T18:45:00.000Z");
+ assert.equal((await crm.meetingsOn(founder,meetingOn)).total,1);
+ assert.equal((await crm.meetingsOn(founder,meetingOn)).items[0]?.id,first.id);
+ assert.equal((await crm.meetingsOn(founder,"2026-10-24")).total,0);
+ assert.equal((await crm.meetingsOn(foreign,meetingOn)).total,0);
+ await assert.rejects(()=>crm.meetingsOn(actor(owner.id,org.id,[],[]),meetingOn),fail(403));
+ const unchangedMeeting=await crm.update(employee,first.id,{version:meeting.version,stageNote:"Date retained"});
+ assert.equal(unchangedMeeting.meetingAt?.toISOString(),meeting.meetingAt?.toISOString());
+ const rescheduled=await crm.update(employee,first.id,{version:unchangedMeeting.version,
+  meetingOn:"2026-10-26",meetingTime:"15:45"});
+ assert.equal((await crm.meetingsOn(founder,meetingOn)).total,0);
+ assert.equal((await crm.meetingsOn(founder,"2026-10-26")).total,1);
  assert.equal((await crm.followUpsOn(founder,followUpOn)).total,0);
  assert.equal((await crm.scheduledFollowUps(founder,{limit:20})).items.length,0);
  const meetingMetrics=await crm.metrics(founder);
@@ -97,15 +116,17 @@ try{
  assert.equal((await crm.list(founder,{limit:30})).items[0]?.stageNote,"Discussed the social media package");
  const autosaved=await crm.saveStageNote(employee,first.id,"Meeting on Friday");
  assert.equal(autosaved.stageNote,"Meeting on Friday");
- assert.equal(autosaved.version,meeting.version);
+ assert.equal(autosaved.version,rescheduled.version);
  assert.equal((await crm.detail(founder,first.id)).stageNote,"Meeting on Friday");
  const notes=(await crm.detail(founder,first.id)).activities.map(activity=>activity.note);
  assert.equal(notes[0],"Meeting on Friday");
  assert.ok(notes.includes("Discussed the social media package"));
  await assert.rejects(()=>crm.update(employee,first.id,{version:1,status:"APPROVED"}),fail(409));
- const decision=await crm.update(employee,first.id,{version:meeting.version,status:"DECISION_PENDING",
+ const decision=await crm.update(employee,first.id,{version:rescheduled.version,status:"DECISION_PENDING",
    stageNote:"Proposal sent; waiting for the client's decision"});
  assert.equal(decision.status,"DECISION_PENDING");
+ assert.equal(decision.meetingAt,null);
+ assert.equal((await crm.meetingsOn(founder,"2026-10-26")).total,0);
  assert.equal((await crm.metrics(founder)).decisionPending,1);
  assert.equal((await crm.metrics(founder)).meetingProcess,0);
  assert.equal((await crm.list(founder,{stage:"DECISION_PENDING",limit:10})).items[0]?.id,first.id);

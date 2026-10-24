@@ -1,0 +1,28 @@
+/* Distinct purple meeting reminders, visually separate from teal follow-ups. */
+.aw-today-meetings{min-width:0;padding:20px;border:1px solid #a977ed;border-radius:13px;background:linear-gradient(115deg,#302046,#21152f 70%,#261a42);color:#fff4ff;box-shadow:0 8px 30px #1c08273b}
+.aw-meeting-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:17px}
+.aw-meeting-kicker{display:flex;align-items:center;gap:8px;font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#e2afff}
+.aw-meeting-heading h2{font-size:clamp(1.1rem,2.1vw,1.6rem);font-weight:850;letter-spacing:-.03em;margin:6px 0 2px}
+.aw-meeting-heading p:last-child{font-size:.75rem;color:#dbbfe9;line-height:1.5}
+.aw-meeting-actions{display:flex;align-items:center;gap:8px}
+.aw-meeting-count{padding:9px 12px;border:1px solid #be8eea;border-radius:30px;background:#57307a;font-size:.84rem;font-weight:800}
+.aw-meeting-refresh{display:inline-grid;place-items:center;min-height:40px;min-width:40px;padding:7px;border:1px solid #9671c5;border-radius:9px;background:#513067;color:#fff}
+.aw-meeting-refresh:hover{background:#6b3f8d}
+.aw-meeting-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px}
+.aw-meeting-card{min-width:0;padding:15px;border:1px solid #b992eb;border-radius:10px;background:linear-gradient(140deg,#603c8e,#43276c);color:#fff}
+.aw-meeting-card-top{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#f1d6ff;margin-bottom:12px}
+.aw-meeting-card-top span{font-size:.66rem;font-weight:900;letter-spacing:.08em}
+.aw-meeting-card h3{font-size:1.02rem;font-weight:800;line-height:1.3;overflow-wrap:anywhere}
+.aw-meeting-card p{font-size:.76rem;color:#f1dafa;line-height:1.5;margin-top:6px;overflow-wrap:anywhere}
+.aw-meeting-card .aw-meeting-time{margin-top:10px;font-size:1.18rem;font-weight:900;color:#fff}
+.aw-meeting-card .aw-meeting-note{margin-top:10px;padding:9px 10px;border:1px solid #a780d2;border-radius:7px;background:#241638a6;white-space:pre-wrap;max-height:118px;overflow-y:auto}
+.aw-meeting-card-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.aw-meeting-card-links a{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:38px;padding:9px 11px;border:1px solid #eed4ff;border-radius:7px;background:#35204b;color:#fff;font-weight:750;font-size:.75rem}
+.aw-meeting-card-links a:hover{background:#724b9a}
+.aw-meeting-overflow{margin-top:12px;font-size:.76rem;color:#e6caef}
+.aw-lead-meeting-field{display:grid;gap:12px;padding:14px;border:1px solid #976aca;border-radius:10px;background:#2c1c45;color:#f6e6ff}
+.aw-lead-meeting-field .field{color-scheme:light}
+.aw-lead-meeting-field p{font-size:.73rem;line-height:1.5;color:#e3c9ff}
+.aw-lead-meeting-scheduled{font-size:.8rem;border-left:3px solid #b17ff3;padding:8px 12px;background:#463063;color:#fff;border-radius:3px}
+@media(max-width:520px){.aw-today-meetings{padding:13px}.aw-meeting-grid{grid-template-columns:1fr}.aw-meeting-card{padding:12px}}
+@media(prefers-reduced-motion:reduce){.aw-today-meetings *{transition:none!important;animation:none!important}}

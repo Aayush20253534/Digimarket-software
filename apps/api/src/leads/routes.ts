@@ -38,6 +38,11 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
    res.set("Cache-Control","no-store");
    res.json({data:await svc.scheduledFollowUps(actor(res),parse(followUpsQuery,req.query))});
  });
+ app.get(root+"/meetings/today",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   const input=parse(z.strictObject({date:z.iso.date()}),req.query);
+   res.json({data:await svc.meetingsOn(actor(res),input.date)});
+ });
  app.get(root+"/follow-ups/today",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
    const input=parse(z.strictObject({date:z.iso.date()}),req.query);
