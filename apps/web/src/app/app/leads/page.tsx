@@ -72,7 +72,7 @@ export default function LeadsPage(){
  const [owner,setOwner]=useState("");
  const [note,setNote]=useState("");
  const [staff,setStaff]=useState<StaffUser[]>([]);
- const [updating,setUpdating]=useState({businessName:"",contactName:"",businessType:"",googleMapsUrl:""});
+ const [updating,setUpdating]=useState({businessName:"",contactName:"",businessType:"",location:"",googleMapsUrl:""});
  // Persist only display preferences, never lead details or auth credentials.
  useEffect(()=>{
    const userId=session?.identity.userId;
@@ -139,7 +139,7 @@ export default function LeadsPage(){
      latestStageNote.current=draft??detail.stageNote??"";
      setNote("");setStageNote(latestStageNote.current);setNoteSaveState(draft===null?"idle":"saving");
      setUpdating({businessName:detail.businessName.startsWith("Lead ")? "":detail.businessName,
-       contactName:detail.contactName??"",businessType:detail.businessType??"",googleMapsUrl:detail.googleMapsUrl??""});
+       contactName:detail.contactName??"",businessType:detail.businessType??"",location:detail.location??"",googleMapsUrl:detail.googleMapsUrl??""});
    }catch(e){setError(errText(e));}
  };
  useEffect(()=>{
@@ -355,6 +355,12 @@ export default function LeadsPage(){
                </FormField>)}
              <section aria-label="Lead location" className="aw-lead-location-section">
                <h3 className="text-sm font-semibold">Location</h3>
+               <FormField id="edit-location" label="Address">
+                 <input id="edit-location" className="field" maxLength={240}
+                   placeholder="Meeting address or business location"
+                   value={updating.location}
+                   onChange={e=>setUpdating(v=>({...v,location:e.target.value}))}/>
+               </FormField>
                <FormField id="edit-google-maps-url" label="Google Maps link">
                  <input id="edit-google-maps-url" type="url" className="field" maxLength={1000}
                    placeholder="https://maps.app.goo.gl/..."

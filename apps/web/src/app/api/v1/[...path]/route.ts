@@ -47,6 +47,7 @@ const endpoints: Record<string, string[]> = {
   "leads/follow-ups": ["GET"],
   "leads/follow-ups/today": ["GET"],
   "leads/meetings/today": ["GET"],
+  "leads/meetings": ["GET"],
   "clients": ["GET","POST"],
   "assets": ["GET"],
   "projects": ["GET","POST"],
@@ -330,6 +331,12 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
   }
   if(path==="leads/follow-ups"){
+    for(const key of ["cursor","limit"]){
+      const value=request.nextUrl.searchParams.get(key);
+      if(value!==null)url.searchParams.set(key,value);
+    }
+  }
+  if(path==="leads/meetings"){
     for(const key of ["cursor","limit"]){
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);

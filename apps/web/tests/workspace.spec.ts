@@ -529,6 +529,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Contact name",{exact:true}).fill("CI Contact");
   await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
   await page.getByLabel("Business type",{exact:true}).fill("Retail");
+  await page.getByLabel("Address").fill("17 Civil Lines, Prayagraj");
   await page.getByLabel("Google Maps link").fill("https://maps.app.goo.gl/abcdEFG123");
   await page.getByLabel("Lead status").selectOption("MEETING_PROCESS");
   await expect(page.getByLabel("Meeting date")).toBeVisible();
@@ -542,6 +543,30 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Lead: Founder CI Lead"})).toBeVisible();
   await expect(page.getByLabel("Meeting date")).toHaveValue(dueTomorrow);
   await expect(page.getByLabel("Meeting time")).toHaveValue("14:30");
+  await expect(page.getByLabel("Address")).toHaveValue("17 Civil Lines, Prayagraj");
+  // Every scheduled meeting is visible in the dedicated register, even when future-dated.
+  const scheduledMeetingsResponse=page.waitForResponse(res=>
+    res.url().includes("/api/v1/leads/meetings?"));
+  await page.getByRole("navigation",{name:"Workspace navigation"})
+    .getByRole("link",{name:"Meetings",exact:true}).click();
+  expect((await scheduledMeetingsResponse).status()).toBe(200);
+  await expect(page).toHaveURL(/\/app\/meetings$/);
+  const meetingRegister=page.getByRole("table",{name:"Meetings register"});
+  await expect(meetingRegister.getByRole("columnheader")).toHaveText([
+    "Meeting date","Meeting time","Business name","Contact name","Phone number","Address",
+  ]);
+  await expect(meetingRegister.locator("tbody tr")).toHaveCount(1);
+  await expect(meetingRegister.locator("tbody tr time").first()).toHaveAttribute("dateTime",/20\d{2}-/);
+  await expect(meetingRegister.locator("tbody tr time").nth(1)).toContainText(/2:30/i);
+  await expect(meetingRegister.getByRole("link",{name:"Founder CI Lead"})).toBeVisible();
+  await expect(meetingRegister.getByText("CI Contact")).toBeVisible();
+  await expect(meetingRegister.getByRole("link",{name:"9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
+  await expect(meetingRegister.getByText("17 Civil Lines, Prayagraj")).toBeVisible();
+  await expect(meetingRegister.getByRole("link",{name:"Open Google Maps for Founder CI Lead"}))
+    .toHaveAttribute("href","https://maps.app.goo.gl/abcdEFG123");
+  await page.goto("/app/leads");
+  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
+  await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   const futureMeeting=page.waitForResponse(res=>res.url().includes("/api/v1/leads/meetings/today?date="));
   await page.goto("/app/dashboard");
   expect((await futureMeeting).status()).toBe(200);
@@ -571,6 +596,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/dashboard");
   expect((await clearedMeeting).status()).toBe(200);
   await expect(page.getByTestId("today-lead-meetings")).toHaveCount(0);
+  await page.goto("/app/meetings");
+  await expect(page.getByRole("table",{name:"Meetings register"}).locator("tbody tr")).toHaveCount(0);
   await page.goto("/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();

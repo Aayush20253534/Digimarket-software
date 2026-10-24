@@ -89,7 +89,7 @@ try{
  await assert.rejects(()=>crm.update(employee,first.id,{version:followUp.version,status:"MEETING_PROCESS",meetingOn}),fail(422));
  const meeting=await crm.update(employee,first.id,{version:followUp.version,status:"MEETING_PROCESS",
   meetingOn,meetingTime,stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",
-  businessType:"Cafe",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"});
+  businessType:"Cafe",location:"12 Example Road, Prayagraj",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"});
  assert.equal(meeting.status,"MEETING_PROCESS");
  assert.equal(meeting.nextFollowUpAt,null);
  assert.equal(meeting.meetingAt?.toISOString(),"2026-10-24T18:45:00.000Z");
@@ -111,6 +111,8 @@ try{
  assert.equal(meetingMetrics.followUp,0);
  assert.equal(meetingMetrics.meetingProcess,1);
  assert.equal(meeting.googleMapsUrl,"https://maps.app.goo.gl/abcdEFG123");
+ assert.equal(meeting.location,"12 Example Road, Prayagraj");
+ assert.equal((await crm.detail(founder,first.id)).location,"12 Example Road, Prayagraj");
  assert.equal((await crm.list(founder,{limit:30})).items[0]?.googleMapsUrl,meeting.googleMapsUrl);
  assert.equal((await crm.detail(founder,first.id)).googleMapsUrl,meeting.googleMapsUrl);
  assert.equal((await crm.list(founder,{limit:30})).items[0]?.stageNote,"Discussed the social media package");
@@ -272,6 +274,33 @@ try{
   assert.ok(entry.createdAt instanceof Date);
   assert.equal(Number.isNaN(entry.createdAt.getTime()),false);
  }
+
+ // Sidebar meetings register uses a different, date-sorted paginated endpoint.
+ const morningDraft=await crm.create(founder,{phone:"919812340501"});
+ const afternoonDraft=await crm.create(founder,{phone:"919812340502"});
+ const morning=await crm.update(founder,morningDraft.id,{version:morningDraft.version,
+   status:"MEETING_PROCESS",meetingOn:"2026-10-27",meetingTime:"09:15",
+   businessName:"Morning cafe",contactName:"Manager A",location:"17 Main Road, Prayagraj"});
+ const afternoon=await crm.update(founder,afternoonDraft.id,{version:afternoonDraft.version,
+   status:"MEETING_PROCESS",meetingOn:"2026-10-28",meetingTime:"15:45",
+   businessName:"Afternoon hotel",contactName:"Manager B"});
+ const firstMeetings=await crm.scheduledMeetings(founder,{limit:1});
+ assert.equal(firstMeetings.total,2);
+ assert.equal(firstMeetings.items.length,1);
+ assert.equal(firstMeetings.items[0]?.id,morning.id);
+ assert.equal(firstMeetings.items[0]?.location,"17 Main Road, Prayagraj");
+ assert.equal(firstMeetings.items[0]?.meetingAt?.toISOString(),"2026-10-27T03:45:00.000Z");
+ assert.ok(firstMeetings.nextCursor);
+ const secondMeetings=await crm.scheduledMeetings(founder,{limit:1,cursor:firstMeetings.nextCursor!});
+ assert.equal(secondMeetings.total,2);
+ assert.equal(secondMeetings.items[0]?.id,afternoon.id);
+ assert.equal(secondMeetings.items[0]?.location,null);
+ assert.equal(secondMeetings.nextCursor,null);
+ assert.equal((await crm.scheduledMeetings(foreign,{limit:20})).total,0);
+ await assert.rejects(()=>crm.scheduledMeetings(actor(owner.id,org.id,[],[]),{limit:20}),fail(403));
+ const removedMeeting=await crm.update(founder,morning.id,{version:morning.version,status:"DECISION_PENDING"});
+ assert.equal(removedMeeting.meetingAt,null);
+ assert.equal((await crm.scheduledMeetings(founder,{limit:20})).total,1);
 
  console.info("Module 7 PASS: phone-only lead, shared editing, atomic Approved conversion, history, webhook dedupe, tenant isolation and import.");
 }finally{await db.$disconnect();}

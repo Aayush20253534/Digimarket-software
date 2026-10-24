@@ -111,6 +111,7 @@ export const leadUpdateSchema = z.strictObject({
  contactName:z.string().trim().max(160).optional(),
  businessName:z.string().trim().max(180).optional(),
  businessType:z.string().trim().max(120).optional(),
+ location:z.string().trim().max(240).optional(),
  googleMapsUrl:leadGoogleMapsUrlSchema.optional(),
  source:leadSourceSchema.optional(),
  status:leadStageSchema.optional(),

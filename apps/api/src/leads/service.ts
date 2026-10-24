@@ -226,6 +226,24 @@ export class LeadsService {
    ]);
    return {date:on,total,items,hasMore:total>items.length};
  }
+ // Full scheduled-meeting register for the sidebar. Sorted by meeting date and
+ // time (IST), independent of lead creation time; read permission and tenant scoped.
+ async scheduledMeetings(a:Principal,input:{cursor?:string;limit:number}){
+   deny(a,"leads.read");
+   const where:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,
+     status:"MEETING_PROCESS",meetingAt:{not:null}};
+   const [total,rows]=await Promise.all([
+     this.db.lead.count({where}),
+     this.db.lead.findMany({where,take:input.limit+1,
+       ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
+       orderBy:[{meetingAt:"asc"},{id:"asc"}],
+       select:{id:true,meetingAt:true,businessName:true,contactName:true,
+         phone:true,location:true,googleMapsUrl:true}}),
+   ]);
+   const hasMore=rows.length>input.limit;
+   const items=rows.slice(0,input.limit);
+   return {items,total,nextCursor:hasMore?items.at(-1)?.id??null:null};
+ }
  // Dated register for the sidebar. Fetch only the four requested display fields
  // and a stable id for navigation/pagination. Never load other tenants or cleared schedules.
  async scheduledFollowUps(a:Principal,input:{cursor?:string;limit:number}){
@@ -301,6 +319,7 @@ export class LeadsService {
    }
    if(changes.contactName!==undefined)data.contactName=urlOrNull(changes.contactName);
    if(changes.businessType!==undefined)data.businessType=urlOrNull(changes.businessType);
+   if(changes.location!==undefined)data.location=urlOrNull(changes.location);
    if(changes.googleMapsUrl!==undefined)data.googleMapsUrl=urlOrNull(changes.googleMapsUrl);
    if(changes.source!==undefined)data.source=changes.source;
    if(changes.status!==undefined)data.status=changes.status;

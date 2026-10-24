@@ -19,6 +19,7 @@ const sections:readonly Group[]=[
  {title:"Relationships",items:[
   {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
   {label:"Follow Ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
+  {label:"Meetings",href:"/app/meetings",icon:CalendarDays,permits:["leads.read"]},
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]}
  ]},
  {title:"Delivery",items:[
