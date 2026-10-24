@@ -113,6 +113,28 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(expenseLink).toBeVisible();
   const reportFrom=await page.getByRole("region",{name:"Reporting period"}).getByLabel("From").inputValue();
   const reportTo=await page.getByRole("region",{name:"Reporting period"}).getByLabel("Through").inputValue();
+  // Guard the Leads breakdown gateway route and its parameter forwarding.
+  const leadsBreakdownLink=page.getByRole("link",{name:"Open complete Leads analytics breakdown"});
+  await expect(leadsBreakdownLink).toBeVisible();
+  const leadsBreakdownResponse=page.waitForResponse(response=>
+    response.url().includes("/api/v1/reports/leads?")&&response.request().method()==="GET");
+  await leadsBreakdownLink.click();
+  const leadResult=await leadsBreakdownResponse;
+  expect(leadResult.status(),"Leads analytics gateway must forward authorized GET").toBe(200);
+  const leadUrl=new URL(leadResult.url());
+  expect(leadUrl.searchParams.get("from")).toBe(reportFrom);
+  expect(leadUrl.searchParams.get("to")).toBe(reportTo);
+  await expect(page).toHaveURL(new RegExp("/app/reports/leads[?]"));
+  await expect(page.getByRole("heading",{name:"Leads Breakdown"})).toBeVisible();
+  await expect(page.getByText("Client converted",{exact:true}).first()).toBeVisible();
+  await expect(page.getByText("Approved",{exact:true}).first()).toBeVisible();
+  await expect(page.getByTestId("lead-analytics-breakdown")).toBeVisible();
+  const csvResponse=page.waitForResponse(response=>
+    response.url().includes("/api/v1/reports/leads/export?")&&response.request().method()==="GET");
+  await page.getByRole("button",{name:"Export filtered CSV"}).click();
+  expect((await csvResponse).status(),"Lead CSV gateway must forward authorized GET").toBe(200);
+  await page.getByRole("link",{name:"Back to Reports"}).click();
+  await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
   const incomeResponse=page.waitForResponse(response=>
     response.url().includes("/api/v1/finance/report-breakdown?")&&
     response.request().method()==="GET");

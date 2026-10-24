@@ -15,6 +15,9 @@ const endpoints: Record<string, string[]> = {
   "finance/proof-confirm": ["POST"],
   "search": ["GET"],
   "reports/overview": ["GET"],
+  // Permit the lead dashboard and its filtered CSV export.
+  "reports/leads": ["GET"],
+  "reports/leads/export": ["GET"],
   "notifications": ["GET"],
   "notifications/push-key": ["GET"],
   "notifications/push-subscription": ["POST","DELETE"],
@@ -248,6 +251,13 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       if(v!==null)url.searchParams.set(key,v);
     }
   }
+  // Preserve cohort and filter parameters for the lead analytics API.
+  if(path==="reports/leads"||path==="reports/leads/export"){
+    for(const key of ["from","to","source","stage","assignedToId","businessType","location","q","page","limit"]){
+      const v=request.nextUrl.searchParams.get(key);
+      if(v!==null)url.searchParams.set(key,v);
+    }
+  }
   // Preserve the validated drill-down filters through the Next.js gateway.
   // The backend still validates kind, dates, search and pagination.
   if(path==="finance/report-breakdown"||path==="finance/report-breakdown/export"){
@@ -345,6 +355,17 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       method: request.method, headers, body,
       cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(folderArchivePattern.test(path)?55000:12000),
     });
+    // The Render free backend may lag Vercel because automatic deployment is disabled.
+    if(response.status===404&&(path==="reports/leads"||path==="reports/leads/export")){
+      const payload=await response.clone().json().catch(()=>null) as
+        {error?:{code?:string;message?:string};meta?:{requestId?:string}} | null;
+      if(payload?.error?.code==="NOT_FOUND"&&payload.error.message==="Route not found"&&
+        typeof payload.meta?.requestId==="string"){
+        return NextResponse.json({error:{code:"LEAD_REPORT_API_NOT_DEPLOYED",
+          message:"Lead analytics is not available on the deployed API. Deploy the latest main branch of digimarket-api on Render."}},
+          {status:503,headers:{"Cache-Control":"no-store"}});
+      }
+    }
     // A new web deployment can point at a stale Render API. Its fallback 404
     // includes meta.requestId, unlike an actual missing note. Report the
     // deployment mismatch instead of misleading users with "Route not found".
