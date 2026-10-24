@@ -487,7 +487,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   ]);
   await expect(scheduledTable.locator("tbody tr")).toHaveCount(1);
   await expect(scheduledTable.locator("tbody tr time")).toHaveAttribute("dateTime",dueTomorrow);
-  await expect(scheduledTable.getByRole("link",{name:"9876543210"})).toHaveAttribute("href","tel:9876543210");
+  await expect(scheduledTable.getByRole("link",{name:"9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
   await expect(scheduledTable.getByRole("link",{name:"Lead 9876543210"})).toBeVisible();
   await expect(scheduledTable.locator("tbody tr").getByText("Not recorded")).toBeVisible();
   await page.goto("/app/leads");
