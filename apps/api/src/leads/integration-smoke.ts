@@ -53,8 +53,20 @@ try{
  assert.equal(notContactedMetrics.pending,0);
  assert.equal((await crm.list(founder,{stage:"YET_TO_CALL",limit:30})).items[0]?.id,first.id);
  assert.equal((await crm.detail(founder,first.id)).stageNote,"Outreach not started");
+ const followUpOn=new Date().toISOString().slice(0,10);
+ const otherDay=new Date(Date.now()+86400000).toISOString().slice(0,10);
+ assert.equal(leadUpdateSchema.safeParse({version:yetToCall.version,status:"FOLLOW_UP",followUpOn}).success,true);
+ assert.equal(leadUpdateSchema.safeParse({version:yetToCall.version,status:"FOLLOW_UP",followUpOn:"2026-99-99"}).success,false);
+ await assert.rejects(()=>crm.update(employee,first.id,{version:yetToCall.version,status:"FOLLOW_UP"}),fail(422));
+ await assert.rejects(()=>crm.update(employee,first.id,{version:yetToCall.version,status:"MEETING_PROCESS",followUpOn}),fail(422));
  const followUp=await crm.update(employee,first.id,{version:yetToCall.version,status:"FOLLOW_UP",
-  stageNote:"Call again on Tuesday"});
+  followUpOn,stageNote:"Call again on Tuesday"});
+ assert.equal(followUp.nextFollowUpAt?.toISOString().slice(0,10),followUpOn);
+ assert.equal((await crm.followUpsOn(founder,followUpOn)).total,1);
+ assert.equal((await crm.followUpsOn(founder,followUpOn)).items[0]?.id,first.id);
+ assert.equal((await crm.followUpsOn(founder,otherDay)).total,0);
+ assert.equal((await crm.followUpsOn(foreign,followUpOn)).total,0);
+ await assert.rejects(()=>crm.followUpsOn(actor(owner.id,org.id,[],[]),followUpOn),fail(403));
  assert.equal(followUp.status,"FOLLOW_UP");
  assert.equal((await crm.metrics(founder)).followUp,1);
  assert.equal((await crm.list(founder,{stage:"FOLLOW_UP",limit:10})).items[0]?.id,first.id);
@@ -62,6 +74,8 @@ try{
  const meeting=await crm.update(employee,first.id,{version:followUp.version,status:"MEETING_PROCESS",
   stageNote:"Discussed the social media package",contactName:"Owner",businessName:"Big Mo Cafe",businessType:"Cafe",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123"});
  assert.equal(meeting.status,"MEETING_PROCESS");
+ assert.equal(meeting.nextFollowUpAt,null);
+ assert.equal((await crm.followUpsOn(founder,followUpOn)).total,0);
  const meetingMetrics=await crm.metrics(founder);
  assert.equal(meetingMetrics.yetToCall,0);
  assert.equal(meetingMetrics.followUp,0);

@@ -459,12 +459,42 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(yetToCallBadge).toHaveCSS("background-color","rgb(0, 0, 0)");
   await expect(yetToCallBadge).toHaveCSS("color","rgb(255, 255, 255)");
   await page.getByLabel("Lead status").selectOption("FOLLOW_UP");
+  await expect(page.getByLabel("Follow-up date")).toBeVisible();
+  const agencyDay=(offset:number)=>new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit",
+  }).format(new Date(Date.now()+offset*86400000));
+  const dueToday=agencyDay(0),dueTomorrow=agencyDay(1);
+  // A follow-up cannot be saved without a date.
+  await page.getByRole("button",{name:"Save details and stage"}).click();
+  await expect(page.getByLabel("Follow-up date")).toBeVisible();
+  await page.getByLabel("Follow-up date").fill(dueTomorrow);
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const followUpBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-badge");
   await expect(followUpBadge).toHaveText("FOLLOW UP");
   await expect(followUpBadge).toHaveCSS("background-color","rgb(91, 245, 39)");
   await expect(followUpBadge).toHaveCSS("color","rgb(0, 0, 0)");
+  // Tomorrow's reminder is invisible today, irrespective of lead creation date.
+  const futureResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups/today?date="));
+  await page.goto("/app/dashboard");
+  expect((await futureResponse).status()).toBe(200);
+  await expect(page.getByTestId("today-lead-followups")).toHaveCount(0);
+  await page.goto("/app/leads");
+  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
+  await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
+  await expect(page.getByLabel("Follow-up date")).toHaveValue(dueTomorrow);
+  await page.getByLabel("Follow-up date").fill(dueToday);
+  await page.getByRole("button",{name:"Save details and stage"}).click();
+  const todayResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups/today?date="));
+  await page.goto("/app/dashboard");
+  expect((await todayResponse).status()).toBe(200);
+  const dueCard=page.getByTestId("today-lead-followups");
+  await expect(dueCard).toBeVisible();
+  await expect(dueCard.getByText("Lead 9876543210")).toBeVisible();
+  await expect(dueCard.locator(".aw-today-followup-card")).toHaveCSS("color","rgb(255, 255, 255)");
+  await page.goto("/app/leads");
+  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
+  await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   await page.getByLabel("Lead status").selectOption("CALL_NOT_PICKING");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})

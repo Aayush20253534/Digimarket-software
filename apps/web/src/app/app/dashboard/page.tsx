@@ -12,6 +12,7 @@ import { AWBadge, AWEmptyState, AWNotice, AWStatusBadge } from "@/components/aw-
 import { AWDataToolbar, AWLocalPagination, AWPanel, AWSortButton, AWStat } from "@/components/aw-data-patterns";
 import { permittedGroups } from "@/components/workspace-navigation";
 import { AWPersonalTasks } from "@/components/aw-personal-tasks";
+import { AWTodayFollowUps } from "@/components/aw-today-followups";
 import { PWAInstallCard } from "@/components/pwa-install";
 
 type Source = "Clients" | "Leads" | "Projects";
@@ -104,7 +105,7 @@ export default function Dashboard() {
   const firstName=session?.user.displayName.split(" ")[0]??"there";
   if(!session)return null;
   const leadership=isAdmin;
-  if(!leadership)return <div className="space-y-5"><PWAInstallCard/><AWPersonalTasks/></div>;
+  if(!leadership)return <div className="space-y-5"><PWAInstallCard/><AWTodayFollowUps/><AWPersonalTasks/></div>;
   const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
   overview?.records.forEach(x=>{groupCounts[x.source]++;});
   return <div className="aw-dashboard space-y-7" data-testid="amplifyworld-dashboard">
@@ -126,6 +127,7 @@ export default function Dashboard() {
     </header>
 
     <PWAInstallCard/>
+    <AWTodayFollowUps/>
 
     {leadership&&<div className="aw-stat-grid" data-testid="dashboard-kpis">
       <AWStat label="Your session" value="Authenticated" description="Verified against the active API session"

@@ -114,6 +114,8 @@ export const leadUpdateSchema = z.strictObject({
  googleMapsUrl:leadGoogleMapsUrlSchema.optional(),
  source:leadSourceSchema.optional(),
  status:leadStageSchema.optional(),
+ // Calendar date, not browser-local timestamp; persisted in the existing nextFollowUpAt field.
+ followUpOn:z.iso.date().nullable().optional(),
  stageNote:z.string().trim().max(2000).optional(),
 });
 export type LeadUpdateInput = z.infer<typeof leadUpdateSchema>;

@@ -59,6 +59,7 @@ export default function LeadsPage(){
  const [creating,setCreating]=useState(false);
  const [selected,setSelected]=useState<Detail|null>(null);
  const [editStage,setEditStage]=useState<Stage>("PENDING");
+ const [followUpOn,setFollowUpOn]=useState("");
  const [editSource,setEditSource]=useState<LeadSource>("COLD_CALL");
  const [stageNote,setStageNote]=useState("");
  const [noteSaveState,setNoteSaveState]=useState<"idle"|"saving"|"saved"|"error">("idle");
@@ -128,7 +129,7 @@ export default function LeadsPage(){
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
      activeLeadId.current=id;
-     setSelected(detail);setEditStage(detail.status);setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
+     setSelected(detail);setEditStage(detail.status);setFollowUpOn(detail.nextFollowUpAt?.slice(0,10)??"");setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
      let draft:string|null=null;try{draft=window.localStorage.getItem(draftKey(id));}catch{ /* Browser storage may be unavailable. */ }
      latestStageNote.current=draft??detail.stageNote??"";
      setNote("");setStageNote(latestStageNote.current);setNoteSaveState(draft===null?"idle":"saving");
@@ -172,10 +173,13 @@ export default function LeadsPage(){
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function edit(e:FormEvent){
-   e.preventDefault();if(!selected)return;setBusy(true);setError("");
+   e.preventDefault();if(!selected)return;
+   if(editStage==="FOLLOW_UP"&&!followUpOn){setError("Select a follow-up date before saving.");return;}
+   setBusy(true);setError("");
    try{
      await noteWriteQueue.current;
      await request("/leads/"+selected.id,{method:"PUT",body:{...updating,source:editSource,status:editStage,
+       followUpOn:editStage==="FOLLOW_UP"?followUpOn:null,
        stageNote,version:selected.version}});
      try{window.localStorage.removeItem(draftKey(selected.id));}catch{ /* Browser storage may be unavailable. */ }
      setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":"Shared lead and status note saved.");await open(selected.id);await load();
@@ -324,6 +328,8 @@ export default function LeadsPage(){
              <PhoneCall size={16} aria-hidden="true"/>Call {selected.phone}</a>}
            {selected.googleMapsUrl&&!selected.canEdit&&<a className="aw-lead-location-link" href={selected.googleMapsUrl}
              target="_blank" rel="noopener noreferrer"><MapPin size={16} aria-hidden="true"/>Open location in Google Maps</a>}
+           {selected.status==="FOLLOW_UP"&&selected.nextFollowUpAt&&
+             <p className="aw-lead-followup-scheduled">Follow-up scheduled for <strong>{new Date(selected.nextFollowUpAt.slice(0,10)+"T12:00:00Z").toLocaleDateString("en-IN",{timeZone:"UTC",dateStyle:"long"})}</strong></p>}
            {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href="/app/clients">client record</Link>.</p>}
            {selected.canEdit&&!isAdmin?<form onSubmit={edit} className="space-y-3">
              {(["contactName","businessName","businessType"] as const).map(k=>
@@ -349,6 +355,14 @@ export default function LeadsPage(){
              </FormField>
              <FormField id="edit-stage" label="Lead status"><select id="edit-stage" className="field" value={editStage} disabled={selected.status==="APPROVED"}
                onChange={e=>setEditStage(e.target.value as Stage)}>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}</select></FormField>
+             {editStage==="FOLLOW_UP"&&<section className="aw-lead-followup-field" aria-label="Follow-up schedule">
+               <FormField id="lead-follow-up-on" label="Follow-up date">
+                 <input id="lead-follow-up-on" className="field" type="date" required
+                   aria-label="Follow-up date" value={followUpOn}
+                   onChange={e=>setFollowUpOn(e.target.value)}/>
+               </FormField>
+               <p>Shown in Overview only on the selected calendar date. Change this date to reschedule.</p>
+             </section>}
              <FormField id="lead-status-note" label={"Note for "+stageLabel(editStage)}>
                <textarea id="lead-status-note" className="field min-h-20" maxLength={2000}
                  placeholder="Call summary, meeting outcome, or reason for approval"

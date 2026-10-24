@@ -193,6 +193,22 @@ export class LeadsService {
    const page=rows.slice(0,input.limit);
    return {items:page,nextCursor:hasMore?page.at(-1)?.id??null:null};
  }
+ // Exact scheduled-day query, independent of lead creation or last-update sorting.
+ // Dates use the same UTC calendar-day representation as nextFollowUpAt.
+ async followUpsOn(a:Principal,on:string){
+   deny(a,"leads.read");
+   const start=new Date(on+"T00:00:00.000Z");
+   const end=new Date(start.getTime()+86400000);
+   const where:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,
+     status:"FOLLOW_UP",nextFollowUpAt:{gte:start,lt:end}};
+   const [total,items]=await Promise.all([
+     this.db.lead.count({where}),
+     this.db.lead.findMany({where,orderBy:[{nextFollowUpAt:"asc"},{id:"asc"}],take:100,
+       select:{id:true,businessName:true,contactName:true,phone:true,source:true,status:true,
+         stageNote:true,nextFollowUpAt:true,assignedToId:true,assignee:{select:{displayName:true}}}}),
+   ]);
+   return {date:on,total,items,hasMore:total>items.length};
+ }
  async detail(a:Principal,id:string){
    const lead=await this.find(a,id);
    const editable=this.canEdit(a,lead);
@@ -212,12 +228,18 @@ export class LeadsService {
  async update(a:Principal,id:string,input:LeadUpdateInput){
    const current=await this.find(a,id);
    if(!this.canEdit(a,current))throw forbidden();
-   const {version,stageNote,...changes}=input;
+   const {version,stageNote,followUpOn,...changes}=input;
    const stageChanged=changes.status!==undefined&&changes.status!==current.status;
+   const targetStatus=changes.status??current.status;
+   // A follow-up is a calendar-day appointment. Do not accept a status without a date.
+   // An existing follow-up can be edited without resending its unchanged date.
+   const scheduledOn=followUpOn===undefined?current.nextFollowUpAt?.toISOString().slice(0,10):followUpOn;
+   if(targetStatus==="FOLLOW_UP"&&!scheduledOn)throw invalid("Choose a follow-up date before saving Follow Up status");
+   if(targetStatus!=="FOLLOW_UP"&&followUpOn)throw invalid("A follow-up date requires Follow Up status");
    if(current.status==="APPROVED"&&stageChanged)
      throw new AuthError(409,"ALREADY_APPROVED","Approved leads cannot return to the lead pipeline");
    if(changes.status==="APPROVED"&&!a.permissions.has("leads.convert"))throw forbidden();
-   if(Object.keys(changes).length===0&&!stageNote?.trim())throw invalid("No changes provided");
+   if(Object.keys(changes).length===0&&followUpOn===undefined&&!stageNote?.trim())throw invalid("No changes provided");
    const data:Prisma.LeadUpdateManyMutationInput={version:{increment:1}};
    if(changes.businessName!==undefined){
      const name=changes.businessName.trim()||"Lead "+current.normalizedPhone;
@@ -228,15 +250,22 @@ export class LeadsService {
    if(changes.googleMapsUrl!==undefined)data.googleMapsUrl=urlOrNull(changes.googleMapsUrl);
    if(changes.source!==undefined)data.source=changes.source;
    if(changes.status!==undefined)data.status=changes.status;
+   // Store selected YYYY-MM-DD at UTC noon to preserve the calendar day across browsers.
+   // Leaving FOLLOW_UP removes its schedule, so it cannot appear on a later overview.
+   if(targetStatus==="FOLLOW_UP")data.nextFollowUpAt=new Date(scheduledOn!+"T12:00:00.000Z");
+   else if(current.nextFollowUpAt)data.nextFollowUpAt=null;
    if(stageNote!==undefined)data.stageNote=stageNote;
    return this.db.$transaction(async tx=>{
      const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null,version},data});
      if(changedCount.count!==1)throw clash();
      const changed=await tx.lead.findUniqueOrThrow({where:{id}});
+     const scheduleChanged=(current.nextFollowUpAt?.toISOString().slice(0,10)??null)!==
+       (changed.nextFollowUpAt?.toISOString().slice(0,10)??null);
      await tx.leadActivity.create({data:{leadId:id,actorId:a.userId,
-       kind:stageChanged?"STAGE_CHANGED":stageNote?.trim()?"NOTE":"DETAILS_UPDATED",
+       kind:stageChanged?"STAGE_CHANGED":scheduleChanged?"FOLLOW_UP_SET":stageNote?.trim()?"NOTE":"DETAILS_UPDATED",
        note:stageNote?.trim()||null,
-       metadata:{fromStatus:current.status,toStatus:changed.status,version:changed.version}}});
+       metadata:{fromStatus:current.status,toStatus:changed.status,version:changed.version,
+         ...(scheduleChanged?{followUpOn:changed.nextFollowUpAt?.toISOString().slice(0,10)??null}:{})}}});
      if(changes.status==="APPROVED"){
        const existing=await tx.client.findUnique({where:{sourceLeadId:id}});
        if(!existing){
