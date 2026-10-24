@@ -54,7 +54,7 @@ function Trend({rows}: {rows:Count[]}){
  const points=rows.map((r,i)=>coord(i,r.count));
  return <div className="aw-lead-trend-scroll">
   <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img"
-   aria-label="New leads over time, from "+rows[0].name+" to "+rows[rows.length-1].name}>
+   aria-label={"New leads over time, from "+rows[0].name+" to "+rows[rows.length-1].name}>
    {[0,.25,.5,.75,1].map(t=><g key={t}>
     <line x1={padX} y1={height-padY-t*(height-2*padY)} x2={width-padX} y2={height-padY-t*(height-2*padY)} stroke="#614771" strokeDasharray="3 5"/>
     <text x={4} y={height-padY-t*(height-2*padY)+4} fill="#d1b9de" fontSize={10}>{Math.round(maximum*t)}</text>
