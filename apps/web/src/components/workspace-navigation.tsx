@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
- BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, CheckSquare2,
+ BriefcaseBusiness, CalendarDays, CalendarClock, ChartNoAxesCombined, CheckSquare2,
  FileStack, FolderKanban, LayoutDashboard, NotebookPen, MessageCircle, Search, Settings2, History,
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
@@ -18,6 +18,7 @@ const sections:readonly Group[]=[
  ]},
  {title:"Relationships",items:[
   {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
+  {label:"Follow Ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]}
  ]},
  {title:"Delivery",items:[

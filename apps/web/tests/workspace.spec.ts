@@ -51,6 +51,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   for(const label of ["Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Leads CRM"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow Ups"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
   await page.goto("/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
@@ -474,6 +475,24 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(followUpBadge).toHaveText("FOLLOW UP");
   await expect(followUpBadge).toHaveCSS("background-color","rgb(91, 245, 39)");
   await expect(followUpBadge).toHaveCSS("color","rgb(0, 0, 0)");
+  // The dedicated sidebar register always lists scheduled leads by follow-up date.
+  const scheduledResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups?"));
+  await page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow Ups"}).click();
+  expect((await scheduledResponse).status()).toBe(200);
+  await expect(page).toHaveURL(/\/app\/follow-ups$/);
+  await expect(page.getByRole("heading",{name:"Follow Ups"})).toBeVisible();
+  const scheduledTable=page.getByRole("table",{name:"Follow-up register"});
+  await expect(scheduledTable.getByRole("columnheader")).toHaveText([
+    "Follow-up date","Phone number","Business name","Contact name",
+  ]);
+  await expect(scheduledTable.locator("tbody tr")).toHaveCount(1);
+  await expect(scheduledTable.locator("tbody tr time")).toHaveAttribute("dateTime",dueTomorrow);
+  await expect(scheduledTable.getByRole("link",{name:"9876543210"})).toHaveAttribute("href","tel:9876543210");
+  await expect(scheduledTable.getByRole("link",{name:"Lead 9876543210"})).toBeVisible();
+  await expect(scheduledTable.locator("tbody tr").getByText("Not recorded")).toBeVisible();
+  await page.goto("/app/leads");
+  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
+  await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   // Tomorrow's reminder is invisible today, irrespective of lead creation date.
   const futureResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups/today?date="));
   await page.goto("/app/dashboard");

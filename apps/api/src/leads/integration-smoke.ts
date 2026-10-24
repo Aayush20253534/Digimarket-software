@@ -64,6 +64,16 @@ try{
  assert.equal(followUp.nextFollowUpAt?.toISOString().slice(0,10),followUpOn);
  assert.equal((await crm.followUpsOn(founder,followUpOn)).total,1);
  assert.equal((await crm.followUpsOn(founder,followUpOn)).items[0]?.id,first.id);
+ const scheduled=await crm.scheduledFollowUps(founder,{limit:20});
+ assert.equal(scheduled.items.length,1);
+ assert.equal(scheduled.items[0]?.id,first.id);
+ assert.equal(scheduled.items[0]?.phone,first.phone);
+ assert.equal(scheduled.items[0]?.businessName,first.businessName);
+ assert.equal(scheduled.items[0]?.contactName,null);
+ assert.equal(scheduled.items[0]?.nextFollowUpAt?.toISOString().slice(0,10),followUpOn);
+ assert.equal(scheduled.nextCursor,null);
+ assert.equal((await crm.scheduledFollowUps(foreign,{limit:20})).items.length,0);
+ await assert.rejects(()=>crm.scheduledFollowUps(actor(owner.id,org.id,[],[]),{limit:20}),fail(403));
  assert.equal((await crm.followUpsOn(founder,otherDay)).total,0);
  assert.equal((await crm.followUpsOn(foreign,followUpOn)).total,0);
  await assert.rejects(()=>crm.followUpsOn(actor(owner.id,org.id,[],[]),followUpOn),fail(403));
@@ -76,6 +86,7 @@ try{
  assert.equal(meeting.status,"MEETING_PROCESS");
  assert.equal(meeting.nextFollowUpAt,null);
  assert.equal((await crm.followUpsOn(founder,followUpOn)).total,0);
+ assert.equal((await crm.scheduledFollowUps(founder,{limit:20})).items.length,0);
  const meetingMetrics=await crm.metrics(founder);
  assert.equal(meetingMetrics.yetToCall,0);
  assert.equal(meetingMetrics.followUp,0);

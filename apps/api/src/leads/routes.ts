@@ -31,6 +31,13 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
  app.post(root,authenticated,async(req,res)=>{
    res.status(201).json({data:await svc.create(actor(res),parse(leadCreateSchema,req.body))});
  });
+ const followUpsQuery=z.strictObject({
+   cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(20),
+ });
+ app.get(root+"/follow-ups",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.scheduledFollowUps(actor(res),parse(followUpsQuery,req.query))});
+ });
  app.get(root+"/follow-ups/today",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
    const input=parse(z.strictObject({date:z.iso.date()}),req.query);

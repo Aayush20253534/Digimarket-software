@@ -1,0 +1,27 @@
+/* Dedicated date-sorted follow-up register: four fields only. */
+.aw-followups-page{min-width:0;display:grid;gap:20px;color:#f2e9ff}
+.aw-followups-header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.aw-followups-title{display:flex;gap:10px;align-items:center;margin:8px 0;font-size:clamp(1.45rem,2.4vw,2rem);font-weight:850;letter-spacing:-.035em;color:#f3e8ff}
+.aw-followups-title svg{color:#79e6ce;flex:none}
+.aw-followups-description{font-size:.85rem;line-height:1.6;color:#bda8d0}
+.aw-followups-refresh,.aw-followups-pagination button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:41px;padding:8px 14px;border:1px solid #70528a;border-radius:9px;background:#291b3a;color:#f6e9ff;font-size:.8rem;font-weight:750}
+.aw-followups-refresh:not(:disabled):hover,.aw-followups-pagination button:not(:disabled):hover{background:#423055}
+.aw-followups-refresh:disabled,.aw-followups-pagination button:disabled{opacity:.45;cursor:not-allowed}
+.aw-followups-register{min-width:0;border:1px solid #5d4277;border-radius:12px;background:#190f27;overflow:hidden}
+.aw-followups-loading{padding:15px;color:#d3bfe5;font-size:.83rem}
+.aw-followups-error{padding:13px}
+.aw-followups-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+.aw-followups-table{width:100%;min-width:630px;border-collapse:collapse;font-size:.84rem;text-align:left}
+.aw-followups-table thead{background:#2d1e3f}
+.aw-followups-table th{color:#dbbdec;letter-spacing:.02em;font-size:.75rem;font-weight:850;white-space:nowrap}
+.aw-followups-table th,.aw-followups-table td{padding:15px 17px;border-bottom:1px solid #3e2c54;vertical-align:middle}
+.aw-followups-table tbody tr:hover{background:#271933}
+.aw-followups-table td{color:#f1e8fb;overflow-wrap:anywhere}
+.aw-followups-table td:first-child{color:#8df0d8;font-weight:760;white-space:nowrap}
+.aw-followups-number{color:#d8bbff;text-decoration:underline;text-underline-offset:3px}
+.aw-followups-business{font-weight:780;color:#fff;text-decoration:none}
+.aw-followups-business:hover,.aw-followups-number:hover{color:#9ff8e7;text-decoration:underline}
+.aw-followups-empty{padding:24px 15px;color:#c6b2d7;font-size:.85rem}
+.aw-followups-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:68px;padding:12px 15px;color:#d0b9e4;font-size:.8rem}
+@media(max-width:639px){.aw-followups-page{gap:14px}.aw-followups-header{align-items:flex-start}.aw-followups-register{border-radius:9px}.aw-followups-table th,.aw-followups-table td{padding:12px}.aw-followups-pagination{gap:7px;padding:10px}.aw-followups-pagination button{padding:8px 10px}}
+@media(prefers-reduced-motion:reduce){.aw-followups-page .animate-spin{animation:none!important}}

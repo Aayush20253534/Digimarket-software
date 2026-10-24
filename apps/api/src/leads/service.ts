@@ -193,6 +193,20 @@ export class LeadsService {
    const page=rows.slice(0,input.limit);
    return {items:page,nextCursor:hasMore?page.at(-1)?.id??null:null};
  }
+ // Dated register for the sidebar. Fetch only the four requested display fields
+ // and a stable id for navigation/pagination. Never load other tenants or cleared schedules.
+ async scheduledFollowUps(a:Principal,input:{cursor?:string;limit:number}){
+   deny(a,"leads.read");
+   const where:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,
+     status:"FOLLOW_UP",nextFollowUpAt:{not:null}};
+   const rows=await this.db.lead.findMany({where,take:input.limit+1,
+     ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
+     orderBy:[{nextFollowUpAt:"asc"},{id:"asc"}],
+     select:{id:true,nextFollowUpAt:true,phone:true,businessName:true,contactName:true}});
+   const hasMore=rows.length>input.limit;
+   const items=rows.slice(0,input.limit);
+   return {items,nextCursor:hasMore?items.at(-1)?.id??null:null};
+ }
  // Exact scheduled-day query, independent of lead creation or last-update sorting.
  // Dates use the same UTC calendar-day representation as nextFollowUpAt.
  async followUpsOn(a:Principal,on:string){
