@@ -98,7 +98,7 @@ try{
  assert.equal((await crm.meetingsOn(founder,"2026-10-24")).total,0);
  assert.equal((await crm.meetingsOn(foreign,meetingOn)).total,0);
  await assert.rejects(()=>crm.meetingsOn(actor(owner.id,org.id,[],[]),meetingOn),fail(403));
- const unchangedMeeting=await crm.update(employee,first.id,{version:meeting.version,stageNote:"Date retained"});
+ const unchangedMeeting=await crm.update(employee,first.id,{version:meeting.version,businessType:"Restaurant"});
  assert.equal(unchangedMeeting.meetingAt?.toISOString(),meeting.meetingAt?.toISOString());
  const rescheduled=await crm.update(employee,first.id,{version:unchangedMeeting.version,
   meetingOn:"2026-10-26",meetingTime:"15:45"});
