@@ -558,7 +558,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(meetingRegister.locator("tbody tr")).toHaveCount(1);
   await expect(meetingRegister.locator("tbody tr time").first()).toHaveAttribute("dateTime",/20\d{2}-/);
   await expect(meetingRegister.locator("tbody tr time").nth(1)).toContainText(/2:30/i);
-  await expect(meetingRegister.getByRole("link",{name:"Founder CI Lead"})).toBeVisible();
+  await expect(meetingRegister.getByRole("link",{name:"Founder CI Lead",exact:true})).toBeVisible();
   await expect(meetingRegister.getByText("CI Contact")).toBeVisible();
   await expect(meetingRegister.getByRole("link",{name:"9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
   await expect(meetingRegister.getByText("17 Civil Lines, Prayagraj")).toBeVisible();
