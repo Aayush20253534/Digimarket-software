@@ -182,16 +182,19 @@ export class LeadsService {
        {location:{contains:input.q,mode:"insensitive"}},
        {phone:{contains:input.q}}]}:{}),
    };
-   const rows=await this.db.lead.findMany({where,take:input.limit+1,
+   const [total,rows]=await Promise.all([
+     this.db.lead.count({where}),
+     this.db.lead.findMany({where,take:input.limit+1,
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
      orderBy:[{[input.sort??"createdAt"]:input.direction??"desc"} as Prisma.LeadOrderByWithRelationInput,{id:input.direction??"desc"}],
      select:{id:true,businessName:true,contactName:true,phone:true,businessType:true,location:true,
        websiteUrl:true,instagramUrl:true,googleMapsUrl:true,source:true,status:true,stageNote:true,assignedToId:true,createdById:true,
        nextFollowUpAt:true,version:true,createdAt:true,updatedAt:true,
-       assignee:{select:{displayName:true}},_count:{select:{duplicateMatches:true,duplicateCandidates:true}}}});
+       assignee:{select:{displayName:true}},_count:{select:{duplicateMatches:true,duplicateCandidates:true}}}}),
+   ]);
    const hasMore=rows.length>input.limit;
    const page=rows.slice(0,input.limit);
-   return {items:page,nextCursor:hasMore?page.at(-1)?.id??null:null};
+   return {items:page,total,nextCursor:hasMore?page.at(-1)?.id??null:null};
  }
  // Dated register for the sidebar. Fetch only the four requested display fields
  // and a stable id for navigation/pagination. Never load other tenants or cleared schedules.

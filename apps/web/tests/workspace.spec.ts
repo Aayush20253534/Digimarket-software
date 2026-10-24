@@ -82,7 +82,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   expect(await leadTableViewport.evaluate(el=>el.scrollHeight<=el.clientHeight+1),
     "All ten rows should fit without an internal vertical scrollbar").toBe(true);
   expect(await leadsRegister.locator("tbody tr").count()).toBeLessThanOrEqual(10);
-  await expect(page.getByText(/^Page 1 · \d+ leads? \(max 10\)$/)).toBeVisible();
+  await expect(page.locator(".aw-register-page")).toHaveText(/^Page 1 of \d+ · Leads (?:0 of 0|1–\d+ of \d+)$/);
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:"Past deadline"})).toHaveCount(0);
   await page.goto("/app/notes");

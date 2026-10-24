@@ -17,7 +17,7 @@ type Lead={id:string;businessName:string;contactName:string|null;phone:string|nu
  version:number;createdAt:string;canEdit?:boolean;assignee?:{displayName:string}|null};
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
-type Page={items:Lead[];nextCursor:string|null};
+type Page={items:Lead[];nextCursor:string|null;total:number};
 type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
@@ -40,6 +40,7 @@ export default function LeadsPage(){
  const canAssign=!isAdmin&&!!session?.identity.permissions.includes("leads.assign");
  const canBulk=!isAdmin&&!!session?.identity.permissions.includes("leads.bulk");
  const [items,setItems]=useState<Lead[]>([]);
+ const [totalLeads,setTotalLeads]=useState<number|null>(null);
  const [metrics,setMetrics]=useState<Metrics|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [legacySort,setLegacySort]=useState(false);
@@ -90,7 +91,7 @@ export default function LeadsPage(){
        }
      }
    }catch{/* Browser storage might be unavailable or cleared. */}
-   setCursor(null);setHistory([]);setPreferencesReady(true);
+   setCursor(null);setHistory([]);setTotalLeads(null);setPreferencesReady(true);
  },[canRead,session?.identity.userId]);
  useEffect(()=>{
    if(!preferencesReady||!session?.identity.userId)return;
@@ -115,7 +116,7 @@ export default function LeadsPage(){
       result=await request<Page>("/leads?"+q);setLegacySort(true);
      }
      if(sequence!==loadSequence.current)return;
-     setItems(result.items);setNextCursor(result.nextCursor);setError("");
+     setItems(result.items);setNextCursor(result.nextCursor);setTotalLeads(result.total);setError("");
      void request<Metrics>("/leads/metrics").then(result=>{
        if(sequence===loadSequence.current)setMetrics(result);
      }).catch(()=>{});
@@ -220,6 +221,10 @@ export default function LeadsPage(){
      setMessage("Organization CSV exported and recorded in audit history.");
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
+ const leadsPage=history.length+1;
+ const leadsPageCount=totalLeads===null?null:Math.max(1,Math.ceil(totalLeads/10));
+ const leadsRangeStart=totalLeads===null||totalLeads===0?0:(leadsPage-1)*10+1;
+ const leadsRangeEnd=totalLeads===null?0:Math.min((leadsPage-1)*10+items.length,totalLeads);
  const sorted=useMemo(()=>legacySort?[...items].sort((a,b)=>{
   const delta=String(a[sortBy]??"").localeCompare(String(b[sortBy]??""),undefined,{numeric:true,sensitivity:"base"});
   return descending?-delta:delta;
@@ -253,16 +258,16 @@ export default function LeadsPage(){
        <Card title="Lead register" description="Ten leads per page, with automatic creation dates and click-to-open rows. Use Next page for more leads.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
-             onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
-           <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setCursor(null);setHistory([]);}}>
+             onChange={e=>{setSearch(e.target.value);setTotalLeads(null);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
+           <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setTotalLeads(null);setCursor(null);setHistory([]);}}>
              <option value="">ALL STAGES</option>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}
            </select>
-           <select aria-label="Filter by lead source" className="field" value={sourceFilter} onChange={e=>{setSourceFilter(e.target.value as ""|LeadSource);setCursor(null);setHistory([]);}}>
+           <select aria-label="Filter by lead source" className="field" value={sourceFilter} onChange={e=>{setSourceFilter(e.target.value as ""|LeadSource);setTotalLeads(null);setCursor(null);setHistory([]);}}>
              <option value="">All sources</option>{leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
            </select>
-<select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setCursor(null);setHistory([]);}}>
+<select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setTotalLeads(null);setCursor(null);setHistory([]);}}>
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="status">Stage</option><option value="createdAt">Created</option>
- </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
+ </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setTotalLeads(null);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
          {loading&&<div className="aw-lead-sync" role="status" aria-live="polite">
            <RefreshCw size={15} className="aw-lead-sync-icon" aria-hidden="true"/>
@@ -294,7 +299,7 @@ export default function LeadsPage(){
            </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
            <button type="button" className="btn-secondary" aria-label="Previous leads page" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button>
-           <span className="aw-register-page" aria-live="polite">{loading&&!items.length?"Loading page…":`Page ${history.length+1} · ${items.length} lead${items.length===1?"":"s"} (max 10)`}</span>
+           <span className="aw-register-page" aria-live="polite">{loading?"Loading page…":totalLeads===null?"Lead count unavailable":totalLeads===0?"Page 1 of 1 · Leads 0 of 0":`Page ${leadsPage} of ${leadsPageCount} · Leads ${leadsRangeStart}–${leadsRangeEnd} of ${totalLeads}`}</span>
            <button type="button" className="btn-secondary" aria-label="Next leads page" disabled={!nextCursor||loading} onClick={()=>{setHistory(h=>[...h,cursor||""]);setCursor(nextCursor);}}>Next page</button>
          </div>
        </Card>
