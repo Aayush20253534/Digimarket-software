@@ -79,7 +79,8 @@ export default function ReportsPage(){
     {cards.map(([name,values],i)=>{
      const Icon=icons[i%icons.length],entries=Object.entries(values).filter(([key])=>!(name==="leads"&&key==="conversionRatePercent")),ledger=name==="cashLedger"&&Array.isArray(values.posted)?values.posted:null,spot=entries.find(([,v])=>!Array.isArray(v)&&
        (typeof v==="number"||(/^-?\d+(\.\d+)?$/.test(v)&&v.length<20)))??entries[0];
-     return <article className={"aw-report-card aw-report-"+themes[i%themes.length]} key={name}>
+     return <article className={"aw-report-card aw-report-"+themes[i%themes.length]+(name==="leads"?" relative":"")} key={name}>
+      {name==="leads"&&<Link href={"/app/reports/leads?"+new URLSearchParams({from:report.from,to:report.to})} className="absolute inset-0 z-10 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300" aria-label="Open complete Leads analytics breakdown"><span className="sr-only">View leads breakdown</span></Link>}
       <div className="aw-report-card-top"><span className="aw-report-icon"><Icon size={22}/></span>
        <ArrowUpRight size={18} aria-hidden="true"/></div>
       <p className="aw-report-card-label">{label(name)}</p>

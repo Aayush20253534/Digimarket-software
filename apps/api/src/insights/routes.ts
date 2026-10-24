@@ -5,6 +5,7 @@ import {searchQuerySchema,reportsPeriodSchema,notificationListSchema} from "@dig
 import {AuthService,type Principal} from "../auth/service";
 import {AuthError,unauthorized} from "../auth/errors";
 import {InsightsService} from "./insights";
+import {LeadAnalyticsService} from "./lead-report";
 import {NotificationService} from "./notifications";
 function parse<T>(schema:z.ZodType<T>,value:unknown):T{
  const checked=schema.safeParse(value);
@@ -12,7 +13,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T{
  return checked.data;
 }
 export function registerInsightsRoutes(app:Express,auth:AuthService){
- const insights=new InsightsService(auth.database),notices=new NotificationService(auth.database);
+ const insights=new InsightsService(auth.database),leadAnalytics=new LeadAnalyticsService(auth.database),notices=new NotificationService(auth.database);
  const authenticate=async(req:Request,res:Response,next:NextFunction)=>{
   try{
    const token=req.get("authorization");
@@ -29,6 +30,25 @@ export function registerInsightsRoutes(app:Express,auth:AuthService){
   res.set("Cache-Control","no-store");
   const p=parse(reportsPeriodSchema,req.query);
   res.json({data:await insights.report(actor(res),p.from,p.to)});
+ });
+ const leadReportQuery=z.strictObject({
+  from:z.iso.date(),to:z.iso.date(),
+  source:z.enum(["META_LEADS","COLD_CALL"]).optional(),
+  stage:z.enum(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP",
+    "MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED",
+    "NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"]).optional(),
+  assignedToId:z.uuid().optional(),businessType:z.string().trim().max(120).optional(),
+  location:z.string().trim().max(240).optional(),q:z.string().trim().max(100).optional(),
+  page:z.coerce.number().int().min(1).max(100000).default(1),
+  limit:z.coerce.number().int().min(1).max(100).default(20),
+ }).refine(value=>value.from<=value.to,{message:"Invalid report period"});
+ app.get(base+"/reports/leads",authenticate,async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json({data:await leadAnalytics.report(actor(res),parse(leadReportQuery,req.query))});
+ });
+ app.get(base+"/reports/leads/export",authenticate,async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json({data:await leadAnalytics.csv(actor(res),parse(leadReportQuery,req.query))});
  });
  const pushSubscription=z.strictObject({endpoint:z.string().url().max(2048)});
  app.get(base+"/notifications/push-key",authenticate,(req,res)=>{
