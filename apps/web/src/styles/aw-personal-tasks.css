@@ -1,5 +1,10 @@
-.aw-personal-task-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px;align-items:start}
-.aw-personal-task-column{display:flex;flex-direction:column;gap:17px;min-width:0}
+/* Align paired task statuses in the same grid row, including empty and populated cards. */
+.aw-personal-task-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px;align-items:stretch}
+.aw-personal-task-column{display:contents}
+.aw-personal-task-grid [data-testid="personal-pending"]{grid-column:1;grid-row:1}
+.aw-personal-task-grid [data-testid="personal-in-process"]{grid-column:2;grid-row:1}
+.aw-personal-task-grid [data-testid="personal-overdue"]{grid-column:1;grid-row:2}
+.aw-personal-task-grid [data-testid="personal-completed"]{grid-column:2;grid-row:2}
 .aw-personal-overdue{grid-column:auto}.aw-personal-task-section{min-width:0;border:1px solid #644477;border-radius:19px;padding:19px;background:linear-gradient(130deg,#291a38,#170f22);box-shadow:0 14px 30px #0003}
 .aw-personal-completed{border-color:#386c54}.aw-personal-overdue{border-color:#8c435d}
 .aw-personal-task-heading{display:flex;align-items:center;gap:11px;margin-bottom:17px;color:#f9edff}.aw-personal-task-heading h2{font-size:1.06rem;font-weight:800}.aw-personal-task-icon{width:40px;height:40px;flex-shrink:0;display:grid;place-items:center;border-radius:12px;background:#583070;color:#f2ceff}.aw-personal-completed .aw-personal-task-icon{background:#194638;color:#b2f2d2}.aw-personal-overdue .aw-personal-task-icon{background:#502236;color:#ffb6c8}.aw-personal-task-count{margin-left:auto;font-size:1.3rem}
@@ -20,11 +25,10 @@
 .aw-personal-comment-save:disabled{opacity:.48;cursor:not-allowed}.aw-personal-task-description{font-size:.76rem;color:#c8b3da;line-height:1.5;margin:4px 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.aw-personal-task-item .aw-status-badge{display:inline-flex;margin-top:8px}
 @media(max-width:900px){
  .aw-personal-task-grid{grid-template-columns:minmax(0,1fr)}
- .aw-personal-task-column{display:contents}
- .aw-personal-task-grid [data-testid="personal-pending"]{order:1}
- .aw-personal-task-grid [data-testid="personal-in-process"]{order:2}
- .aw-personal-task-grid [data-testid="personal-overdue"]{order:3}
- .aw-personal-task-grid [data-testid="personal-completed"]{order:4}
+ .aw-personal-task-grid [data-testid="personal-pending"]{grid-column:1;grid-row:1}
+ .aw-personal-task-grid [data-testid="personal-in-process"]{grid-column:1;grid-row:2}
+ .aw-personal-task-grid [data-testid="personal-overdue"]{grid-column:1;grid-row:3}
+ .aw-personal-task-grid [data-testid="personal-completed"]{grid-column:1;grid-row:4}
  .aw-personal-overdue{grid-column:auto}
 }@media(max-width:390px){.aw-personal-task-section{padding:12px}.aw-personal-task-item{gap:8px;padding:10px}}
 .aw-personal-quick>h2{font-size:.82rem;font-weight:800;color:#baa3d0;margin-bottom:12px;text-transform:uppercase;letter-spacing:.09em}

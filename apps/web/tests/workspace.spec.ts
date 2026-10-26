@@ -284,7 +284,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
-  await expect(page.getByTestId("personal-pending")).toHaveCSS("background-color","rgb(185, 28, 28)");
+  await expect(page.getByTestId("personal-pending")).toHaveCSS("background-color","rgb(195, 73, 73)");
   await page.goto("/app/notes");
   // The studio must reach the bottom of the visible desktop viewport at 75% zoom.
   const notesBottom=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect().bottom);
@@ -657,8 +657,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByLabel("Task history scope")).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Tasks",exact:true}).last()).toBeVisible();
   await page.goto("/app/dashboard");
-  // Masonry-style task columns: Completed starts immediately under In Process,
-  // not below the height of the much taller Pending tasks card.
+  // Paired grid rows keep Pending/In Process and Overdue/Completed equal-height,
+  // while preserving two desktop columns and compact mobile stacking.
   await page.setViewportSize({width:1366,height:812});
   const columns=page.locator(".aw-personal-task-column");
   await expect(columns).toHaveCount(2);
@@ -667,15 +667,26 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(columns.nth(1).locator('[data-testid="personal-in-process"]')).toBeVisible();
   await expect(columns.nth(1).locator('[data-testid="personal-completed"]')).toBeVisible();
   for(const [section,color] of [
-    ["personal-pending","rgb(185, 28, 28)"],
-    ["personal-in-process","rgb(194, 65, 12)"],
-    ["personal-completed","rgb(21, 128, 61)"],
-    ["personal-overdue","rgb(0, 0, 0)"],
+    ["personal-pending","rgb(195, 73, 73)"],
+    ["personal-in-process","rgb(185, 86, 43)"],
+    ["personal-completed","rgb(50, 130, 80)"],
+    ["personal-overdue","rgb(56, 50, 61)"],
   ] as const){
     const card=page.getByTestId(section);
     await expect(card).toHaveCSS("background-color",color);
     await expect(card.locator("h2")).toHaveCSS("color","rgb(255, 255, 255)");
   }
+  const taskRowGeometry=await page.evaluate(()=>{
+    const bounds=(id:string)=>document.querySelector<HTMLElement>('[data-testid="'+id+'"]')!.getBoundingClientRect();
+    const pending=bounds("personal-pending"),inProcess=bounds("personal-in-process");
+    const overdue=bounds("personal-overdue"),completed=bounds("personal-completed");
+    return {firstRowHeight:Math.abs(pending.height-inProcess.height),
+      secondRowHeight:Math.abs(overdue.height-completed.height),
+      secondRowTop:Math.abs(overdue.top-completed.top)};
+  });
+  expect(taskRowGeometry.firstRowHeight,"Pending and In Process should share a row height").toBeLessThanOrEqual(2);
+  expect(taskRowGeometry.secondRowHeight,"Overdue and Completed should have equal heights").toBeLessThanOrEqual(2);
+  expect(taskRowGeometry.secondRowTop,"Overdue and Completed should start at the same height").toBeLessThanOrEqual(2);
   // Non-admin Task Register rows use the same four-color palette.
   await page.goto("/app/tasks");
   const taskCardStyles=await page.locator('[data-aw-module="tasks"]').evaluate(container=>{
@@ -691,10 +702,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     });
   });
   expect(taskCardStyles).toEqual([
-    {background:"rgb(185, 28, 28)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
-    {background:"rgb(194, 65, 12)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
-    {background:"rgb(21, 128, 61)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
-    {background:"rgb(0, 0, 0)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
+    {background:"rgb(195, 73, 73)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
+    {background:"rgb(185, 86, 43)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
+    {background:"rgb(50, 130, 80)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
+    {background:"rgb(56, 50, 61)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
   ]);
   await page.goto("/app/dashboard");
   // Use a temporary index when this test account has no active task yet.

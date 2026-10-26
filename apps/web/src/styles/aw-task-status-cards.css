@@ -1,8 +1,8 @@
 /* Task status surfaces for founders and employees. Administrator pages are unchanged. */
-.aw-personal-dashboard [data-testid="personal-pending"]{--aw-task-card-bg:#B91C1C}
-.aw-personal-dashboard [data-testid="personal-in-process"]{--aw-task-card-bg:#C2410C}
-.aw-personal-dashboard [data-testid="personal-completed"]{--aw-task-card-bg:#15803D}
-.aw-personal-dashboard [data-testid="personal-overdue"]{--aw-task-card-bg:#000000}
+.aw-personal-dashboard [data-testid="personal-pending"]{--aw-task-card-bg:#C34949}
+.aw-personal-dashboard [data-testid="personal-in-process"]{--aw-task-card-bg:#B9562B}
+.aw-personal-dashboard [data-testid="personal-completed"]{--aw-task-card-bg:#328250}
+.aw-personal-dashboard [data-testid="personal-overdue"]{--aw-task-card-bg:#38323D}
 .aw-personal-dashboard .aw-personal-task-section{
   background:var(--aw-task-card-bg);
   border-color:rgba(255,255,255,.4);
@@ -31,10 +31,10 @@
   color:#FFFFFF;
 }
 /* The status-colored register rows are only rendered for non-admin accounts. */
-.aw-theme [data-aw-module="tasks"] .aw-assignee-task-pending{--aw-task-card-bg:#B91C1C}
-.aw-theme [data-aw-module="tasks"] .aw-assignee-task-in-process{--aw-task-card-bg:#C2410C}
-.aw-theme [data-aw-module="tasks"] .aw-assignee-task-completed{--aw-task-card-bg:#15803D}
-.aw-theme [data-aw-module="tasks"] .aw-assignee-task-expired{--aw-task-card-bg:#000000}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-pending{--aw-task-card-bg:#C34949}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-in-process{--aw-task-card-bg:#B9562B}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-completed{--aw-task-card-bg:#328250}
+.aw-theme [data-aw-module="tasks"] .aw-assignee-task-expired{--aw-task-card-bg:#38323D}
 .aw-theme [data-aw-module="tasks"] .aw-assignee-task-card{
   background:var(--aw-task-card-bg);
   border-color:rgba(255,255,255,.5);
