@@ -1,8 +1,8 @@
 /* AmplifyWorld private-workspace service worker.
  * Never cache API responses, authentication, HTML pages, or Next.js RSC payloads. */
-const CACHE_NAME = "amplifyworld-offline-v1";
+const CACHE_NAME = "amplifyworld-offline-v2";
 const OFFLINE = "/offline.html";
-const ASSETS = [OFFLINE, "/brand/amplifyworld-mark.svg"];
+const ASSETS = [OFFLINE, "/pwa-icon/192?v=white-a-2"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -33,7 +33,7 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("push",(event)=>{
   event.waitUntil(self.registration.showNotification("AmplifyWorld: New task assigned",{
     body:"A task has been assigned to you. Open the workspace to view it.",
-    icon:"/brand/amplifyworld-mark.svg",
+    icon:"/pwa-icon/192?v=white-a-2",
     badge:"/brand/amplifyworld-mark.svg",
     tag:"amplifyworld-task-assigned",
     data:{url:"/app/tasks"},

@@ -8,8 +8,8 @@ test("PWA manifest, icons, service worker and safe offline shell are served", as
   expect(manifest.display).toBe("standalone");
   expect(manifest.start_url).toBe("/app/dashboard");
   expect(manifest.icons).toEqual(expect.arrayContaining([
-    expect.objectContaining({ sizes: "192x192", type: "image/png" }),
-    expect.objectContaining({ sizes: "512x512", type: "image/png" }),
+    expect.objectContaining({ src: "/pwa-icon/192?v=white-a-2", sizes: "192x192", type: "image/png", purpose: "any" }),
+    expect.objectContaining({ src: "/pwa-icon/512?v=white-a-2", sizes: "512x512", type: "image/png", purpose: "maskable" }),
   ]));
   for (const dimension of [180, 192, 512]) {
     const response = await request.get("/pwa-icon/" + dimension);
@@ -17,11 +17,15 @@ test("PWA manifest, icons, service worker and safe offline shell are served", as
     expect(response.headers()["content-type"]).toContain("image/png");
     const data = await response.body();
     expect([...data.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(data.readUInt32BE(16)).toBe(dimension);
+    expect(data.readUInt32BE(20)).toBe(dimension);
+    expect(data.length).toBeGreaterThan(2000);
   }
   const worker = await request.get("/sw.js");
   expect(worker.status()).toBe(200);
   const source = await worker.text();
   expect(source).toContain("request.mode !== \"navigate\"");
+  expect(source).toContain("/pwa-icon/192?v=white-a-2");
   expect(source).not.toContain("caches.put");
   expect(source).not.toContain("cache.put");
   const offline = await request.get("/offline.html");

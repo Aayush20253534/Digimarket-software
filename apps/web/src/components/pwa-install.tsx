@@ -89,7 +89,7 @@ export function PWAInstallCard() {
   const [showHelp, setShowHelp] = useState(false);
 
   return <section className="aw-pwa-card" aria-label="Install AmplifyWorld Workspace" data-testid="pwa-install-card">
-    <div className="aw-pwa-logo"><img src="/brand/amplifyworld-mark.svg" alt="" width={66} height={54}/></div>
+    <div className="aw-pwa-logo"><img src="/pwa-icon/192?v=white-a-2" alt="" width={66} height={66}/></div>
     <div className="aw-pwa-copy">
       <p className="aw-pwa-eyebrow"><Smartphone size={14} aria-hidden="true"/> YOUR WORKSPACE, ONE TAP AWAY</p>
       <h2>AmplifyWorld Workspace app</h2>

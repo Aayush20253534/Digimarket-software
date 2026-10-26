@@ -10,8 +10,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [{ url: "/brand/amplifyworld-mark.svg", type: "image/svg+xml" },
-      { url: "/pwa-icon/192", type: "image/png", sizes: "192x192" }],
-    apple: [{ url: "/pwa-icon/180", sizes: "180x180", type: "image/png" }],
+      { url: "/pwa-icon/192?v=white-a-2", type: "image/png", sizes: "192x192" }],
+    apple: [{ url: "/pwa-icon/180?v=white-a-2", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: { capable: true, title: "AmplifyWorld Workspace", statusBarStyle: "black-translucent" },
 };
