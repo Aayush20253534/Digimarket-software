@@ -63,7 +63,21 @@ describe("Lead Analytics",()=>{
   expect(result.page).toBe(2);
   expect(result.hasMore).toBe(false);
  });
- it("escapes spreadsheet formulas in exports",async()=>{
+ it("reports and exports Referral separately with exact source filtering",async()=>{
+   const {subject,findMany}=service();
+   findMany.mockResolvedValue([{...rows[0],source:"REFERRAL"}]);
+   const a=actor(["reports.business.read","leads.read"]);
+   const referralQuery={...query,source:"REFERRAL" as const};
+   const result=await subject.report(a,referralQuery);
+   expect(result.summary.referral).toBe(1);
+   expect(result.sources.find(x=>x.name==="REFERRAL")?.total).toBe(1);
+   expect(result.sources.find(x=>x.name==="META_LEADS")?.total).toBe(0);
+   expect(result.items[0].source).toBe("REFERRAL");
+   expect(findMany).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({AND:[{OR:[{source:"REFERRAL"}]}]})}));
+   const exported=await subject.csv(a,referralQuery);
+   expect(exported.csv).toContain('"REFERRAL"');
+  });
+  it("escapes spreadsheet formulas in exports",async()=>{
   const {subject,findMany}=service();
   findMany.mockResolvedValueOnce([{...rows[0],businessName:"=HYPERLINK(\"https://example.test\")"}]);
   const result=await subject.csv(actor(["reports.business.read","leads.read"]),query);

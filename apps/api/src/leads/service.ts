@@ -154,7 +154,8 @@ export class LeadsService {
      const previous=await tx.lead.findFirst({where:{organizationId,normalizedPhone:normalized}});
      if(previous){
        // Preserve an existing lead and notes when its number later contacts us on WhatsApp.
-       if(!previous.deletedAt&&previous.source!=="META_LEADS"){
+       // Preserve manually attributed referrals when the same contact messages us on WhatsApp.
+        if(!previous.deletedAt&&previous.source!=="META_LEADS"&&previous.source!=="REFERRAL"){
          await tx.lead.update({where:{id:previous.id},data:{source:"META_LEADS",version:{increment:1}}});
          await tx.leadActivity.create({data:{leadId:previous.id,actorId:createdById,
            kind:"DETAILS_UPDATED",metadata:{source:"META_LEADS",reason:"whatsapp_inbound"}}});

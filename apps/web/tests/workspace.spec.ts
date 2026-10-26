@@ -427,6 +427,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(leadDialog).toBeVisible();
   await expect(leadDialog.getByLabel("Phone number")).toBeVisible();
   await expect(leadDialog.getByLabel("Lead source")).toHaveValue("COLD_CALL");
+  await expect(leadDialog.getByRole("option",{name:"Referral"})).toHaveCount(1);
   await expect(leadDialog.getByLabel("Business name")).toHaveCount(0);
   const leadPosition=await leadDialog.boundingBox();
   expect(leadPosition).not.toBeNull();

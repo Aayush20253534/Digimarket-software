@@ -15,7 +15,7 @@ type Team={id:string|null;name:string;total:number;approved:number;converted:num
 type ResponseData={
  from:string;to:string;asOf:string;
  summary:{total:number;approved:number;converted:number;approvalRate:number;conversionRate:number;
- meta:number;cold:number;meetings:number;decisionPending:number;agreementPending:number;
+ meta:number;cold:number;referral:number;meetings:number;decisionPending:number;agreementPending:number;
  rejected:number;overdue:number;averageApprovalDays:number|null;approvalTimingSample:number};
  trends:{daily:Count[];weekly:Count[];monthly:Count[]};
  sources:Source[];stages:Count[];funnel:Count[];team:Team[];categories:Count[];locations:Count[];
@@ -29,7 +29,7 @@ const today=()=>ymd(new Date());
 const startMonth=()=>today().slice(0,7)+"-01";
 const count=(n:number)=>n.toLocaleString("en-IN");
 const label=(v:string)=>v==="META_LEADS"?"Meta Leads":v==="COLD_CALL"?"Cold Call":
- v==="OTHER"?"Other":v.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
+ v==="REFERRAL"?"Referral":v==="OTHER"?"Other":v.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
 const date=(value:string|null)=>value?new Date(value).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}):"Not set";
 const pct=(n:number)=>n.toLocaleString("en-IN",{maximumFractionDigits:2})+"%";
 const getError=(e:unknown)=>e instanceof Error?e.message:"Lead analytics unavailable";
@@ -152,7 +152,8 @@ export default function LeadBreakdownPage(){
  const back="/app/reports?"+new URLSearchParams({from,to});
  const statCards=report?[
   ["Total leads",report.summary.total,"Selected cohort"],["Meta leads",report.summary.meta,"Meta and WhatsApp"],
-  ["Cold call leads",report.summary.cold,"Manual outreach"],["Meetings reached",report.summary.meetings,"Recorded meeting stage"],
+  ["Cold call leads",report.summary.cold,"Manual outreach"],["Referral leads",report.summary.referral,"Referred prospects"],
+   ["Meetings reached",report.summary.meetings,"Recorded meeting stage"],
   ["Decision pending",report.summary.decisionPending,"Current stage"],["Agreement pending",report.summary.agreementPending,"Current stage"],
   ["Approved",report.summary.approved,"Current approved stage"],["Client converted",report.summary.converted,"Approved with linked client"],
   ["Approval rate",pct(report.summary.approvalRate),"Approved / total"],["Client conversion rate",pct(report.summary.conversionRate),"Converted / total"],
@@ -181,7 +182,7 @@ export default function LeadBreakdownPage(){
     <button type="button" className="aw-lead-reset" onClick={clear}>Clear filters</button></div>
    <div className="aw-lead-filter-grid">
     <label>Source<select aria-label="Lead source filter" value={source} onChange={e=>{setSource(e.target.value);setPage(1);}}>
-     <option value="">All sources</option><option value="META_LEADS">Meta Leads</option><option value="COLD_CALL">Cold Calls</option>
+     <option value="">All sources</option><option value="META_LEADS">Meta Leads</option><option value="COLD_CALL">Cold Calls</option><option value="REFERRAL">Referral</option>
     </select></label>
     <label>Status<select aria-label="Lead stage filter" value={stage} onChange={e=>{setStage(e.target.value);setPage(1);}}>
      <option value="">All statuses</option>{["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"].map(v=><option key={v} value={v}>{label(v)}</option>)}

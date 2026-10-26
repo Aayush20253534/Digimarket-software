@@ -24,19 +24,22 @@ describe("shared API contracts", () => {
 });
 
 describe("lead acquisition sources",()=>{
- it("allows manual lead capture as Cold Call or Meta Leads",()=>{
+ it("allows manual lead capture as Cold Call, Meta Leads or Referral",()=>{
   expect(leadCreateSchema.parse({phone:"+919876543210",source:"COLD_CALL"}).source).toBe("COLD_CALL");
   expect(leadCreateSchema.parse({phone:"+919876543211",source:"META_LEADS"}).source).toBe("META_LEADS");
+  expect(leadCreateSchema.parse({phone:"+919876543213",source:"REFERRAL"}).source).toBe("REFERRAL");
   expect(leadCreateSchema.parse({phone:"+919876543212"}).source).toBeUndefined();
  });
  it("rejects unknown sources rather than silently creating inconsistent labels",()=>{
   expect(leadCreateSchema.safeParse({phone:"+919876543210",source:"WHATSAPP"}).success).toBe(false);
-  expect(leadUpdateSchema.safeParse({version:1,source:"REFERRAL"}).success).toBe(false);
+  expect(leadUpdateSchema.safeParse({version:1,source:"UNSUPPORTED_SOURCE"}).success).toBe(false);
   expect(leadListQuerySchema.safeParse({source:"UNKNOWN"}).success).toBe(false);
  });
  it("accepts source edits and source-filtered queries",()=>{
   expect(leadUpdateSchema.parse({version:1,source:"META_LEADS"}).source).toBe("META_LEADS");
+  expect(leadUpdateSchema.parse({version:1,source:"REFERRAL"}).source).toBe("REFERRAL");
   expect(leadListQuerySchema.parse({source:"COLD_CALL"}).source).toBe("COLD_CALL");
+  expect(leadListQuerySchema.parse({source:"REFERRAL"}).source).toBe("REFERRAL");
  });
 });
 

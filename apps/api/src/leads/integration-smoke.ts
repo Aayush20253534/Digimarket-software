@@ -302,5 +302,17 @@ try{
  assert.equal(removedMeeting.meetingAt,null);
  assert.equal((await crm.scheduledMeetings(founder,{limit:20})).total,1);
 
+ // Referral is an acquisition source. WhatsApp must not overwrite it.
+ const referral=await crm.create(founder,{phone:"919812340503",source:"REFERRAL"});
+ assert.equal(referral.source,"REFERRAL");
+ assert.equal((await crm.list(founder,{source:"REFERRAL",limit:30})).total,1);
+ assert.equal((await crm.ingestWhatsApp(org.id,owner.id,"919812340503")).created,false);
+ assert.equal((await crm.detail(founder,referral.id)).source,"REFERRAL");
+ const editedReferral=await crm.update(founder,referral.id,{version:referral.version,source:"COLD_CALL"});
+ assert.equal(editedReferral.source,"COLD_CALL");
+ const restoredReferral=await crm.update(founder,referral.id,{version:editedReferral.version,source:"REFERRAL"});
+ assert.equal(restoredReferral.source,"REFERRAL");
+ assert.equal((await crm.list(founder,{source:"REFERRAL",limit:30})).items[0]?.id,referral.id);
+
  console.info("Module 7 PASS: phone-only lead, shared editing, atomic Approved conversion, history, webhook dedupe, tenant isolation and import.");
 }finally{await db.$disconnect();}

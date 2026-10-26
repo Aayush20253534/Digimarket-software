@@ -3,7 +3,7 @@ import type {Principal} from "../auth/service";
 import {forbidden,invalid} from "../auth/errors";
 
 export type LeadAnalyticsQuery={
- from:string;to:string;source?:"META_LEADS"|"COLD_CALL";stage?:string;
+ from:string;to:string;source?:"META_LEADS"|"COLD_CALL"|"REFERRAL";stage?:string;
  assignedToId?:string;businessType?:string;location?:string;q?:string;
  page:number;limit:number;
 };
@@ -24,7 +24,7 @@ const safeCsv=(value:unknown)=>{
  return '"'+(/^\s*[=+@\-\t\r]/.test(string)?"'":"")+string.replaceAll('"','""')+'"';
 };
 const acquisition=(source:string|null)=>source==="META_LEADS"||source==="WHATSAPP"?"META_LEADS":
- source==="COLD_CALL"||!source?"COLD_CALL":"OTHER";
+ source==="COLD_CALL"||!source?"COLD_CALL":source==="REFERRAL"?"REFERRAL":"OTHER";
 export class LeadAnalyticsService{
  constructor(private readonly db:PrismaClient){}
  private scoped(a:Principal,q:LeadAnalyticsQuery):Prisma.LeadWhereInput{
@@ -32,7 +32,8 @@ export class LeadAnalyticsService{
   if(q.from>q.to)throw invalid("Invalid reporting period");
   return {organizationId:a.organizationId,deletedAt:null,
    createdAt:{gte:new Date(q.from+"T00:00:00.000Z"),lte:new Date(q.to+"T23:59:59.999Z")},
-   ...(q.source?{AND:[{OR:q.source==="META_LEADS"?[{source:"META_LEADS"},{source:"WHATSAPP"}]:[{source:"COLD_CALL"},{source:null}]}]}:{}),
+   ...(q.source?{AND:[{OR:q.source==="META_LEADS"?[{source:"META_LEADS"},{source:"WHATSAPP"}]:
+     q.source==="COLD_CALL"?[{source:"COLD_CALL"},{source:null}]:[{source:"REFERRAL"}]}]}:{}),
    ...(q.stage?{status:q.stage as Prisma.EnumLeadStageFilter["equals"]}:{}),
    ...(q.assignedToId?{assignedToId:q.assignedToId}:{}),
    ...(q.businessType?{businessType:q.businessType}:{}),
@@ -101,7 +102,7 @@ export class LeadAnalyticsService{
     period==="weekly"?weekStart(x.createdAt):isoDay(x.createdAt).slice(0,7));
    return rows.sort((a,b)=>a.name.localeCompare(b.name));
   };
-  const sources=["META_LEADS","COLD_CALL","OTHER"].map(name=>{
+  const sources=["META_LEADS","COLD_CALL","REFERRAL","OTHER"].map(name=>{
    const items=leads.filter(x=>acquisition(x.source)===name);
    const aCount=items.filter(x=>x.status==="APPROVED").length;
    const cCount=items.filter(x=>x.status==="APPROVED"&&x.convertedClient).length;
@@ -137,7 +138,7 @@ export class LeadAnalyticsService{
   return {from:q.from,to:q.to,asOf:now.toISOString(),
    summary:{total,approved:approved.length,converted:converted.length,
     approvalRate:percentage(approved.length,total),conversionRate:percentage(converted.length,total),
-    meta:sources[0].total,cold:sources[1].total,meetings:funnel[1].count,
+    meta:sources[0].total,cold:sources[1].total,referral:sources[2].total,meetings:funnel[1].count,
     decisionPending:stages.find(x=>x.name==="DECISION_PENDING")?.count??0,
     agreementPending:stages.find(x=>x.name==="AGREEMENT_PENDING")?.count??0,
     rejected:stages.find(x=>x.name==="REJECTED")?.count??0,

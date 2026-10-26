@@ -19,9 +19,9 @@ type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{di
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null;total:number};
 type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
-type LeadSource="COLD_CALL"|"META_LEADS";
-const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"}];
-const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value;
+type LeadSource="COLD_CALL"|"META_LEADS"|"REFERRAL";
+const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"},{value:"REFERRAL",label:"Referral"}];
+const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value==="REFERRAL"?"Referral":value;
 const draftKey=(id:string)=>"amplifyworld:lead-stage-note:"+id;
 const callHref=(value:string)=>"tel:"+(value.trim().startsWith("+")?"+":"")+value.replace(/\D/g,"");
 type NewLead={phone:string;source:LeadSource};
@@ -85,7 +85,7 @@ export default function LeadsPage(){
        if(value&&typeof value==="object"){
          const pref=value as Record<string,unknown>;
          if(pref.stage===""||stages.includes(pref.stage as Stage))setStage(pref.stage as string);
-         if(pref.sourceFilter===""||pref.sourceFilter==="COLD_CALL"||pref.sourceFilter==="META_LEADS")
+         if(pref.sourceFilter===""||pref.sourceFilter==="COLD_CALL"||pref.sourceFilter==="META_LEADS"||pref.sourceFilter==="REFERRAL")
            setSourceFilter(pref.sourceFilter as ""|LeadSource);
          if(typeof pref.search==="string")setSearch(pref.search.slice(0,100));
          if(sortKeys.includes(pref.sortBy as SortKey))setSortBy(pref.sortBy as SortKey);
@@ -134,7 +134,7 @@ export default function LeadsPage(){
      activeLeadId.current=id;
      setSelected(detail);setEditStage(detail.status);setFollowUpOn(detail.nextFollowUpAt?.slice(0,10)??"");
      const savedMeeting=detail.meetingAt?new Date(new Date(detail.meetingAt).getTime()+330*60_000).toISOString().slice(0,16):"";
-     setMeetingOn(savedMeeting.slice(0,10));setMeetingTime(savedMeeting.slice(11,16));setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":"COLD_CALL");setOwner(detail.assignedToId??"");
+     setMeetingOn(savedMeeting.slice(0,10));setMeetingTime(savedMeeting.slice(11,16));setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":detail.source==="REFERRAL"?"REFERRAL":"COLD_CALL");setOwner(detail.assignedToId??"");
      let draft:string|null=null;try{draft=window.localStorage.getItem(draftKey(id));}catch{ /* Browser storage may be unavailable. */ }
      latestStageNote.current=draft??detail.stageNote??"";
      setNote("");setStageNote(latestStageNote.current);setNoteSaveState(draft===null?"idle":"saving");
@@ -242,7 +242,7 @@ export default function LeadsPage(){
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
-     description="Track Cold Call and Meta Leads separately. New WhatsApp leads are automatically classified as Meta Leads."
+     description="Track Cold Call, Meta Leads and Referral separately. New WhatsApp leads are automatically classified as Meta Leads."
      actions={<div className="flex flex-wrap gap-2">
        {canCreate&&<button className="btn-primary" type="button" onClick={()=>setCreating(x=>!x)} aria-expanded={creating}>
         <Plus className="h-4 w-4"/>{creating?"Hide lead form":"Add lead"}</button>}
