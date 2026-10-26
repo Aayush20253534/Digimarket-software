@@ -284,6 +284,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
+  // Finance is a top-level sidebar section immediately below Workspace.
+  const founderNav=page.getByRole("navigation",{name:"Workspace navigation"});
+  await expect(founderNav.getByRole("link",{name:"Income & expenses"})).toBeVisible();
+  const founderSections=await founderNav.locator(".aw-nav-group").allTextContents();
+  expect(founderSections.indexOf("Finance"),"Finance should follow Workspace in the sidebar")
+    .toBe(founderSections.indexOf("Workspace")+1);
   await expect(page.getByTestId("personal-pending")).toHaveCSS("background-color","rgb(32, 22, 47)");
   await page.goto("/app/notes");
   // The studio must reach the bottom of the visible desktop viewport at 75% zoom.

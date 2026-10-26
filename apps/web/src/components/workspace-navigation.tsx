@@ -16,6 +16,9 @@ const sections:readonly Group[]=[
   {label:"My search",operational:true,href:"/app/search",icon:Search,permits:["search.read"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
+ {title:"Finance",items:[
+  {label:"Income & expenses",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]}
+ ]},
  {title:"Relationships",items:[
   {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
   {label:"Follow Ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
@@ -29,9 +32,6 @@ const sections:readonly Group[]=[
   {label:"Content calendar",operational:true,href:"/app/content",icon:CalendarDays,permits:["content.read"]},
   {label:"Files & assets",operational:true,href:"/app/assets",icon:FileStack,permits:["assets.read"]},
   {label:"Approvals",href:"/app/approvals",icon:CheckSquare2,permits:["approvals.read"]}
- ]},
- {title:"Finance",items:[
-  {label:"Income & expenses",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]}
  ]},
  {title:"Administration",items:[
   {label:"Founders & responsibilities",href:"/app/founders",icon:UsersRound,permits:["founders.read"]},
