@@ -284,7 +284,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
-  await expect(page.getByTestId("personal-pending")).toHaveCSS("background-color","rgb(195, 73, 73)");
+  await expect(page.getByTestId("personal-pending")).toHaveCSS("background-color","rgb(32, 22, 47)");
   await page.goto("/app/notes");
   // The studio must reach the bottom of the visible desktop viewport at 75% zoom.
   const notesBottom=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect().bottom);
@@ -666,14 +666,26 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(columns.nth(0).locator('[data-testid="personal-overdue"]')).toBeVisible();
   await expect(columns.nth(1).locator('[data-testid="personal-in-process"]')).toBeVisible();
   await expect(columns.nth(1).locator('[data-testid="personal-completed"]')).toBeVisible();
-  for(const [section,color] of [
-    ["personal-pending","rgb(195, 73, 73)"],
-    ["personal-in-process","rgb(185, 86, 43)"],
-    ["personal-completed","rgb(50, 130, 80)"],
-    ["personal-overdue","rgb(56, 50, 61)"],
+  // Every overview card keeps the identical purple body; only borders and glows differ.
+  const sharedCardBackground=await page.getByTestId("personal-pending").evaluate(el=>getComputedStyle(el).backgroundImage);
+  expect(sharedCardBackground).toContain("linear-gradient");
+  for(const [section,outline,halo] of [
+    ["personal-pending","rgb(255, 54, 94)","255, 54, 94"],
+    ["personal-in-process","rgb(255, 140, 36)","255, 140, 36"],
+    ["personal-completed","rgb(43, 255, 118)","43, 255, 118"],
+    ["personal-overdue","rgb(5, 3, 8)","224, 217, 235"],
   ] as const){
     const card=page.getByTestId(section);
-    await expect(card).toHaveCSS("background-color",color);
+    await expect(card).toHaveCSS("background-color","rgb(32, 22, 47)");
+    await expect(card).toHaveCSS("border-top-color",outline);
+    await expect(card).toHaveCSS("border-top-width","2px");
+    const effect=await card.evaluate(el=>{
+      const style=getComputedStyle(el);
+      return {background:style.backgroundImage,shadow:style.boxShadow};
+    });
+    expect(effect.background,"All four cards should use the same brand-purple gradient").toBe(sharedCardBackground);
+    expect(effect.shadow,"Every status border needs a strong, visible outer glow").toContain("48px");
+    expect(effect.shadow,"The outer halo should correspond to the status").toContain(halo);
     await expect(card.locator("h2")).toHaveCSS("color","rgb(255, 255, 255)");
   }
   const taskRowGeometry=await page.evaluate(()=>{
