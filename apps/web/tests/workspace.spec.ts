@@ -369,6 +369,44 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
 
   await page.goto("/app/assets");
   await expect(page.getByRole("heading",{name:"My Drive"})).toBeVisible();
+  // Regression: long filenames and upload progress must not stretch the modal.
+  await page.getByRole("button",{name:"New",exact:true}).click();
+  await page.getByRole("menuitem",{name:"Upload files"}).click();
+  const uploadDialog=page.getByRole("dialog",{name:"Upload files"});
+  await uploadDialog.locator('input[type="file"]').setInputFiles({
+    name:"AmplifyWorld_Tothepoint_Astrology_One_Month_Agreement_".repeat(3)+"Draft.pdf",
+    mimeType:"application/pdf",
+    buffer:Buffer.from("%PDF-1.4\\n")
+  });
+  await expect(uploadDialog.getByText("1 file(s) queued.",{exact:false})).toBeVisible();
+  await uploadDialog.locator(".aw-drive-modal-form").evaluate(form=>{
+    const progress=document.createElement("p");
+    progress.setAttribute("role","status");
+    progress.textContent="Verifying 1 of 1: "+"AmplifyWorld_Long_Contract_".repeat(20)+"Draft.pdf";
+    form.insertBefore(progress,form.lastElementChild);
+  });
+  for(const width of [1366,375]){
+    await page.setViewportSize({width,height:768});
+    const bounds=await uploadDialog.evaluate(dialog=>{
+      const modal=dialog.querySelector(".aw-drive-modal")!;
+      const picker=dialog.querySelector('input[type="file"]')!;
+      const progress=dialog.querySelector('[role="status"]')!;
+      const m=modal.getBoundingClientRect(), f=picker.getBoundingClientRect();
+      return {
+        modalInsideViewport:m.left>=-1&&m.right<=window.innerWidth+1,
+        pickerInsideModal:f.left>=m.left&&f.right<=m.right+1,
+        progressContained:progress.scrollWidth<=progress.clientWidth+1,
+        formContained:modal.scrollWidth<=modal.clientWidth+1
+      };
+    });
+    expect(bounds,"Upload dialog layout at "+width+"px").toEqual({
+      modalInsideViewport:true,pickerInsideModal:true,
+      progressContained:true,formContained:true
+    });
+    await expect(uploadDialog.getByRole("button",{name:"Upload and verify"})).toBeVisible();
+  }
+  await uploadDialog.getByRole("button",{name:"Cancel"}).click();
+  await page.setViewportSize({width:1366,height:768});
   await page.getByRole("button",{name:"New",exact:true}).click();
   await page.getByRole("menuitem",{name:"New folder"}).click();
   await page.getByRole("textbox",{name:"New folder name"}).fill("CI Campaign Artwork");
