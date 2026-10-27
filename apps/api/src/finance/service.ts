@@ -303,15 +303,18 @@ export class FinanceService {
       {enteredBy:{displayName:{contains:query,mode:"insensitive" as const}}},
       ...(method?[{method}]:[]),
     ]}: {};
-    return {period,where:{...period,...search}};
+    return {period,where:{...period,...(input.day?{occurredOn:new Date(input.day+"T00:00:00.000Z")}:{}) ,
+      ...(input.personId?{enteredById:input.personId}:{}),...search}};
   }
   async breakdown(actor:Principal,input:FinanceBreakdownQuery){
     const {period,where}=this.breakdownScope(actor,input);
-    const [categories,months,transactions,count,filteredSum]=await Promise.all([
+    const [categories,months,people,transactions,count,filteredSum]=await Promise.all([
       this.db.financialTransaction.groupBy({by:["categoryId"],where:period,
         _sum:{amount:true},_count:{_all:true}}),
       this.db.financialTransaction.groupBy({by:["occurredOn"],where:period,
         _sum:{amount:true},_count:{_all:true},orderBy:{occurredOn:"asc"}}),
+      this.db.financialTransaction.groupBy({by:["enteredById"],where:period,
+        _sum:{amount:true},_count:{_all:true}}),
       this.db.financialTransaction.findMany({where,orderBy:[{occurredOn:"desc"},{id:"desc"}],
         skip:(input.page-1)*input.limit,take:input.limit,
         select:{id:true,amount:true,occurredOn:true,method:true,
@@ -327,6 +330,12 @@ export class FinanceService {
       where:{organizationId:actor.organizationId,id:{in:categoryIds}},
       select:{id:true,name:true},
     }):[];
+    const userIds=people.map(p=>p.enteredById);
+    const users=userIds.length?await this.db.user.findMany({
+      where:{organizationId:actor.organizationId,id:{in:userIds}},
+      select:{id:true,displayName:true,loginId:true},
+    }):[];
+    const userNames=new Map(users.map(u=>[u.id,u]));
     const categoryNames=new Map(names.map(c=>[c.id,c.name]));
     const fullTotal=categories.reduce((sum,c)=>sum.plus(c._sum.amount??0),new Prisma.Decimal(0));
     const monthly=new Map<string,{amount:Prisma.Decimal,count:number}>();
@@ -352,7 +361,15 @@ export class FinanceService {
         name:categoryNames.get(c.categoryId)??"Uncategorized",
         total:(c._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:c._count._all}))
         .sort((a,b)=>new Prisma.Decimal(b.total).cmp(a.total)),
-      monthly:series,search:input.q,matchingTotal:(filteredSum._sum.amount??new Prisma.Decimal(0)).toFixed(4),
+      monthly:series,
+      daily:months.map(m=>({date:m.occurredOn.toISOString().slice(0,10),
+        total:(m._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:m._count._all})),
+      people:people.map(p=>({id:p.enteredById,
+        name:userNames.get(p.enteredById)?.displayName??"Former member",
+        loginId:userNames.get(p.enteredById)?.loginId??"",
+        total:(p._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:p._count._all}))
+        .sort((a,b)=>new Prisma.Decimal(b.total).cmp(a.total)||a.name.localeCompare(b.name)),
+      search:input.q,matchingTotal:(filteredSum._sum.amount??new Prisma.Decimal(0)).toFixed(4),
       matchingCount:count,page:input.page,limit:input.limit,
       hasMore:input.page*input.limit<count,
       transactions:transactions.map(t=>({

@@ -102,6 +102,10 @@ try{
   assert.equal(expenseDetails.categories[0].total,expenseDetails.total);
   assert.deepEqual(expenseDetails.monthly.map(x=>x.month),["2026-10"]);
   assert.equal(expenseDetails.monthly[0].total,expenseDetails.total);
+  assert.deepEqual(expenseDetails.daily,[{date:"2026-10-19",total:"150.2545",count:1}]);
+  assert.equal(expenseDetails.people.length,1);
+  assert.equal(expenseDetails.people[0].id,employee.id);
+  assert.equal(expenseDetails.people[0].total,expenseDetails.total);
   assert.equal(expenseDetails.transactions.length,1);
   assert.equal(expenseDetails.transactions[0].amount,"150.2545");
   assert.equal(expenseDetails.transactions[0].method,"UPI");
@@ -290,5 +294,52 @@ try{
   }),(e:{status?:number})=>e.status===422);
   await assert.rejects(()=>finance.submit(founder,directInput),(e:{status?:number})=>e.status===409);
   assert.equal((await finance.entries(founder,"mine")).length,2);
+  // Month-to-day drill-down and person-scoped ledgers must reconcile exactly.
+  const secondFounder=principal(newStaff.id,directOrg.id,["FOUNDER"],[
+    "finance.entry.create","finance.entry.read.own","finance.read.all",
+  ]);
+  await finance.submit(secondFounder,{...directInput,occurredOn:"2026-10-20",
+    amount:"10.2500",idempotencyKey:randomUUID()});
+  await finance.submit(founder,{...directInput,occurredOn:"2026-09-30",
+    amount:"20.7500",idempotencyKey:randomUUID()});
+  const reportingFounder=principal(founderUser.id,directOrg.id,["FOUNDER"],[
+    "reports.business.read","finance.read.all",
+  ]);
+  const dailyPeriod={kind:"EXPENSE" as const,from:"2026-09-01",to:"2026-10-31",q:"",page:1,limit:20};
+  const drill=await finance.breakdown(reportingFounder,dailyPeriod);
+  assert.equal(drill.total,"52.0000");
+  assert.deepEqual(drill.monthly.map(x=>[x.month,x.total]),[
+    ["2026-09","20.7500"],["2026-10","31.2500"]]);
+  assert.deepEqual(drill.daily,[
+    {date:"2026-09-30",total:"20.7500",count:1},
+    {date:"2026-10-19",total:"21.0000",count:1},
+    {date:"2026-10-20",total:"10.2500",count:1},
+  ]);
+  assert.equal(drill.people.length,2);
+  assert.deepEqual(drill.people.map(p=>[p.id,p.total]),[
+    [founderUser.id,"41.7500"],[newStaff.id,"10.2500"]]);
+  assert.equal(drill.people.reduce((n,p)=>n+Number(p.total),0),52);
+  const filtered=await finance.breakdown(reportingFounder,{
+    ...dailyPeriod,personId:newStaff.id,day:"2026-10-20",
+  });
+  assert.equal(filtered.total,drill.total);
+  assert.deepEqual(filtered.people,drill.people);
+  assert.equal(filtered.matchingTotal,"10.2500");
+  assert.equal(filtered.matchingCount,1);
+  assert.equal(filtered.transactions.length,1);
+  assert.equal(filtered.transactions[0].enteredBy,"Staff");
+  assert.equal((await finance.breakdown(reportingFounder,{
+    ...dailyPeriod,personId:newStaff.id,day:"2026-10-19",
+  })).matchingCount,0);
+  assert.equal((await finance.breakdown(reportingFounder,{
+    ...dailyPeriod,personId:outsider.id,
+  })).matchingCount,0);
+  const scopedCsv=await finance.exportBreakdown(reportingFounder,{
+    ...dailyPeriod,personId:newStaff.id,day:"2026-10-20",
+  });
+  assert.equal(scopedCsv.count,1);
+  assert.ok(scopedCsv.csv.includes("10.2500"));
+  assert.equal(financeBreakdownQuerySchema.safeParse({...dailyPeriod,day:"2026-11-01"}).success,false);
+  assert.equal(financeBreakdownQuerySchema.safeParse({...dailyPeriod,personId:"not-uuid"}).success,false);
   console.info("Module 6 PASS: admin category rename/unused delete/referenced archive, other-user expense edits/cancellation, audit and tenant isolation.");
 }finally{await db.$disconnect();}

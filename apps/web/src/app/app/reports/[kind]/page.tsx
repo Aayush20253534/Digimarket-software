@@ -11,7 +11,10 @@ type Transaction={id:string;occurredOn:string;amount:string;method:string;mercha
  description:string|null;postedAt:string|null;category:string;enteredBy:string};
 type Breakdown={kind:Kind;from:string;to:string;currency:string;total:string;
  transactionCount:number;categories:{id:string;name:string;total:string;count:number}[];
- monthly:{month:string;total:string;count:number}[];search:string;matchingTotal:string;
+ monthly:{month:string;total:string;count:number}[];
+ daily:{date:string;total:string;count:number}[];
+ people:{id:string;name:string;loginId:string;total:string;count:number}[];
+ search:string;matchingTotal:string;
  matchingCount:number;page:number;limit:number;hasMore:boolean;transactions:Transaction[]};
 const today=()=>new Date().toISOString().slice(0,10);
 const currentMonth=()=>today().slice(0,7)+"-01";
@@ -38,6 +41,9 @@ export default function FinanceBreakdownPage(){
  const [ready,setReady]=useState(false);
  const [query,setQuery]=useState("");
  const [page,setPage]=useState(1);
+ const [selectedMonth,setSelectedMonth]=useState<string|null>(null);
+ const [selectedDay,setSelectedDay]=useState<string|null>(null);
+ const [selectedPersonId,setSelectedPersonId]=useState<string|null>(null);
  const [records,setRecords]=useState<Breakdown|null>(null);
  const [busy,setBusy]=useState(false);
  const [exporting,setExporting]=useState(false);
@@ -53,7 +59,9 @@ export default function FinanceBreakdownPage(){
  },[]);
  const params=useMemo(()=>new URLSearchParams({
    kind:kind??"INCOME",from,to,q:query,page:String(page),limit:"20",
- }),[kind,from,to,query,page]);
+   ...(selectedDay?{day:selectedDay}:{}),
+   ...(selectedPersonId?{personId:selectedPersonId}:{}),
+ }),[kind,from,to,query,page,selectedDay,selectedPersonId]);
  const refresh=useCallback(async()=>{
    if(!ready||!session||!allowed||!kind)return;
    if(!from||!to||from>to){setError("Select a valid start and end date.");return;}
@@ -65,7 +73,10 @@ export default function FinanceBreakdownPage(){
    finally{if(current===seq.current)setBusy(false);}
  },[ready,session,allowed,kind,from,to,params,request]);
  useEffect(()=>{void refresh();return()=>{seq.current+=1;};},[refresh]);
- const changePeriod=(start:string,end:string)=>{setFrom(start);setTo(end);setPage(1);};
+ const changePeriod=(start:string,end:string)=>{
+   setFrom(start);setTo(end);setPage(1);
+   setSelectedMonth(null);setSelectedDay(null);setSelectedPersonId(null);
+ };
  const preset=(mode:"current"|"three"|"year"|"all")=>{
    const current=new Date(),origin=new Date(Date.UTC(current.getFullYear(),current.getMonth(),1));
    if(mode==="current")changePeriod(currentMonth(),today());
@@ -93,6 +104,26 @@ export default function FinanceBreakdownPage(){
  const chartMonths=(records?.monthly??[]).slice(-18);
  const maxMonth=Math.max(1,...chartMonths.map(x=>Number(x.total)));
  const categoryMax=Math.max(1,...(records?.categories??[]).map(x=>Number(x.total)));
+ const personMax=Math.max(1,...(records?.people??[]).map(x=>Number(x.total)));
+ const activePerson=records?.people.find(p=>p.id===selectedPersonId);
+ const dailyForMonth:Breakdown["daily"]=[];
+ if(records&&selectedMonth){
+   const firstDay=selectedMonth+"-01";
+   const [year,month]=selectedMonth.split("-").map(Number);
+   const finalDay=new Date(Date.UTC(year,month,0)).toISOString().slice(0,10);
+   const start=records.from>firstDay?records.from:firstDay;
+   const end=records.to<finalDay?records.to:finalDay;
+   const byDate=new Map(records.daily.map(entry=>[entry.date,entry]));
+   if(start<=end){
+     const cursor=new Date(start+"T00:00:00.000Z");
+     for(let i=0;i<31&&cursor.toISOString().slice(0,10)<=end;i++){
+       const date=cursor.toISOString().slice(0,10);
+       dailyForMonth.push(byDate.get(date)??{date,total:"0.0000",count:0});
+       cursor.setUTCDate(cursor.getUTCDate()+1);
+     }
+   }
+ }
+ const dayMax=Math.max(1,...dailyForMonth.map(x=>Number(x.total)));
  const back="/app/reports?"+new URLSearchParams({from,to}).toString();
  if(!session)return <Spinner label="Checking report permissions…"/>;
  if(!kind)return <Notice kind="error">Unknown financial report.</Notice>;
@@ -115,9 +146,9 @@ export default function FinanceBreakdownPage(){
    </div>
    <div className="aw-report-breakdown-fields">
     <label>From<input aria-label="Breakdown from date" className="field" type="date"
-      value={from} max={to} onChange={e=>{setFrom(e.target.value);setPage(1);}}/></label>
+      value={from} max={to} onChange={e=>changePeriod(e.target.value,to)}/></label>
     <label>Through<input aria-label="Breakdown to date" className="field" type="date"
-      value={to} min={from} onChange={e=>{setTo(e.target.value);setPage(1);}}/></label>
+      value={to} min={from} onChange={e=>changePeriod(from,e.target.value)}/></label>
     <button type="button" className="aw-report-primary" disabled={busy}
       onClick={()=>void refresh()}><RefreshCcw size={16}/>Refresh</button>
    </div>
@@ -144,15 +175,24 @@ export default function FinanceBreakdownPage(){
     <section className="aw-finance-panel" aria-label="Monthly financial trend">
       <div className="aw-finance-panel-heading"><TrendingUp size={17}/><h2>Monthly {isIncome?"income":"expenses"}</h2></div>
       <p className="aw-finance-panel-caption">{records.monthly.length>18
-        ?"Latest 18 months shown. Totals include the complete selected period."
-        :"Totals by month for the selected period."}</p>
+        ?"Latest 18 months shown. Select any month to inspect its days."
+        :"Select a month to inspect its day-wise totals and transactions."}</p>
       <div className="aw-finance-trend" role="list">
        {chartMonths.map(m=><div role="listitem" className="aw-finance-trend-item" key={m.month}>
-         <div className="aw-finance-trend-column">
-          <div className="aw-finance-trend-bar" style={{height:Math.max(2,Number(m.total)/maxMonth*100)+"%"}}
-           title={monthTitle(m.month)+": "+money(m.total)}/>
-         </div>
-         <span>{monthTitle(m.month)}</span><small>{money(m.total)}</small>
+         <button type="button" className="aw-finance-trend-trigger"
+          aria-label={"Open day-wise breakdown for "+monthTitle(m.month)}
+          aria-expanded={selectedMonth===m.month}
+          aria-controls="aw-finance-daily"
+          onClick={()=>{
+            setSelectedMonth(month=>month===m.month?null:m.month);
+            setSelectedDay(null);setPage(1);
+          }}>
+          <span className="aw-finance-trend-column">
+           <span className="aw-finance-trend-bar" style={{height:Math.max(2,Number(m.total)/maxMonth*100)+"%"}}
+            title={monthTitle(m.month)+": "+money(m.total)}/>
+          </span>
+          <span>{monthTitle(m.month)}</span><small>{money(m.total)}</small>
+         </button>
        </div>)}
       </div>
     </section>
@@ -169,10 +209,55 @@ export default function FinanceBreakdownPage(){
       </div>
     </section>
    </div>
+   <div className="aw-finance-drill-panels">
+    {selectedMonth&&<section id="aw-finance-daily" className="aw-finance-panel" aria-label="Day-wise financial breakdown">
+      <div className="aw-finance-drill-heading">
+       <div><h2>Day-wise breakdown · {monthTitle(selectedMonth)}</h2>
+        <p className="aw-finance-panel-caption">All days in the selected reporting window, including days with no transactions. Select a day to filter the ledger.</p></div>
+       <button type="button" className="aw-finance-clear" onClick={()=>{setSelectedMonth(null);setSelectedDay(null);setPage(1);}}>Close days</button>
+      </div>
+      <div className="aw-finance-days">
+       {dailyForMonth.map(d=><button key={d.date} type="button"
+        className={"aw-finance-day"+(selectedDay===d.date?" is-selected":"")}
+        aria-label={"Filter ledger to "+pretty(d.date)}
+        aria-pressed={selectedDay===d.date}
+        onClick={()=>{setSelectedDay(day=>day===d.date?null:d.date);setPage(1);}}>
+        <span>{d.date.slice(-2)}</span>
+        <span className="aw-finance-day-track"><span style={{height:Math.max(2,Number(d.total)/dayMax*100)+"%"}}/></span>
+        <strong>{money(d.total)}</strong>
+        <small>{d.count} entr{d.count===1?"y":"ies"}</small>
+       </button>)}
+      </div>
+    </section>}
+    <section className="aw-finance-panel" aria-label="Person-wise financial breakdown">
+     <div className="aw-finance-drill-heading">
+      <div><h2>Person-wise {isIncome?"income":"expenses"}</h2>
+       <p className="aw-finance-panel-caption">Totals grouped by assigned person, including members no longer active. Select a person to filter the ledger and CSV.</p></div>
+      {selectedPersonId&&<button type="button" className="aw-finance-clear" onClick={()=>{setSelectedPersonId(null);setPage(1);}}>All people</button>}
+     </div>
+     <div className="aw-finance-people">
+      {records.people.length===0&&<p className="aw-finance-empty">No posted entries in this period.</p>}
+      {records.people.map(p=><button type="button" key={p.id}
+       aria-pressed={selectedPersonId===p.id}
+       aria-label={"Filter ledger by "+p.name}
+       className={"aw-finance-person"+(selectedPersonId===p.id?" is-selected":"")}
+       onClick={()=>{setSelectedPersonId(id=>id===p.id?null:p.id);setPage(1);}}>
+       <span className="aw-finance-person-title"><strong>{p.name}</strong><small>{p.loginId}</small></span>
+       <span className="aw-finance-person-total">{money(p.total)}<small>{p.count} transaction{p.count===1?"":"s"}</small></span>
+       <span className="aw-finance-category-track"><span style={{width:Math.min(100,Number(p.total)/personMax*100)+"%"}}/></span>
+      </button>)}
+     </div>
+    </section>
+   </div>
    <section className="aw-finance-panel" aria-label="Financial transactions ledger">
      <div className="aw-finance-ledger-heading">
       <div><h2>Transaction ledger</h2>
-       <p>20 transactions per page. Search affects the ledger and CSV, not the summary totals.</p></div>
+       <p>20 transactions per page. Search and day/person selection filter this ledger and CSV, not overall totals.</p>
+       {(selectedDay||selectedPersonId)&&<p className="aw-finance-active-filters">
+        {selectedDay&&<span>Day: {pretty(selectedDay)}</span>}
+        {selectedPersonId&&<span>Person: {activePerson?.name??"Selected member"}</span>}
+        <button type="button" onClick={()=>{setSelectedDay(null);setSelectedPersonId(null);setPage(1);}}>Clear ledger filters</button>
+       </p>}</div>
       <button type="button" className="aw-report-primary" disabled={exporting||busy}
         onClick={()=>void exportCsv()}><ArrowDownToLine size={16}/>{exporting?"Exporting…":"Export filtered CSV"}</button>
      </div>

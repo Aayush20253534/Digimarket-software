@@ -83,9 +83,13 @@ export const financeBreakdownQuerySchema=z.strictObject({
  from:z.iso.date(),
  to:z.iso.date(),
  q:z.string().trim().max(100).default(""),
+ // Optional drill-down filters apply only to the transaction ledger/CSV.
+ personId:z.uuid().optional(),
+ day:z.iso.date().optional(),
  page:z.coerce.number().int().min(1).max(100000).default(1),
  limit:z.coerce.number().int().min(1).max(100).default(20),
-}).refine(x=>x.from<=x.to,{message:"Invalid reporting date range"});
+}).refine(x=>x.from<=x.to,{message:"Invalid reporting date range"})
+ .refine(x=>!x.day||(x.day>=x.from&&x.day<=x.to),{message:"Day must be inside reporting period"});
 export type FinanceBreakdownQuery=z.infer<typeof financeBreakdownQuerySchema>;
 
 // A phone number is all that is required to create a prospect.
