@@ -85,9 +85,12 @@ describe("private ChatGPT integration security", () => {
   });
 
   it("rejects cross-organization founder role records", async () => {
+    vi.stubEnv("CHATGPT_API_ORIGIN", "https://crm.example.org");
+    vi.stubEnv("CHATGPT_WEB_ORIGIN", "https://app.example.org");
     const auth = { database: {
       chatGptGrant: { findUnique: vi.fn().mockResolvedValue({
         id: "grant", organizationId: "org-a", userId: "founder",
+        resource: "https://crm.example.org/api/v1/integrations/chatgpt/mcp",
         scopes: ["crm.leads.read"], revokedAt: null,
         accessExpiresAt: new Date(Date.now() + 60_000),
         refreshExpiresAt: new Date(Date.now() + 60_000),
