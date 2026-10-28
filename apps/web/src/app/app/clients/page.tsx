@@ -52,6 +52,8 @@ export default function ClientsPage(){
  const [message,setMessage]=useState("");
  const [contact,setContact]=useState({name:"",role:"",phone:"",email:"",isPrimary:false});
  const [service,setService]=useState({name:"",description:"",status:"ACTIVE" as Service["status"],monthlyTarget:""});
+ const [editingService,setEditingService]=useState<Service|null>(null);
+ const [serviceEdit,setServiceEdit]=useState({name:"",description:"",status:"ACTIVE" as Service["status"],monthlyTarget:""});
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
    setLoading(true);
@@ -102,6 +104,16 @@ export default function ClientsPage(){
      await request("/clients/"+selected.id+"/contacts",{method:"POST",body:contact});
      setContact({name:"",role:"",phone:"",email:"",isPrimary:false});
      await open(selected.id);setMessage("Client contact saved.");
+   }catch(e){setError(readable(e));}finally{setBusy(false);}
+ }
+ async function saveServiceEdit(e:FormEvent){
+   e.preventDefault();if(!selected||!editingService)return;
+   setBusy(true);setError("");setMessage("");
+   try{
+     await request("/clients/"+selected.id+"/services/"+editingService.id,{method:"PUT",body:{
+       ...serviceEdit,monthlyTarget:serviceEdit.monthlyTarget?Number(serviceEdit.monthlyTarget):null,
+     }});
+     setEditingService(null);await open(selected.id);setMessage("Service commitment updated.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
  async function addService(e:FormEvent){
@@ -212,10 +224,30 @@ export default function ClientsPage(){
        {selected&&<Card title="Services & monthly commitments" description="Services promised to this client and their agreed monthly delivery targets.">
          {selected.services.length===0?<p className="text-sm text-slate-500">No services listed.</p>:
            <div className="space-y-2">{selected.services.map(x=><div key={x.id} className="rounded-lg border p-3 text-sm">
-             <div className="flex justify-between"><p className="font-semibold">{x.name}</p><StatusBadge status={x.status}/></div>
+             <div className="flex items-center justify-between gap-2"><p className="font-semibold">{x.name}</p><div className="flex items-center gap-2">
+               <StatusBadge status={x.status}/>
+               {canEdit&&<button className="btn-secondary text-xs" type="button" onClick={()=>{
+                 setEditingService(x);setServiceEdit({name:x.name,description:x.description??"",status:x.status,monthlyTarget:x.monthlyTarget?.toString()??""});
+               }} aria-label={"Edit service "+x.name}>Edit</button>}
+             </div></div>
              {x.description&&<p className="mt-1 text-xs">{x.description}</p>}
              {x.monthlyTarget&&<p className="mt-1 text-xs font-semibold">{x.monthlyTarget} per month</p>}
            </div>)}</div>}
+         {canEdit&&editingService&&<form onSubmit={saveServiceEdit} className="mt-3 space-y-2 rounded-lg border border-violet-200 p-3">
+           <h3 className="font-semibold">Edit service commitment</h3>
+           <FormField id="edit-service-name" label="Service name"><input id="edit-service-name" className="field" required maxLength={120} value={serviceEdit.name}
+             onChange={e=>setServiceEdit(v=>({...v,name:e.target.value}))}/></FormField>
+           <FormField id="edit-service-description" label="Description"><input id="edit-service-description" className="field" maxLength={1000} value={serviceEdit.description}
+             onChange={e=>setServiceEdit(v=>({...v,description:e.target.value}))}/></FormField>
+           <FormField id="edit-service-target" label="Monthly target"><input id="edit-service-target" className="field" type="number" min={1} max={1000} value={serviceEdit.monthlyTarget}
+             onChange={e=>setServiceEdit(v=>({...v,monthlyTarget:e.target.value}))}/></FormField>
+           <FormField id="edit-service-status" label="Status"><select id="edit-service-status" className="field" value={serviceEdit.status}
+             onChange={e=>setServiceEdit(v=>({...v,status:e.target.value as Service["status"]}))}>
+             <option>ACTIVE</option><option>PAUSED</option><option>ENDED</option>
+           </select></FormField>
+           <div className="flex gap-2"><button className="btn-primary" type="submit" disabled={busy}>Save service</button>
+             <button className="btn-secondary" type="button" onClick={()=>setEditingService(null)}>Cancel</button></div>
+         </form>}
          {canEdit&&<form onSubmit={addService} className="mt-4 space-y-2">
            <FormField id="service-name" label="Service name"><input id="service-name" className="field" required maxLength={120} value={service.name} onChange={e=>setService(v=>({...v,name:e.target.value}))}/></FormField>
            <FormField id="service-description" label="Service description"><input id="service-description" className="field" maxLength={1000} value={service.description} onChange={e=>setService(v=>({...v,description:e.target.value}))}/></FormField>
