@@ -102,11 +102,11 @@ const changeStatus = z.strictObject({
   confirmClientConversion: z.boolean().optional(),
 }).extend(writeBase.shape);
 const scheduleMeeting = z.strictObject({ id, version: z.number().int().positive(),
-  meetingOn: iso, meetingTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/) }).and(writeBase);
-const scheduleFollowup = z.strictObject({ id, version: z.number().int().positive(), followUpOn: iso }).and(writeBase);
+  meetingOn: iso, meetingTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/) }).extend(writeBase.shape);
+const scheduleFollowup = z.strictObject({ id, version: z.number().int().positive(), followUpOn: iso }).extend(writeBase.shape);
 const assignLead = z.strictObject({ id, version: z.number().int().positive(),
-  assignedToId: id }).and(writeBase);
-const addNote = z.strictObject({ id, note: z.string().trim().min(1).max(2000) }).and(writeBase);
+  assignedToId: id }).extend(writeBase.shape);
+const addNote = z.strictObject({ id, note: z.string().trim().min(1).max(2000) }).extend(writeBase.shape);
 const localDay = () => new Intl.DateTimeFormat("sv-SE", {
   timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
 }).format(new Date());
