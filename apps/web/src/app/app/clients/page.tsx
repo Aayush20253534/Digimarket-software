@@ -171,12 +171,26 @@ export default function ClientsPage(){
                {(["ACTIVE","PAUSED","ARCHIVED"] as const).map(x=><option key={x}>{x}</option>)}
              </select>
            </FormField>
-           <button disabled={busy} className="btn-primary">Save client profile</button>
+           <div className="grid gap-3 border-t pt-3 sm:grid-cols-2">
+             <FormField id="client-contract-start" label="Agreement start"><input className="field" id="client-contract-start" type="date" value={terms.contractStartOn}
+               onChange={e=>setTerms(v=>({...v,contractStartOn:e.target.value}))}/></FormField>
+             <FormField id="client-contract-end" label="Agreement end"><input className="field" id="client-contract-end" type="date" min={terms.contractStartOn||undefined} value={terms.contractEndOn}
+               onChange={e=>setTerms(v=>({...v,contractEndOn:e.target.value}))}/></FormField>
+             <FormField id="client-monthly-fee" label="Monthly service fee (INR)"><input className="field" id="client-monthly-fee" inputMode="decimal"
+               placeholder="15000" pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" value={terms.monthlyFee}
+               onChange={e=>setTerms(v=>({...v,monthlyFee:e.target.value}))}/></FormField>
+             <FormField id="client-monthly-ad-budget" label="Monthly ad budget (INR)"><input className="field" id="client-monthly-ad-budget" inputMode="decimal"
+               placeholder="3000" pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" value={terms.monthlyAdBudget}
+               onChange={e=>setTerms(v=>({...v,monthlyAdBudget:e.target.value}))}/></FormField>
+           </div>
+           <button disabled={busy} className="btn-primary">Save client profile & agreement</button>
          </form>:<div className="space-y-2 text-sm text-slate-600">
            <p>Business: {selected.businessType||"Not recorded"}</p>
            <p>Phone: {selected.phone||"Not recorded"} · Email: {selected.email||"Not recorded"}</p>
            <p>Location: {selected.location||"Not recorded"}</p>
            {selected.notes&&<p className="whitespace-pre-wrap">{selected.notes}</p>}
+           <p>Agreement: {selected.contractStartOn?.slice(0,10)??"Not set"} to {selected.contractEndOn?.slice(0,10)??"Not set"}</p>
+           <p>Monthly fee: ₹{selected.monthlyFee??"Not set"} · Ad budget: ₹{selected.monthlyAdBudget??"Not set"}</p>
            <StatusBadge status={selected.status}/>
          </div>}
        </Card>:null}
@@ -195,21 +209,25 @@ export default function ClientsPage(){
            <div className="sm:col-span-2"><button disabled={busy} className="btn-secondary">Add contact</button></div>
          </form>}
        </Card>}
-       {selected&&<Card title="Services" description="Services supplied to this client; invoicing is a later module.">
+       {selected&&<Card title="Services & monthly commitments" description="Services promised to this client and their agreed monthly delivery targets.">
          {selected.services.length===0?<p className="text-sm text-slate-500">No services listed.</p>:
            <div className="space-y-2">{selected.services.map(x=><div key={x.id} className="rounded-lg border p-3 text-sm">
              <div className="flex justify-between"><p className="font-semibold">{x.name}</p><StatusBadge status={x.status}/></div>
              {x.description&&<p className="mt-1 text-xs">{x.description}</p>}
+             {x.monthlyTarget&&<p className="mt-1 text-xs font-semibold">{x.monthlyTarget} per month</p>}
            </div>)}</div>}
          {canEdit&&<form onSubmit={addService} className="mt-4 space-y-2">
            <FormField id="service-name" label="Service name"><input id="service-name" className="field" required maxLength={120} value={service.name} onChange={e=>setService(v=>({...v,name:e.target.value}))}/></FormField>
            <FormField id="service-description" label="Service description"><input id="service-description" className="field" maxLength={1000} value={service.description} onChange={e=>setService(v=>({...v,description:e.target.value}))}/></FormField>
+           <FormField id="service-target" label="Monthly quantity (optional)"><input id="service-target" className="field" type="number" min={1} max={1000}
+             placeholder="8 for reels / posts" value={service.monthlyTarget} onChange={e=>setService(v=>({...v,monthlyTarget:e.target.value}))}/></FormField>
            <FormField id="service-status" label="Service status"><select id="service-status" className="field" value={service.status} onChange={e=>setService(v=>({...v,status:e.target.value as Service["status"]}))}>
              <option>ACTIVE</option><option>PAUSED</option><option>ENDED</option>
            </select></FormField>
            <button disabled={busy} className="btn-secondary">Add service</button>
          </form>}
        </Card>}
+       {selected&&<ClientDeliveryWorkspace key={selected.id} clientId={selected.id} canCreate={!!session?.identity.permissions.includes("projects.create")}/>}
        </div>
      </DirectoryDetailsPortal>}
    </div>
