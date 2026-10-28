@@ -1,0 +1,30 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "amplifyworld-crm": {
+      "type": "streamable-http",
+      "url": "https://digimarket-software.onrender.com/api/v1/integrations/chatgpt/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": {
+              "mode": "dcr"
+            },
+            "authorizationServerBase": "https://digimarket-software.onrender.com",
+            "baseScopes": [
+              "crm.leads.read",
+              "crm.leads.write",
+              "crm.meetings.read",
+              "crm.meetings.write",
+              "crm.followups.read",
+              "crm.followups.write",
+              "crm.clients.read",
+              "crm.analytics.read"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
