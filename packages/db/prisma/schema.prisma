@@ -1249,6 +1249,7 @@ model ChatGptOAuthCode {
   userId         String    @db.Uuid
   organizationId String    @db.Uuid
   codeChallenge  String    @db.VarChar(128)
+  resource       String    @db.VarChar(1000)
   scopes         String[]
   expiresAt      DateTime  @db.Timestamptz(6)
   usedAt         DateTime? @db.Timestamptz(6)
@@ -1262,6 +1263,7 @@ model ChatGptGrant {
   userId           String    @db.Uuid
   organizationId   String    @db.Uuid
   scopes           String[]
+  resource         String    @db.VarChar(1000)
   accessTokenHash  String?   @unique @db.VarChar(64)
   refreshTokenHash String?   @unique @db.VarChar(64)
   accessExpiresAt  DateTime  @db.Timestamptz(6)
