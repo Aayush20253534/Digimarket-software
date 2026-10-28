@@ -666,7 +666,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/meetings");
   await expect(page.getByRole("table",{name:"Meetings register"}).locator("tbody tr")).toHaveCount(0);
   await page.goto("/app/leads");
-  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
+  // The app can still be hydrating after navigation on a loaded CI runner.
+  // Wait for the real CRM register, not merely the navigation response.
+  await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false",{timeout:20000});
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   const decisionBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-decision-pending");
