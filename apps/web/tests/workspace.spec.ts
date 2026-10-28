@@ -834,22 +834,17 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.goto("/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   const financeCategory=page.getByLabel("Category",{exact:true});
-  const financePerson=page.getByLabel("Person",{exact:true});
+  // No Person field on new transactions; the server records the submitting user.
   await expect(financeCategory).toHaveValue("");
-  await expect(financePerson).toHaveValue("");
+  await expect(page.locator("#finance-person")).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Submit for approval"})).toBeDisabled();
-  await expect(financePerson.getByRole("option",{name:"CI Employee (ci-employee)"})).toBeAttached();
-  await expect(financePerson.locator("option")).toHaveCount(2); // Placeholder + self only.
   await financeCategory.selectOption({label:"CI Admin Category Updated"});
-  await financePerson.selectOption({label:"CI Employee (ci-employee)"});
   await page.getByLabel("Amount (INR)").fill("19.50");
   await page.getByRole("button",{name:"Submit for approval"}).click();
   await expect(page.getByText("Entry submitted for finance approval. Pending amounts are not included in posted totals.")).toBeVisible();
   await expect(financeCategory).toHaveValue("");
-  await expect(financePerson).toHaveValue("");
   await page.getByLabel("Entry type").selectOption("INCOME");
   await financeCategory.selectOption({label:"CI Revenue Category"});
-  await financePerson.selectOption({label:"CI Employee (ci-employee)"});
   await page.getByLabel("Amount (INR)").fill("55.50");
   await page.getByRole("button",{name:"Submit for approval"}).click();
   await expect(page.getByText("Entry submitted for finance approval. Pending amounts are not included in posted totals.")).toBeVisible();
