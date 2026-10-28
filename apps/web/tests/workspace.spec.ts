@@ -509,6 +509,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   expect(await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").count()).toBeLessThanOrEqual(10);
   const visibleLeadTable=page.locator('[data-aw-module="leads"] .aw-register-scroll');
   expect(await visibleLeadTable.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
+  // Mobile row selection should reveal the contact name in the lower detail editor.
+  await page.setViewportSize({width:390,height:800});
+  await freshLeadRow.click();
+  await expect.poll(()=>page.locator("#edit-contactName").evaluate(input=>{
+    const rect=input.getBoundingClientRect();
+    return rect.top>=0&&rect.top<window.innerHeight-20;
+  })).toBe(true);
+  // Do not automatically focus the input: the on-screen keyboard must remain closed.
+  await expect(page.locator("#edit-contactName")).not.toBeFocused();
+  await page.setViewportSize({width:1366,height:768});
   await page.getByLabel("Lead status").selectOption("YET_TO_CALL");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
