@@ -50,6 +50,10 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.status(201).json({data:await svc.addService(actor(res),parse(id,req.params.id),
      parse(clientServiceSchema,req.body))});
  });
+ app.put(root+"/:id/services/:serviceId",authenticated,async(req,res)=>{
+   res.json({data:await svc.updateService(actor(res),parse(id,req.params.id),
+     parse(id,req.params.serviceId),parse(clientServiceSchema,req.body))});
+ });
  app.post("/api/v1/leads/:id/convert",authenticated,async(_req,res)=>{
    res.status(405).json({error:{code:"AUTO_CONVERSION_ONLY",
      message:"Set lead status to Approved to create its client"}});
