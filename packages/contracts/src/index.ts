@@ -56,6 +56,8 @@ export type FinanceCategoryInput = z.infer<typeof financeCategoryInputSchema>;
 export const financeEntryInputSchema = z.strictObject({
   kind: financeKindSchema,
   categoryId: z.uuid(),
+  // Explicit assignee for new UI entries. Optional for older API clients; server validates when supplied.
+  enteredById: z.uuid().optional(),
   amount: z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),
   occurredOn: z.iso.date(),
   method: z.enum(["CASH","UPI","BANK_TRANSFER","CARD","OTHER"]),
