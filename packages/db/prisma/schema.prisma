@@ -1248,6 +1248,7 @@ model ChatGptOAuthCode {
   redirectUri    String    @db.VarChar(1000)
   userId         String    @db.Uuid
   organizationId String    @db.Uuid
+  userAuthVersion Int
   codeChallenge  String    @db.VarChar(128)
   resource       String    @db.VarChar(1000)
   scopes         String[]
@@ -1262,6 +1263,7 @@ model ChatGptGrant {
   clientId         String    @db.VarChar(120)
   userId           String    @db.Uuid
   organizationId   String    @db.Uuid
+  userAuthVersion  Int
   scopes           String[]
   resource         String    @db.VarChar(1000)
   accessTokenHash  String?   @unique @db.VarChar(64)
