@@ -175,7 +175,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
   app.get(base + "/oauth/authorize", async (req, res) => {
     const data = checked(approveInput, req.query);
     if (!await validClient(data.client_id, data.redirect_uri)) return oauthFailure(res, "invalid_client");
-    const search = new URLSearchParams(data).toString();
+    const search = new URLSearchParams(Object.entries(data).filter((entry): entry is [string, string] => typeof entry[1] === "string")).toString();
     res.set("Cache-Control", "no-store").redirect(302,
       origin.web + "/app/integrations/chatgpt/authorize?" + search);
   });
