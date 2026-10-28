@@ -1232,3 +1232,54 @@ model WorkspaceMessage {
  @@index([organizationId,senderId,recipientId,createdAt])
  @@index([organizationId,recipientId,createdAt])
 }
+
+
+// Per-founder OAuth grants for the private ChatGPT CRM MCP. Never store bearer secrets in plaintext.
+// This integration does not reuse interactive browser refresh sessions.
+model ChatGptOAuthClient {
+  id           String   @id @db.VarChar(120)
+  redirectUris String[]
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model ChatGptOAuthCode {
+  codeHash       String    @id @db.VarChar(64)
+  clientId       String    @db.VarChar(120)
+  redirectUri    String    @db.VarChar(1000)
+  userId         String    @db.Uuid
+  organizationId String    @db.Uuid
+  codeChallenge  String    @db.VarChar(128)
+  scopes         String[]
+  expiresAt      DateTime  @db.Timestamptz(6)
+  usedAt         DateTime? @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  @@index([expiresAt])
+}
+
+model ChatGptGrant {
+  id               String    @id @default(uuid()) @db.Uuid
+  clientId         String    @db.VarChar(120)
+  userId           String    @db.Uuid
+  organizationId   String    @db.Uuid
+  scopes           String[]
+  accessTokenHash  String?   @unique @db.VarChar(64)
+  refreshTokenHash String?   @unique @db.VarChar(64)
+  accessExpiresAt  DateTime  @db.Timestamptz(6)
+  refreshExpiresAt DateTime  @db.Timestamptz(6)
+  revokedAt        DateTime? @db.Timestamptz(6)
+  lastUsedAt       DateTime? @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  @@index([organizationId, userId, createdAt])
+}
+
+model ChatGptWrite {
+  id             String   @id @default(uuid()) @db.Uuid
+  grantId        String   @db.Uuid
+  key            String   @db.VarChar(80)
+  toolName       String   @db.VarChar(100)
+  payloadHash    String   @db.VarChar(64)
+  state          String   @default("PENDING") @db.VarChar(16)
+  result         Json?
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  @@unique([grantId, key])
+}
