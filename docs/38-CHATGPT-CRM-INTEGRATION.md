@@ -39,7 +39,7 @@
 - OAuth codes are one-use. Refresh grants are database-backed and explicitly revocable; each MCP request checks founder role and current permissions.
 - Only HTTPS callbacks from verified ChatGPT/OpenAI hostnames are supported. Reassess callback hostnames before broad rollout.
 - The existing primary login currently uses standard interactive session JWTs. This feature enforces enrolled MFA at consent, but does not itself rework primary login MFA.
-- Token revocation on password change is not automatic. Disable an account, remove founder permissions or revoke individual grants to terminate existing ChatGPT access.
+- Token revocation on password changes is enforced through authVersion checking. Disable an account, remove founder permissions or revoke individual grants to terminate existing ChatGPT access.
 - Rate limiting is per API process, not distributed. Add a shared limiter for multi-instance production.
 - CRM write idempotency is crash-safe against automatic duplicate retries but an UNCERTAIN state requires operator inspection.
 - Meta WhatsApp messages must not be treated as proof of a specific paid advertisement without verified referral metadata.
