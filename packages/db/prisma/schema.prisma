@@ -616,6 +616,10 @@ model Client {
   instagramUrl String? @db.VarChar(500)
   facebookUrl String? @db.VarChar(500)
   notes String? @db.VarChar(2000)
+  contractStartOn DateTime? @db.Date
+  contractEndOn DateTime? @db.Date
+  monthlyFee Decimal? @db.Decimal(19,4)
+  monthlyAdBudget Decimal? @db.Decimal(19,4)
   status ClientStatus @default(ACTIVE)
   version Int @default(1)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
@@ -656,6 +660,7 @@ model ClientService {
   clientId String @db.Uuid
   name String @db.VarChar(120)
   description String? @db.VarChar(1000)
+  monthlyTarget Int?
   status ClientServiceStatus @default(ACTIVE)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
