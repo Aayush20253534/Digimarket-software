@@ -103,6 +103,8 @@ export async function authenticateChatGpt(auth: AuthService, bearer: string): Pr
   });
   if (!grant || (configuredOrigins()?.api + "/api/v1/integrations/chatgpt/mcp") !== grant.resource || grant.revokedAt || grant.accessExpiresAt <= now || grant.refreshExpiresAt <= now) throw unauthorized();
   const p = await liveFounder(auth, grant.userId, grant.organizationId);
+  const userState = await auth.database.user.findUnique({ where: { id: grant.userId }, select: { authVersion: true } });
+  if (!userState || userState.authVersion !== grant.userAuthVersion) throw unauthorized();
   const approved = new Set(allowedScopes(p));
   const scopes = new Set(grant.scopes.filter(s => approved.has(s as CrmScope)));
   await auth.database.chatGptGrant.updateMany({
@@ -193,10 +195,12 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
     if (!requested.length || requested.join(" ") !== input.scope.trim()) throw forbidden();
     const allowed = new Set(allowedScopes(p));
     if (requested.some(s => !allowed.has(s))) throw forbidden();
+    const account = await auth.database.user.findUnique({ where: { id: p.userId }, select: { authVersion: true } });
+    if (!account) throw unauthorized();
     const code = randomSecret();
     await auth.database.chatGptOAuthCode.create({ data: {
       codeHash: hashSecret(code), clientId: input.client_id, redirectUri: input.redirect_uri,
-      organizationId: p.organizationId, userId: p.userId, scopes: requested,
+      organizationId: p.organizationId, userId: p.userId, userAuthVersion: account.authVersion, scopes: requested,
       codeChallenge: input.code_challenge, resource: resource!, expiresAt: new Date(Date.now() + authCodeLife),
     } });
     const redirect = new URL(input.redirect_uri);
@@ -223,6 +227,8 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
       if (!await validClient(input.client_id, input.redirect_uri)) return oauthFailure(res, "invalid_grant");
       try { await liveFounder(auth, code.userId, code.organizationId); }
       catch { return oauthFailure(res, "invalid_grant"); }
+      const current = await auth.database.user.findUnique({ where: { id: code.userId }, select: { authVersion: true } });
+      if (!current || current.authVersion !== code.userAuthVersion) return oauthFailure(res, "invalid_grant");
       const used = await auth.database.chatGptOAuthCode.updateMany({
         where: { codeHash, usedAt: null }, data: { usedAt: new Date() },
       });
@@ -230,7 +236,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
       const access = randomSecret(), refresh = randomSecret(), now = Date.now();
       await auth.database.chatGptGrant.create({ data: {
         clientId: code.clientId, userId: code.userId, organizationId: code.organizationId,
-        scopes: code.scopes, resource: code.resource, accessTokenHash: hashSecret(access), refreshTokenHash: hashSecret(refresh),
+        scopes: code.scopes, resource: code.resource, userAuthVersion: code.userAuthVersion, accessTokenHash: hashSecret(access), refreshTokenHash: hashSecret(refresh),
         accessExpiresAt: new Date(now + accessLife), refreshExpiresAt: new Date(now + refreshLife),
       } });
       return res.set("Cache-Control", "no-store").json(oauthTokens(access, refresh, code.scopes));
@@ -242,6 +248,8 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
       grant.refreshExpiresAt <= new Date()) return oauthFailure(res, "invalid_grant");
     try { await liveFounder(auth, grant.userId, grant.organizationId); }
     catch { return oauthFailure(res, "invalid_grant"); }
+    const current = await auth.database.user.findUnique({ where: { id: grant.userId }, select: { authVersion: true } });
+    if (!current || current.authVersion !== grant.userAuthVersion) return oauthFailure(res, "invalid_grant");
     const access = randomSecret(), refresh = randomSecret();
     const updated = await auth.database.chatGptGrant.updateMany({
       where: { id: grant.id, refreshTokenHash: oldHash, revokedAt: null },
