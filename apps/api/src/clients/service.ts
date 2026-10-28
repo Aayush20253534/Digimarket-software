@@ -41,10 +41,11 @@ export class ClientsService {
  }
  async detail(a:Principal,id:string){
    await this.existing(a,id);
-   return this.db.client.findFirstOrThrow({where:{id,organizationId:a.organizationId},
+   const client=await this.db.client.findFirstOrThrow({where:{id,organizationId:a.organizationId},
      include:{contacts:{orderBy:[{isPrimary:"desc"},{createdAt:"asc"}]},
        services:{orderBy:{createdAt:"asc"}},
        sourceLead:{select:{id:true,businessName:true,status:true}}}});
+   return a.permissions.has("finance.read.all")?client:{...client,monthlyFee:null,monthlyAdBudget:null};
  }
  async create(_a:Principal,_input:ClientCreateInput):Promise<never>{
    void _a;void _input;
@@ -171,7 +172,8 @@ export class ClientsService {
      return {
        id:row.id,businessName:row.businessName,status:row.status,
        contractStartOn:row.contractStartOn,contractEndOn:row.contractEndOn,
-       monthlyFee:row.monthlyFee,monthlyAdBudget:row.monthlyAdBudget,
+       monthlyFee:a.permissions.has("finance.read.all")?row.monthlyFee:null,
+       monthlyAdBudget:a.permissions.has("finance.read.all")?row.monthlyAdBudget:null,
        targets,
        projects:projects.map(project=>({
          id:project.id,name:project.name,status:project.status,dueOn:project.dueOn,
