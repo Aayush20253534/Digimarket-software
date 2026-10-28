@@ -116,6 +116,23 @@ export class ClientsService {
 
  // A single permission-scoped snapshot powers client delivery Overview and client workspaces.
  // Project visibility exactly follows ProjectsService: private team projects are not leaked.
+ async updateService(a:Principal,id:string,serviceId:string,input:ClientServiceInput){
+   deny(a,"clients.edit");
+   await this.existing(a,id);
+   return this.db.$transaction(async tx=>{
+     const found=await tx.clientService.findFirst({where:{id:serviceId,clientId:id}});
+     if(!found)throw missing();
+     const updated=await tx.clientService.update({where:{id:serviceId},data:{
+       name:input.name.trim(),description:optional(input.description),status:input.status,
+       monthlyTarget:input.monthlyTarget??null,
+     }});
+     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+       action:"clients.service_updated",entityType:"ClientService",entityId:serviceId,
+       beforeRedacted:{status:found.status,monthlyTarget:found.monthlyTarget},
+       afterRedacted:{status:updated.status,monthlyTarget:updated.monthlyTarget}}});
+     return updated;
+   });
+ }
  async deliverySummary(a:Principal){
    deny(a,"clients.read");
    const now=new Date();
