@@ -11,7 +11,7 @@ import { useAuth } from "@/components/auth-provider";
 import { AWBadge, AWEmptyState, AWNotice, AWStatusBadge } from "@/components/aw-ui";
 import { AWDataToolbar, AWLocalPagination, AWPanel, AWSortButton, AWStat } from "@/components/aw-data-patterns";
 import { permittedGroups } from "@/components/workspace-navigation";
-import { AWPersonalTasks } from "@/components/aw-personal-tasks";
+import { AWClientDeliveries } from "@/components/aw-client-deliveries";
 import { AWTodayFollowUps } from "@/components/aw-today-followups";
 import { AWTodayMeetings } from "@/components/aw-today-meetings";
 import { PWAInstallCard } from "@/components/pwa-install";
@@ -34,7 +34,7 @@ const choices = [
 const topics = [
   {label:"Leads CRM",permits:["leads.read"],href:"/app/leads",icon:BriefcaseBusiness,detail:"Pipeline, follow-ups, and conversions"},
   {label:"Clients",permits:["clients.read"],href:"/app/clients",icon:Users,detail:"Client contacts and service delivery"},
-  {label:"Projects",permits:["projects.read"],href:"/app/projects",icon:FolderKanban,detail:"Milestones and deliverables"},
+  {label:"Client Deliveries",permits:["clients.read"],href:"/app/clients",icon:FolderKanban,detail:"Agreements, projects, milestones and service targets"},
   {label:"Tasks",permits:["tasks.read"],href:"/app/tasks",icon:CheckCircle2,detail:"Assignments and recurring work"},
   {label:"Content calendar",permits:["content.read"],href:"/app/content",icon:Layers,detail:"Editorial planning and approvals"},
   {label:"Income & expenses",permits:["finance.entry.read.own","finance.read.all"],href:"/app/finance",icon:Wallet,detail:"Your permitted financial records"},
@@ -106,7 +106,7 @@ export default function Dashboard() {
   const firstName=session?.user.displayName.split(" ")[0]??"there";
   if(!session)return null;
   const leadership=isAdmin;
-  if(!leadership)return <div className="space-y-5"><PWAInstallCard/><AWTodayMeetings/><AWTodayFollowUps/><AWPersonalTasks/></div>;
+  if(!leadership)return <div className="space-y-5"><PWAInstallCard/><AWTodayMeetings/><AWTodayFollowUps/><AWClientDeliveries/></div>;
   const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
   overview?.records.forEach(x=>{groupCounts[x.source]++;});
   return <div className="aw-dashboard space-y-7" data-testid="amplifyworld-dashboard">
@@ -130,6 +130,7 @@ export default function Dashboard() {
     <PWAInstallCard/>
     <AWTodayMeetings/>
     <AWTodayFollowUps/>
+    <AWClientDeliveries/>
 
     {leadership&&<div className="aw-stat-grid" data-testid="dashboard-kpis">
       <AWStat label="Your session" value="Authenticated" description="Verified against the active API session"
