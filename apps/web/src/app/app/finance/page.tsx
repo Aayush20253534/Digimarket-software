@@ -285,7 +285,7 @@ export default function FinancePage(){
             <option value="">Select a person</option>
             {assignees.map(user=><option key={user.id} value={user.id}>{user.displayName} ({user.loginId})</option>)}
           </select></FormField>
-          {assigneesError&&<p className="sm:col-span-2 text-sm" role="alert">{assigneesError}</p>
+          {assigneesError&&<p className="sm:col-span-2 text-sm" role="alert">{assigneesError}</p>}
           <FormField id="finance-amount" label="Amount (INR)"><input id="finance-amount" className="field" inputMode="decimal" required
             pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" placeholder="1250.00"
             value={amount} onChange={e=>setAmount(e.target.value)}/></FormField>
