@@ -6,7 +6,7 @@ import {
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
 
-type Item={label:string;href:string;icon:LucideIcon;permits?:readonly string[]; operational?:boolean};
+type Item={label:string;href:string;icon:LucideIcon;permits?:readonly string[]; roles?:readonly string[]; operational?:boolean};
 type Group={title:string;items:readonly Item[]};
 const sections:readonly Group[]=[
  {title:"Workspace",items:[
@@ -36,6 +36,7 @@ const sections:readonly Group[]=[
  {title:"Administration",items:[
   {label:"Founders & responsibilities",href:"/app/founders",icon:UsersRound,permits:["founders.read"]},
   {label:"Company settings",href:"/app/settings",icon:Settings2,permits:["organization.settings.manage"]},
+  {label:"ChatGPT CRM",href:"/app/integrations/chatgpt",icon:Settings2,permits:["organization.settings.manage"],roles:["FOUNDER"]},
   {label:"Team & accounts",href:"/app/team/users",icon:Users,permits:["users.read"]}
  ]},
  {title:"Account",items:[{label:"My account",href:"/app/profile",icon:ShieldCheck}]}
@@ -43,7 +44,7 @@ const sections:readonly Group[]=[
 export function permittedGroups(permissions:readonly string[],roles:readonly string[]=[]):Group[]{
   const admin=roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN");
  const granted=new Set(permissions);
- return sections.map(group=>({...group,items:group.items.filter(item=>(!admin||!item.operational)&&(!item.permits||item.permits.some(p=>granted.has(p))))}))
+ return sections.map(group=>({...group,items:group.items.filter(item=>(!admin||!item.operational)&&(!item.permits||item.permits.some(p=>granted.has(p))||item.roles?.some(r=>roles.includes(r))))}))
   .filter(group=>group.items.length>0);
 }
 export function currentSection(groups:Group[],pathname:string){
