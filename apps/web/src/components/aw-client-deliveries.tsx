@@ -31,7 +31,7 @@ export function AWClientDeliveries(){
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <p className="aw-eyebrow">DELIVERY OPERATIONS</p>
-        <h2 className="text-2xl font-bold text-white sm:text-3xl">Client Deliveries</h2>
+        <h2 className="aw-dashboard-title text-2xl font-bold text-white sm:text-3xl">Client Deliveries</h2>
         <p className="mt-1 text-sm text-[#BFAAD1]">Contract commitments and project progress. Team tasks stay in the delivery workspace.</p>
       </div>
       <div className="flex flex-wrap gap-2">
