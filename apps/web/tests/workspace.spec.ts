@@ -837,21 +837,22 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const financePerson=page.getByLabel("Person",{exact:true});
   await expect(financeCategory).toHaveValue("");
   await expect(financePerson).toHaveValue("");
-  await expect(page.getByRole("button",{name:"Save entry"})).toBeDisabled();
+  await expect(page.getByRole("button",{name:"Submit for approval"})).toBeDisabled();
   await expect(financePerson.getByRole("option",{name:"CI Employee (ci-employee)"})).toBeAttached();
+  await expect(financePerson.locator("option")).toHaveCount(2); // Placeholder + self only.
   await financeCategory.selectOption({label:"CI Admin Category Updated"});
   await financePerson.selectOption({label:"CI Employee (ci-employee)"});
   await page.getByLabel("Amount (INR)").fill("19.50");
-  await page.getByRole("button",{name:"Save entry"}).click();
-  await expect(page.getByText("Entry saved and included in posted totals.")).toBeVisible();
+  await page.getByRole("button",{name:"Submit for approval"}).click();
+  await expect(page.getByText("Entry submitted for finance approval. Pending amounts are not included in posted totals.")).toBeVisible();
   await expect(financeCategory).toHaveValue("");
   await expect(financePerson).toHaveValue("");
   await page.getByLabel("Entry type").selectOption("INCOME");
   await financeCategory.selectOption({label:"CI Revenue Category"});
-  await financePerson.selectOption({label:"CI Founder (ci-founder)"});
+  await financePerson.selectOption({label:"CI Employee (ci-employee)"});
   await page.getByLabel("Amount (INR)").fill("55.50");
-  await page.getByRole("button",{name:"Save entry"}).click();
-  await expect(page.getByText("Entry saved and included in posted totals.")).toBeVisible();
+  await page.getByRole("button",{name:"Submit for approval"}).click();
+  await expect(page.getByText("Entry submitted for finance approval. Pending amounts are not included in posted totals.")).toBeVisible();
   await expect(page.getByRole("button",{name:"Agency totals"})).toHaveCount(0);
   for(const width of [320,360,375,390,430,768,1024,1366,1440]){
     await page.setViewportSize({width,height:812});
