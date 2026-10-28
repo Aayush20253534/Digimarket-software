@@ -60,6 +60,7 @@ export default function FinancePage(){
   const [success,setSuccess]=useState("");
   const [kind,setKind]=useState<Kind>("EXPENSE");
   const [categoryId,setCategoryId]=useState("");
+  const [enteredById,setEnteredById]=useState("");
   const [amount,setAmount]=useState("");
   const [occurredOn,setOccurredOn]=useState(()=>new Date().toISOString().slice(0,10));
   const [method,setMethod]=useState<(typeof modes)[number]>("UPI");
@@ -70,7 +71,8 @@ export default function FinancePage(){
   const [categoryKind,setCategoryKind]=useState<Kind>("EXPENSE");
   const [categoryName,setCategoryName]=useState("");
   const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind),[categories,kind]);
-  useEffect(()=>{if(!selected.some(c=>c.id===categoryId))setCategoryId(selected[0]?.id??"");},[selected,categoryId]);
+  // An entry must start without a selected category.
+  useEffect(()=>{if(categoryId&&!selected.some(c=>c.id===categoryId))setCategoryId("");},[selected,categoryId]);
 
   const reload=useCallback(async()=>{
     const sequence=++reloadSequence.current;
@@ -106,7 +108,7 @@ export default function FinancePage(){
     return()=>{reloadSequence.current+=1;};
   },[reload]);
   useEffect(()=>{
-    if(!adminFinance)return;
+    if(!canCreate&&!adminFinance)return;
     let active=true;
     void request<Assignee[]>("/finance/assignees").then(users=>{
       if(active){setAssignees(users);setAssigneesError("");}
@@ -114,7 +116,7 @@ export default function FinancePage(){
       if(active)setAssigneesError(readable(e));
     });
     return()=>{active=false;};
-  },[adminFinance,request]);
+  },[adminFinance,canCreate,request]);
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
     if(!id||!entries.some(entry=>entry.id===id))return;
@@ -123,7 +125,9 @@ export default function FinancePage(){
   },[entries]);
 
   async function submit(e:FormEvent){
-    e.preventDefault();setBusy(true);setError("");setSuccess("");
+    e.preventDefault();
+    if(!categoryId||!enteredById){setError("Select a category and a person before saving this entry.");return;}
+    setBusy(true);setError("");setSuccess("");
     try{
       let receiptAssetId:string|null=null;
       if(receipt){
@@ -147,12 +151,13 @@ export default function FinancePage(){
       }
       setUploadStatus(isFounder?"Recording transaction…":"Submitting transaction for approval…");
       const saved=await request<{status:string}>("/finance/entries",{method:"POST",body:{
-        kind,categoryId,amount:amount.trim(),occurredOn,method,
+        kind,categoryId,enteredById,amount:amount.trim(),occurredOn,method,
         merchantOrSource:source.trim(),description:description.trim(),
         idempotencyKey:crypto.randomUUID(),receiptAssetId,
       }});
       setSuccess(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals.");
       setAmount("");setSource("");setDescription("");setReceipt(null);
+      setCategoryId("");setEnteredById("");
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
   }
@@ -270,11 +275,17 @@ export default function FinancePage(){
     <div className="aw-finance-panels grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       {canCreate&&<Card title="New income or expense" description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
         <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
-          <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" value={kind} onChange={e=>setKind(e.target.value as Kind)}>
+          <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" value={kind} onChange={e=>{setKind(e.target.value as Kind);setCategoryId("");}}>
             <option value="EXPENSE">Expense</option><option value="INCOME">Income</option></select></FormField>
           <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>setCategoryId(e.target.value)}>
-            {!selected.length&&<option value="">Create a category first</option>}
+            <option value="">{selected.length?"Select a category":"Create a category first"}</option>
             {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></FormField>
+          <FormField id="finance-person" label="Person"><select id="finance-person" className="field" required value={enteredById}
+            onChange={e=>setEnteredById(e.target.value)}>
+            <option value="">Select a person</option>
+            {assignees.map(user=><option key={user.id} value={user.id}>{user.displayName} ({user.loginId})</option>)}
+          </select></FormField>
+          {assigneesError&&<p className="sm:col-span-2 text-sm" role="alert">{assigneesError}</p>}
           <FormField id="finance-amount" label="Amount (INR)"><input id="finance-amount" className="field" inputMode="decimal" required
             pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" placeholder="1250.00"
             value={amount} onChange={e=>setAmount(e.target.value)}/></FormField>
@@ -294,7 +305,7 @@ export default function FinancePage(){
             {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
             {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
           </div>
-          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
+          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||!enteredById||!!assigneesError||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
             <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?"Save entry":"Submit for approval"}</button></div>
         </form>
       </Card>}
@@ -322,8 +333,17 @@ export default function FinancePage(){
         !entries.length?<Notice kind="error">The financial register could not be loaded. Saved entries have not been deleted. Retry Refresh.</Notice>:
         <div className="aw-finance-register-scroll" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
+            {adminFinance&&<th className="pb-3 pr-4">Actions</th>}
             {["Date","Type","Category","Source","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
           </tr></thead><tbody>{entries.map(row=><tr key={row.id} id={"finance-"+row.id}>
+            {adminFinance&&<td className="py-3 pr-4">
+              {row.status!=="CANCELLED"&&<div className="flex items-center gap-2">
+                <button type="button" className="btn-secondary text-xs" disabled={busy}
+                  onClick={()=>beginEntryEdit(row)} aria-label={"Edit "+row.kind.toLowerCase()+" "+row.id}>Edit</button>
+                <button type="button" className="btn-secondary text-xs" disabled={busy}
+                  onClick={()=>void deleteEntry(row)} aria-label={"Delete "+row.kind.toLowerCase()+" "+row.id}>Delete</button>
+              </div>}
+            </td>}
             <td className="py-3 pr-4">{row.occurredOn}</td>
             <td><span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>{row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>} {row.kind==="INCOME"?"Income":"Expense"}</span></td>
             <td className="py-3 pr-4">{row.category.name}</td>
@@ -338,12 +358,7 @@ export default function FinancePage(){
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
               <Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>
-              {adminFinance&&row.status!=="CANCELLED"&&<>
-                <button type="button" className="btn-secondary text-xs" disabled={busy}
-                  onClick={()=>beginEntryEdit(row)} aria-label={"Edit "+row.kind.toLowerCase()+" "+row.id}>Edit</button>
-                <button type="button" className="btn-secondary text-xs" disabled={busy}
-                  onClick={()=>void deleteEntry(row)} aria-label={"Delete "+row.kind.toLowerCase()+" "+row.id}>Delete</button>
-              </>}
+
             </div></td>
           </tr>)}</tbody></table></div>}
     </Card>
@@ -385,7 +400,7 @@ export default function FinancePage(){
             value={entryEdit.occurredOn} onChange={e=>setEntryEdit(v=>({...v,occurredOn:e.target.value}))}/></FormField>
           <FormField id="admin-expense-method" label="Payment method"><select id="admin-expense-method" className="field" value={entryEdit.method}
             onChange={e=>setEntryEdit(v=>({...v,method:e.target.value}))}>{modes.map(m=><option key={m} value={m}>{m}</option>)}</select></FormField>
-          <div className="sm:col-span-2"><FormField id="admin-expense-payee" label="Merchant / payee">
+          <div className="sm:col-span-2"><FormField id="admin-expense-payee" label={editingEntry.kind==="INCOME"?"Income source":"Merchant / payee"}>
             <input id="admin-expense-payee" className="field" maxLength={160} value={entryEdit.merchantOrSource}
               onChange={e=>setEntryEdit(v=>({...v,merchantOrSource:e.target.value}))}/></FormField></div>
           <div className="sm:col-span-2"><FormField id="admin-expense-desc" label="Notes"><textarea id="admin-expense-desc" className="field" maxLength={2000}

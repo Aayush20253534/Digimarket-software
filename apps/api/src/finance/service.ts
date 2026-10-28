@@ -115,9 +115,15 @@ export class FinanceService {
   }
 
   async assignees(actor:Principal){
-    this.administrator(actor);
+    const adminAllowed=actor.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&
+      actor.permissions.has("finance.category.manage")&&actor.permissions.has("finance.read.all");
+    if(!adminAllowed&&!actor.permissions.has("finance.entry.create"))throw forbidden();
+    // Admins and founders may allocate transactions to colleagues.
+    // Regular employees must explicitly select themselves; this is not a privilege escalation.
+    const canAssignOthers=adminAllowed||isFounder(actor);
     return this.db.user.findMany({
-      where:{organizationId:actor.organizationId,status:"ACTIVE"},
+      where:{organizationId:actor.organizationId,status:"ACTIVE",
+        ...(canAssignOthers?{}:{id:actor.userId})},
       orderBy:[{displayName:"asc"},{id:"asc"}],
       select:{id:true,displayName:true,loginId:true},take:1000,
     });
@@ -219,14 +225,21 @@ export class FinanceService {
     need(actor,"finance.entry.create");
     const founder=isFounder(actor);
     if(!founder)need(actor,"approvals.submit");
+    const enteredById=input.enteredById??actor.userId; // Legacy callers remain compatible.
+    const canAssignOthers=founder||(
+      actor.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&
+      actor.permissions.has("finance.category.manage")&&actor.permissions.has("finance.read.all"));
+    if(enteredById!==actor.userId&&!canAssignOthers)throw forbidden();
     const amount=new Prisma.Decimal(input.amount);
     if(!amount.isFinite()||amount.lte(0))throw invalid("Amount must be greater than zero");
-    const [category,policy,organization]=await Promise.all([
+    const [category,policy,organization,assignedUser]=await Promise.all([
       this.db.financialCategory.findFirst({where:{id:input.categoryId,organizationId:actor.organizationId,kind:input.kind,active:true}}),
       founder?Promise.resolve(null):this.db.approvalPolicy.findUnique({where:{organizationId_category:{organizationId:actor.organizationId,category:"FINANCE"}}}),
       this.db.organization.findUnique({where:{id:actor.organizationId},select:{defaultCurrency:true}}),
+      this.db.user.findFirst({where:{id:enteredById,organizationId:actor.organizationId,status:"ACTIVE"},select:{id:true}}),
     ]);
     if(!category)throw invalid("Select an active category belonging to this workspace and type");
+    if(!assignedUser)throw invalid("Select an active person in this organization");
     if(!founder&&(!policy?.active||!policy.approverRoleKeys.length))throw invalid("An administrator must activate a FINANCE approval policy");
     if(!organization||organization.defaultCurrency!=="INR")throw invalid("This finance module currently supports INR workspaces only");
     if(input.receiptAssetId){
@@ -250,7 +263,7 @@ export class FinanceService {
           ...(founder?{status:"APPROVED" as const,decidedAt:now}:{}),
         }});
         const entry=await tx.financialTransaction.create({data:{
-          organizationId:actor.organizationId,enteredById:actor.userId,
+          organizationId:actor.organizationId,enteredById,
           categoryId:category.id,approvalRequestId:approval.id,
           idempotencyKey:input.idempotencyKey,kind:input.kind,
           amount:amount.toFixed(4),currencyCode:organization.defaultCurrency,
@@ -267,7 +280,8 @@ export class FinanceService {
         }});
         await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
           action:founder?"finance.founder_posted":"finance.submitted",entityType:"FinancialTransaction",entityId:entry.id,
-          afterRedacted:{kind:entry.kind,status:entry.status,currency:entry.currencyCode}}});
+          afterRedacted:{kind:entry.kind,status:entry.status,currency:entry.currencyCode,
+            enteredById:entry.enteredById,submittedById:actor.userId}}});
         await tx.outboxEvent.create({data:{
           organizationId:actor.organizationId,eventKey:(founder?"finance.resolved.":"finance.submitted.")+entry.id,
           kind:founder?"finance.resolved":"finance.submitted",aggregateType:"FinancialTransaction",aggregateId:entry.id,

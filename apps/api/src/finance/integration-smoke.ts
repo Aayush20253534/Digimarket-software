@@ -45,7 +45,13 @@ try{
   assert.equal(financeEntryInputSchema.safeParse({...input,amount:"1e4"}).success,false);
   assert.equal(financeEntryInputSchema.safeParse({...input,amount:"-1"}).success,false);
   assert.equal(financeEntryInputSchema.safeParse({...input,amount:"0.00001"}).success,false);
-  const pending=await finance.submit(staff,input);
+  assert.equal(financeEntryInputSchema.safeParse({...input,enteredById:employee.id}).success,true);
+  assert.equal(financeEntryInputSchema.safeParse({...input,enteredById:""}).success,false);
+  await assert.rejects(()=>finance.submit(staff,{...input,enteredById:admin.id}),
+    (error:{status?:number})=>error.status===403);
+  await assert.rejects(()=>finance.submit(manager,{...input,enteredById:outsider.id}),
+    (error:{status?:number})=>error.status===422);
+  const pending=await finance.submit(staff,{...input,enteredById:employee.id});
   assert.equal(pending.status,"PENDING");
   assert.equal(pending.amount,"150.2545");
   await assert.rejects(()=>finance.submit(staff,input),(error:{status?:number})=>error.status===409);
@@ -204,7 +210,9 @@ try{
   // Only finance administrators may enumerate active colleagues or transfer an expense.
   assert.ok((await finance.assignees(manager)).some(x=>x.id===employee.id));
   assert.equal((await finance.assignees(manager)).some(x=>x.id===outsider.id),false);
-  await assert.rejects(()=>finance.assignees(staff),(error:{status?:number})=>error.status===403);
+  assert.deepEqual((await finance.assignees(staff)).map(x=>x.id),[employee.id]);
+  const cannotAccess=principal(employee.id,org.id,["EMPLOYEE"],["finance.entry.read.own"]);
+  await assert.rejects(()=>finance.assignees(cannotAccess),(error:{status?:number})=>error.status===403);
   const disabled=await db.user.create({data:{organizationId:org.id,loginId:"fin-disabled",
     displayName:"Disabled member",status:"DISABLED"}});
   assert.equal((await finance.assignees(manager)).some(x=>x.id===disabled.id),false);
@@ -275,8 +283,11 @@ try{
   const fIncome=await db.financialCategory.create({data:{
     organizationId:directOrg.id,kind:"INCOME",name:"Founder income",normalizedName:"founder income",
   }});
-  const directInput={kind:"EXPENSE" as const,categoryId:fExpense.id,amount:"21.0000",
+  const directInput={kind:"EXPENSE" as const,categoryId:fExpense.id,enteredById:founderUser.id,amount:"21.0000",
     occurredOn:"2026-10-19",method:"CASH" as const,idempotencyKey:randomUUID()};
+  assert.equal((await finance.assignees(founder)).length,2);
+  await assert.rejects(()=>finance.submit(founder,{...directInput,enteredById:outsider.id}),
+    (error:{status?:number})=>error.status===422);
   const postedExpense=await finance.submit(founder,directInput);
   assert.equal(postedExpense.status,"POSTED");assert.ok(postedExpense.postedAt);
   const founderPostedIncome=await finance.submit(founder,{...directInput,kind:"INCOME",categoryId:fIncome.id,
@@ -290,7 +301,7 @@ try{
     organizationId:directOrg.id,category:"FINANCE",
   }}})).active,false);
   await assert.rejects(()=>finance.submit(regular,{
-    ...directInput,idempotencyKey:randomUUID(),
+    ...directInput,enteredById:newStaff.id,idempotencyKey:randomUUID(),
   }),(e:{status?:number})=>e.status===422);
   await assert.rejects(()=>finance.submit(founder,directInput),(e:{status?:number})=>e.status===409);
   assert.equal((await finance.entries(founder,"mine")).length,2);
@@ -298,7 +309,7 @@ try{
   const secondFounder=principal(newStaff.id,directOrg.id,["FOUNDER"],[
     "finance.entry.create","finance.entry.read.own","finance.read.all",
   ]);
-  await finance.submit(secondFounder,{...directInput,occurredOn:"2026-10-20",
+  await finance.submit(secondFounder,{...directInput,enteredById:newStaff.id,occurredOn:"2026-10-20",
     amount:"10.2500",idempotencyKey:randomUUID()});
   await finance.submit(founder,{...directInput,occurredOn:"2026-09-30",
     amount:"20.7500",idempotencyKey:randomUUID()});
@@ -341,5 +352,10 @@ try{
   assert.ok(scopedCsv.csv.includes("10.2500"));
   assert.equal(financeBreakdownQuerySchema.safeParse({...dailyPeriod,day:"2026-11-01"}).success,false);
   assert.equal(financeBreakdownQuerySchema.safeParse({...dailyPeriod,personId:"not-uuid"}).success,false);
+  const assigned=await finance.submit(founder,{...directInput,enteredById:newStaff.id,amount:"7.0000",
+    occurredOn:"2026-11-01",idempotencyKey:randomUUID()});
+  assert.equal(assigned.enteredById,newStaff.id);
+  assert.equal((await db.approvalRequest.findUniqueOrThrow({where:{id:assigned.approvalRequestId}})).requesterId,founderUser.id);
+  assert.equal((await finance.entries(secondFounder,"mine")).some(entry=>entry.id===assigned.id),true);
   console.info("Module 6 PASS: admin category rename/unused delete/referenced archive, other-user expense edits/cancellation, audit and tenant isolation.");
 }finally{await db.$disconnect();}

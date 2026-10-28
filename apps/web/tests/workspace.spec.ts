@@ -217,6 +217,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Category name",{exact:true}).last().fill("CI Admin Category Updated");
   await page.getByRole("button",{name:"Save changes"}).click();
   await expect(page.getByText("CI Admin Category Updated",{exact:true}).last()).toBeVisible();
+  await page.getByLabel("Type",{exact:true}).selectOption("INCOME");
+  await page.getByLabel("Category name",{exact:true}).fill("CI Revenue Category");
+  await page.getByRole("button",{name:"Add category"}).click();
+  await expect(page.getByText("CI Revenue Category",{exact:true}).last()).toBeVisible();
   await expect(page.getByRole("link",{name:"Invoices & payments"})).toHaveCount(0);
   await page.goto("/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval policy configuration"})).toBeVisible();
@@ -829,6 +833,26 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
   await page.goto("/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
+  const financeCategory=page.getByLabel("Category",{exact:true});
+  const financePerson=page.getByLabel("Person",{exact:true});
+  await expect(financeCategory).toHaveValue("");
+  await expect(financePerson).toHaveValue("");
+  await expect(page.getByRole("button",{name:"Submit for approval"})).toBeDisabled();
+  await expect(financePerson.getByRole("option",{name:"CI Employee (ci-employee)"})).toBeAttached();
+  await expect(financePerson.locator("option")).toHaveCount(2); // Placeholder + self only.
+  await financeCategory.selectOption({label:"CI Admin Category Updated"});
+  await financePerson.selectOption({label:"CI Employee (ci-employee)"});
+  await page.getByLabel("Amount (INR)").fill("19.50");
+  await page.getByRole("button",{name:"Submit for approval"}).click();
+  await expect(page.getByText("Entry submitted for finance approval. Pending amounts are not included in posted totals.")).toBeVisible();
+  await expect(financeCategory).toHaveValue("");
+  await expect(financePerson).toHaveValue("");
+  await page.getByLabel("Entry type").selectOption("INCOME");
+  await financeCategory.selectOption({label:"CI Revenue Category"});
+  await financePerson.selectOption({label:"CI Employee (ci-employee)"});
+  await page.getByLabel("Amount (INR)").fill("55.50");
+  await page.getByRole("button",{name:"Submit for approval"}).click();
+  await expect(page.getByText("Entry submitted for finance approval. Pending amounts are not included in posted totals.")).toBeVisible();
   await expect(page.getByRole("button",{name:"Agency totals"})).toHaveCount(0);
   for(const width of [320,360,375,390,430,768,1024,1366,1440]){
     await page.setViewportSize({width,height:812});
@@ -869,6 +893,28 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
         .toBeLessThanOrEqual(width+1);
     }
   }
+  // Admin controls are visible at the start of the register and can edit both entry types.
+  await page.setViewportSize({width:1366,height:768});
+  await page.getByRole("button",{name:"Sign out"}).click();
+  await login(page,"admin-e2e",UPDATED);
+  await expect(page).toHaveURL(/\/app\/dashboard/);
+  await page.goto("/app/finance");
+  const incomeRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Revenue Category"});
+  const expenseRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Admin Category Updated"});
+  await expect(incomeRow.getByRole("button",{name:/Edit income/})).toBeVisible();
+  await expect(expenseRow.getByRole("button",{name:/Edit expense/})).toBeVisible();
+  await incomeRow.getByRole("button",{name:/Edit income/}).click();
+  const incomeEdit=page.getByRole("dialog",{name:"Edit income"});
+  await expect(incomeEdit).toBeVisible();
+  await incomeEdit.getByLabel("Amount (INR)").fill("56.00");
+  await incomeEdit.getByRole("button",{name:"Save income"}).click();
+  await expect(page.getByText("Finance entry updated and assigned user saved with an audit record.")).toBeVisible();
+  await expenseRow.getByRole("button",{name:/Edit expense/}).click();
+  const expenseEdit=page.getByRole("dialog",{name:"Edit expense"});
+  await expect(expenseEdit).toBeVisible();
+  await expenseEdit.getByLabel("Amount (INR)").fill("20.00");
+  await expenseEdit.getByRole("button",{name:"Save expense"}).click();
+  await expect(page.getByText("Finance entry updated and assigned user saved with an audit record.")).toBeVisible();
 });
 test("unauthenticated dashboard access is denied",async({page})=>{
   await page.goto("/app/dashboard");await expect(page).toHaveURL(/\/login/);
