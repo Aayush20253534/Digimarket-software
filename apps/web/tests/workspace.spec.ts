@@ -299,14 +299,14 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await finishPasswordRotation(page,founderPassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
-  await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
+  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   // Finance is a top-level sidebar section immediately below Workspace.
   const founderNav=page.getByRole("navigation",{name:"Workspace navigation"});
   await expect(founderNav.getByRole("link",{name:"Income & expenses"})).toBeVisible();
   const founderSections=await founderNav.locator(".aw-nav-group").allTextContents();
   expect(founderSections.indexOf("Finance"),"Finance should follow Workspace in the sidebar")
     .toBe(founderSections.indexOf("Workspace")+1);
-  await expect(page.getByTestId("personal-pending")).toHaveCSS("background-color","rgb(32, 22, 47)");
+  await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await page.goto("/app/notes");
   // The studio must reach the bottom of the visible desktop viewport at 75% zoom.
   const notesBottom=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect().bottom);
@@ -721,60 +721,19 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const employeePassword="CI-Employee-"+Date.now().toString(36)+"#2026";
   await finishPasswordRotation(page,employeePassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
-  await expect(page.getByTestId("personal-task-dashboard")).toBeVisible();
-  await expect(page.getByTestId("personal-completed").getByText("Completed within the last 24 hours.")).toBeVisible();
+  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await expect(page.getByRole("link",{name:"Task history",exact:true}).first()).toBeVisible();
   await page.goto("/app/task-history");
   await expect(page.getByTestId("task-history-page")).toBeVisible();
   await expect(page.getByLabel("Task history scope")).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Tasks",exact:true}).last()).toBeVisible();
   await page.goto("/app/dashboard");
-  // Paired grid rows keep Pending/In Process and Overdue/Completed equal-height,
-  // while preserving two desktop columns and compact mobile stacking.
+  // Overview is now client-delivery based. Task-status cards remain only in the delivery module.
   await page.setViewportSize({width:1366,height:812});
-  const columns=page.locator(".aw-personal-task-column");
-  await expect(columns).toHaveCount(2);
-  await expect(columns.nth(0).locator('[data-testid="personal-pending"]')).toBeVisible();
-  await expect(columns.nth(0).locator('[data-testid="personal-overdue"]')).toBeVisible();
-  await expect(columns.nth(1).locator('[data-testid="personal-in-process"]')).toBeVisible();
-  await expect(columns.nth(1).locator('[data-testid="personal-completed"]')).toBeVisible();
-  // Every overview card keeps the identical purple body; only borders and glows differ.
-  const sharedCardBackground=await page.getByTestId("personal-pending").evaluate(el=>getComputedStyle(el).backgroundImage);
-  expect(sharedCardBackground).toContain("linear-gradient");
-  for(const [section,outline,halo] of [
-    ["personal-pending","rgb(255, 54, 94)","255, 54, 94"],
-    ["personal-in-process","rgb(255, 140, 36)","255, 140, 36"],
-    ["personal-completed","rgb(43, 255, 118)","43, 255, 118"],
-    ["personal-overdue","rgb(5, 3, 8)","224, 217, 235"],
-  ] as const){
-    const card=page.getByTestId(section);
-    await expect(card).toHaveCSS("background-color","rgb(32, 22, 47)");
-    await expect(card).toHaveCSS("border-top-color",outline);
-    // Desktop workspace uses CSS zoom, so computed pixel widths differ from stylesheet values.
-    const borderWidth=await card.evaluate(el=>Number.parseFloat(getComputedStyle(el).borderTopWidth));
-    expect(borderWidth,"Each task card needs a visible colored outline").toBeGreaterThan(0);
-    const effect=await card.evaluate(el=>{
-      const style=getComputedStyle(el);
-      return {background:style.backgroundImage,shadow:style.boxShadow};
-    });
-    expect(effect.background,"All four cards should use the same brand-purple gradient").toBe(sharedCardBackground);
-    // Glow lengths are scaled by the browser's workspace zoom as well.
-    expect(effect.shadow,"Every status border needs a visible outer glow").not.toBe("none");
-    expect(effect.shadow.split("rgba(").length-1,"The shadow should include three outer glow layers").toBeGreaterThanOrEqual(3);
-    expect(effect.shadow,"The outer halo should correspond to the status").toContain(halo);
-    await expect(card.locator("h2")).toHaveCSS("color","rgb(255, 255, 255)");
-  }
-  const taskRowGeometry=await page.evaluate(()=>{
-    const bounds=(id:string)=>document.querySelector<HTMLElement>('[data-testid="'+id+'"]')!.getBoundingClientRect();
-    const pending=bounds("personal-pending"),inProcess=bounds("personal-in-process");
-    const overdue=bounds("personal-overdue"),completed=bounds("personal-completed");
-    return {firstRowHeight:Math.abs(pending.height-inProcess.height),
-      secondRowHeight:Math.abs(overdue.height-completed.height),
-      secondRowTop:Math.abs(overdue.top-completed.top)};
-  });
-  expect(taskRowGeometry.firstRowHeight,"Pending and In Process should share a row height").toBeLessThanOrEqual(2);
-  expect(taskRowGeometry.secondRowHeight,"Overdue and Completed should have equal heights").toBeLessThanOrEqual(2);
-  expect(taskRowGeometry.secondRowTop,"Overdue and Completed should start at the same height").toBeLessThanOrEqual(2);
+  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await expect(page.locator('[data-testid="personal-pending"]')).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"All clients"})).toBeVisible();
   // Non-admin Task Register rows use the same four-color palette.
   await page.goto("/app/tasks");
   const taskCardStyles=await page.locator('[data-aw-module="tasks"]').evaluate(container=>{
@@ -796,39 +755,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     {background:"rgb(56, 50, 61)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
   ]);
   await page.goto("/app/dashboard");
-  // Use a temporary index when this test account has no active task yet.
-  // This verifies the actual applied CSS, not just the stylesheet text.
-  for(const [section,background] of [
-    ["personal-pending","rgb(255, 255, 0)"],
-    ["personal-in-process","rgb(255, 0, 0)"],
-    ["personal-completed","rgb(0, 255, 0)"],
-    ["personal-overdue","rgb(0, 0, 0)"],
-  ] as const){
-    const numberStyles=await page.getByTestId(section).evaluate(element=>{
-      const index=document.createElement("span");
-      index.className="aw-personal-task-index";
-      index.textContent="1";
-      element.appendChild(index);
-      const style=getComputedStyle(index);
-      const colors={color:style.color,background:style.backgroundColor,border:style.borderTopColor};
-      index.remove();
-      return colors;
-    });
-    expect(numberStyles).toEqual({
-      color:"rgb(255, 255, 255)",background,border:background,
-    });
-  }
-  const cardGeometry=await page.evaluate(()=>{
-    const box=(testid:string)=>document.querySelector<HTMLElement>('[data-testid="'+testid+'"]')!.getBoundingClientRect();
-    const pending=box("personal-pending"),inProcess=box("personal-in-process"),completed=box("personal-completed");
-    return {rightAligned:Math.abs(completed.left-inProcess.left),
-      completedGap:completed.top-inProcess.bottom,
-      pendingLeft:pending.left,progressLeft:inProcess.left};
-  });
-  expect(cardGeometry.rightAligned,"Completed must share the right column with In Process").toBeLessThanOrEqual(2);
-  expect(cardGeometry.completedGap,"Completed should sit directly under In Process").toBeGreaterThanOrEqual(0);
-  expect(cardGeometry.completedGap,"No empty grid-row gap before Completed").toBeLessThanOrEqual(25);
-  expect(cardGeometry.progressLeft).toBeGreaterThan(cardGeometry.pendingLeft);
+  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await expect(page.locator('[data-testid="personal-completed"]')).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Team & accounts"})).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
   await page.goto("/app/finance");

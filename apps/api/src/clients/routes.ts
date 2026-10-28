@@ -31,6 +31,10 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.status(405).json({error:{code:"LEAD_APPROVAL_REQUIRED",
      message:"Approve a lead in Leads CRM to create a client"}});
  });
+ app.get(root+"/deliveries",authenticated,async(_req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.deliverySummary(actor(res))});
+ });
  app.get(root+"/:id",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.detail(actor(res),parse(id,req.params.id))});
@@ -45,6 +49,10 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  app.post(root+"/:id/services",authenticated,async(req,res)=>{
    res.status(201).json({data:await svc.addService(actor(res),parse(id,req.params.id),
      parse(clientServiceSchema,req.body))});
+ });
+ app.put(root+"/:id/services/:serviceId",authenticated,async(req,res)=>{
+   res.json({data:await svc.updateService(actor(res),parse(id,req.params.id),
+     parse(id,req.params.serviceId),parse(clientServiceSchema,req.body))});
  });
  app.post("/api/v1/leads/:id/convert",authenticated,async(_req,res)=>{
    res.status(405).json({error:{code:"AUTO_CONVERSION_ONLY",

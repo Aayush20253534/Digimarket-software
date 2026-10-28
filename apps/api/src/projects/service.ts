@@ -74,12 +74,43 @@ export class ProjectsService {
     need(a,"projects.create");need(a,"clients.read");need(a,"projects.read");
     const client=await this.db.client.findFirst({where:{id:input.clientId,organizationId:a.organizationId,status:{not:"ARCHIVED"}}});
     if(!client)throw missing();
+    const template=input.template??"NONE";
+    const activeServices=template==="SOCIAL_MONTHLY"?await this.db.clientService.findMany({
+      where:{clientId:input.clientId,status:"ACTIVE"},select:{name:true,monthlyTarget:true},
+    }):[];
+    const target=(pattern:RegExp,fallback:number)=>{
+      const match=activeServices.find(service=>pattern.test(service.name));
+      return match?.monthlyTarget??fallback;
+    };
+    const plan=template==="SOCIAL_MONTHLY"?[
+      {title:"Reel",quantity:target(/reels?/i,8)},
+      {title:"Post",quantity:target(/posts?/i,8)},
+    ]:template==="WEBSITE"?[
+      {title:"Requirements and content",quantity:1},{title:"Design approval",quantity:1},
+      {title:"Website development",quantity:1},{title:"Testing and launch",quantity:1},
+    ]:template==="SEO"?[
+      {title:"SEO, AEO and GEO audit",quantity:1},{title:"On-page optimization",quantity:1},
+      {title:"Content and schema improvements",quantity:1},{title:"Monthly performance report",quantity:1},
+    ]:template==="PAID_ADS"?[
+      {title:"Campaign setup",quantity:1},{title:"Creative and copy",quantity:1},
+      {title:"Optimization review",quantity:1},{title:"Monthly campaign report",quantity:1},
+    ]:[];
     return this.db.$transaction(async tx=>{
       const result=await tx.project.create({data:{
         organizationId:a.organizationId,clientId:input.clientId,createdById:a.userId,
         name:input.name,description:text(input.description),startOn:date(input.startOn),dueOn:date(input.dueOn),
         members:{create:{userId:a.userId,role:"MANAGER"}},
       }});
+      if(plan.length){
+        const milestone=await tx.projectMilestone.create({data:{
+          projectId:result.id,title:"Delivery checklist",dueOn:date(input.dueOn),
+        }});
+        const deliverables=plan.flatMap(item=>Array.from({length:item.quantity},(_,index)=>({
+          projectId:result.id,milestoneId:milestone.id,
+          title:item.quantity===1?item.title:item.title+" "+String(index+1).padStart(2,"0"),
+        })));
+        await tx.projectDeliverable.createMany({data:deliverables});
+      }
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,action:"projects.created",entityType:"Project",entityId:result.id}});
       await tx.outboxEvent.create({data:{organizationId:a.organizationId,eventKey:"project.created."+result.id,
         kind:"projects.created",aggregateType:"Project",aggregateId:result.id,payloadMinimal:{projectId:result.id,clientId:result.clientId}}});
