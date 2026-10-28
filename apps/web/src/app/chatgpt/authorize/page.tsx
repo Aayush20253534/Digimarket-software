@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/api";
 import { Card, Notice, PageHeader, Spinner } from "@/components/ui";
 
 const paramNames = ["client_id", "redirect_uri", "response_type", "code_challenge",
-  "code_challenge_method", "scope", "state"];
+  "code_challenge_method", "scope", "resource", "state"];
 const errorText = (e: unknown) => e instanceof ApiError || e instanceof Error ?
   e.message : "Could not authorize the connection";
 
