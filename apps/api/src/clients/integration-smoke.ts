@@ -57,10 +57,14 @@ try{
  const service=await clients.addService(team,client.id,{name:"SEO",description:"Search",status:"ACTIVE",monthlyTarget:4});
  assert.equal(service.name,"SEO");
  assert.equal(service.monthlyTarget,4);
+ const modified=await clients.updateService(team,client.id,service.id,{name:"SEO",description:"Search optimization",status:"ACTIVE",monthlyTarget:6});
+ assert.equal(modified.monthlyTarget,6);
+ await assert.rejects(()=>clients.updateService(external,client.id,service.id,{name:"Hijack",status:"ACTIVE"}),fail(404));
+ await assert.rejects(()=>clients.updateService(team,client.id,outsider.id,{name:"Unknown",status:"ACTIVE"}),fail(404));
  const delivery=await clients.deliverySummary(team);
  assert.equal(delivery.items.length,1);
  assert.equal(delivery.items[0].businessName,"Agency Cafe Updated");
- assert.equal(delivery.items[0].targets[0].monthlyTarget,4);
+ assert.equal(delivery.items[0].targets[0].monthlyTarget,6);
  assert.equal(delivery.items[0].totalDeliverables,0);
  assert.equal((await clients.deliverySummary(external)).items.length,0);
  await assert.rejects(()=>clients.deliverySummary(actor(member.id,org.id,[])),fail(403));
