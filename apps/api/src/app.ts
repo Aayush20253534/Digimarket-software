@@ -22,6 +22,8 @@ import { registerFinanceRoutes } from "./finance/routes";
 import { registerApprovalRoutes } from "./approvals/routes";
 import { registerAuthRoutes } from "./auth/routes";
 import type { AuthService } from "./auth/service";
+import { registerChatGptOAuthRoutes } from "./chatgpt/oauth";
+import { registerChatGptMcpRoutes } from "./chatgpt/mcp";
 
 export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], authService?: AuthService) {
   const app = express();
@@ -130,6 +132,8 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
         next();
       }catch(error){next(error);}
     });
+    registerChatGptOAuthRoutes(app, authService);
+    registerChatGptMcpRoutes(app, authService);
     registerNotesRoutes(app, authService);
     registerWorkspaceMessages(app, authService);
     registerInsightsRoutes(app, authService);
