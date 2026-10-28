@@ -91,16 +91,16 @@ const clientInput = clientListQuerySchema.pick({ q: true, status: true, cursor: 
   .extend({ includePhone: z.boolean().optional() }).strict();
 const meetingInput = span.safeExtend({ cursor: id.optional(),
   limit: z.number().int().min(1).max(100).default(20) });
-const createLeadInput = leadCreateSchema.and(writeBase);
+const createLeadInput = leadCreateSchema.extend(writeBase.shape);
 const updateLeadInput = leadUpdateSchema.pick({
   version: true, businessName: true, contactName: true, businessType: true, location: true,
-}).and(z.object({ id })).and(writeBase);
+}).extend({ id, ...writeBase.shape });
 const changeStatus = z.strictObject({
   id, version: z.number().int().positive(), status: leadStageSchema,
   followUpOn: iso.optional(), meetingOn: iso.optional(),
   meetingTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
   confirmClientConversion: z.boolean().optional(),
-}).and(writeBase);
+}).extend(writeBase.shape);
 const scheduleMeeting = z.strictObject({ id, version: z.number().int().positive(),
   meetingOn: iso, meetingTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/) }).and(writeBase);
 const scheduleFollowup = z.strictObject({ id, version: z.number().int().positive(), followUpOn: iso }).and(writeBase);
