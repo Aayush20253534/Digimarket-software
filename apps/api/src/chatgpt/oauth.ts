@@ -44,20 +44,22 @@ const approveInput = z.strictObject({
   response_type: z.literal("code"), code_challenge: z.string().regex(/^[A-Za-z0-9_-]{43,128}$/),
   code_challenge_method: z.literal("S256"),
   scope: z.string().max(500).default("crm.leads.read"),
+  resource: z.url().max(1000).optional(),
   state: z.string().max(1024).optional(),
 });
-const registration = z.strictObject({
+const registration = z.object({
   redirect_uris: z.array(z.url().max(1000)).min(1).max(5),
   client_name: z.string().max(120).optional(),
   token_endpoint_auth_method: z.literal("none").optional(),
   grant_types: z.array(z.string()).optional(),
   response_types: z.array(z.string()).optional(),
-});
+}).passthrough();
 const tokenRequest = z.object({
   grant_type: z.enum(["authorization_code", "refresh_token"]),
   client_id: z.string().min(1).max(120),
   code: z.string().optional(), code_verifier: z.string().optional(),
   redirect_uri: z.string().optional(), refresh_token: z.string().optional(),
+  resource: z.string().max(1000).optional(),
 }).passthrough();
 export function checked<T>(schema: z.ZodType<T>, data: unknown): T {
   const result = schema.safeParse(data);
@@ -99,7 +101,7 @@ export async function authenticateChatGpt(auth: AuthService, bearer: string): Pr
   const grant = await auth.database.chatGptGrant.findUnique({
     where: { accessTokenHash: hashSecret(bearer) },
   });
-  if (!grant || grant.revokedAt || grant.accessExpiresAt <= now || grant.refreshExpiresAt <= now) throw unauthorized();
+  if (!grant || (configuredOrigins()?.api + "/api/v1/integrations/chatgpt/mcp") !== grant.resource || grant.revokedAt || grant.accessExpiresAt <= now || grant.refreshExpiresAt <= now) throw unauthorized();
   const p = await liveFounder(auth, grant.userId, grant.organizationId);
   const approved = new Set(allowedScopes(p));
   const scopes = new Set(grant.scopes.filter(s => approved.has(s as CrmScope)));
@@ -119,6 +121,7 @@ function oauthTokens(access: string, refresh: string, scopes: string[]) {
 export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
   const origin = configuredOrigins();
   const base = "/api/v1/integrations/chatgpt";
+  const resource = origin?.api + base + "/mcp";
   // Disabled by default. Never make a publicly usable OAuth endpoint without exact HTTPS origins.
   if (!origin) return;
   const limit = rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: "draft-8",
@@ -174,6 +177,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
   };
   app.get(base + "/oauth/authorize", async (req, res) => {
     const data = checked(approveInput, req.query);
+    if (data.resource && data.resource !== resource) return oauthFailure(res, "invalid_target");
     if (!await validClient(data.client_id, data.redirect_uri)) return oauthFailure(res, "invalid_client");
     const search = new URLSearchParams(Object.entries(data).filter((entry): entry is [string, string] => typeof entry[1] === "string")).toString();
     res.set("Cache-Control", "no-store").redirect(302,
@@ -183,6 +187,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
     const p = managed(res);
     requireFounder(p);
     const input = checked(approveInput, req.body);
+    if (input.resource && input.resource !== resource) throw forbidden();
     if (!await validClient(input.client_id, input.redirect_uri)) throw forbidden();
     const requested = safeScope(input.scope);
     if (!requested.length || requested.join(" ") !== input.scope.trim()) throw forbidden();
@@ -192,7 +197,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
     await auth.database.chatGptOAuthCode.create({ data: {
       codeHash: hashSecret(code), clientId: input.client_id, redirectUri: input.redirect_uri,
       organizationId: p.organizationId, userId: p.userId, scopes: requested,
-      codeChallenge: input.code_challenge, expiresAt: new Date(Date.now() + authCodeLife),
+      codeChallenge: input.code_challenge, resource: resource!, expiresAt: new Date(Date.now() + authCodeLife),
     } });
     const redirect = new URL(input.redirect_uri);
     redirect.searchParams.set("code", code);
@@ -204,12 +209,13 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
   });
   app.post(base + "/oauth/token", express.urlencoded({ extended: false, limit: "8kb" }), async (req, res) => {
     const input = checked(tokenRequest, req.body);
+    if (input.resource && input.resource !== resource) return oauthFailure(res, "invalid_target");
     if (input.grant_type === "authorization_code") {
       if (!input.code || !input.code_verifier || !input.redirect_uri ||
         !/^[A-Za-z0-9._~-]{43,128}$/.test(input.code_verifier)) return oauthFailure(res, "invalid_grant");
       const codeHash = hashSecret(input.code);
       const code = await auth.database.chatGptOAuthCode.findUnique({ where: { codeHash } });
-      if (!code || code.clientId !== input.client_id || code.redirectUri !== input.redirect_uri ||
+      if (!code || code.resource !== resource || code.clientId !== input.client_id || code.redirectUri !== input.redirect_uri ||
         code.usedAt || code.expiresAt <= new Date()) return oauthFailure(res, "invalid_grant");
       const calculated = createHash("sha256").update(input.code_verifier).digest("base64url");
       const aa = Buffer.from(calculated), bb = Buffer.from(code.codeChallenge);
@@ -224,7 +230,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
       const access = randomSecret(), refresh = randomSecret(), now = Date.now();
       await auth.database.chatGptGrant.create({ data: {
         clientId: code.clientId, userId: code.userId, organizationId: code.organizationId,
-        scopes: code.scopes, accessTokenHash: hashSecret(access), refreshTokenHash: hashSecret(refresh),
+        scopes: code.scopes, resource: code.resource, accessTokenHash: hashSecret(access), refreshTokenHash: hashSecret(refresh),
         accessExpiresAt: new Date(now + accessLife), refreshExpiresAt: new Date(now + refreshLife),
       } });
       return res.set("Cache-Control", "no-store").json(oauthTokens(access, refresh, code.scopes));
@@ -232,7 +238,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
     if (!input.refresh_token) return oauthFailure(res, "invalid_grant");
     const oldHash = hashSecret(input.refresh_token);
     const grant = await auth.database.chatGptGrant.findUnique({ where: { refreshTokenHash: oldHash } });
-    if (!grant || grant.clientId !== input.client_id || grant.revokedAt ||
+    if (!grant || grant.resource !== resource || grant.clientId !== input.client_id || grant.revokedAt ||
       grant.refreshExpiresAt <= new Date()) return oauthFailure(res, "invalid_grant");
     try { await liveFounder(auth, grant.userId, grant.organizationId); }
     catch { return oauthFailure(res, "invalid_grant"); }
