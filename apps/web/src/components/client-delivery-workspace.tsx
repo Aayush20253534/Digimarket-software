@@ -55,7 +55,11 @@ export function ClientDeliveryWorkspace({clientId,canCreate}:{clientId:string;ca
             <p className="font-semibold">{project.name}</p>
             <p className="text-xs text-slate-600">{project.status.replaceAll("_"," ")} · {project._count?.deliverables??0} deliverables{project.dueOn?" · Due "+project.dueOn.slice(0,10):""}</p>
           </div>
-          <Link href={"/app/projects?focus="+encodeURIComponent(project.id)} className="btn-secondary text-xs">Open <ArrowRight size={14}/></Link>
+          <div className="flex flex-wrap gap-2">
+            {session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&session.identity.permissions.includes("tasks.create")&&
+              <Link href={"/app/tasks?projectId="+encodeURIComponent(project.id)} className="btn-secondary text-xs">Assign task</Link>}
+            <Link href={"/app/projects?focus="+encodeURIComponent(project.id)} className="btn-secondary text-xs">Open <ArrowRight size={14}/></Link>
+          </div>
         </div>
       </div>)}
       {loaded&&!projects.length&&<p className="text-sm text-slate-500">No projects yet. Create the first service-delivery project below.</p>}
