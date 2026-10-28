@@ -135,5 +135,19 @@ try{
   assert.equal((await db.approvalPolicy.findUniqueOrThrow({where:{
     organizationId_category:{organizationId:founderOrg.id,category:"DELIVERABLE"},
   }})).active,false);
+  // Monthly social templates initialize real deliverables from client commitments.
+  await db.clientService.createMany({data:[
+    {clientId:fClient.id,name:"Reels",monthlyTarget:8,normalizedName:"reels"},
+    {clientId:fClient.id,name:"Posts",monthlyTarget:8,normalizedName:"posts"},
+  ]});
+  const monthly=await projects.create(founder,{clientId:fClient.id,name:"Monthly content",
+    template:"SOCIAL_MONTHLY",startOn:"2026-10-29",dueOn:"2026-11-28"});
+  const detail=await projects.detail(founder,monthly.id);
+  assert.equal(detail.milestones.length,1);
+  assert.equal(detail.deliverables.length,16);
+  assert.equal(detail.deliverables.filter(x=>x.title.startsWith("Reel")).length,8);
+  assert.equal(detail.deliverables.filter(x=>x.title.startsWith("Post")).length,8);
+  const seoProject=await projects.create(founder,{clientId:fClient.id,name:"SEO delivery",template:"SEO"});
+  assert.equal((await projects.detail(founder,seoProject.id)).deliverables.length,4);
   console.info("Module 10 PASS: project/client isolation, membership, roles, milestones, asset scope, review rejection/revision/approval, atomic states, versions, audit/outbox.");
 }finally{await db.$disconnect();}
