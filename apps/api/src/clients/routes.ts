@@ -31,6 +31,10 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.status(405).json({error:{code:"LEAD_APPROVAL_REQUIRED",
      message:"Approve a lead in Leads CRM to create a client"}});
  });
+ app.get(root+"/deliveries",authenticated,async(_req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.deliverySummary(actor(res))});
+ });
  app.get(root+"/:id",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.detail(actor(res),parse(id,req.params.id))});
