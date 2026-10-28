@@ -33,8 +33,9 @@ export function trustedChatGptRedirect(uri: string) {
   try {
     const url = new URL(uri);
     return url.protocol === "https:" && !url.username && !url.password && !url.hash &&
-      ["chatgpt.com", "chat.openai.com", "auth.openai.com"].includes(url.hostname) &&
-      url.port === "" && uri.length <= 1000;
+      url.hostname === "chatgpt.com" && url.port === "" && uri.length <= 1000 &&
+      !url.search && (url.pathname === "/connector_platform_oauth_redirect" ||
+      /^\/connector\/oauth\/[A-Za-z0-9_-]{8,160}$/.test(url.pathname));
   } catch { return false; }
 }
 export const safeScope = (scope: string) => scope.split(" ").filter((s): s is CrmScope =>
