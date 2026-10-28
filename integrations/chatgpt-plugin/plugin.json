@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "amplifyworld-crm",
+  "version": "0.1.0",
+  "description": "Private, OAuth-secured access to authorized AmplifyWorld CRM leads, clients, meetings and follow-ups.",
+  "mcpServers": "./mcp.json",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "AmplifyWorld CRM",
+        "shortDescription": "Secure CRM insights and approved lead actions.",
+        "developerName": "AmplifyWorld",
+        "category": "Business",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "brandColor": "#A82CD2",
+        "defaultPrompt": [
+          "Show me today's AmplifyWorld meetings.",
+          "Summarize this week's CRM lead conversion rate."
+        ]
+      }
+    }
+  }
+}
