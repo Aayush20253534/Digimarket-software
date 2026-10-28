@@ -40,12 +40,30 @@ try{
  const updated=await clients.update(team,client.id,{version:1,businessName:"Agency Cafe Updated",businessType:"Hospitality"});
  assert.equal(updated.version,2);
  assert.equal(updated.businessType,"Hospitality");
+ const agreement=await clients.update(team,client.id,{
+   version:2,contractStartOn:"2026-10-29",contractEndOn:"2026-11-28",
+   monthlyFee:"15000.00",monthlyAdBudget:"3000.00",
+ });
+ assert.equal(agreement.monthlyFee?.toFixed(4),"15000.0000");
+ assert.equal(agreement.contractEndOn?.toISOString().slice(0,10),"2026-11-28");
+ await assert.rejects(()=>clients.update(team,client.id,{version:agreement.version,
+   contractStartOn:"2026-12-01",contractEndOn:"2026-11-01"}),fail(422));
+ await assert.rejects(()=>clients.update(team,client.id,{version:agreement.version,
+   contractEndOn:"2026-10-01"}),fail(422));
  await assert.rejects(()=>clients.update(manager,client.id,{version:1,status:"PAUSED"}),fail(409));
  const contact=await clients.addContact(team,client.id,{name:"Manager",role:"Marketing",isPrimary:true});
  assert.ok(contact.id);
  assert.equal((await clients.detail(team,client.id)).contacts.filter(c=>c.isPrimary).length,1);
- const service=await clients.addService(team,client.id,{name:"SEO",description:"Search",status:"ACTIVE"});
+ const service=await clients.addService(team,client.id,{name:"SEO",description:"Search",status:"ACTIVE",monthlyTarget:4});
  assert.equal(service.name,"SEO");
+ assert.equal(service.monthlyTarget,4);
+ const delivery=await clients.deliverySummary(team);
+ assert.equal(delivery.items.length,1);
+ assert.equal(delivery.items[0].businessName,"Agency Cafe Updated");
+ assert.equal(delivery.items[0].targets[0].monthlyTarget,4);
+ assert.equal(delivery.items[0].totalDeliverables,0);
+ assert.equal((await clients.deliverySummary(external)).items.length,0);
+ await assert.rejects(()=>clients.deliverySummary(actor(member.id,org.id,[])),fail(403));
  assert.equal((await clients.list(manager,{limit:30,q:"Updated"})).items.length,1);
  assert.equal((await clients.list(manager,{limit:30,status:"PAUSED"})).items.length,0);
  assert.equal((await db.client.count({where:{sourceLeadId:created.id}})),1);
