@@ -60,7 +60,6 @@ export default function FinancePage(){
   const [success,setSuccess]=useState("");
   const [kind,setKind]=useState<Kind>("EXPENSE");
   const [categoryId,setCategoryId]=useState("");
-  const [enteredById,setEnteredById]=useState("");
   const [amount,setAmount]=useState("");
   const [occurredOn,setOccurredOn]=useState(()=>new Date().toISOString().slice(0,10));
   const [method,setMethod]=useState<(typeof modes)[number]>("UPI");
@@ -108,7 +107,7 @@ export default function FinancePage(){
     return()=>{reloadSequence.current+=1;};
   },[reload]);
   useEffect(()=>{
-    if(!canCreate&&!adminFinance)return;
+    if(!adminFinance)return;
     let active=true;
     void request<Assignee[]>("/finance/assignees").then(users=>{
       if(active){setAssignees(users);setAssigneesError("");}
@@ -116,7 +115,7 @@ export default function FinancePage(){
       if(active)setAssigneesError(readable(e));
     });
     return()=>{active=false;};
-  },[adminFinance,canCreate,request]);
+  },[adminFinance,request]);
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
     if(!id||!entries.some(entry=>entry.id===id))return;
@@ -126,7 +125,7 @@ export default function FinancePage(){
 
   async function submit(e:FormEvent){
     e.preventDefault();
-    if(!categoryId||!enteredById){setError("Select a category and a person before saving this entry.");return;}
+    if(!categoryId){setError("Select a category before saving this entry.");return;}
     setBusy(true);setError("");setSuccess("");
     try{
       let receiptAssetId:string|null=null;
@@ -151,13 +150,13 @@ export default function FinancePage(){
       }
       setUploadStatus(isFounder?"Recording transaction…":"Submitting transaction for approval…");
       const saved=await request<{status:string}>("/finance/entries",{method:"POST",body:{
-        kind,categoryId,enteredById,amount:amount.trim(),occurredOn,method,
+        kind,categoryId,amount:amount.trim(),occurredOn,method,
         merchantOrSource:source.trim(),description:description.trim(),
         idempotencyKey:crypto.randomUUID(),receiptAssetId,
       }});
       setSuccess(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals.");
       setAmount("");setSource("");setDescription("");setReceipt(null);
-      setCategoryId("");setEnteredById("");
+      setCategoryId("");
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
   }
@@ -280,12 +279,6 @@ export default function FinancePage(){
           <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>setCategoryId(e.target.value)}>
             <option value="">{selected.length?"Select a category":"Create a category first"}</option>
             {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></FormField>
-          <FormField id="finance-person" label="Person"><select id="finance-person" className="field" required value={enteredById}
-            onChange={e=>setEnteredById(e.target.value)}>
-            <option value="">Select a person</option>
-            {assignees.map(user=><option key={user.id} value={user.id}>{user.displayName} ({user.loginId})</option>)}
-          </select></FormField>
-          {assigneesError&&<p className="sm:col-span-2 text-sm" role="alert">{assigneesError}</p>}
           <FormField id="finance-amount" label="Amount (INR)"><input id="finance-amount" className="field" inputMode="decimal" required
             pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" placeholder="1250.00"
             value={amount} onChange={e=>setAmount(e.target.value)}/></FormField>
@@ -305,7 +298,7 @@ export default function FinancePage(){
             {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
             {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
           </div>
-          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||!enteredById||!!assigneesError||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
+          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
             <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?"Save entry":"Submit for approval"}</button></div>
         </form>
       </Card>}
