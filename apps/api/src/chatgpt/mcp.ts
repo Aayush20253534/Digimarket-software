@@ -290,7 +290,15 @@ export async function callCrmTool(auth: AuthService, grant: GrantIdentity,
   };
   const definition = CHATGPT_TOOLS.find(t => t.name === name);
   if (!definition || definition.annotations.readOnlyHint) return execute();
-  // The confirmation flag is checked inside the Zod contract before any service mutation.
+  // Validate the entire mutation before reserving its idempotency key.
+  // Malformed requests must not consume keys or create uncertain-write records.
+  const mutationSchemas: Record<string, z.ZodType> = {
+    create_lead: createLeadInput, update_lead: updateLeadInput,
+    update_lead_status: changeStatus, schedule_meeting: scheduleMeeting,
+    schedule_followup: scheduleFollowup, assign_lead: assignLead,
+    add_lead_note: addNote,
+  };
+  checked(mutationSchemas[name], args);
   // Reserve the key before executing: a crash leaves it pending instead of silently duplicating a write.
   const payload = checked(z.object({ confirmed: z.literal(true), idempotencyKey: id }).passthrough(), args);
   const payloadHash = createHash("sha256").update(JSON.stringify({ name, args })).digest("hex");
