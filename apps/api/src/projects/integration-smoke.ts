@@ -137,8 +137,8 @@ try{
   }})).active,false);
   // Monthly social templates initialize real deliverables from client commitments.
   await db.clientService.createMany({data:[
-    {clientId:fClient.id,name:"Reels",monthlyTarget:8,normalizedName:"reels"},
-    {clientId:fClient.id,name:"Posts",monthlyTarget:8,normalizedName:"posts"},
+    {clientId:fClient.id,name:"Reels",monthlyTarget:8},
+    {clientId:fClient.id,name:"Posts",monthlyTarget:8},
   ]});
   const monthly=await projects.create(founder,{clientId:fClient.id,name:"Monthly content",
     template:"SOCIAL_MONTHLY",startOn:"2026-10-29",dueOn:"2026-11-28"});
