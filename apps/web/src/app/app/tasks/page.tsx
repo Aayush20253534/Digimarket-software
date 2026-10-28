@@ -96,6 +96,13 @@ export default function TasksPage(){
  useEffect(()=>{void load();},[load]);
   useEffect(()=>{const params=new URLSearchParams(window.location.search);const id=params.get("focus")??params.get("task");if(id&&/^[0-9a-f-]{36}$/i.test(id))void open(id);},[open]);
  useEffect(()=>{
+  if(!canCreate)return;
+  const projectId=new URLSearchParams(window.location.search).get("projectId");
+  if(projectId&&projects.some(project=>project.id===projectId)){
+    setCreate(previous=>previous.projectId===projectId?previous:{...previous,projectId});
+  }
+ },[canCreate,projects]);
+ useEffect(()=>{
   if(canCreate||canManage)void request<User[]>("/tasks/team").then(setStaff).catch(()=>{});
   if(grants.includes("projects.read"))void request<Result<Project>>("/projects?limit=100").then(r=>setProjects(r.items)).catch(()=>{});
   if(canRepeat)void loadRecurrences();
