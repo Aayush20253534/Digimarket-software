@@ -7,7 +7,7 @@ import { leadCreateSchema, leadUpdateSchema, leadStageSchema, leadListQuerySchem
 import type { AuthService, Principal } from "../auth/service";
 import { LeadsService } from "../leads/service";
 import { ClientsService } from "../clients/service";
-import { AuthError, forbidden, unauthorized } from "../auth/errors";
+import { AuthError, forbidden } from "../auth/errors";
 import { authenticateChatGpt, checked, configuredOrigins, requireScope,
   type CrmScope } from "./oauth";
 
@@ -79,7 +79,6 @@ export const CHATGPT_TOOLS: ToolDefinition[] = [
 
 const id = z.uuid();
 const iso = z.iso.date();
-const page = z.strictObject({ cursor: id.optional(), limit: z.number().int().min(1).max(100).default(20) });
 const span = z.strictObject({ from: iso, to: iso }).refine(x => x.from <= x.to, "Invalid date range");
 const writeBase = z.object({ confirmed: z.literal(true), idempotencyKey: id });
 const objectId = z.strictObject({ id, includePhone: z.boolean().optional() });
