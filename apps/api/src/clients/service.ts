@@ -133,10 +133,10 @@ export class ClientsService {
        id:true,businessName:true,status:true,contractStartOn:true,contractEndOn:true,
        monthlyFee:true,monthlyAdBudget:true,
        services:{where:{status:"ACTIVE"},select:{id:true,name:true,monthlyTarget:true,status:true}},
-       projects:projectAllowed?{where:projectScope,select:{
+       projects:{where:projectAllowed?projectScope:{id:{in:[]}},select:{
          id:true,name:true,status:true,dueOn:true,
          deliverables:{select:{status:true}},
-       }}:false,
+       }},
        contentPosts:a.permissions.has("content.read")?{where:{
          status:"PUBLISHED",publishedAt:{gte:monthStart,lt:nextMonth},
        },select:{format:true}}:false,
