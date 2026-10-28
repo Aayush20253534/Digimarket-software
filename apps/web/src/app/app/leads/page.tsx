@@ -128,10 +128,13 @@ export default function LeadsPage(){
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const focusedRef=useRef(false);
- const open=async(id:string)=>{
+ const mobileScrollLeadId=useRef<string|null>(null);
+ const leadDetailsRef=useRef<HTMLDivElement>(null);
+ const open=async(id:string, scrollOnMobile=false)=>{
    setError("");try{
      const detail=await request<Detail>("/leads/"+id);
      activeLeadId.current=id;
+     mobileScrollLeadId.current=scrollOnMobile?id:null;
      setSelected(detail);setEditStage(detail.status);setFollowUpOn(detail.nextFollowUpAt?.slice(0,10)??"");
      const savedMeeting=detail.meetingAt?new Date(new Date(detail.meetingAt).getTime()+330*60_000).toISOString().slice(0,16):"";
      setMeetingOn(savedMeeting.slice(0,10));setMeetingTime(savedMeeting.slice(11,16));setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":detail.source==="REFERRAL"?"REFERRAL":"COLD_CALL");setOwner(detail.assignedToId??"");
@@ -142,6 +145,17 @@ export default function LeadsPage(){
        contactName:detail.contactName??"",businessType:detail.businessType??"",location:detail.location??"",googleMapsUrl:detail.googleMapsUrl??""});
    }catch(e){setError(errText(e));}
  };
+ useEffect(()=>{
+  if(!selected||mobileScrollLeadId.current!==selected.id)return;
+  mobileScrollLeadId.current=null;
+  if(window.innerWidth>=768)return;
+  // On phones, the editor follows the register. Scroll to the name without showing the keyboard.
+  const target=leadDetailsRef.current?.querySelector<HTMLInputElement>("#edit-contactName")??leadDetailsRef.current;
+  target?.scrollIntoView({
+    behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",
+    block:"start",
+  });
+ },[selected]);
  useEffect(()=>{
   if(!selected?.canEdit||isAdmin||stageNote===(selected.stageNote??""))return;
   const leadId=selected.id,noteText=stageNote;
@@ -291,9 +305,9 @@ export default function LeadsPage(){
              </tr>):sorted.map(l=><tr key={l.id} tabIndex={0}
              aria-label={"Open lead "+(l.contactName||l.businessName)}
              className={"aw-lead-clickable"+(selected?.id===l.id?" aw-register-selected":"")}
-             onClick={()=>void open(l.id)}
+             onClick={()=>void open(l.id,true)}
              onKeyDown={e=>{if(e.target!==e.currentTarget)return;
-               if(e.key==="Enter"||e.key===" "){e.preventDefault();void open(l.id);}}}>
+               if(e.key==="Enter"||e.key===" "){e.preventDefault();void open(l.id,true);}}}>
              <td>{l.phone?<a href={callHref(l.phone)} className="aw-lead-action" aria-label={"Call "+l.phone}
                title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
                <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>
@@ -336,7 +350,7 @@ export default function LeadsPage(){
      </div>
      <div className="space-y-5">
        {selected?<Card title={"Lead: "+selected.businessName} description={"Version "+selected.version+" · "+selected.status}>
-         <div className="space-y-5">
+         <div ref={leadDetailsRef} className="space-y-5 scroll-mt-24">
            <p className="text-xs text-slate-500">Created {fmt(selected.createdAt)} · Source: {sourceLabel(selected.source)}</p>
            {selected.phone&&<a className="aw-lead-location-link" href={callHref(selected.phone)}>
              <PhoneCall size={16} aria-hidden="true"/>Call {selected.phone}</a>}
@@ -350,7 +364,7 @@ export default function LeadsPage(){
            {selected.canEdit&&!isAdmin?<form onSubmit={edit} className="space-y-3">
              {(["contactName","businessName","businessType"] as const).map(k=>
                <FormField key={k} id={"edit-"+k} label={k==="contactName"?"Contact name":k==="businessName"?"Business name":"Business type"}>
-                 <input id={"edit-"+k} className="field" maxLength={k==="businessName"?180:k==="contactName"?160:120}
+                 <input id={"edit-"+k} className="field scroll-mt-24" maxLength={k==="businessName"?180:k==="contactName"?160:120}
                    value={updating[k]} onChange={e=>setUpdating(v=>({...v,[k]:e.target.value}))}/>
                </FormField>)}
              <section aria-label="Lead location" className="aw-lead-location-section">
