@@ -6,13 +6,15 @@ import { BriefcaseBusiness, RefreshCw } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryDetailsPortal } from "@/components/directory-modal";
 import { ApiError } from "@/lib/api";
+import { ClientDeliveryWorkspace } from "@/components/client-delivery-workspace";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
-type Service={id:string;name:string;description:string|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
+type Service={id:string;name:string;description:string|null;monthlyTarget:number|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Client={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;
  websiteUrl:string|null;instagramUrl:string|null;facebookUrl:string|null;notes:string|null;
+ contractStartOn:string|null;contractEndOn:string|null;monthlyFee:string|null;monthlyAdBudget:string|null;
  status:Status;version:number;sourceLeadId:string|null;createdAt:string};
 type Detail=Client&{contacts:Contact[];services:Service[];sourceLead:{id:string;businessName:string;status:string}|null};
 type Register={items:Client[];nextCursor:string|null};
@@ -36,6 +38,7 @@ export default function ClientsPage(){
  const [selected,setSelected]=useState<Detail|null>(null);
  const [draft,setDraft]=useState<Editable>(clean);
  const [status,setStatus]=useState<Status>("ACTIVE");
+ const [terms,setTerms]=useState({contractStartOn:"",contractEndOn:"",monthlyFee:"",monthlyAdBudget:""});
  const [filter,setFilter]=useState("");
  const [search,setSearch]=useState("");
  const [history,setHistory]=useState<string[]>([]);
@@ -48,7 +51,7 @@ export default function ClientsPage(){
  const [error,setError]=useState("");
  const [message,setMessage]=useState("");
  const [contact,setContact]=useState({name:"",role:"",phone:"",email:"",isPrimary:false});
- const [service,setService]=useState({name:"",description:"",status:"ACTIVE" as Service["status"]});
+ const [service,setService]=useState({name:"",description:"",status:"ACTIVE" as Service["status"],monthlyTarget:""});
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
    setLoading(true);
@@ -73,6 +76,8 @@ export default function ClientsPage(){
    try{
      const data=await request<Detail>("/clients/"+id);
      setSelected(data);setDraft(fromClient(data));setStatus(data.status);
+     setTerms({contractStartOn:data.contractStartOn?.slice(0,10)??"",contractEndOn:data.contractEndOn?.slice(0,10)??"",
+       monthlyFee:data.monthlyFee??"",monthlyAdBudget:data.monthlyAdBudget??""});
      setError("");
    }catch(e){setError(readable(e));}
  };
@@ -86,7 +91,7 @@ export default function ClientsPage(){
    e.preventDefault();if(!selected)return;
    setBusy(true);setError("");setMessage("");
    try{
-     await request("/clients/"+selected.id,{method:"PUT",body:{businessName:draft.businessName,businessType:draft.businessType,phone:draft.phone,notes:draft.notes,status,version:selected.version}});
+     await request("/clients/"+selected.id,{method:"PUT",body:{businessName:draft.businessName,businessType:draft.businessType,phone:draft.phone,notes:draft.notes,...terms,status,version:selected.version}});
      await open(selected.id);await load();setMessage("Client profile updated.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
@@ -103,8 +108,8 @@ export default function ClientsPage(){
    e.preventDefault();if(!selected)return;
    setBusy(true);setError("");setMessage("");
    try{
-     await request("/clients/"+selected.id+"/services",{method:"POST",body:service});
-     setService({name:"",description:"",status:"ACTIVE"});
+     await request("/clients/"+selected.id+"/services",{method:"POST",body:{...service,monthlyTarget:service.monthlyTarget?Number(service.monthlyTarget):null}});
+     setService({name:"",description:"",status:"ACTIVE",monthlyTarget:""});
      await open(selected.id);setMessage("Service added to client.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
@@ -115,8 +120,8 @@ export default function ClientsPage(){
  if(!session)return <Spinner label="Checking client access…"/>;
  if(!canRead)return <><PageHeader title="Clients access denied"/><Notice kind="error">Your account cannot view client records.</Notice></>;
  return <div data-aw-module="clients" className="aw-module-root space-y-7">
-   <PageHeader eyebrow="Agency relationships" title="Clients"
-     description="Shared clients are created automatically when a lead reaches Approved. Manual client creation is disabled."
+   <PageHeader eyebrow="Client delivery" title="Clients & delivery"
+     description="Client agreements, services, projects and deliverables in one workspace. Clients come from approved leads."
      actions={<div className="flex flex-wrap gap-2"><Link className="btn-secondary" href="/app/leads">View leads</Link><button type="button" className="btn-secondary" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Client relationships</span><span className="aw-module-count">{rows.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{filter||"All statuses"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
@@ -153,7 +158,7 @@ export default function ClientsPage(){
      {selected&&<DirectoryDetailsPortal onClose={()=>setSelected(null)}>
        <div className="aw-directory-details-panel">
        {selected&&<div className="aw-directory-details-header"><strong>Client details</strong><button type="button" className="btn-secondary" onClick={()=>setSelected(null)}>Close</button></div>}
-       {selected?<Card title={"Client: "+selected.businessName} description={"Profile version "+selected.version}>
+       {selected?<Card title={"Client: "+selected.businessName} description={"Profile version "+selected.version+" · Agreement and onboarding"}>
          {selected.sourceLead&&<p className="mb-4 text-sm">Source lead: <Link href="/app/leads" className="text-indigo-700 underline">{selected.sourceLead.businessName}</Link></p>}
          {canEdit?<form onSubmit={save} className="space-y-3">
            {editableFields.map(([key,label])=><FormField key={key} id={"edit-client-"+key} label={label}>
