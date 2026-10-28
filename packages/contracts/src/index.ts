@@ -164,7 +164,12 @@ export const clientCreateSchema=z.strictObject({
 export type ClientCreateInput=z.infer<typeof clientCreateSchema>;
 export const clientUpdateSchema=clientCreateSchema.partial().extend({
  version:z.number().int().min(1),status:clientStatusSchema.optional(),
-}).strict();
+ contractStartOn:z.union([z.iso.date(),z.literal("")]).optional(),
+ contractEndOn:z.union([z.iso.date(),z.literal("")]).optional(),
+ monthlyFee:z.union([z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),z.literal("")]).optional(),
+ monthlyAdBudget:z.union([z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),z.literal("")]).optional(),
+}).strict().refine(x=>!x.contractStartOn||!x.contractEndOn||x.contractStartOn<=x.contractEndOn,
+ {message:"Contract start must not exceed end date"});
 export type ClientUpdateInput=z.infer<typeof clientUpdateSchema>;
 export const clientListQuerySchema=z.strictObject({
  q:z.string().trim().max(100).optional(),status:clientStatusSchema.optional(),
@@ -182,6 +187,7 @@ export type ClientContactInput=z.infer<typeof clientContactSchema>;
 export const clientServiceSchema=z.strictObject({
  name:z.string().trim().min(2).max(120),description:z.string().trim().max(1000).optional(),
  status:clientServiceStatusSchema.default("ACTIVE"),
+ monthlyTarget:z.number().int().min(1).max(1000).nullable().optional(),
 });
 export type ClientServiceInput=z.infer<typeof clientServiceSchema>;
 export const clientConvertSchema=z.strictObject({version:z.number().int().min(1)});
