@@ -63,7 +63,7 @@ export function AWClientDeliveries(){
             <span>Completed service dates</span><strong>{client.completedOccurrences} / {client.scheduledOccurrences}</strong>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#41324F]"><div className="h-full rounded-full bg-violet-400" style={{width:(client.completedOccurrences/client.scheduledOccurrences*100)+"%"}}/></div>
-        </div>:<p className="mt-3 text-xs text-[#BFAAD1]">No service dates scheduled yet. Create a dated delivery schedule in this client.</p>
+        </div>:<p className="mt-3 text-xs text-[#BFAAD1]">No service dates scheduled yet. Create a dated delivery schedule in this client.</p>}
         {client.targets.length>0&&<div className="mt-3 flex flex-wrap gap-2">
           {client.targets.map(target=><span key={target.id} className="rounded-md border border-violet-500/30 bg-[#2B1D40] px-2 py-1 text-xs text-[#E8D7FA]">
             {target.name}: {target.deliveredThisMonth===null||target.monthlyTarget===null?"Target "+(target.monthlyTarget??"not set"):target.deliveredThisMonth+" / "+target.monthlyTarget+" this month"}
