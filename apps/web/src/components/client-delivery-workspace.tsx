@@ -65,12 +65,22 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
  };
  const check=async(p:Schedule,o:Occurrence)=>{
   if(busy)return;
+  const completed=o.status!=="COMPLETED";
+  // Optimistic checkbox update, server remains authoritative.
+  setPlans(all=>all.map(schedule=>schedule.id===p.id?{...schedule,
+    occurrences:schedule.occurrences.map(item=>item.id===o.id?{...item,
+      status:completed?"COMPLETED" as const:"PENDING" as const,
+      completedAt:completed?new Date().toISOString():null,
+      completedBy:completed?{displayName:"You"}:null,
+    }:item),
+  }:schedule));
   setBusy(true);setError("");setSuccess("");
   try{
-   await request("/service-deliveries/"+p.id+"/occurrences/"+o.id,{method:"PUT",body:{version:o.version,completed:o.status!=="COMPLETED"}});
+   await request("/service-deliveries/"+p.id+"/occurrences/"+o.id,{method:"PUT",body:{version:o.version,completed}});
    await load();
-  }catch(e){setError(e instanceof Error?e.message:"Unable to update this delivery");}
-  finally{setBusy(false);}
+  }catch(e){
+   await load();setError(e instanceof Error?e.message:"Unable to update this delivery");
+  }finally{setBusy(false);}
  };
  const toggleDay=(day:number)=>setDraft(p=>({...p,weekdays:p.weekdays.includes(day)?p.weekdays.filter(x=>x!==day):[...p.weekdays,day].sort()}));
  return <section className="aw-client-panel" aria-label="Service delivery schedules" data-testid="service-delivery-schedules">
