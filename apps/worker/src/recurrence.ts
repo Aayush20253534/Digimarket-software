@@ -59,13 +59,15 @@ export async function sweepRecurrences(db:PrismaClient,now=new Date(),limit=100)
      const current=await tx.taskRecurrence.findFirst({where:{
        id:entry.id,enabled:true,nextRunAt:entry.nextRunAt}});
      if(!current||current.nextRunAt>now)return "skip" as const;
-     const [staff,project]=await Promise.all([
+     const [staff,project,service]=await Promise.all([
        tx.user.count({where:{id:{in:current.assigneeIds},organizationId:current.organizationId,status:"ACTIVE"}}),
        current.projectId?tx.project.findFirst({where:{id:current.projectId,organizationId:current.organizationId},
-         select:{status:true,members:{select:{userId:true}},createdById:true}}):Promise.resolve(null),
+         select:{status:true,members:{select:{userId:true}},createdById:true,clientId:true}}):Promise.resolve(null),
+       current.serviceId?tx.clientService.findFirst({where:{id:current.serviceId,status:"ACTIVE",client:{organizationId:current.organizationId,status:"ACTIVE"}},select:{clientId:true}}):Promise.resolve(null),
      ]);
      const members=project?new Set([project.createdById,...project.members.map(m=>m.userId)]):null;
      if(staff!==current.assigneeIds.length ||
+         (current.serviceId&&(!service||(project&&project.clientId!==service.clientId))) ||
          (current.projectId&&(!project||project.status==="ARCHIVED"||project.status==="COMPLETED"||
             current.assigneeIds.some(id=>!members?.has(id))))){
        const changed=await tx.taskRecurrence.updateMany({where:{
@@ -82,7 +84,7 @@ export async function sweepRecurrences(db:PrismaClient,now=new Date(),limit=100)
        data:{nextRunAt:nextAt,version:{increment:1}}});
      if(moved.count!==1)return "skip" as const;
      const task=await tx.task.create({data:{
-       organizationId:current.organizationId,projectId:current.projectId,createdById:current.createdById,
+       organizationId:current.organizationId,projectId:current.projectId,serviceId:current.serviceId,createdById:current.createdById,
        recurrenceId:current.id,scheduledFor:current.nextRunAt,title:current.title,
        description:current.description,priority:current.priority,
        dueAt:new Date(current.nextRunAt.getTime()+current.dueOffsetDays*86400000),

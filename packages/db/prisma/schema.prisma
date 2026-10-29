@@ -665,6 +665,8 @@ model ClientService {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  tasks Task[]
+  recurrences TaskRecurrence[]
   @@index([clientId,status])
 }
 
@@ -821,6 +823,7 @@ model Task {
   projectId String? @db.Uuid
   createdById String @db.Uuid
   recurrenceId String? @db.Uuid
+  serviceId String? @db.Uuid
   scheduledFor DateTime? @db.Timestamptz(6)
   title String @db.VarChar(180)
   description String? @db.VarChar(2000)
@@ -835,6 +838,7 @@ model Task {
   project Project? @relation(fields:[projectId],references:[id],onDelete:Restrict)
   creator User @relation("TaskCreator",fields:[createdById],references:[id],onDelete:Restrict)
   recurrence TaskRecurrence? @relation(fields:[recurrenceId],references:[id],onDelete:Restrict)
+  service ClientService? @relation(fields:[serviceId],references:[id],onDelete:Restrict)
   assignees TaskAssignment[]
   checklist TaskChecklistItem[]
   comments TaskComment[]
@@ -842,6 +846,7 @@ model Task {
   @@index([organizationId,status,dueAt])
   @@index([organizationId,createdAt,id])
   @@index([projectId,status])
+  @@index([serviceId,status])
 }
 
 model TaskAssignment {
@@ -880,6 +885,7 @@ model TaskRecurrence {
   id String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   projectId String? @db.Uuid
+  serviceId String? @db.Uuid
   createdById String @db.Uuid
   title String @db.VarChar(180)
   description String? @db.VarChar(2000)
@@ -897,6 +903,7 @@ model TaskRecurrence {
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
   project Project? @relation(fields:[projectId],references:[id],onDelete:Restrict)
+  service ClientService? @relation(fields:[serviceId],references:[id],onDelete:Restrict)
   creator User @relation(fields:[createdById],references:[id],onDelete:Restrict)
   occurrences Task[]
   @@index([enabled,nextRunAt])

@@ -276,6 +276,7 @@ export const taskFrequencySchema=z.enum(["DAILY","WEEKLY","MONTHLY"]);
 const taskOptionalText=z.string().trim().max(2000).optional();
 const taskOptionalTimestamp=z.iso.datetime({offset:true}).nullable().optional();
 export const taskCreateSchema=z.strictObject({
+ serviceId:z.uuid().nullable().optional(),
  title:z.string().trim().min(2).max(180),description:taskOptionalText,
  priority:taskPrioritySchema.default("MEDIUM"),dueAt:taskOptionalTimestamp,
  projectId:z.uuid().nullable().optional(),
@@ -292,6 +293,7 @@ export type TaskUpdateInput=z.infer<typeof taskUpdateSchema>;
 // A complete, atomic edit: administrators can change details, project and assignees
 // without leaving partially saved state if another operation fails.
 export const taskEditSchema=z.strictObject({
+ serviceId:z.uuid().nullable().optional(),
  version:z.number().int().positive(),
  title:z.string().trim().min(2).max(180),
  description:z.string().trim().max(2000),
@@ -307,6 +309,7 @@ export const taskAssigneesSchema=z.strictObject({
  assigneeIds:z.array(z.uuid()).min(1).max(30).refine(x=>new Set(x).size===x.length,"Duplicate assignee"),
 });
 export const taskListSchema=z.strictObject({
+ serviceId:z.uuid().optional(),
  view:z.enum(["mine","team"]).default("mine"),
  status:z.enum(["TODO","IN_PROGRESS","BLOCKED","IN_REVIEW","DONE","CANCELLED","EXPIRED"]).optional(),projectId:z.uuid().optional(),
  q:z.string().trim().max(100).optional(),cursor:z.uuid().optional(),
@@ -324,6 +327,7 @@ export const taskChecklistCreateSchema=z.strictObject({label:z.string().trim().m
 export const taskChecklistUpdateSchema=z.strictObject({completed:z.boolean()});
 export const taskCommentSchema=z.strictObject({body:z.string().trim().min(1).max(2000)});
 export const taskRecurrenceCreateSchema=z.strictObject({
+ serviceId:z.uuid().nullable().optional(),
  title:z.string().trim().min(2).max(180),description:taskOptionalText,
  priority:taskPrioritySchema.default("MEDIUM"),
  projectId:z.uuid().nullable().optional(),

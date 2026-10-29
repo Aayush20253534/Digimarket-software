@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { createApp } from "./app";
+import { sweepRecurrences } from "../../worker/src/recurrence";
 import { createDatabaseClient } from "@digimarket/db";
 import { AuthService } from "./auth/service";
 import { loadAuthConfig } from "./auth/crypto";
@@ -54,10 +55,22 @@ async function startServer() {
     console.info(`DigiMarket API listening on port ${rawPort}`);
   });
 
+  // Redis-free recurring task scheduler: database cursor and uniqueness prevent duplicate tasks.
+  let scanning=false;
+  const scan=async()=>{
+    if(!database||scanning)return;
+    scanning=true;
+    try{await sweepRecurrences(database,new Date(),100);}
+    catch(e){console.error("Recurring task scan failed:",e instanceof Error?e.name:"UNKNOWN");}
+    finally{scanning=false;}
+  };
+  const recurrenceTimer=database?setInterval(()=>{void scan();},60_000):null;
+  if(database)void scan();
   let closing = false;
   function shutdown(signal: string) {
     if (closing) return;
     closing = true;
+    if(recurrenceTimer)clearInterval(recurrenceTimer);
     console.info(`Received ${signal}; closing HTTP server`);
     server.close(async (error) => {
       if (database) await database.$disconnect();

@@ -9,9 +9,9 @@ const notFound=()=>new AuthError(404,"NOT_FOUND","Task not found");
 const conflict=()=>new AuthError(409,"VERSION_CONFLICT","Task changed; reload");
 const clean=(s?:string)=>s?.trim()||null;
 const date=(s?:string|null)=>s?new Date(s):null;
-const adminRole=(a:Principal)=>a.roles.some(r=>r==="SUPER_ADMIN"||r==="ADMIN");
-const requireAdministrator=(a:Principal)=>{if(!adminRole(a))throw forbidden();};
-const manager=(a:Principal)=>adminRole(a)&&a.permissions.has("tasks.manage");
+const managerialRole=(a:Principal)=>a.roles.some(r=>r==="SUPER_ADMIN"||r==="ADMIN"||r==="FOUNDER");
+const requireTaskManager=(a:Principal)=>{if(!managerialRole(a))throw forbidden();};
+const manager=(a:Principal)=>managerialRole(a)&&a.permissions.has("tasks.manage");
 const own=(a:Principal):Prisma.TaskWhereInput=>({OR:[
   {createdById:a.userId},{assignees:{some:{userId:a.userId}}}
 ]});
@@ -48,6 +48,17 @@ export class TasksService {
       if(unique.some(id=>!members.has(id)))throw invalid("Assign only existing project members");
     }
   }
+  private async ensureService(a:Principal,serviceId:string|null|undefined,projectId:string|null|undefined){
+    if(!serviceId)return;
+    const service=await this.db.clientService.findFirst({where:{
+      id:serviceId,status:"ACTIVE",client:{organizationId:a.organizationId,status:"ACTIVE"}
+    },select:{clientId:true}});
+    if(!service)throw invalid("Choose an active service belonging to this agency");
+    if(projectId){
+      const project=await this.db.project.findFirst({where:{id:projectId,organizationId:a.organizationId},select:{clientId:true}});
+      if(!project||project.clientId!==service.clientId)throw invalid("Project and service must belong to the same client");
+    }
+  }
   async list(a:Principal,input:TaskListInput){
     need(a,"tasks.read");
     if(input.view==="team")need(a,"tasks.manage");
@@ -61,6 +72,7 @@ export class TasksService {
               ?{AND:[{OR:[{dueAt:null},{dueAt:{gte:new Date()}}]}]}:{})}
           :{}),
       ...(input.projectId?{projectId:input.projectId}:{}),
+      ...(input.serviceId?{serviceId:input.serviceId}:{}),
       ...(input.q?{title:{contains:input.q,mode:"insensitive"}}:{}),
     };
     const rows=await this.db.task.findMany({
@@ -68,7 +80,7 @@ export class TasksService {
       take:input.limit+1,...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
       select:{id:true,title:true,description:true,status:true,priority:true,dueAt:true,completedAt:true,
         version:true,createdAt:true,projectId:true,recurrenceId:true,scheduledFor:true,
-        project:{select:{name:true}},assignees:{select:{userId:true,user:{select:{displayName:true}}}},
+        project:{select:{name:true}},service:{select:{name:true,client:{select:{businessName:true}}}},assignees:{select:{userId:true,user:{select:{displayName:true}}}},
         _count:{select:{comments:true,checklist:true}}},
     });
     return {items:rows.slice(0,input.limit),nextCursor:rows.length>input.limit?rows[input.limit-1].id:null};
@@ -101,24 +113,25 @@ export class TasksService {
   async detail(a:Principal,id:string){
     await this.allowed(a,id);
     return this.db.task.findFirstOrThrow({where:{id,organizationId:a.organizationId},include:{
-      project:{select:{name:true,id:true}},assignees:{include:{user:{select:{id:true,displayName:true,status:true}}}},
+      project:{select:{name:true,id:true}},service:{select:{id:true,name:true,clientId:true,client:{select:{businessName:true}}}},assignees:{include:{user:{select:{id:true,displayName:true,status:true}}}},
       checklist:{orderBy:{createdAt:"asc"}},
       comments:{orderBy:{createdAt:"asc"},take:100,include:{author:{select:{id:true,displayName:true}}}},
     }});
   }
   async team(a:Principal){
-    requireAdministrator(a);need(a,"tasks.create");
+    requireTaskManager(a);need(a,"tasks.create");
     return this.db.user.findMany({where:{organizationId:a.organizationId,status:"ACTIVE"},
       select:{id:true,displayName:true},take:500,orderBy:{displayName:"asc"}});
   }
   async create(a:Principal,input:TaskCreateInput){
-    requireAdministrator(a);need(a,"tasks.create");need(a,"tasks.read");
+    requireTaskManager(a);need(a,"tasks.create");need(a,"tasks.read");
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
+    await this.ensureService(a,input.serviceId,input.projectId);
     if(!input.dueAt||!Number.isFinite(Date.parse(input.dueAt))||Date.parse(input.dueAt)<=Date.now())
       throw invalid("A future expiry date and time are required for every assigned task");
     const task=await this.db.$transaction(async tx=>{
       const t=await tx.task.create({data:{
-        organizationId:a.organizationId,projectId:input.projectId??null,createdById:a.userId,
+        organizationId:a.organizationId,projectId:input.projectId??null,serviceId:input.serviceId??null,createdById:a.userId,
         title:input.title,description:clean(input.description),priority:input.priority,
         dueAt:date(input.dueAt),assignees:{create:input.assigneeIds.map(userId=>({userId}))},
       }});
@@ -172,9 +185,10 @@ export class TasksService {
   // Atomic admin edit: core details, project, and assignees share a single
   // optimistic version lock. Existing comments/checklists/status are preserved.
   async edit(a:Principal,id:string,input:TaskEditInput){
-    requireAdministrator(a);need(a,"tasks.manage");need(a,"tasks.read");
+    requireTaskManager(a);need(a,"tasks.manage");need(a,"tasks.read");
     const existing=await this.allowed(a,id);
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
+    await this.ensureService(a,input.serviceId===undefined?existing.serviceId:input.serviceId,input.projectId);
     const nextDueAt=new Date(input.dueAt);
     if(!Number.isFinite(nextDueAt.getTime()))throw invalid("Task expiry date and time is invalid");
     // Determine added/removed assignees only after the version-guarded update,
@@ -183,7 +197,8 @@ export class TasksService {
       const changed=await tx.task.updateMany({
         where:{id,organizationId:a.organizationId,version:input.version},
         data:{version:{increment:1},title:input.title,description:clean(input.description),
-          priority:input.priority,dueAt:nextDueAt,projectId:input.projectId},
+          priority:input.priority,dueAt:nextDueAt,projectId:input.projectId,
+          ...(input.serviceId!==undefined?{serviceId:input.serviceId}:{})},
       });
       if(changed.count!==1)throw conflict();
       const current=await tx.taskAssignment.findMany({where:{taskId:id},select:{userId:true}});
@@ -223,7 +238,7 @@ export class TasksService {
   // assignees, comments and checklist; prune dangling assignment alerts and
   // queued events in the same transaction. Preserve only an audit tombstone.
   async delete(a:Principal,id:string,version:number){
-    requireAdministrator(a);need(a,"tasks.manage");
+    requireTaskManager(a);need(a,"tasks.manage");
     const exists=await this.db.task.findFirst({
       where:{id,organizationId:a.organizationId},select:{id:true,version:true},
     });
@@ -249,7 +264,7 @@ export class TasksService {
     });
   }
   async assign(a:Principal,id:string,version:number,assigneeIds:string[]){
-    requireAdministrator(a);need(a,"tasks.manage");
+    requireTaskManager(a);need(a,"tasks.manage");
     const existing=await this.allowed(a,id);
     await this.ensureAssignment(a,existing.projectId,assigneeIds);
     if(!existing.dueAt)throw invalid("Set a task expiry date and time before assigning employees");
@@ -308,15 +323,16 @@ export class TasksService {
     });
   }
   async createRecurrence(a:Principal,input:TaskRecurrenceCreateInput){
-    requireAdministrator(a);need(a,"tasks.recurrence.manage");need(a,"tasks.read");
+    requireTaskManager(a);need(a,"tasks.recurrence.manage");need(a,"tasks.read");
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
+    await this.ensureService(a,input.serviceId,input.projectId);
     try{new Intl.DateTimeFormat("en-US",{timeZone:input.timezone});}
     catch{throw invalid("Invalid IANA timezone");}
     const start=new Date(input.startAt);
     if(start.getTime()<Date.now()-30*86400000)throw invalid("Recurrence start is more than 30 days in the past");
     return this.db.$transaction(async tx=>{
       const recurrence=await tx.taskRecurrence.create({data:{
-        organizationId:a.organizationId,createdById:a.userId,projectId:input.projectId??null,
+        organizationId:a.organizationId,createdById:a.userId,projectId:input.projectId??null,serviceId:input.serviceId??null,
         title:input.title,description:clean(input.description),priority:input.priority,
         assigneeIds:input.assigneeIds,frequency:input.frequency,interval:input.interval,
         anchorAt:start,nextRunAt:start,timezone:input.timezone,dueOffsetDays:input.dueOffsetDays,
@@ -327,12 +343,12 @@ export class TasksService {
     });
   }
   async listRecurrences(a:Principal){
-    requireAdministrator(a);need(a,"tasks.recurrence.manage");
+    requireTaskManager(a);need(a,"tasks.recurrence.manage");
     return this.db.taskRecurrence.findMany({where:{organizationId:a.organizationId},
       orderBy:{createdAt:"desc"},take:200});
   }
   async toggleRecurrence(a:Principal,id:string,version:number,enabled:boolean){
-    requireAdministrator(a);need(a,"tasks.recurrence.manage");
+    requireTaskManager(a);need(a,"tasks.recurrence.manage");
     return this.db.$transaction(async tx=>{
       const count=await tx.taskRecurrence.updateMany({
         where:{id,organizationId:a.organizationId,version},
