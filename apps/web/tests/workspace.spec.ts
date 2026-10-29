@@ -728,7 +728,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(deliveryForm).toBeVisible();
   await expect(deliveryForm.getByLabel("Delivery service name")).toHaveValue("Video shooting");
   await deliveryForm.getByLabel("Delivery service name").fill("CI Thursday shoot");
-  await deliveryForm.getByLabel("Delivery assigned employee").selectOption({label:"CI Employee"});
+  // Newly provisioned accounts are INVITED until their first login. Assign an ACTIVE user.
+  const deliveryAssignee=deliveryForm.getByLabel("Delivery assigned employee");
+  await expect.poll(()=>deliveryAssignee.locator("option").count()).toBeGreaterThan(1);
+  await deliveryAssignee.selectOption({index:1});
   await deliveryForm.getByLabel("Start date").fill("2025-10-28");
   await deliveryForm.getByLabel("End date").fill("2025-11-28");
   await deliveryForm.getByText("Thu",{exact:true}).click();
