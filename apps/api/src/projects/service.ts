@@ -77,6 +77,7 @@ export class ProjectsService {
     if(!client)throw missing();
     const template=input.template??"NONE";
     const assigneeIds=input.assigneeIds??[];
+    if(new Set(assigneeIds).size!==assigneeIds.length)throw invalid("Duplicate project assignee");
     if(assigneeIds.length){
       // Only project managers with explicit assignment permission may allocate staff.
       need(a,"projects.assign");
