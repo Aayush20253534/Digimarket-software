@@ -89,6 +89,8 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
  const check=async(p:Schedule,o:Occurrence)=>{
   if(busy)return;
   const completed=o.status!=="COMPLETED";
+  // Keep the current checklist week visible while a checkbox is updated.
+  setWeekBySchedule(previous=>({...previous,[p.id]:previous[p.id]??weekStart(ymd(o.scheduledOn))}));
   // Optimistic checkbox update, server remains authoritative.
   setPlans(all=>all.map(schedule=>schedule.id===p.id?{...schedule,
     occurrences:schedule.occurrences.map(item=>item.id===o.id?{...item,
@@ -161,7 +163,9 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
   <div className="aw-delivery-schedule-list">{plans.map(p=>{
    const completed=p.occurrences.filter(x=>x.status==="COMPLETED").length;
    const overdue=p.occurrences.filter(x=>x.status==="PENDING"&&ymd(x.scheduledOn)<today()).length;
-   const weeks=calendarWeeks(ymd(p.startOn),ymd(p.endOn));
+   const firstOccurrence=ymd(p.occurrences[0]?.scheduledOn??p.startOn);
+   const lastOccurrence=ymd(p.occurrences.at(-1)?.scheduledOn??p.endOn);
+   const weeks=calendarWeeks(firstOccurrence<ymd(p.startOn)?firstOccurrence:ymd(p.startOn),lastOccurrence>ymd(p.endOn)?lastOccurrence:ymd(p.endOn));
    const currentWeek=weekStart(today());
    const upcoming=p.occurrences.find(o=>o.status==="PENDING"&&ymd(o.scheduledOn)>=today());
    const nextPending=p.occurrences.find(o=>o.status==="PENDING");

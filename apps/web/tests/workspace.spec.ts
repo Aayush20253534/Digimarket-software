@@ -748,6 +748,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await firstShoot.check();
   await expect(firstShoot).toBeChecked();
   await expect(workspace.getByText("1/5 completed")).toBeVisible();
+  await expect(workspace.getByRole("button",{name:"Previous week for CI Thursday shoot"})).toBeDisabled();
   await expect(workspace.getByRole("button",{name:"Edit schedule / reassign"})).toBeVisible();
   await createDelivery.click();
   await expect(deliveryForm.getByLabel("Repeat this service")).not.toBeChecked();
