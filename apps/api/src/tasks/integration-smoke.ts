@@ -114,7 +114,7 @@ try{
  assert.deepEqual((await tasks.history(stranger,{view:"mine",limit:20})).items,[]);
  assert.equal((await tasks.history(mgr,{view:"team",q:"Fresh completed",limit:20})).items.length,1);
  await assert.rejects(()=>tasks.history(staffActor,{view:"team",limit:20}),failed(403));
- await assert.rejects(()=>tasks.history(founder,{view:"team",limit:20}),failed(403));
+ await assert.rejects(()=>tasks.history(limitedFounder,{view:"team",limit:20}),failed(403));
  await tasks.delete(mgr,fresh.id,finishedFresh.version);
  assert.equal((await tasks.history(mgr,{view:"team",limit:20})).items.length,1);
  await assert.rejects(()=>tasks.update(staffActor,t.id,{version:1,status:"TODO"}),failed(422));
@@ -129,7 +129,7 @@ try{
  // A completed task may only be reopened by an administrator with tasks.manage.
  await assert.rejects(()=>tasks.update(staffActor,t.id,
    {version:updated.version,status:"IN_PROGRESS"}),failed(422));
- await assert.rejects(()=>tasks.update(founder,t.id,
+ await assert.rejects(()=>tasks.update(limitedFounder,t.id,
    {version:updated.version,status:"IN_PROGRESS"}),failed(404));
  // An assigned admin without tasks.manage has only ordinary assignee rights.
  const limitedAssignee=actor(admin.id,org.id,["tasks.read","tasks.update.own"]);
