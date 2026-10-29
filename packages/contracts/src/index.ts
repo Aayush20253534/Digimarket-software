@@ -476,13 +476,14 @@ export const notificationListSchema=z.strictObject({
 
 
 // Date-range service delivery, intentionally independent of the internal Tasks module.
-export const serviceDeliveryPlanSchema=z.strictObject({
+const serviceDeliveryPlanBase=z.strictObject({
  clientId:z.uuid(),serviceId:z.uuid().nullable().optional(),title:z.string().trim().min(2).max(180),
  assigneeId:z.uuid(),startOn:z.iso.date(),endOn:z.iso.date(),
  weekdays:z.array(z.number().int().min(0).max(6)).min(1).max(7)
   .refine(values=>new Set(values).size===values.length,"Weekdays must be unique"),
-}).refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"});
-export const serviceDeliveryPlanUpdateSchema=serviceDeliveryPlanSchema.omit({clientId:true}).extend({
+});
+export const serviceDeliveryPlanSchema=serviceDeliveryPlanBase.refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"});
+export const serviceDeliveryPlanUpdateSchema=serviceDeliveryPlanBase.omit({clientId:true}).extend({
  version:z.number().int().positive(),active:z.boolean(),
 }).refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"});
 export const serviceDeliveryOccurrenceUpdateSchema=z.strictObject({
