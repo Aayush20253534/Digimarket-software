@@ -11,6 +11,7 @@ type Schedule={id:string;clientId:string;serviceId:string|null;title:string;star
  assigneeId:string;assignee:Person;client:{id:string;businessName:string};service:Service|null;occurrences:Occurrence[]};
 type Draft={serviceId:string;title:string;startOn:string;endOn:string;assigneeId:string;weekdays:number[];active:boolean};
 const days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const presets=["Video shooting","Video editing","Reels","Posts","Website","SEO","AEO / GEO","Meta ads","Google ads"];
 const defaultDraft=(start="",end=""):Draft=>({serviceId:"",title:"Video shooting",startOn:start,endOn:end,assigneeId:"",weekdays:[],active:true});
 const ymd=(value:string)=>value.slice(0,10);
 const format=(iso:string)=>new Date(ymd(iso)+"T12:00:00.000Z").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric",weekday:"short",timeZone:"Asia/Kolkata"});
@@ -85,12 +86,14 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
   {manager&&clientId&&expanded&&<form className="aw-client-form aw-client-subform" aria-label="Service delivery schedule form" onSubmit={e=>void save(e)}>
    <h3>{editing?"Edit service schedule":"Schedule a service"}</h3>
    <div className="aw-client-form-grid">
-    <label>Service type<select className="field" value={draft.serviceId||"custom"} onChange={e=>{
-     const s=services.find(x=>x.id===e.target.value);
-     setDraft(v=>({...v,serviceId:s?.id??"",title:s?.name??v.title}));
+    <label>Service type<select className="field" value={draft.serviceId||(presets.includes(draft.title)?"preset:"+draft.title:"custom")} onChange={e=>{
+     const entry=services.find(x=>x.id===e.target.value);
+     const name=e.target.value.startsWith("preset:")?e.target.value.slice(7):entry?.name;
+     setDraft(v=>({...v,serviceId:entry?.id??"",title:name??v.title}));
     }}>
      <option value="custom">Custom service</option>
-     {services.filter(x=>x.status==="ACTIVE").map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+     {presets.map(name=><option key={name} value={"preset:"+name}>{name}</option>)}
+     {services.filter(x=>x.status==="ACTIVE").map(s=><option key={s.id} value={s.id}>{s.name+" (agreed service)"}</option>)}
     </select></label>
     <label>Service name<input className="field" aria-label="Delivery service name" minLength={2} maxLength={180} required value={draft.title}
      onChange={e=>setDraft(v=>({...v,title:e.target.value}))}/></label>
