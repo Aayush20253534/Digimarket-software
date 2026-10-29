@@ -3,6 +3,7 @@ import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { TeamMultiSelect } from "@/components/team-multi-select";
+import { ServiceAllocationPicker } from "@/components/service-allocation-picker";
 import { Pencil, Trash2 } from "lucide-react";
 import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
 
@@ -12,11 +13,11 @@ type User={id:string;displayName:string};
 type Member={userId:string;user:{displayName:string}};
 type Comment={id:string;body:string;author:{displayName:string};createdAt:string};
 type Task={id:string;title:string;description:string|null;status:Status;priority:Priority;
- dueAt:string|null;createdAt:string;projectId:string|null;version:number;recurrenceId:string|null;
- assignees:Member[];project?:{id?:string;name:string}|null;comments?:Comment[]};
+ dueAt:string|null;createdAt:string;projectId:string|null;serviceId:string|null;version:number;recurrenceId:string|null;
+ assignees:Member[];project?:{id?:string;name:string}|null;service?:{id?:string;name:string;clientId?:string;client:{businessName:string}}|null;comments?:Comment[]};
 type Recurrence={id:string;title:string;frequency:"DAILY"|"WEEKLY"|"MONTHLY";interval:number;
- nextRunAt:string;enabled:boolean;version:number;timezone:string;assigneeIds:string[]};
-type Project={id:string;name:string};
+ nextRunAt:string;enabled:boolean;version:number;timezone:string;assigneeIds:string[];service?:{name:string;client:{businessName:string}}|null};
+type Project={id:string;name:string;clientId:string};
 type Result<T>={items:T[];nextCursor:string|null};
 const visibleStatuses=[{value:"TODO",label:"Pending"},{value:"IN_PROGRESS",label:"In Process"},{value:"DONE",label:"Completed"},{value:"EXPIRED",label:"Expired"}] as const;
 const editableStatuses:{value:Status;label:string}[]=[
@@ -33,7 +34,7 @@ const displayStatus=(task:Task)=>expired(task)?"Expired":task.status==="TODO"?"P
 const taskCardTone=(task:Task)=>expired(task)?"expired":task.status==="DONE"?"completed":task.status==="TODO"?"pending":task.status==="IN_PROGRESS"?"in-process":"";
 const priorities:Priority[]=["LOW","MEDIUM","HIGH","URGENT"];
 const err=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.message:"Request failed";
-const initial={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",dueAt:"",assigneeIds:[] as string[]};
+const initial={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",clientId:"",serviceId:"",dueAt:"",assigneeIds:[] as string[]};
 type EditDraft=typeof initial;
 const localDeadline=(value:string|null)=>{
  if(!value)return "";
@@ -41,7 +42,7 @@ const localDeadline=(value:string|null)=>{
  if(Number.isNaN(date.getTime()))return "";
  return new Date(date.getTime()-date.getTimezoneOffset()*60_000).toISOString().slice(0,16);
 };
-const initialSchedule={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",
+const initialSchedule={title:"",description:"",priority:"MEDIUM" as Priority,projectId:"",clientId:"",serviceId:"",
  assigneeIds:[] as string[],frequency:"DAILY" as "DAILY"|"WEEKLY"|"MONTHLY",interval:1,
  startAt:"",dueOffsetDays:0};
 
@@ -49,8 +50,9 @@ export default function TasksPage(){
  const {session,request}=useAuth();
  const grants=session?.identity.permissions??[];
  const isAdmin=!!session?.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN");
- const canRead=grants.includes("tasks.read"),canCreate=isAdmin&&grants.includes("tasks.create");
- const canManage=isAdmin&&grants.includes("tasks.manage"),canRepeat=isAdmin&&grants.includes("tasks.recurrence.manage");
+ const isManager=!!session?.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN"||r==="FOUNDER");
+ const canRead=grants.includes("tasks.read"),canCreate=isManager&&grants.includes("tasks.create");
+ const canManage=isManager&&grants.includes("tasks.manage"),canRepeat=isManager&&grants.includes("tasks.recurrence.manage");
  const canWrite=grants.includes("tasks.update.own")||canManage;
  const [view,setView]=useState<"mine"|"team">("mine");
  const [tasks,setTasks]=useState<Task[]>([]);
@@ -78,6 +80,8 @@ export default function TasksPage(){
    if(search.trim())params.set("q",search.trim());
    if(statusFilter)params.set("status",statusFilter);
    if(cursor)params.set("cursor",cursor);
+   const focused=new URLSearchParams(window.location.search).get("serviceId");
+   if(focused&&/^[0-9a-f-]{36}$/i.test(focused))params.set("serviceId",focused);
    const data=await request<Result<Task>>("/tasks?"+params);
    setTasks(data.items);setNextCursor(data.nextCursor);setError("");
   }catch(e){setError(err(e));}finally{setLoading(false);}
@@ -99,9 +103,19 @@ export default function TasksPage(){
   if(!canCreate)return;
   const projectId=new URLSearchParams(window.location.search).get("projectId");
   if(projectId&&projects.some(project=>project.id===projectId)){
-    setCreate(previous=>previous.projectId===projectId?previous:{...previous,projectId});
+    const project=projects.find(x=>x.id===projectId)!;
+    setCreate(previous=>previous.projectId===projectId?previous:{...previous,projectId,clientId:project.clientId,serviceId:""});
   }
  },[canCreate,projects]);
+ useEffect(()=>{
+  if(!canCreate)return;
+  const q=new URLSearchParams(window.location.search);
+  const clientId=q.get("clientId"),serviceId=q.get("serviceId");
+  if(clientId&&/^[0-9a-f-]{36}$/i.test(clientId)){
+   setCreate(v=>v.clientId===clientId&&v.serviceId===(serviceId??"")?v:{...v,clientId,serviceId:serviceId&&/^[0-9a-f-]{36}$/i.test(serviceId)?serviceId:""});
+   setSchedule(v=>v.clientId===clientId&&v.serviceId===(serviceId??"")?v:{...v,clientId,serviceId:serviceId&&/^[0-9a-f-]{36}$/i.test(serviceId)?serviceId:""});
+  }
+ },[canCreate]);
  useEffect(()=>{
   if(canCreate||canManage)void request<User[]>("/tasks/team").then(setStaff).catch(()=>{});
   if(grants.includes("projects.read"))void request<Result<Project>>("/projects?limit=100").then(r=>setProjects(r.items)).catch(()=>{});
@@ -120,7 +134,7 @@ export default function TasksPage(){
   setError("");setMessage("");
   setEditDraft({
    title:task.title,description:task.description??"",priority:task.priority,
-   projectId:task.projectId??"",dueAt:localDeadline(task.dueAt),
+   projectId:task.projectId??"",clientId:task.service?.clientId??"",serviceId:task.serviceId??"",dueAt:localDeadline(task.dueAt),
    assigneeIds:task.assignees.map(a=>a.userId),
   });
   setEditing(true);
@@ -137,7 +151,7 @@ export default function TasksPage(){
   await run(()=>request("/tasks/"+task.id+"/edit",{method:"PUT",body:{
    version:task.version,title:editDraft.title.trim(),description:editDraft.description.trim(),
    priority:editDraft.priority,dueAt:due.toISOString(),
-   projectId:editDraft.projectId||null,assigneeIds:editDraft.assigneeIds,
+   projectId:editDraft.projectId||null,serviceId:editDraft.serviceId||null,assigneeIds:editDraft.assigneeIds,
   }}),"Task edited successfully. Assigned team members have been updated.");
  }
  async function deleteTask(){
@@ -167,7 +181,7 @@ export default function TasksPage(){
   }
   await run(async()=>{
    const task=await request<Task>("/tasks",{method:"POST",body:{
-    ...create,projectId:create.projectId||null,dueAt:new Date(create.dueAt).toISOString()}});
+    ...create,clientId:undefined,projectId:create.projectId||null,serviceId:create.serviceId||null,dueAt:new Date(create.dueAt).toISOString()}});
    setCreate(initial);await open(task.id);
   },"Task created.",false);
  }
@@ -177,7 +191,7 @@ export default function TasksPage(){
   if(!schedule.startAt)return;
   await run(async()=>{
    await request("/task-recurrences",{method:"POST",body:{
-    ...schedule,projectId:schedule.projectId||null,
+    ...schedule,clientId:undefined,projectId:schedule.projectId||null,serviceId:schedule.serviceId||null,
     timezone:browserTimezone,startAt:new Date(schedule.startAt).toISOString()}});
    setSchedule(initialSchedule);
   },"Recurring schedule created.",false);
@@ -205,7 +219,7 @@ export default function TasksPage(){
      {tasks.map(task=><button type="button" key={task.id} onClick={()=>void open(task.id)}
        className={"flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-indigo-400"+(!isAdmin&&taskCardTone(task)?" aw-assignee-task-card aw-assignee-task-"+taskCardTone(task):"")}>
        <div><p className="text-sm font-semibold">{task.title}</p>
-         <p className="mt-1 text-xs text-slate-500">{task.project?.name||"General"} · {task.priority}
+         <p className="mt-1 text-xs text-slate-500">{task.service?task.service.client.businessName+" / "+task.service.name:task.project?.name||"General"} · {task.priority}
            {task.dueAt?" · Due "+new Date(task.dueAt).toLocaleString():""}</p></div>
        <span className={"aw-task-state"+(expired(task)?" aw-task-expired":"")}>{displayStatus(task)}</span>
      </button>)}
@@ -215,16 +229,17 @@ export default function TasksPage(){
     <button type="button" className="btn-secondary" disabled={!nextCursor||busy} onClick={()=>setCursor(nextCursor)}>Next page</button>
    </div>
   </Card>
-  {canCreate&&<Card title="Create a task" description="Select one or more active employees. Project-linked tasks require project members.">
+  {canCreate&&<Card title="Allocate a service task" description="Assign internal work to employees and optionally link it to a client service. Project assignments require project members.">
     <form className="grid gap-3 md:grid-cols-2" onSubmit={submitTask}>
      <label className="text-sm">Task title<input className="field mt-1 w-full" required minLength={2} maxLength={180}
        value={create.title} onChange={e=>setCreate(p=>({...p,title:e.target.value}))}/></label>
      <label className="text-sm">Priority<select className="field mt-1 w-full" value={create.priority}
        onChange={e=>setCreate(p=>({...p,priority:e.target.value as Priority}))}>
        {priorities.map(p=><option key={p}>{p}</option>)}</select></label>
+     <ServiceAllocationPicker clientId={create.clientId} serviceId={create.serviceId} onChange={(clientId,serviceId)=>setCreate(v=>({...v,clientId,serviceId,projectId:v.projectId&&projects.find(p=>p.id===v.projectId)?.clientId!==clientId?"":v.projectId}))}/>
      <label className="text-sm">Project<select className="field mt-1 w-full" value={create.projectId}
-       onChange={e=>setCreate(p=>({...p,projectId:e.target.value}))}>
-       <option value="">General task</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+       onChange={e=>{const project=projects.find(p=>p.id===e.target.value);setCreate(p=>({...p,projectId:e.target.value,clientId:project?.clientId??p.clientId,serviceId:project&&project.clientId!==p.clientId?"":p.serviceId}));}}>
+       <option value="">General task</option>{projects.filter(p=>!create.clientId||p.clientId===create.clientId).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
      <label className="text-sm">Expiry date and time <span className="text-red-400">*</span><input type="datetime-local" required className="field mt-1 w-full" aria-label="Task expiry date and time"
        value={create.dueAt} onChange={e=>setCreate(p=>({...p,dueAt:e.target.value}))}/></label>
      <div className="md:col-span-2"><TeamMultiSelect label="Assign employees" options={staff} value={create.assigneeIds}
@@ -240,7 +255,7 @@ export default function TasksPage(){
     <div className="flex flex-wrap items-center justify-between gap-3">
      <span className="text-sm text-slate-500">Assigned: {selected.assignees.map(a=>a.user.displayName).join(", ")}</span>
      {canWrite&&(canManage?<label className="flex flex-col gap-1 text-sm font-semibold">
-       Admin: change task status
+       Manager: change task status
        <select aria-label="Admin task status" className="field" value={selected.status} disabled={busy}
         onChange={e=>{const status=e.target.value as Status;if(status===selected.status)return;
          void run(()=>request("/tasks/"+selected.id,{method:"PUT",
@@ -248,7 +263,7 @@ export default function TasksPage(){
           status==="IN_PROGRESS"&&selected.status==="DONE"?"Task reopened in In Process.":"Task status updated.");}}>
         {editableStatuses.map(v=><option key={v.value} value={v.value}>{v.label}</option>)}
        </select>
-       <span className="text-xs font-normal text-slate-500">Admins may reopen completed work or move tasks between any statuses.</span>
+       <span className="text-xs font-normal text-slate-500">Admins and Founders may reopen completed work or change task status.</span>
       </label>:selected.status==="TODO"||selected.status==="IN_PROGRESS"?
        <button type="button" className="btn-primary" disabled={busy} onClick={()=>void run(()=>request("/tasks/"+selected.id,{method:"PUT",body:{
         version:selected.version,status:selected.status==="TODO"?"IN_PROGRESS":"DONE"
@@ -279,13 +294,14 @@ export default function TasksPage(){
           {priorities.map(p=><option key={p} value={p}>{p}</option>)}
         </select>
       </label>
+      <ServiceAllocationPicker clientId={editDraft.clientId} serviceId={editDraft.serviceId} onChange={(clientId,serviceId)=>setEditDraft(v=>({...v,clientId,serviceId,projectId:v.projectId&&projects.find(p=>p.id===v.projectId)?.clientId!==clientId?"":v.projectId}))}/>
       <label className="text-sm font-semibold">Project
         <select aria-label="Edit task project" className="field mt-1 w-full" value={editDraft.projectId}
-          onChange={e=>setEditDraft(x=>({...x,projectId:e.target.value}))}>
+          onChange={e=>{const p=projects.find(p=>p.id===e.target.value);setEditDraft(x=>({...x,projectId:e.target.value,clientId:p?.clientId??x.clientId,serviceId:p&&p.clientId!==x.clientId?"":x.serviceId}));}}>
           <option value="">General task</option>
           {editDraft.projectId&&!projects.some(p=>p.id===editDraft.projectId)&&
             <option value={editDraft.projectId}>{selected.project?.name||"Current project"}</option>}
-          {projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          {projects.filter(p=>!editDraft.clientId||p.clientId===editDraft.clientId).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </label>
       <label className="text-sm font-semibold">Expiry date and time
@@ -328,9 +344,9 @@ export default function TasksPage(){
     </section>
    </div>
   </Card>}
-  {canRepeat&&<Card title="Recurring schedules" description="BullMQ generates task occurrences at the scheduled time. Scheduled work remains idempotent across retries.">
+  {canRepeat&&<Card title="Recurring service allocations" description="The database-backed scheduler creates recurring task occurrences. Schedules can be paused or resumed by Admins and Founders.">
     <ul className="mb-5 space-y-2">{recurrences.map(x=><li key={x.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm">
-     <div><b>{x.title}</b><p className="text-xs text-slate-500">{x.frequency} every {x.interval} · Next {new Date(x.nextRunAt).toLocaleString()} ({x.timezone})</p></div>
+     <div><b>{x.title}</b>{x.service&&<p className="text-xs text-purple-300">{x.service.client.businessName} / {x.service.name}</p>}<p className="text-xs text-slate-500">{x.frequency} every {x.interval} · Next {new Date(x.nextRunAt).toLocaleString()} ({x.timezone})</p></div>
      <button className="btn-secondary" type="button" disabled={busy} onClick={()=>void run(()=>
        request("/task-recurrences/"+x.id,{method:"PUT",body:{version:x.version,enabled:!x.enabled}}),
        x.enabled?"Schedule paused.":"Schedule resumed.",false)}>{x.enabled?"Pause":"Resume"}</button>
@@ -346,9 +362,10 @@ export default function TasksPage(){
        value={schedule.interval} onChange={e=>setSchedule(p=>({...p,interval:Number(e.target.value)}))}/></label>
      <label className="text-sm">First occurrence (your local time)<input className="field mt-1 w-full" type="datetime-local"
        required value={schedule.startAt} onChange={e=>setSchedule(p=>({...p,startAt:e.target.value}))}/></label>
+     <ServiceAllocationPicker clientId={schedule.clientId} serviceId={schedule.serviceId} onChange={(clientId,serviceId)=>setSchedule(v=>({...v,clientId,serviceId,projectId:v.projectId&&projects.find(p=>p.id===v.projectId)?.clientId!==clientId?"":v.projectId}))}/>
      <label className="text-sm">Project<select className="field mt-1 w-full" value={schedule.projectId}
-       onChange={e=>setSchedule(p=>({...p,projectId:e.target.value}))}>
-       <option value="">General work</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+       onChange={e=>{const project=projects.find(p=>p.id===e.target.value);setSchedule(p=>({...p,projectId:e.target.value,clientId:project?.clientId??p.clientId,serviceId:project&&project.clientId!==p.clientId?"":p.serviceId}));}}>
+       <option value="">General work</option>{projects.filter(p=>!schedule.clientId||p.clientId===schedule.clientId).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
      <label className="text-sm">Days until due<input className="field mt-1 w-full" type="number" min={0} max={30}
        value={schedule.dueOffsetDays} onChange={e=>setSchedule(p=>({...p,dueOffsetDays:Number(e.target.value)}))}/></label>
      <div className="md:col-span-2"><TeamMultiSelect label="Assign recurring employees" options={staff} value={schedule.assigneeIds}

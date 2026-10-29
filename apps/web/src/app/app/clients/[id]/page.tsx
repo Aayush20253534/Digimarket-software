@@ -110,6 +110,7 @@ export default function ClientWorkspacePage(){
     <div className="aw-client-service-grid">{client.services.map(item=><article className="aw-client-service" key={item.id}>
      <div className="aw-client-panel-heading"><div><h3>{item.name}</h3><p>{item.description||"No service description"}</p></div><span className={"aw-client-status aw-client-status-"+item.status.toLowerCase()}>{item.status}</span></div>
      <p className="aw-client-muted">{item.monthlyTarget?item.monthlyTarget+" deliverables / month":"Milestone-based or no quantity set"}</p>
+     {session.identity.permissions.includes("tasks.create")&&session.identity.roles.some(r=>["ADMIN","SUPER_ADMIN","FOUNDER"].includes(r))&&<Link className="aw-client-btn" href={"/app/tasks?clientId="+client.id+"&serviceId="+item.id}>Allocate task / recurrence <ArrowRight size={14}/></Link>}
      {canEdit&&<button className="aw-client-btn" type="button" onClick={()=>{setEditingService(item.id);setServiceEdit({name:item.name,description:item.description??"",status:item.status,monthlyTarget:item.monthlyTarget?.toString()??""});}}>Edit service</button>}
     </article>)}</div>
     {!client.services.length&&<p className="aw-client-empty">No services yet. Add the first agreed service below.</p>}

@@ -345,6 +345,7 @@ export class TasksService {
   async listRecurrences(a:Principal){
     requireTaskManager(a);need(a,"tasks.recurrence.manage");
     return this.db.taskRecurrence.findMany({where:{organizationId:a.organizationId},
+      include:{service:{select:{name:true,client:{select:{businessName:true}}}}},
       orderBy:{createdAt:"desc"},take:200});
   }
   async toggleRecurrence(a:Principal,id:string,version:number,enabled:boolean){
