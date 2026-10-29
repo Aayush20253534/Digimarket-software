@@ -300,6 +300,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  // Authenticated delivery summary must reach the API gateway (regression for 404).
+  const deliverySummaryResponse=page.waitForResponse(res=>
+    res.url().includes("/api/v1/clients/deliveries")&&res.request().method()==="GET");
+  await page.reload();
+  expect((await deliverySummaryResponse).status(),"Client deliveries gateway must reach the API").toBe(200);
   // Finance is a top-level sidebar section immediately below Workspace.
   const founderNav=page.getByRole("navigation",{name:"Workspace navigation"});
   await expect(founderNav.getByRole("link",{name:"Income & expenses"})).toBeVisible();
@@ -719,6 +724,18 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(workspace.getByRole("heading",{name:"Projects & deliverables"})).toHaveCount(0);
   await clientTabs.getByRole("tab",{name:"Services"}).click();
   await expect(workspace.getByRole("heading",{name:"Services & monthly commitments"})).toBeVisible();
+  const newService=workspace.getByRole("form",{name:"Add client service"});
+  await newService.getByLabel("Service name").fill("CI Reels");
+  await newService.getByLabel("Monthly target").fill("8");
+  await newService.getByRole("button",{name:"Add service"}).click();
+  await expect(workspace.getByText("Service commitment added.")).toBeVisible();
+  await workspace.getByRole("button",{name:"Edit service"}).first().click();
+  const editService=workspace.getByRole("form",{name:"Edit client service"});
+  await editService.getByLabel("Monthly quantity").fill("9");
+  await editService.getByRole("button",{name:"Save changes"}).click();
+  await expect(workspace.getByText("Service commitment saved.")).toBeVisible();
+  await expect(workspace.getByText("9 deliverables / month")).toBeVisible();
+  await expect(page.getByRole("dialog",{name:"Client details"})).toHaveCount(0);
   await clientTabs.getByRole("tab",{name:"Contacts"}).click();
   await expect(workspace.getByRole("heading",{name:"Contacts"})).toBeVisible();
   await workspace.getByRole("link",{name:"All clients"}).click();
