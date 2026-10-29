@@ -10,14 +10,14 @@ import {Spinner} from "@/components/ui";
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
 type ClientTab="delivery"|"services"|"agreement"|"contacts";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
-type Service={id:string;name:string;description:string|null;monthlyTarget:number|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
+type Service={id:string;name:string;description:string|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Detail={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;notes:string|null;
  contractStartOn:string|null;contractEndOn:string|null;monthlyFee:string|null;monthlyAdBudget:string|null;status:Status;version:number;
  sourceLead:{businessName:string}|null;contacts:Contact[];services:Service[]};
 type Editing={businessName:string;businessType:string;phone:string;email:string;location:string;notes:string;
  contractStartOn:string;contractEndOn:string;monthlyFee:string;monthlyAdBudget:string;status:Status};
-type ServiceDraft={name:string;description:string;status:Service["status"];monthlyTarget:string};
-const blankService:ServiceDraft={name:"",description:"",status:"ACTIVE",monthlyTarget:""};
+type ServiceDraft={name:string;description:string;status:Service["status"]};
+const blankService:ServiceDraft={name:"",description:"",status:"ACTIVE"};
 const tabs=[["delivery","Delivery",FolderKanban],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users]] as const;
 function formFrom(c:Detail):Editing{return {
  businessName:c.businessName,businessType:c.businessType??"",phone:c.phone??"",email:c.email??"",location:c.location??"",notes:c.notes??"",
@@ -62,15 +62,11 @@ export default function ClientWorkspacePage(){
  }
  function addService(e:FormEvent){
   e.preventDefault();
-  void execute(async()=>{await request("/clients/"+id+"/services",{method:"POST",body:{
-   ...service,monthlyTarget:service.monthlyTarget?Number(service.monthlyTarget):null
-  }});setService(blankService);},"Service commitment added.");
+  void execute(async()=>{await request("/clients/"+id+"/services",{method:"POST",body:service});setService(blankService);},"Service commitment added.");
  }
  function saveService(e:FormEvent){
   e.preventDefault();if(!editingService)return;
-  void execute(async()=>{await request("/clients/"+id+"/services/"+editingService,{method:"PUT",body:{
-   ...serviceEdit,monthlyTarget:serviceEdit.monthlyTarget?Number(serviceEdit.monthlyTarget):null
-  }});setEditingService(null);},"Service commitment saved.");
+  void execute(async()=>{await request("/clients/"+id+"/services/"+editingService,{method:"PUT",body:serviceEdit});setEditingService(null);},"Service commitment saved.");
  }
  if(!session)return <Spinner label="Verifying workspace access…"/>;
  if(!canRead)return <div className="aw-client-workspace"><p role="alert">Client access denied.</p></div>;
@@ -106,18 +102,16 @@ export default function ClientWorkspacePage(){
      <button className="aw-client-btn" type="button" onClick={()=>setTab("services")}>Add services <ArrowRight size={15}/></button></div>}
     <ClientDeliveryWorkspace clientId={client.id} contractStartOn={client.contractStartOn} contractEndOn={client.contractEndOn} services={client.services}/>
    </>}
-   {tab==="services"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Services & monthly commitments</h2><p>Record the work promised in the agreement. Monthly targets are quantities, not staff tasks.</p></div></div>
+   {tab==="services"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Agreed services</h2><p>Record the services promised in the agreement. Delivery dates and quantities belong under Client deliveries.</p></div></div>
     <div className="aw-client-service-grid">{client.services.map(item=><article className="aw-client-service" key={item.id}>
      <div className="aw-client-panel-heading"><div><h3>{item.name}</h3><p>{item.description||"No service description"}</p></div><span className={"aw-client-status aw-client-status-"+item.status.toLowerCase()}>{item.status}</span></div>
-     <p className="aw-client-muted">{item.monthlyTarget?item.monthlyTarget+" deliverables / month":"Milestone-based or no quantity set"}</p>
-     {canEdit&&<button className="aw-client-btn" type="button" onClick={()=>{setEditingService(item.id);setServiceEdit({name:item.name,description:item.description??"",status:item.status,monthlyTarget:item.monthlyTarget?.toString()??""});}}>Edit service</button>}
+     {canEdit&&<button className="aw-client-btn" type="button" onClick={()=>{setEditingService(item.id);setServiceEdit({name:item.name,description:item.description??"",status:item.status});}}>Edit service</button>}
     </article>)}</div>
     {!client.services.length&&<p className="aw-client-empty">No services yet. Add the first agreed service below.</p>}
     {canEdit&&editingService&&<form className="aw-client-form aw-client-subform" onSubmit={saveService} aria-label="Edit client service">
      <h3>Edit service commitment</h3>
      <label>Service name<input className="field" required minLength={2} maxLength={120} value={serviceEdit.name} onChange={e=>setServiceEdit(v=>({...v,name:e.target.value}))}/></label>
      <label>Description<input className="field" maxLength={1000} value={serviceEdit.description} onChange={e=>setServiceEdit(v=>({...v,description:e.target.value}))}/></label>
-     <label>Monthly quantity<input className="field" type="number" min={1} max={1000} value={serviceEdit.monthlyTarget} onChange={e=>setServiceEdit(v=>({...v,monthlyTarget:e.target.value}))}/></label>
      <label>Status<select className="field" value={serviceEdit.status} onChange={e=>setServiceEdit(v=>({...v,status:e.target.value as Service["status"]}))}><option>ACTIVE</option><option>PAUSED</option><option>ENDED</option></select></label>
      <div className="aw-client-actions"><button className="aw-client-primary" disabled={busy}>Save changes</button><button className="aw-client-btn" type="button" onClick={()=>setEditingService(null)}>Cancel</button></div>
     </form>}
@@ -125,7 +119,6 @@ export default function ClientWorkspacePage(){
      <h3>Add agreed service</h3>
      <label>Service name<input className="field" required minLength={2} maxLength={120} placeholder="e.g. Reels" value={service.name} onChange={e=>setService(v=>({...v,name:e.target.value}))}/></label>
      <label>Description<input className="field" maxLength={1000} placeholder="Scope and expectations" value={service.description} onChange={e=>setService(v=>({...v,description:e.target.value}))}/></label>
-     <label>Monthly target<input className="field" type="number" min={1} max={1000} placeholder="8" value={service.monthlyTarget} onChange={e=>setService(v=>({...v,monthlyTarget:e.target.value}))}/></label>
      <label>Status<select className="field" value={service.status} onChange={e=>setService(v=>({...v,status:e.target.value as Service["status"]}))}><option>ACTIVE</option><option>PAUSED</option><option>ENDED</option></select></label>
      <div className="aw-client-actions"><button className="aw-client-primary" disabled={busy}>Add service</button></div>
     </form>}

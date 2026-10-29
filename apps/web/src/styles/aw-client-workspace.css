@@ -112,3 +112,9 @@
 .aw-theme .aw-delivery-weekdays label.selected{background:#563374;border-color:#b37bec}
 .aw-theme .aw-delivery-weekdays input{accent-color:#b47ceb}
 .aw-theme .aw-delivery-preview{background:#311d41;border:1px solid #64417b;border-radius:8px;padding:12px;color:#dcc3ed;font-size:12px;line-height:1.6}
+
+/* Orange glow on client cards with unfinished scheduled service occurrences. */
+.aw-theme .aw-client-delivery-card--pending{
+ border:1px solid #ffa32b;
+ box-shadow:0 0 0 1px rgba(255,173,52,.28),0 0 15px rgba(255,139,0,.65),0 0 32px rgba(255,126,0,.30),inset 0 0 12px rgba(255,139,0,.10);
+}

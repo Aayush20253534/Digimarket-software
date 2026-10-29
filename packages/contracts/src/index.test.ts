@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, serviceDeliveryPlanSchema, serviceDeliveryPlanUpdateSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, serviceDeliveryPlanSchema, serviceDeliveryPlanUpdateSchema, clientServiceSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -70,5 +70,14 @@ describe("optional recurrence for client deliveries",()=>{
   expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30"}).success).toBe(false);
   expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30",weekdays:[4]}).success).toBe(true);
   expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30",weekdays:[4,4]}).success).toBe(false);
+ });
+});
+
+describe("agreed services without duplicate monthly quantity",()=>{
+ it("accepts service details without monthly targets",()=>{
+  expect(clientServiceSchema.parse({name:"Google Business Profile",description:"Profile creation",status:"ACTIVE"}).name).toBe("Google Business Profile");
+ });
+ it("rejects removed monthly target fields",()=>{
+  expect(clientServiceSchema.safeParse({name:"Video editing",monthlyTarget:8}).success).toBe(false);
  });
 });

@@ -187,7 +187,6 @@ export type ClientContactInput=z.infer<typeof clientContactSchema>;
 export const clientServiceSchema=z.strictObject({
  name:z.string().trim().min(2).max(120),description:z.string().trim().max(1000).optional(),
  status:clientServiceStatusSchema.default("ACTIVE"),
- monthlyTarget:z.number().int().min(1).max(1000).nullable().optional(),
 });
 export type ClientServiceInput=z.infer<typeof clientServiceSchema>;
 export const clientConvertSchema=z.strictObject({version:z.number().int().min(1)});

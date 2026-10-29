@@ -55,11 +55,11 @@ try{
  const contact=await clients.addContact(team,client.id,{name:"Manager",role:"Marketing",isPrimary:true});
  assert.ok(contact.id);
  assert.equal((await clients.detail(team,client.id)).contacts.filter(c=>c.isPrimary).length,1);
- const service=await clients.addService(team,client.id,{name:"SEO",description:"Search",status:"ACTIVE",monthlyTarget:4});
+ const service=await clients.addService(team,client.id,{name:"SEO",description:"Search",status:"ACTIVE"});
  assert.equal(service.name,"SEO");
- assert.equal(service.monthlyTarget,4);
- const modified=await clients.updateService(team,client.id,service.id,{name:"SEO",description:"Search optimization",status:"ACTIVE",monthlyTarget:6});
- assert.equal(modified.monthlyTarget,6);
+ assert.equal(service.monthlyTarget,null);
+ const modified=await clients.updateService(team,client.id,service.id,{name:"SEO",description:"Search optimization",status:"ACTIVE"});
+ assert.equal(modified.monthlyTarget,null);
  await assert.rejects(()=>clients.updateService(external,client.id,service.id,{name:"Hijack",status:"ACTIVE"}),fail(404));
  await assert.rejects(()=>clients.updateService(team,client.id,outsider.id,{name:"Unknown",status:"ACTIVE"}),fail(404));
  const thursdays=datesInRange("2026-10-28","2026-11-28",[4]);
@@ -106,7 +106,9 @@ try{
  const delivery=await clients.deliverySummary(team);
  assert.equal(delivery.items.length,1);
  assert.equal(delivery.items[0].businessName,"Agency Cafe Updated");
- assert.equal(delivery.items[0].targets[0].monthlyTarget,6);
+ assert.ok(!("targets" in delivery.items[0]));
+ assert.equal(delivery.items[0].scheduledOccurrences,6);
+ assert.equal(delivery.items[0].completedOccurrences,2);
  assert.equal(delivery.items[0].totalDeliverables,0);
  assert.equal((await clients.deliverySummary(external)).items.length,0);
  await assert.rejects(()=>clients.deliverySummary(actor(member.id,org.id,[])),fail(403));

@@ -106,11 +106,10 @@ export class ClientsService {
    return this.db.$transaction(async tx=>{
      const service=await tx.clientService.create({data:{
        clientId:id,name:input.name.trim(),description:optional(input.description),status:input.status,
-       monthlyTarget:input.monthlyTarget??null,
      }});
      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
        action:"clients.service_added",entityType:"Client",entityId:id,
-       afterRedacted:{serviceId:service.id,status:service.status,monthlyTarget:service.monthlyTarget}}});
+       afterRedacted:{serviceId:service.id,status:service.status}}});
      return service;
    });
  }
@@ -125,20 +124,17 @@ export class ClientsService {
      if(!found)throw missing();
      const updated=await tx.clientService.update({where:{id:serviceId},data:{
        name:input.name.trim(),description:optional(input.description),status:input.status,
-       monthlyTarget:input.monthlyTarget??null,
      }});
      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
        action:"clients.service_updated",entityType:"ClientService",entityId:serviceId,
-       beforeRedacted:{status:found.status,monthlyTarget:found.monthlyTarget},
-       afterRedacted:{status:updated.status,monthlyTarget:updated.monthlyTarget}}});
+       beforeRedacted:{status:found.status},
+       afterRedacted:{status:updated.status}}});
      return updated;
    });
  }
  async deliverySummary(a:Principal){
    deny(a,"clients.read");
    const now=new Date();
-   const monthStart=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1));
-   const nextMonth=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1));
    const deliveryManager=a.permissions.has("clients.edit")&&a.roles.some(x=>["FOUNDER","ADMIN","SUPER_ADMIN"].includes(x));
    const projectAllowed=a.permissions.has("projects.read");
    const canSeeAllProjects=a.permissions.has("projects.assign");
@@ -151,33 +147,21 @@ export class ClientsService {
      select:{
        id:true,businessName:true,status:true,contractStartOn:true,contractEndOn:true,
        monthlyFee:true,monthlyAdBudget:true,
-       services:{where:{status:"ACTIVE"},select:{id:true,name:true,monthlyTarget:true,status:true}},
        deliverySchedules:{where:deliveryManager?{}:{assigneeId:a.userId},
          select:{active:true,occurrences:{select:{status:true,scheduledOn:true}}}},
        projects:{where:projectAllowed?projectScope:{id:{in:[]}},select:{
          id:true,name:true,status:true,dueOn:true,
          deliverables:{select:{status:true}},
        }},
-       contentPosts:a.permissions.has("content.read")?{where:{
-         status:"PUBLISHED",publishedAt:{gte:monthStart,lt:nextMonth},
-       },select:{format:true}}:false,
      },
    });
    const items=rows.slice(0,100).map(row=>{
      const projects=row.projects||[];
-     const posts=row.contentPosts||[];
-     const targets=row.services.map(service=>{
-       const format=/reels?/i.test(service.name)?"REEL":/posts?/i.test(service.name)?"POST":null;
-       return {id:service.id,name:service.name,monthlyTarget:service.monthlyTarget,
-         deliveredThisMonth:format&&a.permissions.has("content.read")?
-           posts.filter(post=>post.format===format).length:null};
-     });
      return {
        id:row.id,businessName:row.businessName,status:row.status,
        contractStartOn:row.contractStartOn,contractEndOn:row.contractEndOn,
        monthlyFee:a.permissions.has("finance.read.all")?row.monthlyFee:null,
        monthlyAdBudget:a.permissions.has("finance.read.all")?row.monthlyAdBudget:null,
-       targets,
        scheduledOccurrences:row.deliverySchedules.reduce((n,p)=>n+p.occurrences.length,0),
        completedOccurrences:row.deliverySchedules.reduce((n,p)=>n+p.occurrences.filter(o=>o.status==="COMPLETED").length,0),
        activeDeliverySchedules:row.deliverySchedules.filter(p=>p.active).length,

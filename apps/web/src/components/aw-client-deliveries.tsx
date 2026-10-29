@@ -6,11 +6,10 @@ import { ArrowRight, BriefcaseBusiness, CalendarDays, ClipboardCheck, FolderKanb
 import { useAuth } from "@/components/auth-provider";
 import { AWNotice } from "@/components/aw-ui";
 
-type Target={id:string;name:string;monthlyTarget:number|null;deliveredThisMonth:number|null};
 type Project={id:string;name:string;status:string;dueOn:string|null;totalDeliverables:number;approvedDeliverables:number};
 type Delivery={id:string;businessName:string;status:string;contractEndOn:string|null;
   scheduledOccurrences:number;completedOccurrences:number;activeDeliverySchedules:number;
-  targets:Target[];projects:Project[];activeProjects:number;totalDeliverables:number;approvedDeliverables:number};
+  projects:Project[];activeProjects:number;totalDeliverables:number;approvedDeliverables:number};
 type Summary={items:Delivery[];truncated:boolean;month:string};
 const shortDate=(date:string)=>new Date(date).toLocaleDateString(undefined,{day:"numeric",month:"short"});
 export function AWClientDeliveries(){
@@ -33,7 +32,7 @@ export function AWClientDeliveries(){
       <div>
         <p className="aw-eyebrow">DELIVERY OPERATIONS</p>
         <h2 className="aw-dashboard-title text-2xl font-bold text-white sm:text-3xl">Client Deliveries</h2>
-        <p className="mt-1 text-sm text-[#BFAAD1]">Recurring service dates and completion progress. Internal Tasks remain separate.</p>
+        <p className="mt-1 text-sm text-[#BFAAD1]">Pending service dates are highlighted with orange borders. Internal Tasks remain separate.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Link href="/app/clients" className="aw-dashboard-refresh"><Users size={16}/>All clients</Link>
@@ -50,7 +49,7 @@ export function AWClientDeliveries(){
        <Link href="/app/clients" className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-purple-200 underline">Open Clients <ArrowRight size={15}/></Link>
      </div>:null}
     {summary&&summary.items.length>0&&<div className="grid gap-3 lg:grid-cols-2" data-testid="client-deliveries-list">
-      {summary.items.map(client=><article key={client.id} className="min-w-0 rounded-xl border border-violet-500/30 bg-[#20162F] p-4 shadow-[0_4px_24px_rgba(112,58,160,0.13)]">
+      {summary.items.map(client=><article key={client.id} className={"aw-client-delivery-card min-w-0 rounded-xl border bg-[#20162F] p-4 "+(client.scheduledOccurrences>client.completedOccurrences?"aw-client-delivery-card--pending":"border-violet-500/30 shadow-[0_4px_24px_rgba(112,58,160,0.13)]")}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <Link href={"/app/clients/"+encodeURIComponent(client.id)} className="text-base font-bold text-white hover:underline">{client.businessName}</Link>
@@ -58,17 +57,7 @@ export function AWClientDeliveries(){
           </div>
           <Link href={"/app/clients/"+encodeURIComponent(client.id)} className="shrink-0 rounded-lg border border-violet-500/40 p-2 text-purple-200" aria-label={"Open delivery for "+client.businessName}><ArrowRight size={18}/></Link>
         </div>
-        {client.scheduledOccurrences>0?<div className="mt-3">
-          <div className="flex justify-between gap-3 text-xs text-[#E7D8F6]">
-            <span>Completed service dates</span><strong>{client.completedOccurrences} / {client.scheduledOccurrences}</strong>
-          </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#41324F]"><div className="h-full rounded-full bg-violet-400" style={{width:(client.completedOccurrences/client.scheduledOccurrences*100)+"%"}}/></div>
-        </div>:<p className="mt-3 text-xs text-[#BFAAD1]">No service dates scheduled yet. Create a dated delivery schedule in this client.</p>}
-        {client.targets.length>0&&<div className="mt-3 flex flex-wrap gap-2">
-          {client.targets.map(target=><span key={target.id} className="rounded-md border border-violet-500/30 bg-[#2B1D40] px-2 py-1 text-xs text-[#E8D7FA]">
-            {target.name}: {target.deliveredThisMonth===null||target.monthlyTarget===null?"Target "+(target.monthlyTarget??"not set"):target.deliveredThisMonth+" / "+target.monthlyTarget+" this month"}
-          </span>)}
-        </div>}
+        {client.scheduledOccurrences===0&&<p className="mt-3 text-xs text-[#BFAAD1]">No service dates scheduled yet. Create a dated delivery schedule in this client.</p>}
         {client.contractEndOn&&<p className="mt-3 flex items-center gap-2 text-xs text-[#CBB9D9]"><CalendarDays size={14}/>Contract ends {shortDate(client.contractEndOn)}</p>}
       </article>)}
     </div>}
