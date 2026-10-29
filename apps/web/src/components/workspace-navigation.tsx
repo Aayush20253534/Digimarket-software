@@ -26,7 +26,7 @@ const sections:readonly Group[]=[
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]}
  ]},
  {title:"Delivery",items:[
-  {label:"Projects",href:"/app/projects",icon:FolderKanban,permits:["projects.read"]},
+  {label:"Client deliveries",href:"/app/deliveries",icon:FolderKanban,permits:["clients.read"]},
   {label:"Tasks",href:"/app/tasks",icon:CheckSquare2,permits:["tasks.read"]},
   {label:"Task history",href:"/app/task-history",icon:History,permits:["tasks.read"]},
   {label:"Content calendar",operational:true,href:"/app/content",icon:CalendarDays,permits:["content.read"]},

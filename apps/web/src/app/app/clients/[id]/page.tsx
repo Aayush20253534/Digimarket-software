@@ -102,9 +102,9 @@ export default function ClientWorkspacePage(){
   {success&&<div className="aw-client-success" role="status">{success}</div>}
   <div id="client-workspace-panel" role="tabpanel" aria-labelledby={"client-tab-"+tab} data-testid="client-workspace-active-panel">
    {tab==="delivery"&&<>
-    {client.services.length===0&&<div className="aw-client-callout"><div><strong>Start with the service agreement</strong><p>No service commitments are recorded. Add the promised services before generating a delivery project.</p></div>
+    {client.services.length===0&&<div className="aw-client-callout"><div><strong>Start with the service agreement</strong><p>No service commitments are recorded. You can record an agreed service or schedule a named delivery directly.</p></div>
      <button className="aw-client-btn" type="button" onClick={()=>setTab("services")}>Add services <ArrowRight size={15}/></button></div>}
-    <ClientDeliveryWorkspace clientId={client.id} canCreate={!!session.identity.permissions.includes("projects.create")}/>
+    <ClientDeliveryWorkspace clientId={client.id} contractStartOn={client.contractStartOn} contractEndOn={client.contractEndOn} services={client.services}/>
    </>}
    {tab==="services"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Services & monthly commitments</h2><p>Record the work promised in the agreement. Monthly targets are quantities, not staff tasks.</p></div></div>
     <div className="aw-client-service-grid">{client.services.map(item=><article className="aw-client-service" key={item.id}>

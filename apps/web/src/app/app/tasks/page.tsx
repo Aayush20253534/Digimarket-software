@@ -3,7 +3,6 @@ import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { TeamMultiSelect } from "@/components/team-multi-select";
-import { ServiceAllocationPicker } from "@/components/service-allocation-picker";
 import { Pencil, Trash2 } from "lucide-react";
 import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
 
@@ -80,8 +79,7 @@ export default function TasksPage(){
    if(search.trim())params.set("q",search.trim());
    if(statusFilter)params.set("status",statusFilter);
    if(cursor)params.set("cursor",cursor);
-   const focused=new URLSearchParams(window.location.search).get("serviceId");
-   if(focused&&/^[0-9a-f-]{36}$/i.test(focused))params.set("serviceId",focused);
+  
    const data=await request<Result<Task>>("/tasks?"+params);
    setTasks(data.items);setNextCursor(data.nextCursor);setError("");
   }catch(e){setError(err(e));}finally{setLoading(false);}
@@ -229,14 +227,14 @@ export default function TasksPage(){
     <button type="button" className="btn-secondary" disabled={!nextCursor||busy} onClick={()=>setCursor(nextCursor)}>Next page</button>
    </div>
   </Card>
-  {canCreate&&<Card title="Create a task" description="Assign internal work to employees and optionally link it to a client service. Project assignments require project members.">
+  {canCreate&&<Card title="Create a task" description="For independent internal work. Client service deliveries are scheduled separately.">
     <form className="grid gap-3 md:grid-cols-2" onSubmit={submitTask}>
      <label className="text-sm">Task title<input className="field mt-1 w-full" required minLength={2} maxLength={180}
        value={create.title} onChange={e=>setCreate(p=>({...p,title:e.target.value}))}/></label>
      <label className="text-sm">Priority<select className="field mt-1 w-full" value={create.priority}
        onChange={e=>setCreate(p=>({...p,priority:e.target.value as Priority}))}>
        {priorities.map(p=><option key={p}>{p}</option>)}</select></label>
-     <ServiceAllocationPicker clientId={create.clientId} serviceId={create.serviceId} onChange={(clientId,serviceId)=>setCreate(v=>({...v,clientId,serviceId,projectId:v.projectId&&projects.find(p=>p.id===v.projectId)?.clientId!==clientId?"":v.projectId}))}/>
+  
      <label className="text-sm">Project<select className="field mt-1 w-full" value={create.projectId}
        onChange={e=>{const project=projects.find(p=>p.id===e.target.value);setCreate(p=>({...p,projectId:e.target.value,clientId:project?.clientId??p.clientId,serviceId:project&&project.clientId!==p.clientId?"":p.serviceId}));}}>
        <option value="">General task</option>{projects.filter(p=>!create.clientId||p.clientId===create.clientId).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
@@ -294,7 +292,7 @@ export default function TasksPage(){
           {priorities.map(p=><option key={p} value={p}>{p}</option>)}
         </select>
       </label>
-      <ServiceAllocationPicker clientId={editDraft.clientId} serviceId={editDraft.serviceId} onChange={(clientId,serviceId)=>setEditDraft(v=>({...v,clientId,serviceId,projectId:v.projectId&&projects.find(p=>p.id===v.projectId)?.clientId!==clientId?"":v.projectId}))}/>
+
       <label className="text-sm font-semibold">Project
         <select aria-label="Edit task project" className="field mt-1 w-full" value={editDraft.projectId}
           onChange={e=>{const p=projects.find(p=>p.id===e.target.value);setEditDraft(x=>({...x,projectId:e.target.value,clientId:p?.clientId??x.clientId,serviceId:p&&p.clientId!==x.clientId?"":x.serviceId}));}}>
@@ -362,7 +360,7 @@ export default function TasksPage(){
        value={schedule.interval} onChange={e=>setSchedule(p=>({...p,interval:Number(e.target.value)}))}/></label>
      <label className="text-sm">First occurrence (your local time)<input className="field mt-1 w-full" type="datetime-local"
        required value={schedule.startAt} onChange={e=>setSchedule(p=>({...p,startAt:e.target.value}))}/></label>
-     <ServiceAllocationPicker clientId={schedule.clientId} serviceId={schedule.serviceId} onChange={(clientId,serviceId)=>setSchedule(v=>({...v,clientId,serviceId,projectId:v.projectId&&projects.find(p=>p.id===v.projectId)?.clientId!==clientId?"":v.projectId}))}/>
+
      <label className="text-sm">Project<select className="field mt-1 w-full" value={schedule.projectId}
        onChange={e=>{const project=projects.find(p=>p.id===e.target.value);setSchedule(p=>({...p,projectId:e.target.value,clientId:project?.clientId??p.clientId,serviceId:project&&project.clientId!==p.clientId?"":p.serviceId}));}}>
        <option value="">General work</option>{projects.filter(p=>!schedule.clientId||p.clientId===schedule.clientId).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>

@@ -93,3 +93,22 @@
 .aw-theme .aw-client-member-list small{color:#bda7cf;margin-left:9px}
 .aw-theme .aw-client-project-editor .aw-team-select{color:#f3e7fa}
 .aw-theme .aw-client-project-editor .aw-client-btn{min-height:34px}
+
+/* Flat service delivery schedules: contract range and individual dated checkboxes. */
+.aw-theme .aw-delivery-schedule-list{display:grid;gap:16px;margin-top:16px}
+.aw-theme .aw-delivery-schedule{background:#291a38;border:1px solid #6b427f;border-radius:12px;padding:18px;min-width:0}
+.aw-theme .aw-delivery-schedule h3{font-weight:750;color:#f8ecff;font-size:17px}
+.aw-theme .aw-delivery-owner{display:flex;align-items:center;gap:7px;color:#d8bde8}
+.aw-theme .aw-delivery-progress{display:flex;justify-content:space-between;gap:10px;color:#d6c1e7;font-size:12px;padding:12px 0;border-top:1px solid #543565}
+.aw-theme .aw-delivery-occurrences{display:grid;grid-template-columns:repeat(auto-fit,minmax(205px,1fr));gap:9px}
+.aw-theme .aw-delivery-occurrence{border:1px solid #63457b;border-radius:8px;background:#24172f;display:grid;grid-template-columns:20px minmax(0,1fr);gap:3px 8px;padding:12px;align-items:start;color:#f7eafc;cursor:pointer;font-size:13px}
+.aw-theme .aw-delivery-occurrence input{accent-color:#9e59dc;width:17px;height:17px;grid-row:span 2;margin-top:1px}
+.aw-theme .aw-delivery-occurrence small{color:#c0acd2;display:flex;align-items:center;gap:4px;font-size:11px}
+.aw-theme .aw-delivery-occurrence.done{border-color:#359b73;background:#163d32}
+.aw-theme .aw-delivery-occurrence.done small{color:#9af2c3}
+.aw-theme .aw-delivery-occurrence:has(input:disabled){cursor:default}
+.aw-theme .aw-delivery-weekdays{display:flex;gap:8px;flex-wrap:wrap}
+.aw-theme .aw-delivery-weekdays label{display:flex;flex-direction:row;align-items:center;gap:7px;border:1px solid #634278;border-radius:7px;padding:9px 11px;color:#ead8fb;background:#231630;font-size:12px;cursor:pointer}
+.aw-theme .aw-delivery-weekdays label.selected{background:#563374;border-color:#b37bec}
+.aw-theme .aw-delivery-weekdays input{accent-color:#b47ceb}
+.aw-theme .aw-delivery-preview{background:#311d41;border:1px solid #64417b;border-radius:8px;padding:12px;color:#dcc3ed;font-size:12px;line-height:1.6}
