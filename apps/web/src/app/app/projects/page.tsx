@@ -15,7 +15,7 @@ type Deliverable={id:string;title:string;description:string|null;status:"DRAFT"|
   version:number;revision:number;milestoneId:string|null;assetId:string|null;approvalRequestId:string|null;
   asset:{id:string;filename:string;status:string}|null;
   approvalRequest:{id:string;status:string;requesterId:string;decidedAt:string|null}|null};
-type Project={id:string;clientId:string;name:string;description:string|null;status:ProjectStatus;
+type Project={id:string;clientId:string;name:string;description:string|null;status:ProjectStatus;members?:Member[];
   startOn:string|null;dueOn:string|null;version:number;client:{id?:string;businessName:string;status?:string};
   _count?:{members:number;milestones:number;deliverables:number}};
 type Detail=Project&{members:Member[];milestones:Milestone[];deliverables:Deliverable[]};
@@ -188,6 +188,7 @@ export default function ProjectsPage(){
               <span className="block text-sm font-semibold text-slate-900">{project.name}</span>
               <span className="mt-1 block text-xs text-slate-500">{project.client.businessName}</span>
               <span className="mt-2 block text-xs text-slate-500">{project._count?.deliverables??0} deliverables</span>
+              <span className="mt-1 block text-xs text-slate-500">Assigned: {project.members?.map(m=>m.user.displayName).join(", ")||"None"}</span>
             </button>)}</div>
           </section>)}
         </div>}

@@ -54,7 +54,7 @@ export class ProjectsService {
       ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
       orderBy:[{createdAt:"desc"},{id:"desc"}],
       select:{id:true,name:true,description:true,status:true,startOn:true,dueOn:true,version:true,
-        createdAt:true,updatedAt:true,clientId:true,client:{select:{businessName:true}},
+        createdAt:true,updatedAt:true,createdById:true,clientId:true,client:{select:{businessName:true}},
         members:{select:{userId:true,role:true,user:{select:{displayName:true}}}},
         _count:{select:{members:true,milestones:true,deliverables:true}}}});
     return {items:rows.slice(0,input.limit),nextCursor:rows.length>input.limit?rows[input.limit-1].id:null};

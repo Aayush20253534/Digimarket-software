@@ -81,3 +81,15 @@
 .aw-theme .aw-client-readonly{font-size:13px;color:#d7c2e5;line-height:2.4}
 @media(max-width:900px){.aw-theme .aw-client-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.aw-theme .aw-client-controls input{grid-column:1/-1}.aw-theme .aw-client-service-grid,.aw-theme .aw-client-project-grid{grid-template-columns:1fr}}
 @media(max-width:650px){.aw-theme .aw-client-controls{grid-template-columns:1fr 1fr}.aw-theme .aw-client-controls input{grid-column:1/-1}.aw-theme .aw-client-statrow,.aw-theme .aw-client-metrics{grid-template-columns:1fr}.aw-theme .aw-client-form-grid,.aw-theme .aw-client-form.aw-client-subform{grid-template-columns:1fr}.aw-theme .aw-client-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.aw-theme .aw-client-hero{padding:16px}.aw-theme .aw-client-panel{padding:15px}.aw-theme .aw-client-service-grid,.aw-theme .aw-client-project-grid{grid-template-columns:1fr}}
+
+.aw-theme .aw-client-project-team{font-size:12px;color:#cdb8df;line-height:1.55;margin-bottom:14px}
+.aw-theme .aw-client-project-team strong{color:#f6e9ff}
+.aw-theme .aw-client-project-editor{border-top:1px solid #5e3b70;margin-top:17px;padding-top:18px;display:grid;gap:17px}
+.aw-theme .aw-client-project-editor .aw-client-form{margin-top:0}
+.aw-theme .aw-client-project-editor .aw-client-form>button{margin-top:14px}
+.aw-theme .aw-client-member-editor{border-top:1px solid #5e3b70;padding-top:16px}
+.aw-theme .aw-client-member-list{list-style:none;margin:12px 0;padding:0;display:grid;gap:8px}
+.aw-theme .aw-client-member-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#31213f;border:1px solid #573666;border-radius:8px;padding:9px 12px;color:#f3e7fa;font-size:12px}
+.aw-theme .aw-client-member-list small{color:#bda7cf;margin-left:9px}
+.aw-theme .aw-client-project-editor .aw-team-select{color:#f3e7fa}
+.aw-theme .aw-client-project-editor .aw-client-btn{min-height:34px}

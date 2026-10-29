@@ -147,25 +147,27 @@ try{
   assert.equal(detail.deliverables.length,16);
   assert.equal(detail.deliverables.filter(x=>x.title.startsWith("Reel")).length,8);
   assert.equal(detail.deliverables.filter(x=>x.title.startsWith("Post")).length,8);
+  const [fReviewer,fContributor,fExtra]=await Promise.all(["shoot-reviewer","shoot-crew","shoot-extra"].map(loginId=>
+    db.user.create({data:{organizationId:founderOrg.id,loginId,displayName:loginId,status:"ACTIVE"}})));
   const videoProject=await projects.create(founder,{clientId:fClient.id,name:"October video shoot",
-    template:"VIDEO_SHOOTING",assigneeIds:[reviewer.id,contributor.id]});
+    template:"VIDEO_SHOOTING",assigneeIds:[fReviewer.id,fContributor.id]});
   const videoDetail=await projects.detail(founder,videoProject.id);
   assert.equal(videoDetail.deliverables.length,5);
   assert.ok(videoDetail.deliverables.some(x=>x.title==="Video shoot and footage capture"));
   assert.equal(videoDetail.members.length,3);
-  assert.equal(videoDetail.members.find(x=>x.userId===reviewer.id)?.role,"CONTRIBUTOR");
+  assert.equal(videoDetail.members.find(x=>x.userId===fReviewer.id)?.role,"CONTRIBUTOR");
   assert.equal((await projects.list(founder,{clientId:fClient.id,limit:20})).items
     .find(x=>x.id===videoProject.id)?.members.length,3);
   assert.equal(await db.notification.count({where:{organizationId:founderOrg.id,
-    recipientId:reviewer.id,kind:"PROJECT_ASSIGNED",dedupeKey:"project.assigned:"+videoProject.id}}),1);
+    recipientId:fReviewer.id,kind:"PROJECT_ASSIGNED",dedupeKey:"project.assigned:"+videoProject.id}}),1);
   await assert.rejects(()=>projects.create(founder,{clientId:fClient.id,name:"Bad assignment",
     template:"VIDEO_SHOOTING",assigneeIds:[external.id]}),failure(422));
   await assert.rejects(()=>projects.create(founder,{clientId:fClient.id,name:"Duplicate assignment",
-    template:"VIDEO_SHOOTING",assigneeIds:[reviewer.id,reviewer.id]}),failure(422));
+    template:"VIDEO_SHOOTING",assigneeIds:[fReviewer.id,fReviewer.id]}),failure(422));
   // Assignment updates must be visible immediately and revoke access when removed.
-  await projects.setMember(founder,videoProject.id,{userId:unknown.id,role:"CONTRIBUTOR"});
+  await projects.setMember(founder,videoProject.id,{userId:fExtra.id,role:"CONTRIBUTOR"});
   assert.equal((await projects.detail(founder,videoProject.id)).members.length,4);
-  await projects.removeMember(founder,videoProject.id,unknown.id);
+  await projects.removeMember(founder,videoProject.id,fExtra.id);
   assert.equal((await projects.detail(founder,videoProject.id)).members.length,3);
   const seoProject=await projects.create(founder,{clientId:fClient.id,name:"SEO delivery",template:"SEO"});
   assert.equal((await projects.detail(founder,seoProject.id)).deliverables.length,4);
