@@ -118,3 +118,9 @@
  border:1px solid #ffa32b;
  box-shadow:0 0 0 1px rgba(255,173,52,.28),0 0 15px rgba(255,139,0,.65),0 0 32px rgba(255,126,0,.30),inset 0 0 12px rgba(255,139,0,.10);
 }
+
+/* Weekly checklist navigation follows calendar weeks, including shifted interval dates. */
+.aw-theme .aw-delivery-week-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:12px 0;color:#f1defc}
+.aw-theme .aw-delivery-week-toolbar strong{font-size:12px;font-weight:750;text-align:center;flex:1 1 170px}
+.aw-theme .aw-delivery-week-toolbar button{min-height:34px}
+@media(max-width:520px){.aw-theme .aw-delivery-week-toolbar{gap:8px}.aw-theme .aw-delivery-week-toolbar button{flex:1}.aw-theme .aw-delivery-week-toolbar strong{order:-1;flex-basis:100%}}

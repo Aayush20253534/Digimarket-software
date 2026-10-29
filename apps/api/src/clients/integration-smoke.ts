@@ -67,6 +67,13 @@ try{
  assert.equal(datesInRange("2026-10-28","2026-11-28",[1]).length,4);
  assert.deepEqual(datesInRange("2026-11-07","2026-11-07",[]),["2026-11-07"]);
  assert.deepEqual(datesInRange("2026-11-07","2026-11-28",[]),[]);
+ assert.deepEqual(datesInRange("2026-10-28","2026-11-08",[],2),
+  ["2026-10-28","2026-10-30","2026-11-01","2026-11-03","2026-11-05","2026-11-07"]);
+ assert.deepEqual(datesInRange("2026-10-28","2026-11-08",[],3),
+  ["2026-10-28","2026-10-31","2026-11-03","2026-11-06"]);
+ assert.deepEqual(datesInRange("2026-10-28","2026-11-08",[],4),
+  ["2026-10-28","2026-11-01","2026-11-05"]);
+ assert.deepEqual(datesInRange("2026-10-28","2026-11-08",[4],3),[]);
  const managerSchedule=await deliveries.create(manager,{
   clientId:client.id,title:"Weekly video shooting",assigneeId:member.id,
   startOn:"2025-10-28",endOn:"2025-11-28",weekdays:[4],
@@ -110,6 +117,26 @@ try{
  assert.equal(delivery.items[0].scheduledOccurrences,6);
  assert.equal(delivery.items[0].completedOccurrences,2);
  assert.equal(delivery.items[0].totalDeliverables,0);
+ const interval=await deliveries.create(manager,{clientId:client.id,title:"Three-day reel editing",assigneeId:member.id,
+  startOn:"2025-10-28",endOn:"2025-11-08",weekdays:[],repeatEveryDays:3});
+ const intervalItems=(await deliveries.list(manager,{clientId:client.id})).items.find(x=>x.id===interval.id);
+ assert.equal(intervalItems?.repeatEveryDays,3);
+ assert.deepEqual(intervalItems?.occurrences.map(o=>o.scheduledOn.toISOString().slice(0,10)),
+  ["2025-10-28","2025-10-31","2025-11-03","2025-11-06"]);
+ assert.ok(intervalItems);
+ const firstInterval=intervalItems.occurrences[0];
+ assert.equal((await deliveries.complete(assignee,interval.id,firstInterval.id,{version:firstInterval.version,completed:true})).status,"COMPLETED");
+ await assert.rejects(()=>deliveries.create(manager,{clientId:client.id,title:"Conflicting recurrence",assigneeId:member.id,
+  startOn:"2026-11-01",endOn:"2026-11-20",weekdays:[2],repeatEveryDays:3}),fail(422));
+ const intervalUpdated=await deliveries.update(manager,interval.id,{
+  version:interval.version,title:"Every other day reel editing",assigneeId:member.id,serviceId:null,
+  startOn:"2026-11-01",endOn:"2026-11-13",weekdays:[],repeatEveryDays:2,active:true,
+ });
+ assert.equal(intervalUpdated.repeatEveryDays,2);
+ const afterInterval=(await deliveries.list(manager,{clientId:client.id})).items.find(x=>x.id===interval.id);
+ assert.equal(afterInterval?.occurrences.filter(o=>o.status==="COMPLETED").length,1);
+ assert.deepEqual(afterInterval?.occurrences.filter(o=>o.scheduledOn>=new Date("2026-11-01T00:00:00Z")).map(o=>o.scheduledOn.toISOString().slice(0,10)),
+  ["2026-11-01","2026-11-03","2026-11-05","2026-11-07","2026-11-09","2026-11-11","2026-11-13"]);
  assert.equal((await clients.deliverySummary(external)).items.length,0);
  await assert.rejects(()=>clients.deliverySummary(actor(member.id,org.id,[])),fail(403));
  assert.equal((await clients.list(manager,{limit:30,q:"Updated"})).items.length,1);

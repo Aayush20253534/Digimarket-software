@@ -81,3 +81,19 @@ describe("agreed services without duplicate monthly quantity",()=>{
   expect(clientServiceSchema.safeParse({name:"Video editing",monthlyTarget:8}).success).toBe(false);
  });
 });
+
+describe("interval recurrence for service deliveries",()=>{
+ const base={clientId:"00000000-0000-4000-8000-000000000001",assigneeId:"00000000-0000-4000-8000-000000000002",title:"Reel editing",startOn:"2026-10-28",endOn:"2026-11-28",weekdays:[]};
+ it("accepts alternating, two-day and three-day gaps",()=>{
+  for(const n of [2,3,4,7,31])expect(serviceDeliveryPlanSchema.safeParse({...base,repeatEveryDays:n}).success).toBe(true);
+ });
+ it("rejects unsupported or conflicting day intervals",()=>{
+  for(const n of [0,1,32,2.5])expect(serviceDeliveryPlanSchema.safeParse({...base,repeatEveryDays:n}).success).toBe(false);
+  expect(serviceDeliveryPlanSchema.safeParse({...base,weekdays:[4],repeatEveryDays:3}).success).toBe(false);
+ });
+ it("allows interval schedule updates and weekly recurrence",()=>{
+  const plan={assigneeId:base.assigneeId,title:base.title,startOn:base.startOn,endOn:base.endOn,weekdays:base.weekdays};
+  expect(serviceDeliveryPlanUpdateSchema.safeParse({...plan,repeatEveryDays:2,active:true,version:1}).success).toBe(true);
+  expect(serviceDeliveryPlanUpdateSchema.safeParse({...plan,weekdays:[4],repeatEveryDays:null,active:true,version:1}).success).toBe(true);
+ });
+});
