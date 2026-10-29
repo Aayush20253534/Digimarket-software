@@ -9,7 +9,14 @@ const collision=()=>new AuthError(409,"VERSION_CONFLICT","Delivery changed; relo
 const manage=(a:Principal)=>a.roles.some(role=>["SUPER_ADMIN","ADMIN","FOUNDER"].includes(role))&&a.permissions.has("clients.edit");
 const date=(s:string)=>new Date(s+"T00:00:00.000Z");
 const onlyDate=(value:Date)=>value.toISOString().slice(0,10);
-export function datesInRange(start:string,end:string,weekdays:number[]){
+export function datesInRange(start:string,end:string,weekdays:number[],repeatEveryDays:number|null=null){
+ if(repeatEveryDays!==null){
+  if(weekdays.length||!Number.isInteger(repeatEveryDays)||repeatEveryDays<2||repeatEveryDays>31)return [];
+  const results:string[]=[];
+  for(let time=date(start).getTime(),last=date(end).getTime();time<=last;time+=repeatEveryDays*86_400_000)
+   results.push(onlyDate(new Date(time)));
+  return results;
+ }
  if(weekdays.length===0)return start===end?[start]:[];
  const results:string[]=[],selected=new Set(weekdays);
  for(let time=date(start).getTime(),last=date(end).getTime();time<=last;time+=86_400_000){
@@ -34,15 +41,17 @@ export class ServiceDeliveryService {
   if(!c)throw missing();
   return c;
  }
- private async validate(a:Principal,input:{clientId:string;serviceId?:string|null;assigneeId:string;startOn:string;endOn:string;weekdays:number[]}){
+ private async validate(a:Principal,input:{clientId:string;serviceId?:string|null;assigneeId:string;startOn:string;endOn:string;weekdays:number[];repeatEveryDays?:number|null}){
   const client=await this.client(a,input.clientId);
   if(client.status!=="ACTIVE")throw invalid("Client must be active to schedule deliveries");
   if((date(input.endOn).getTime()-date(input.startOn).getTime())/86_400_000>366)
     throw invalid("A service delivery schedule may span at most 367 dates");
-  if(input.weekdays.length===0&&input.startOn!==input.endOn)
+  if(input.repeatEveryDays!=null&&input.weekdays.length>0)
+    throw invalid("Choose either weekday recurrence or a day interval, not both");
+  if(input.repeatEveryDays==null&&input.weekdays.length===0&&input.startOn!==input.endOn)
     throw invalid("One-time deliveries must have the same start and end date");
-  if(!datesInRange(input.startOn,input.endOn,input.weekdays).length)
-    throw invalid("Choose at least one weekday within the selected dates");
+  if(!datesInRange(input.startOn,input.endOn,input.weekdays,input.repeatEveryDays).length)
+    throw invalid("Choose valid weekdays or a day interval within the selected dates");
   const assignee=await this.db.user.findFirst({where:{id:input.assigneeId,organizationId:a.organizationId,status:"ACTIVE"},select:{id:true}});
   if(!assignee)throw invalid("Choose an active employee in your organization");
   if(input.serviceId){
@@ -66,12 +75,13 @@ export class ServiceDeliveryService {
  async create(a:Principal,input:ServiceDeliveryPlanInput){
   this.requireManager(a);
   await this.validate(a,input);
-  const dates=datesInRange(input.startOn,input.endOn,input.weekdays);
+  const dates=datesInRange(input.startOn,input.endOn,input.weekdays,input.repeatEveryDays);
   return this.db.$transaction(async tx=>{
    const record=await tx.serviceDeliverySchedule.create({data:{
     organizationId:a.organizationId,clientId:input.clientId,serviceId:input.serviceId??null,
     title:input.title,assigneeId:input.assigneeId,createdById:a.userId,
     startOn:date(input.startOn),endOn:date(input.endOn),weekdays:input.weekdays,
+    repeatEveryDays:input.repeatEveryDays??null,
     occurrences:{create:dates.map(scheduledOn=>({scheduledOn:date(scheduledOn)}))},
    }});
    await tx.notification.create({data:{organizationId:a.organizationId,recipientId:input.assigneeId,
@@ -89,11 +99,12 @@ export class ServiceDeliveryService {
   if(!existing)throw missing();
   await this.validate(a,{...input,clientId:existing.clientId});
   const today=todayInZone("Asia/Kolkata");
-  const next=datesInRange(input.startOn,input.endOn,input.weekdays).filter(x=>x>=today);
+  const next=datesInRange(input.startOn,input.endOn,input.weekdays,input.repeatEveryDays).filter(x=>x>=today);
   return this.db.$transaction(async tx=>{
    const updated=await tx.serviceDeliverySchedule.updateMany({where:{id,organizationId:a.organizationId,version:input.version},data:{
     serviceId:input.serviceId??null,title:input.title,assigneeId:input.assigneeId,
     startOn:date(input.startOn),endOn:date(input.endOn),weekdays:input.weekdays,
+    repeatEveryDays:input.repeatEveryDays??null,
     active:input.active,version:{increment:1},
    }});
    if(updated.count!==1)throw collision();
