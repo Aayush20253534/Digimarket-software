@@ -311,6 +311,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const founderSections=await founderNav.locator(".aw-nav-group").allTextContents();
   expect(founderSections.indexOf("Finance"),"Finance should follow Workspace in the sidebar")
     .toBe(founderSections.indexOf("Workspace")+1);
+  const workspaceLinks=await founderNav.locator(".aw-nav-section").first().locator(".aw-nav-name").allTextContents();
+  expect(workspaceLinks.slice(0,3),"Clients and Client deliveries must follow Overview").toEqual(["Overview","Clients","Client deliveries"]);
+  await expect(founderNav.getByRole("link",{name:"Clients",exact:true})).toHaveCount(1);
+  await expect(founderNav.getByRole("link",{name:"Client deliveries",exact:true})).toHaveCount(1);
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await page.goto("/app/notes");
   // The studio must reach the bottom of the visible desktop viewport at 75% zoom.

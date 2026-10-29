@@ -11,6 +11,8 @@ type Group={title:string;items:readonly Item[]};
 const sections:readonly Group[]=[
  {title:"Workspace",items:[
   {label:"Overview",href:"/app/dashboard",icon:LayoutDashboard},
+  {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]},
+  {label:"Client deliveries",href:"/app/deliveries",icon:FolderKanban,permits:["clients.read"]},
   {label:"My notes",href:"/app/notes",icon:NotebookPen},
   {label:"Messages",href:"/app/messages",icon:MessageCircle},
   {label:"My search",operational:true,href:"/app/search",icon:Search,permits:["search.read"]},
@@ -22,11 +24,9 @@ const sections:readonly Group[]=[
  {title:"Relationships",items:[
   {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
   {label:"Follow Ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
-  {label:"Meetings",href:"/app/meetings",icon:CalendarDays,permits:["leads.read"]},
-  {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]}
+  {label:"Meetings",href:"/app/meetings",icon:CalendarDays,permits:["leads.read"]}
  ]},
  {title:"Delivery",items:[
-  {label:"Client deliveries",href:"/app/deliveries",icon:FolderKanban,permits:["clients.read"]},
   {label:"Tasks",href:"/app/tasks",icon:CheckSquare2,permits:["tasks.read"]},
   {label:"Task history",href:"/app/task-history",icon:History,permits:["tasks.read"]},
   {label:"Content calendar",operational:true,href:"/app/content",icon:CalendarDays,permits:["content.read"]},
