@@ -700,22 +700,29 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("table",{name:"Clients directory"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add client"})).toHaveCount(0);
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
-  // A client must open on Delivery, rather than burying projects beneath long editing forms.
-  await page.getByRole("table",{name:"Clients directory"}).getByRole("row")
-    .filter({hasText:"Founder CI Lead"}).getByRole("button",{name:"Open"}).click();
-  const clientDialog=page.getByRole("dialog",{name:"Client details"});
-  const clientTabs=clientDialog.getByRole("tablist",{name:"Client workspace sections"});
+  // Client records open as real pages, not as cramped modal drawers.
+  const openClient=page.getByRole("table",{name:"Clients directory"}).getByRole("row")
+    .filter({hasText:"Founder CI Lead"}).getByRole("link",{name:"Open workspace"});
+  await openClient.click();
+  await expect(page).toHaveURL(/\/app\/clients\/[0-9a-f-]{36}$/i);
+  const workspace=page.getByTestId("client-workspace-page");
+  await expect(workspace).toBeVisible();
+  const clientTabs=workspace.getByRole("tablist",{name:"Client workspace sections"});
   await expect(clientTabs.getByRole("tab",{name:"Delivery"})).toHaveAttribute("aria-selected","true");
-  await expect(clientDialog.getByRole("heading",{name:"Projects & deliverables"})).toBeVisible();
-  await expect(clientDialog.getByLabel("Create client delivery project")).toBeVisible();
+  await expect(workspace.getByRole("heading",{name:"Projects & deliverables"})).toBeVisible();
+  const createDelivery=workspace.getByRole("button",{name:"Create client delivery project"});
+  await expect(createDelivery).toBeVisible();
+  await createDelivery.click();
+  await expect(workspace.getByRole("form",{name:"Create client delivery project"})).toBeVisible();
   await clientTabs.getByRole("tab",{name:"Agreement"}).click();
-  await expect(clientDialog.getByRole("heading",{name:"Client: Founder CI Lead"})).toBeVisible();
-  await expect(clientDialog.getByRole("heading",{name:"Projects & deliverables"})).toHaveCount(0);
+  await expect(workspace.getByRole("heading",{name:"Client profile & agreement"})).toBeVisible();
+  await expect(workspace.getByRole("heading",{name:"Projects & deliverables"})).toHaveCount(0);
   await clientTabs.getByRole("tab",{name:"Services"}).click();
-  await expect(clientDialog.getByRole("heading",{name:"Services & monthly commitments"})).toBeVisible();
+  await expect(workspace.getByRole("heading",{name:"Services & monthly commitments"})).toBeVisible();
   await clientTabs.getByRole("tab",{name:"Contacts"}).click();
-  await expect(clientDialog.getByRole("heading",{name:"Contacts"})).toBeVisible();
-  await clientDialog.getByRole("button",{name:"Close",exact:true}).click();
+  await expect(workspace.getByRole("heading",{name:"Contacts"})).toBeVisible();
+  await workspace.getByRole("link",{name:"All clients"}).click();
+  await expect(page).toHaveURL(/\/app\/clients$/);
   // Confirm the frontend gateway supports metrics and hard-deletion, and that
   // deleting an approved lead never removes its linked client.
   await page.goto("/app/leads");

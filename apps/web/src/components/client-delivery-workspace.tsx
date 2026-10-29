@@ -1,89 +1,80 @@
 "use client";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { ArrowRight, RefreshCw } from "lucide-react";
-import { useAuth } from "@/components/auth-provider";
-import { Card, FormField, Notice } from "@/components/ui";
-type Project={id:string;name:string;description:string|null;status:string;dueOn:string|null;
-  _count?:{members:number;milestones:number;deliverables:number}};
+import {FormEvent,useCallback,useEffect,useState} from "react";
+import {ArrowRight,CheckCircle2,FolderKanban,Plus,RefreshCw} from "lucide-react";
+import {useAuth} from "@/components/auth-provider";
+type Project={id:string;name:string;description:string|null;status:string;dueOn:string|null;_count?:{members:number;milestones:number;deliverables:number}};
 type Result={items:Project[];nextCursor:string|null};
 type Template="NONE"|"SOCIAL_MONTHLY"|"WEBSITE"|"SEO"|"PAID_ADS";
-const initial={name:"",description:"",startOn:"",dueOn:"",template:"SOCIAL_MONTHLY" as Template};
+const fresh=()=>({name:"",description:"",startOn:"",dueOn:"",template:"SOCIAL_MONTHLY" as Template});
 export function ClientDeliveryWorkspace({clientId,canCreate}:{clientId:string;canCreate:boolean}){
-  const {session,request}=useAuth();
-  const canRead=!!session?.identity.permissions.includes("projects.read");
-  const [projects,setProjects]=useState<Project[]>([]);
-  const [form,setForm]=useState(initial);
-  const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [loaded,setLoaded]=useState(false);
-  const [more,setMore]=useState(false);
-  const load=useCallback(async()=>{
-    if(!canRead)return;
-    try{
-      const data=await request<Result>("/projects?"+new URLSearchParams({clientId,limit:"100"}));
-      setProjects(data.items);setMore(!!data.nextCursor);setLoaded(true);
-    }catch(e){setError(e instanceof Error?e.message:"Unable to load client projects");setLoaded(true);}
-  },[clientId,canRead,request]);
-  useEffect(()=>{void load();},[load]);
-  async function create(e:FormEvent){
-    e.preventDefault();setBusy(true);setError("");setNotice("");
-    try{
-      const saved=await request<Project>("/projects",{method:"POST",body:{clientId,...form}});
-      setForm(initial);await load();
-      setNotice("Project and delivery checklist created. Open the project to assign collaborators and track approvals.");
-      // The new project is now in the shared client-linked register.
-      if(!saved.id)throw Error("Project creation did not return an identifier");
-    }catch(e){setError(e instanceof Error?e.message:"Could not create a delivery project");}
-    finally{setBusy(false);}
-  }
-  if(!canRead)return <Card title="Projects & deliverables" description="Project information is restricted to authorized team members.">
-    <p className="text-sm">This account does not have project access.</p>
-  </Card>;
-  return <Card title="Projects & deliverables" description="Client-linked delivery milestones, responsibilities and approvals. Tasks are created within these projects.">
-    {error&&<Notice kind="error">{error}</Notice>}
-    {notice&&<Notice kind="success">{notice}</Notice>}
-    <div className="mb-4 flex items-center justify-between gap-2">
-      <p className="text-sm text-slate-600">{loaded?projects.length+" accessible projects":"Loading projects…"}</p>
-      <button type="button" className="btn-secondary" disabled={busy} onClick={()=>void load()}><RefreshCw size={14}/>Refresh</button>
+ const {session,request}=useAuth(),canRead=!!session?.identity.permissions.includes("projects.read");
+ const [projects,setProjects]=useState<Project[]>([]),[form,setForm]=useState(fresh),[expanded,setExpanded]=useState(false);
+ const [loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState(""),[more,setMore]=useState(false);
+ const load=useCallback(async()=>{
+  if(!canRead)return;
+  try{const result=await request<Result>("/projects?"+new URLSearchParams({clientId,limit:"100"}));setProjects(result.items);setMore(!!result.nextCursor);setError("");}
+  catch(e){setError(e instanceof Error?e.message:"Unable to load projects");}
+  finally{setLoaded(true);}
+ },[clientId,canRead,request]);
+ useEffect(()=>{void load();},[load]);
+ async function create(e:FormEvent){
+  e.preventDefault();setBusy(true);setError("");setNotice("");
+  try{
+   const created=await request<Project>("/projects",{method:"POST",body:{clientId,...form}});
+   if(!created.id)throw Error("Project creation did not return an identifier");
+   setForm(fresh());await load();setExpanded(false);
+   setNotice("Delivery project created. Open it to manage milestones, collaborators and approvals.");
+  }catch(e){setError(e instanceof Error?e.message:"Project creation failed");}
+  finally{setBusy(false);}
+ }
+ if(!canRead)return <section className="aw-client-panel"><h2>Projects & deliverables</h2><p className="aw-client-muted">You do not have permission to view client projects.</p></section>;
+ const active=projects.filter(p=>p.status==="ACTIVE"||p.status==="PLANNED").length;
+ const total=projects.reduce((n,p)=>n+(p._count?.deliverables||0),0);
+ return <section className="aw-client-panel" aria-label="Projects and deliverables">
+  <div className="aw-client-panel-heading">
+   <div><p className="aw-client-kicker">DELIVERY PLANNING</p><h2>Projects & deliverables</h2><p>Each project is linked to this client. Templates create draft milestones and deliverables, not completed work.</p></div>
+   <div className="aw-client-actions"><button type="button" disabled={busy} className="aw-client-btn" onClick={()=>void load()}><RefreshCw size={15}/>Refresh</button>
+    {canCreate&&<button type="button" className="aw-client-primary" aria-label="Create client delivery project" aria-expanded={expanded}
+      onClick={()=>setExpanded(v=>!v)}><Plus size={15}/>{expanded?"Close setup":"New delivery project"}</button>}
+   </div>
+  </div>
+  {error&&<div role="alert" className="aw-client-alert">{error}</div>}
+  {notice&&<div role="status" className="aw-client-success">{notice}</div>}
+  <div className="aw-client-metrics">
+   <div><span>Accessible projects</span><strong>{loaded?projects.length:"…"}</strong></div>
+   <div><span>Planned / active</span><strong>{loaded?active:"…"}</strong></div>
+   <div><span>Tracked deliverables</span><strong>{loaded?total:"…"}</strong></div>
+  </div>
+  <div className="aw-client-project-grid" aria-label="Client projects">
+   {projects.map(item=><article key={item.id} className="aw-client-project">
+    <div className="aw-client-panel-heading"><div><div className="aw-client-project-icon"><FolderKanban size={19}/></div><h3>{item.name}</h3><p>{item.description||"No project description"}</p></div>
+     <span className="aw-client-project-state">{item.status.replaceAll("_"," ")}</span>
     </div>
-    <div className="space-y-2" aria-label="Client projects">
-      {projects.map(project=><div key={project.id} className="rounded-lg border border-slate-200 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-semibold">{project.name}</p>
-            <p className="text-xs text-slate-600">{project.status.replaceAll("_"," ")} · {project._count?.deliverables??0} deliverables{project.dueOn?" · Due "+project.dueOn.slice(0,10):""}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&session.identity.permissions.includes("tasks.create")&&
-              <Link href={"/app/tasks?projectId="+encodeURIComponent(project.id)} className="btn-secondary text-xs">Assign task</Link>}
-            <Link href={"/app/projects?focus="+encodeURIComponent(project.id)} className="btn-secondary text-xs">Open <ArrowRight size={14}/></Link>
-          </div>
-        </div>
-      </div>)}
-      {loaded&&!projects.length&&<p className="text-sm text-slate-500">No projects yet. Create the first service-delivery project below.</p>}
-      {more&&<p className="text-xs text-amber-700">Showing the first 100 projects. Open Projects to see more.</p>}
+    <div className="aw-client-project-details"><span><CheckCircle2 size={14}/>{item._count?.deliverables||0} deliverables</span><span>{item._count?.milestones||0} milestones</span>{item.dueOn&&<span>Due {item.dueOn.slice(0,10)}</span>}</div>
+    <div className="aw-client-actions">
+     <Link href={"/app/projects?focus="+encodeURIComponent(item.id)} className="aw-client-btn">Manage project <ArrowRight size={14}/></Link>
+     {session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&session.identity.permissions.includes("tasks.create")&&
+      <Link href={"/app/tasks?projectId="+encodeURIComponent(item.id)} className="aw-client-btn">Assign task</Link>}
     </div>
-    {canCreate&&<form className="mt-5 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2" onSubmit={create} aria-label="Create client delivery project">
-      <h3 className="sm:col-span-2 font-semibold">Set up a delivery project</h3>
-      <FormField id="delivery-project-name" label="Project name"><input id="delivery-project-name" className="field" required minLength={2} maxLength={180}
-        placeholder="October marketing delivery" value={form.name} onChange={e=>setForm(v=>({...v,name:e.target.value}))}/></FormField>
-      <FormField id="delivery-project-template" label="Service template"><select id="delivery-project-template" className="field" value={form.template} onChange={e=>setForm(v=>({...v,template:e.target.value as Template}))}>
-        <option value="SOCIAL_MONTHLY">Social media: reels and posts</option>
-        <option value="WEBSITE">Website build</option>
-        <option value="SEO">SEO / AEO / GEO</option>
-        <option value="PAID_ADS">Paid advertising</option>
-        <option value="NONE">Blank project</option>
-      </select></FormField>
-      <FormField id="delivery-project-start" label="Start date"><input id="delivery-project-start" className="field" type="date" value={form.startOn}
-        onChange={e=>setForm(v=>({...v,startOn:e.target.value}))}/></FormField>
-      <FormField id="delivery-project-due" label="Due date"><input id="delivery-project-due" className="field" type="date" min={form.startOn||undefined} value={form.dueOn}
-        onChange={e=>setForm(v=>({...v,dueOn:e.target.value}))}/></FormField>
-      <FormField id="delivery-project-description" label="Delivery scope"><textarea id="delivery-project-description" className="field" rows={2} maxLength={2000} value={form.description}
-        onChange={e=>setForm(v=>({...v,description:e.target.value}))}/></FormField>
-      <div className="sm:col-span-2"><button className="btn-primary" disabled={busy} type="submit">{busy?"Creating…":"Create delivery project"}</button></div>
-      <p className="sm:col-span-2 text-xs text-slate-500">Templates create a milestone and draft deliverables. They do not automatically create staff tasks, publish content or repeat next month.</p>
-    </form>}
-  </Card>;
+   </article>)}
+  </div>
+  {loaded&&!projects.length&&<div className="aw-client-empty"><FolderKanban size={23}/><h3>No delivery projects yet</h3><p>Add the agreed services, then start a project using the appropriate template. Work remains empty until a project is created.</p></div>}
+  {more&&<p className="aw-client-muted">Showing the first 100 accessible projects. Agency-wide projects are available in the Projects module.</p>}
+  {canCreate&&expanded&&<form className="aw-client-form aw-client-subform" onSubmit={create} aria-label="Create client delivery project">
+   <h3>Set up delivery project</h3>
+   <p className="aw-client-muted">Use a separate project for each meaningful workstream, such as monthly social content or a one-time website.</p>
+   <div className="aw-client-form-grid">
+    <label>Project name<input className="field" required minLength={2} maxLength={180} placeholder="October social media delivery" value={form.name} onChange={e=>setForm(v=>({...v,name:e.target.value}))}/></label>
+    <label>Service template<select className="field" value={form.template} onChange={e=>setForm(v=>({...v,template:e.target.value as Template}))}>
+     <option value="SOCIAL_MONTHLY">Social media: reels & posts</option><option value="WEBSITE">Website development</option><option value="SEO">SEO / AEO / GEO</option><option value="PAID_ADS">Paid advertising</option><option value="NONE">Blank project</option>
+    </select></label>
+    <label>Start date<input className="field" type="date" value={form.startOn} onChange={e=>setForm(v=>({...v,startOn:e.target.value}))}/></label>
+    <label>Due date<input className="field" type="date" min={form.startOn||undefined} value={form.dueOn} onChange={e=>setForm(v=>({...v,dueOn:e.target.value}))}/></label>
+    <label className="aw-client-wide">Scope<textarea className="field" maxLength={2000} rows={3} value={form.description} onChange={e=>setForm(v=>({...v,description:e.target.value}))}/></label>
+   </div>
+   <div className="aw-client-actions"><button type="submit" className="aw-client-primary" disabled={busy}>{busy?"Creating…":"Create project and checklist"}</button><button type="button" className="aw-client-btn" onClick={()=>setExpanded(false)}>Cancel</button></div>
+   <p className="aw-client-muted">Templates do not automatically assign staff tasks, publish content or renew every month.</p>
+  </form>}
+ </section>;
 }
