@@ -1,16 +1,16 @@
 CREATE TYPE "ServiceOccurrenceStatus" AS ENUM ('PENDING','COMPLETED');
 CREATE TABLE "ServiceDeliverySchedule" (
- "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+ "id" UUID NOT NULL,
  "organizationId" UUID NOT NULL,"clientId" UUID NOT NULL,"serviceId" UUID,
  "title" VARCHAR(180) NOT NULL,"assigneeId" UUID NOT NULL,"createdById" UUID NOT NULL,
  "startOn" DATE NOT NULL,"endOn" DATE NOT NULL,"weekdays" INTEGER[] NOT NULL,
  "active" BOOLEAN NOT NULL DEFAULT true,"version" INTEGER NOT NULL DEFAULT 1,
  "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
- "updatedAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ "updatedAt" TIMESTAMPTZ(6) NOT NULL,
  CONSTRAINT "ServiceDeliverySchedule_pkey" PRIMARY KEY ("id")
 );
 CREATE TABLE "ServiceDeliveryOccurrence"(
- "id" UUID NOT NULL DEFAULT gen_random_uuid(),"scheduleId" UUID NOT NULL,
+ "id" UUID NOT NULL,"scheduleId" UUID NOT NULL,
  "scheduledOn" DATE NOT NULL,"status" "ServiceOccurrenceStatus" NOT NULL DEFAULT 'PENDING',
  "completedAt" TIMESTAMPTZ(6),"completedById" UUID,"version" INTEGER NOT NULL DEFAULT 1,
  CONSTRAINT "ServiceDeliveryOccurrence_pkey" PRIMARY KEY ("id")
