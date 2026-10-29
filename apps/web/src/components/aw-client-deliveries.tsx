@@ -52,10 +52,10 @@ export function AWClientDeliveries(){
       {summary.items.map(client=><article key={client.id} className="min-w-0 rounded-xl border border-violet-500/30 bg-[#20162F] p-4 shadow-[0_4px_24px_rgba(112,58,160,0.13)]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Link href={"/app/clients?focus="+encodeURIComponent(client.id)} className="text-base font-bold text-white hover:underline">{client.businessName}</Link>
+            <Link href={"/app/clients/"+encodeURIComponent(client.id)} className="text-base font-bold text-white hover:underline">{client.businessName}</Link>
             <p className="mt-1 text-xs text-[#BFAAD1]">{client.activeProjects} planned / active projects · {client.status.toLowerCase()}</p>
           </div>
-          <Link href={"/app/clients?focus="+encodeURIComponent(client.id)} className="shrink-0 rounded-lg border border-violet-500/40 p-2 text-purple-200" aria-label={"Open delivery for "+client.businessName}><ArrowRight size={18}/></Link>
+          <Link href={"/app/clients/"+encodeURIComponent(client.id)} className="shrink-0 rounded-lg border border-violet-500/40 p-2 text-purple-200" aria-label={"Open delivery for "+client.businessName}><ArrowRight size={18}/></Link>
         </div>
         {client.totalDeliverables>0?<div className="mt-3">
           <div className="flex justify-between gap-3 text-xs text-[#E7D8F6]">

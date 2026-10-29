@@ -49,6 +49,7 @@ const endpoints: Record<string, string[]> = {
   "leads/meetings/today": ["GET"],
   "leads/meetings": ["GET"],
   "clients": ["GET","POST"],
+  "clients/deliveries": ["GET"],
   "assets": ["GET"],
   "projects": ["GET","POST"],
   "projects/assignees": ["GET"],
@@ -115,6 +116,7 @@ const projectDeliverablePattern = /^projects\/[0-9a-fA-F-]{36}\/deliverables\/[0
 const projectDeliverableSubmitPattern = /^projects\/[0-9a-fA-F-]{36}\/deliverables\/[0-9a-fA-F-]{36}\/submit$/;
 const clientDetailPattern = /^clients\/[0-9a-fA-F-]{36}$/;
 const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/(contacts|services)$/;
+const clientServiceEditPattern = /^clients\/[0-9a-fA-F-]{36}\/services\/[0-9a-fA-F-]{36}$/;
 const clientConvertPattern = /^leads\/[0-9a-fA-F-]{36}\/convert$/;
 const assetIdPattern = /^assets\/[0-9a-fA-F-]{36}$/;
 const assetActionPattern = /^assets\/[0-9a-fA-F-]{36}\/(authorized-download|link|archive)$/;
@@ -164,6 +166,7 @@ function permitted(path: string, method: string): boolean {
   if (assetActionPattern.test(path)) return method==="POST";
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (clientChildrenPattern.test(path)) return method === "POST";
+  if (clientServiceEditPattern.test(path)) return method === "PUT";
   if (clientConvertPattern.test(path)) return method === "POST";
   if (leadDetailPattern.test(path)) return ["GET","PUT","DELETE"].includes(method);
   if (leadAssignPattern.test(path)) return method === "PUT";
