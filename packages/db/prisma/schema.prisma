@@ -135,6 +135,10 @@ enum RecurrenceFrequency {
   WEEKLY
   MONTHLY
 }
+enum ServiceOccurrenceStatus {
+  PENDING
+  COMPLETED
+}
 enum ContentStatus {
   IDEA
   DRAFT
@@ -233,9 +237,11 @@ model Organization {
   assetFolders AssetFolder[]
   assetUploadIntents AssetUploadIntent[]
   projects Project[]
+  deliverySchedules ServiceDeliverySchedule[]
   contentPosts ContentPost[]
   tasks Task[]
   taskRecurrences TaskRecurrence[]
+  serviceDeliverySchedules ServiceDeliverySchedule[]
 }
 
 model User {
@@ -292,6 +298,9 @@ model User {
   taskComments TaskComment[]
   notifications Notification[]
   taskRecurrencesCreated TaskRecurrence[]
+  deliverySchedulesCreated ServiceDeliverySchedule[] @relation("DeliveryScheduleCreator")
+  deliverySchedulesAssigned ServiceDeliverySchedule[] @relation("DeliveryScheduleAssignee")
+  deliveryOccurrencesCompleted ServiceDeliveryOccurrence[] @relation("DeliveryOccurrenceCompleter")
 
   @@unique([organizationId, loginId])
   @@index([organizationId, status])
@@ -667,6 +676,7 @@ model ClientService {
   client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
   tasks Task[]
   recurrences TaskRecurrence[]
+  deliverySchedules ServiceDeliverySchedule[]
   @@index([clientId,status])
 }
 
@@ -813,6 +823,48 @@ model ProjectDeliverable {
   @@index([projectId,status,updatedAt])
   @@index([milestoneId])
   @@index([assetId])
+}
+
+
+// Contract-date-based service deliveries. Unlike Projects and Tasks these
+// are flat dated occurrences, not milestones, checklists or staff tasks.
+model ServiceDeliverySchedule {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  serviceId String? @db.Uuid
+  title String @db.VarChar(180)
+  assigneeId String @db.Uuid
+  createdById String @db.Uuid
+  startOn DateTime @db.Date
+  endOn DateTime @db.Date
+  weekdays Int[]
+  active Boolean @default(true)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  service ClientService? @relation(fields:[serviceId],references:[id],onDelete:Restrict)
+  assignee User @relation("DeliveryScheduleAssignee",fields:[assigneeId],references:[id],onDelete:Restrict)
+  creator User @relation("DeliveryScheduleCreator",fields:[createdById],references:[id],onDelete:Restrict)
+  occurrences ServiceDeliveryOccurrence[]
+  @@index([organizationId,clientId,startOn])
+  @@index([organizationId,assigneeId,active])
+}
+
+model ServiceDeliveryOccurrence {
+  id String @id @default(uuid()) @db.Uuid
+  scheduleId String @db.Uuid
+  scheduledOn DateTime @db.Date
+  status ServiceOccurrenceStatus @default(PENDING)
+  completedAt DateTime? @db.Timestamptz(6)
+  completedById String? @db.Uuid
+  version Int @default(1)
+  schedule ServiceDeliverySchedule @relation(fields:[scheduleId],references:[id],onDelete:Restrict)
+  completedBy User? @relation("DeliveryOccurrenceCompleter",fields:[completedById],references:[id],onDelete:Restrict)
+  @@unique([scheduleId,scheduledOn])
+  @@index([status,scheduledOn])
 }
 
 // Module 11: assignable tasks, checklists, comments and durable recurrence cursor.

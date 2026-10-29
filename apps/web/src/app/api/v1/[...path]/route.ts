@@ -50,6 +50,7 @@ const endpoints: Record<string, string[]> = {
   "leads/meetings": ["GET"],
   "clients": ["GET","POST"],
   "clients/deliveries": ["GET"],
+  "service-deliveries": ["GET","POST"],
   "assets": ["GET"],
   "projects": ["GET","POST"],
   "projects/assignees": ["GET"],
@@ -117,6 +118,8 @@ const projectDeliverableSubmitPattern = /^projects\/[0-9a-fA-F-]{36}\/deliverabl
 const clientDetailPattern = /^clients\/[0-9a-fA-F-]{36}$/;
 const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/(contacts|services)$/;
 const clientServiceEditPattern = /^clients\/[0-9a-fA-F-]{36}\/services\/[0-9a-fA-F-]{36}$/;
+const deliveryPlanEditPattern=/^service-deliveries\/[0-9a-fA-F-]{36}$/;
+const deliveryOccurrenceEditPattern=/^service-deliveries\/[0-9a-fA-F-]{36}\/occurrences\/[0-9a-fA-F-]{36}$/;
 const clientConvertPattern = /^leads\/[0-9a-fA-F-]{36}\/convert$/;
 const assetIdPattern = /^assets\/[0-9a-fA-F-]{36}$/;
 const assetActionPattern = /^assets\/[0-9a-fA-F-]{36}\/(authorized-download|link|archive)$/;
@@ -167,6 +170,7 @@ function permitted(path: string, method: string): boolean {
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (clientChildrenPattern.test(path)) return method === "POST";
   if (clientServiceEditPattern.test(path)) return method === "PUT";
+  if (deliveryPlanEditPattern.test(path)||deliveryOccurrenceEditPattern.test(path))return method==="PUT";
   if (clientConvertPattern.test(path)) return method === "POST";
   if (leadDetailPattern.test(path)) return ["GET","PUT","DELETE"].includes(method);
   if (leadAssignPattern.test(path)) return method === "PUT";
@@ -235,6 +239,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
+  if(path==="service-deliveries"){
+    for(const key of ["clientId","mine"]){const value=request.nextUrl.searchParams.get(key);if(value)url.searchParams.set(key,value);}
+  }
   if (path === "approvals" || ["finance/entries","finance/summary","finance/export"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");
     if (view && (path==="approvals"?["mine","queue","history"]:["mine","all"]).includes(view)) url.searchParams.set("view", view);

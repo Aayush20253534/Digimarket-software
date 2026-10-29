@@ -1,10 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { clientUpdateSchema,clientListQuerySchema,
-  clientContactSchema,clientServiceSchema } from "@digimarket/contracts";
+  clientContactSchema,clientServiceSchema,serviceDeliveryPlanSchema,
+  serviceDeliveryPlanUpdateSchema,serviceDeliveryOccurrenceUpdateSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { ClientsService } from "./service";
+import { ServiceDeliveryService } from "./delivery-service";
 const id=z.uuid();
 function parse<T>(schema:z.ZodType<T>,value:unknown):T {
  const result=schema.safeParse(value);
@@ -13,6 +15,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T {
 }
 export function registerClientRoutes(app:Express,auth:AuthService) {
  const svc=new ClientsService(auth.database);
+ const deliveries=new ServiceDeliveryService(auth.database);
  const authenticated=async(req:Request,res:Response,next:NextFunction)=>{
    try{
      const token=req.get("authorization");
@@ -53,6 +56,23 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  app.put(root+"/:id/services/:serviceId",authenticated,async(req,res)=>{
    res.json({data:await svc.updateService(actor(res),parse(id,req.params.id),
      parse(id,req.params.serviceId),parse(clientServiceSchema,req.body))});
+ });
+
+ app.get("/api/v1/service-deliveries",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   const query=z.strictObject({clientId:z.uuid().optional(),mine:z.enum(["true","false"]).optional()});
+   res.json({data:await deliveries.list(actor(res),parse(query,req.query))});
+ });
+ app.post("/api/v1/service-deliveries",authenticated,async(req,res)=>{
+   res.status(201).json({data:await deliveries.create(actor(res),parse(serviceDeliveryPlanSchema,req.body))});
+ });
+ app.put("/api/v1/service-deliveries/:id",authenticated,async(req,res)=>{
+   res.json({data:await deliveries.update(actor(res),parse(id,req.params.id),
+     parse(serviceDeliveryPlanUpdateSchema,req.body))});
+ });
+ app.put("/api/v1/service-deliveries/:id/occurrences/:occurrenceId",authenticated,async(req,res)=>{
+   res.json({data:await deliveries.complete(actor(res),parse(id,req.params.id),
+     parse(id,req.params.occurrenceId),parse(serviceDeliveryOccurrenceUpdateSchema,req.body))});
  });
  app.post("/api/v1/leads/:id/convert",authenticated,async(_req,res)=>{
    res.status(405).json({error:{code:"AUTO_CONVERSION_ONLY",
