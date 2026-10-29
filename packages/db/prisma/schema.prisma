@@ -640,6 +640,7 @@ model Client {
   assets Asset[]
   assetUploadIntents AssetUploadIntent[]
   projects Project[]
+  deliverySchedules ServiceDeliverySchedule[]
   contentPosts ContentPost[]
   invoices Invoice[]
   payments Payment[]
