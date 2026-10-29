@@ -10,6 +10,7 @@ import { ClientDeliveryWorkspace } from "@/components/client-delivery-workspace"
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
+type ClientTab="delivery"|"services"|"agreement"|"contacts";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
 type Service={id:string;name:string;description:string|null;monthlyTarget:number|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Client={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;
@@ -36,6 +37,7 @@ export default function ClientsPage(){
  const canEdit=!!session?.identity.permissions.includes("clients.edit");
  const [rows,setRows]=useState<Client[]>([]);
  const [selected,setSelected]=useState<Detail|null>(null);
+ const [activeTab,setActiveTab]=useState<ClientTab>("delivery");
  const [draft,setDraft]=useState<Editable>(clean);
  const [status,setStatus]=useState<Status>("ACTIVE");
  const [terms,setTerms]=useState({contractStartOn:"",contractEndOn:"",monthlyFee:"",monthlyAdBudget:""});
@@ -74,10 +76,10 @@ export default function ClientsPage(){
  },[canRead,request,search,filter,cursor,sortBy,descending]);
  useEffect(()=>{void load();},[load]);
  const focusedRef=useRef(false);
- const open=async(id:string)=>{
+ const open=async(id:string,resetTab=true)=>{
    try{
      const data=await request<Detail>("/clients/"+id);
-     setSelected(data);setDraft(fromClient(data));setStatus(data.status);
+     setSelected(data);if(resetTab)setActiveTab("delivery");setDraft(fromClient(data));setStatus(data.status);
      setTerms({contractStartOn:data.contractStartOn?.slice(0,10)??"",contractEndOn:data.contractEndOn?.slice(0,10)??"",
        monthlyFee:data.monthlyFee??"",monthlyAdBudget:data.monthlyAdBudget??""});
      setError("");
@@ -94,7 +96,7 @@ export default function ClientsPage(){
    setBusy(true);setError("");setMessage("");
    try{
      await request("/clients/"+selected.id,{method:"PUT",body:{businessName:draft.businessName,businessType:draft.businessType,phone:draft.phone,notes:draft.notes,...terms,status,version:selected.version}});
-     await open(selected.id);await load();setMessage("Client profile updated.");
+     await open(selected.id,false);await load();setMessage("Client profile updated.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
  async function addContact(e:FormEvent){
@@ -103,7 +105,7 @@ export default function ClientsPage(){
    try{
      await request("/clients/"+selected.id+"/contacts",{method:"POST",body:contact});
      setContact({name:"",role:"",phone:"",email:"",isPrimary:false});
-     await open(selected.id);setMessage("Client contact saved.");
+     await open(selected.id,false);setMessage("Client contact saved.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
  async function saveServiceEdit(e:FormEvent){
@@ -113,7 +115,7 @@ export default function ClientsPage(){
      await request("/clients/"+selected.id+"/services/"+editingService.id,{method:"PUT",body:{
        ...serviceEdit,monthlyTarget:serviceEdit.monthlyTarget?Number(serviceEdit.monthlyTarget):null,
      }});
-     setEditingService(null);await open(selected.id);setMessage("Service commitment updated.");
+     setEditingService(null);await open(selected.id,false);setMessage("Service commitment updated.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
  async function addService(e:FormEvent){
@@ -122,7 +124,7 @@ export default function ClientsPage(){
    try{
      await request("/clients/"+selected.id+"/services",{method:"POST",body:{...service,monthlyTarget:service.monthlyTarget?Number(service.monthlyTarget):null}});
      setService({name:"",description:"",status:"ACTIVE",monthlyTarget:""});
-     await open(selected.id);setMessage("Service added to client.");
+     await open(selected.id,false);setMessage("Service added to client.");
    }catch(e){setError(readable(e));}finally{setBusy(false);}
  }
  const sorted=useMemo(()=>legacySort?[...rows].sort((a,b)=>{
@@ -170,7 +172,28 @@ export default function ClientsPage(){
      {selected&&<DirectoryDetailsPortal onClose={()=>setSelected(null)}>
        <div className="aw-directory-details-panel">
        {selected&&<div className="aw-directory-details-header"><strong>Client details</strong><button type="button" className="btn-secondary" onClick={()=>setSelected(null)}>Close</button></div>}
-       {selected?<Card title={"Client: "+selected.businessName} description={"Profile version "+selected.version+" · Agreement and onboarding"}>
+       <section className="rounded-xl border border-violet-500/30 bg-[#1D112B] p-4 text-[#F5EAFE]" aria-label="Client delivery workspace header">
+         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+           <div>
+             <p className="text-xs font-semibold uppercase tracking-widest text-violet-300">Client delivery workspace</p>
+             <h2 className="mt-1 text-xl font-bold">{selected.businessName}</h2>
+             <p className="mt-1 text-xs text-[#CBB8DE]">{selected.services.length} services · {selected.contractEndOn?"Agreement ends "+selected.contractEndOn.slice(0,10):"Agreement dates not set"}</p>
+           </div>
+           <StatusBadge status={selected.status}/>
+         </div>
+         <div role="tablist" aria-label="Client workspace sections" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+           {([["delivery","Delivery"],["services","Services"],["agreement","Agreement"],["contacts","Contacts"]] as const).map(([key,label])=>
+             <button key={key} id={"client-tab-"+key} type="button" role="tab" aria-selected={activeTab===key}
+               aria-controls="client-workspace-panel" onClick={()=>setActiveTab(key)}
+               className={"min-h-10 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors "+(activeTab===key
+                 ?"border-violet-300 bg-[#4A2B67] text-white":"border-violet-500/30 bg-[#281A37] text-[#DECDEC] hover:bg-[#38234F]")}>
+               {label}
+             </button>)}
+         </div>
+       </section>
+       <div id="client-workspace-panel" role="tabpanel" aria-labelledby={"client-tab-"+activeTab} className="space-y-4" data-testid="client-workspace-active-panel">
+         {activeTab==="delivery"&&<ClientDeliveryWorkspace key={selected.id} clientId={selected.id} canCreate={!!session?.identity.permissions.includes("projects.create")}/>}
+       {selected&&activeTab==="agreement"?<Card title={"Client: "+selected.businessName} description={"Profile version "+selected.version+" · Agreement and onboarding"}>
          {selected.sourceLead&&<p className="mb-4 text-sm">Source lead: <Link href="/app/leads" className="text-indigo-700 underline">{selected.sourceLead.businessName}</Link></p>}
          {canEdit?<form onSubmit={save} className="space-y-3">
            {editableFields.map(([key,label])=><FormField key={key} id={"edit-client-"+key} label={label}>
@@ -206,7 +229,7 @@ export default function ClientsPage(){
            <StatusBadge status={selected.status}/>
          </div>}
        </Card>:null}
-       {selected&&<Card title="Contacts" description="People connected with this client. No login credentials are stored.">
+       {selected&&activeTab==="contacts"&&<Card title="Contacts" description="People connected with this client. No login credentials are stored.">
          {selected.contacts.length===0?<p className="text-sm text-slate-500">No contacts recorded.</p>:
            <div className="space-y-2">{selected.contacts.map(x=><div key={x.id} className="rounded-lg border p-3 text-sm">
              <p className="font-semibold">{x.name}{x.isPrimary?" · Primary":""}</p>
@@ -221,7 +244,7 @@ export default function ClientsPage(){
            <div className="sm:col-span-2"><button disabled={busy} className="btn-secondary">Add contact</button></div>
          </form>}
        </Card>}
-       {selected&&<Card title="Services & monthly commitments" description="Services promised to this client and their agreed monthly delivery targets.">
+       {selected&&activeTab==="services"&&<Card title="Services & monthly commitments" description="Services promised to this client and their agreed monthly delivery targets.">
          {selected.services.length===0?<p className="text-sm text-slate-500">No services listed.</p>:
            <div className="space-y-2">{selected.services.map(x=><div key={x.id} className="rounded-lg border p-3 text-sm">
              <div className="flex items-center justify-between gap-2"><p className="font-semibold">{x.name}</p><div className="flex items-center gap-2">
@@ -259,7 +282,7 @@ export default function ClientsPage(){
            <button disabled={busy} className="btn-secondary">Add service</button>
          </form>}
        </Card>}
-       {selected&&<ClientDeliveryWorkspace key={selected.id} clientId={selected.id} canCreate={!!session?.identity.permissions.includes("projects.create")}/>}
+       </div>
        </div>
      </DirectoryDetailsPortal>}
    </div>
