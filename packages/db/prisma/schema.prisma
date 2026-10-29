@@ -237,7 +237,6 @@ model Organization {
   assetFolders AssetFolder[]
   assetUploadIntents AssetUploadIntent[]
   projects Project[]
-  deliverySchedules ServiceDeliverySchedule[]
   contentPosts ContentPost[]
   tasks Task[]
   taskRecurrences TaskRecurrence[]
