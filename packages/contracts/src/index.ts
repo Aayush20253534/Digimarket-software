@@ -230,7 +230,8 @@ export const projectCreateSchema=z.strictObject({
   clientId:z.uuid(),name:z.string().trim().min(2).max(180),
   description:z.string().trim().max(2000).optional(),
   startOn:optionalProjectDate,dueOn:optionalProjectDate,
-  template:z.enum(["NONE","SOCIAL_MONTHLY","WEBSITE","SEO","PAID_ADS"]).optional(),
+  template:z.enum(["NONE","SOCIAL_MONTHLY","WEBSITE","SEO","PAID_ADS","VIDEO_SHOOTING"]).optional(),
+  assigneeIds:z.array(z.uuid()).max(30).refine(ids=>new Set(ids).size===ids.length,"Duplicate project assignee").optional(),
 }).refine(x=>!x.startOn||!x.dueOn||x.startOn<=x.dueOn,{message:"Start date must be on or before due date"});
 export type ProjectCreateInput=z.infer<typeof projectCreateSchema>;
 export const projectUpdateSchema=z.strictObject({

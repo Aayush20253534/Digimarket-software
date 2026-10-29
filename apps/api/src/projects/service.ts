@@ -55,6 +55,7 @@ export class ProjectsService {
       orderBy:[{createdAt:"desc"},{id:"desc"}],
       select:{id:true,name:true,description:true,status:true,startOn:true,dueOn:true,version:true,
         createdAt:true,updatedAt:true,clientId:true,client:{select:{businessName:true}},
+        members:{select:{userId:true,role:true,user:{select:{displayName:true}}}},
         _count:{select:{members:true,milestones:true,deliverables:true}}}});
     return {items:rows.slice(0,input.limit),nextCursor:rows.length>input.limit?rows[input.limit-1].id:null};
   }
@@ -75,6 +76,14 @@ export class ProjectsService {
     const client=await this.db.client.findFirst({where:{id:input.clientId,organizationId:a.organizationId,status:{not:"ARCHIVED"}}});
     if(!client)throw missing();
     const template=input.template??"NONE";
+    const assigneeIds=input.assigneeIds??[];
+    if(assigneeIds.length){
+      // Only project managers with explicit assignment permission may allocate staff.
+      need(a,"projects.assign");
+      const unique=[...new Set(assigneeIds)];
+      const staff=await this.db.user.findMany({where:{id:{in:unique},organizationId:a.organizationId,status:"ACTIVE"},select:{id:true}});
+      if(staff.length!==unique.length)throw invalid("All project assignees must be active agency employees");
+    }
     const activeServices=template==="SOCIAL_MONTHLY"?await this.db.clientService.findMany({
       where:{clientId:input.clientId,status:"ACTIVE"},select:{name:true,monthlyTarget:true},
     }):[];
@@ -94,12 +103,21 @@ export class ProjectsService {
     ]:template==="PAID_ADS"?[
       {title:"Campaign setup",quantity:1},{title:"Creative and copy",quantity:1},
       {title:"Optimization review",quantity:1},{title:"Monthly campaign report",quantity:1},
+    ]:template==="VIDEO_SHOOTING"?[
+      {title:"Creative brief and shot list",quantity:1},
+      {title:"Shoot schedule and location confirmed",quantity:1},
+      {title:"Video shoot and footage capture",quantity:1},
+      {title:"Footage backup and handoff",quantity:1},
+      {title:"Footage review and client approval",quantity:1},
     ]:[];
     return this.db.$transaction(async tx=>{
       const result=await tx.project.create({data:{
         organizationId:a.organizationId,clientId:input.clientId,createdById:a.userId,
         name:input.name,description:text(input.description),startOn:date(input.startOn),dueOn:date(input.dueOn),
-        members:{create:{userId:a.userId,role:"MANAGER"}},
+        members:{create:[
+          {userId:a.userId,role:"MANAGER"},
+          ...assigneeIds.filter(id=>id!==a.userId).map(userId=>({userId,role:"CONTRIBUTOR" as const})),
+        ]},
       }});
       if(plan.length){
         const milestone=await tx.projectMilestone.create({data:{
@@ -111,7 +129,14 @@ export class ProjectsService {
         })));
         await tx.projectDeliverable.createMany({data:deliverables});
       }
-      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,action:"projects.created",entityType:"Project",entityId:result.id}});
+      if(assigneeIds.length)await tx.notification.createMany({data:assigneeIds.filter(id=>id!==a.userId).map(recipientId=>({
+        organizationId:a.organizationId,recipientId,dedupeKey:"project.assigned:"+result.id,
+        kind:"PROJECT_ASSIGNED",title:"Project assigned",
+        body:"You have been assigned to "+result.name.slice(0,240),
+        href:"/app/projects?focus="+result.id,
+      })),skipDuplicates:true});
+      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,action:"projects.created",entityType:"Project",entityId:result.id,
+        afterRedacted:{assignedCount:assigneeIds.length,template}}});
       await tx.outboxEvent.create({data:{organizationId:a.organizationId,eventKey:"project.created."+result.id,
         kind:"projects.created",aggregateType:"Project",aggregateId:result.id,payloadMinimal:{projectId:result.id,clientId:result.clientId}}});
       return result;
@@ -155,9 +180,16 @@ export class ProjectsService {
     const user=await this.db.user.findFirst({where:{id:input.userId,organizationId:a.organizationId,status:"ACTIVE"}});
     if(!user)throw missing();
     return this.db.$transaction(async tx=>{
+      const previous=await tx.projectMember.findUnique({where:{projectId_userId:{projectId:id,userId:input.userId}}});
       const member=await tx.projectMember.upsert({where:{projectId_userId:{projectId:id,userId:input.userId}},
         create:{projectId:id,userId:input.userId,role:input.role},update:{role:input.role}});
       if(input.userId===p.createdById&&input.role!=="MANAGER")throw invalid("Project creator must remain a manager");
+      if(!previous&&input.userId!==a.userId)await tx.notification.createMany({data:[{
+        organizationId:a.organizationId,recipientId:input.userId,dedupeKey:"project.assigned:"+id,
+        kind:"PROJECT_ASSIGNED",title:"Project assigned",
+        body:"You have been assigned to "+p.name.slice(0,240),
+        href:"/app/projects?focus="+id,
+      }],skipDuplicates:true});
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
         action:"projects.member_set",entityType:"Project",entityId:id,
         afterRedacted:{userId:input.userId,role:input.role}}});
@@ -170,7 +202,15 @@ export class ProjectsService {
     const changed=await this.db.$transaction(async tx=>{
       const existing=await tx.projectMember.findUnique({where:{projectId_userId:{projectId:id,userId}}});
       if(!existing)throw missing();
+      // Active tasks and schedules may only target current project members.
+      const [assignedTasks,scheduledTasks]=await Promise.all([
+        tx.task.count({where:{projectId:id,status:{notIn:["DONE","CANCELLED"]},assignees:{some:{userId}}}}),
+        tx.taskRecurrence.count({where:{projectId:id,enabled:true,assigneeIds:{has:userId}}}),
+      ]);
+      if(assignedTasks||scheduledTasks)throw invalid("Reassign this employee's active project tasks and recurring schedules before removing project access");
       await tx.projectMember.delete({where:{projectId_userId:{projectId:id,userId}}});
+      await tx.notification.deleteMany({where:{organizationId:a.organizationId,recipientId:userId,
+        kind:"PROJECT_ASSIGNED",dedupeKey:"project.assigned:"+id}});
       await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
         action:"projects.member_removed",entityType:"Project",entityId:id,afterRedacted:{userId}}});
       return {removed:true};
