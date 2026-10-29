@@ -26,9 +26,11 @@ try{
  const mgr=actor(admin.id,org.id,perms);
  const founder=actor(other.id,org.id,perms);
  founder.roles=["FOUNDER"];
- await assert.rejects(()=>tasks.create(founder,{title:"Unauthorized creation",priority:"LOW",
+ const limitedFounder=actor(other.id,org.id,["tasks.read"]);
+ limitedFounder.roles=["FOUNDER"];
+ await assert.rejects(()=>tasks.create(limitedFounder,{title:"Unauthorized creation",priority:"LOW",
    assigneeIds:[staff.id]}),failed(403));
- await assert.rejects(()=>tasks.createRecurrence(founder,{
+ await assert.rejects(()=>tasks.createRecurrence(limitedFounder,{
    title:"Unauthorized recurring work",priority:"MEDIUM",frequency:"DAILY",interval:1,
    timezone:"UTC",startAt:new Date().toISOString(),dueOffsetDays:0,assigneeIds:[staff.id]
  }),failed(403));
@@ -37,6 +39,7 @@ try{
  const readOnly=actor(other.id,org.id,["tasks.read","tasks.update.own","tasks.comment"]);
  const stranger=actor(foreign.id,outside.id,perms);
  const client=await db.client.create({data:{organizationId:org.id,createdById:admin.id,businessName:"Cafe"}});
+ const clientService=await db.clientService.create({data:{clientId:client.id,name:"Social media reels",monthlyTarget:8}});
  const project=await db.project.create({data:{organizationId:org.id,clientId:client.id,
    createdById:admin.id,name:"Website",
    members:{create:[{userId:admin.id,role:"MANAGER"},{userId:staff.id,role:"CONTRIBUTOR"}]}}});
@@ -44,6 +47,26 @@ try{
  await assert.rejects(()=>tasks.create(mgr,{title:"Wrong project assignee",priority:"MEDIUM",
    projectId:project.id,assigneeIds:[other.id]}),failed(422));
  const deadline=new Date(Date.now()+86400000).toISOString();
+ const founderTask=await tasks.create(founder,{title:"Founder campaign allocation",priority:"MEDIUM",
+   serviceId:clientService.id,dueAt:deadline,assigneeIds:[staff.id]});
+ assert.equal(founderTask.serviceId,clientService.id);
+ assert.equal((await tasks.list(founder,{view:"team",serviceId:clientService.id,limit:10})).items.length,1);
+ assert.equal((await tasks.detail(founder,founderTask.id)).service?.clientId,client.id);
+ await tasks.delete(founder,founderTask.id,founderTask.version);
+ const foreignClient=await db.client.create({data:{organizationId:outside.id,createdById:foreign.id,businessName:"Other tenant"}});
+ const foreignService=await db.clientService.create({data:{clientId:foreignClient.id,name:"Hidden service"}});
+ await assert.rejects(()=>tasks.create(mgr,{title:"Foreign service task",priority:"MEDIUM",
+   serviceId:foreignService.id,dueAt:deadline,assigneeIds:[staff.id]}),failed(422));
+ const unrelated=await db.client.create({data:{organizationId:org.id,createdById:admin.id,businessName:"Different client"}});
+ const unrelatedService=await db.clientService.create({data:{clientId:unrelated.id,name:"SEO"}});
+ await assert.rejects(()=>tasks.create(mgr,{title:"Mismatched client project",priority:"MEDIUM",
+   serviceId:unrelatedService.id,projectId:project.id,dueAt:deadline,assigneeIds:[staff.id]}),failed(422));
+ const founderSchedule=await tasks.createRecurrence(founder,{
+   title:"Founder weekly social schedule",priority:"LOW",serviceId:clientService.id,
+   frequency:"WEEKLY",interval:1,timezone:"Asia/Kolkata",
+   startAt:new Date(Date.now()+3600000).toISOString(),dueOffsetDays:1,assigneeIds:[staff.id]});
+ assert.equal(founderSchedule.serviceId,clientService.id);
+ await tasks.toggleRecurrence(founder,founderSchedule.id,founderSchedule.version,false);
  await assert.rejects(()=>tasks.create(mgr,{title:"Missing expiry",priority:"MEDIUM",assigneeIds:[staff.id]}),failed(422));
  await assert.rejects(()=>tasks.create(mgr,{title:"Expired at assignment",priority:"MEDIUM",dueAt:new Date(Date.now()-60000).toISOString(),assigneeIds:[staff.id]}),failed(422));
  const t=await tasks.create(mgr,{title:"Launch homepage",description:"Build first view",priority:"HIGH",
@@ -133,7 +156,7 @@ try{
    dueAt:nextDeadline,projectId:null,assigneeIds:[staff.id,other.id],
  };
  await assert.rejects(()=>tasks.edit(staffActor,t.id,editedInput),failed(403));
- await assert.rejects(()=>tasks.edit(founder,t.id,editedInput),failed(403));
+ await assert.rejects(()=>tasks.edit(limitedFounder,t.id,editedInput),failed(403));
  await assert.rejects(()=>tasks.edit(stranger,t.id,editedInput),failed(404));
  await assert.rejects(()=>tasks.edit(mgr,t.id,{...editedInput,
    projectId:project.id,assigneeIds:[foreign.id]}),failed(422));
@@ -160,13 +183,13 @@ try{
  statusTask=edited;
  // Only a tenant admin with task management can delete a shared task.
  await assert.rejects(()=>tasks.delete(staffActor,t.id,statusTask.version),failed(403));
- await assert.rejects(()=>tasks.delete(founder,t.id,statusTask.version),failed(403));
+ await assert.rejects(()=>tasks.delete(limitedFounder,t.id,statusTask.version),failed(403));
  await assert.rejects(()=>tasks.delete(stranger,t.id,statusTask.version),failed(404));
  const limitedAdmin=actor(admin.id,org.id,["tasks.read"]);
  await assert.rejects(()=>tasks.delete(limitedAdmin,t.id,statusTask.version),failed(403));
  await assert.rejects(()=>tasks.delete(mgr,t.id,statusTask.version-1),failed(409));
  const start=new Date(Date.now()-120000).toISOString();
- const repeat=await tasks.createRecurrence(mgr,{title:"Daily campaign check",priority:"MEDIUM",
+ const repeat=await tasks.createRecurrence(mgr,{title:"Daily campaign check",priority:"MEDIUM",serviceId:clientService.id,
    frequency:"DAILY",interval:1,timezone:"Asia/Kolkata",startAt:start,
    dueOffsetDays:0,assigneeIds:[staff.id]});
  await assert.rejects(()=>tasks.createRecurrence(mgr,{title:"Impossible zone",priority:"MEDIUM",
@@ -177,6 +200,7 @@ try{
  assert.equal((await sweepRecurrences(db,new Date(),100)).created,0);
  const generated=await db.task.findMany({where:{recurrenceId:repeat.id}});
  assert.equal(generated.length,1);
+ assert.equal(generated[0].serviceId,clientService.id);
  assert.equal(await db.notification.count({where:{organizationId:org.id,recipientId:staff.id,
    kind:"TASK_ASSIGNED",href:"/app/tasks?task="+generated[0].id}}),1);
 
@@ -228,5 +252,5 @@ try{
  assert.equal(await db.notification.count({where:{href:"/app/tasks?task="+generated[0].id}}),0);
  assert.equal(await db.outboxEvent.count({where:{aggregateType:"Task",aggregateId:generated[0].id}}),0);
  assert.equal(await db.taskRecurrence.count({where:{id:repeat.id}}),1);
- console.info("Module 11 PASS: private task scope, assignments, checklist/comments, versions, recurrence, DST, monthly clamping, retry dedupe and auto-pause");
+ console.info("Module 11 PASS: tenant-safe client service tasks, founder management, assignments, recurring generation and idempotency");
 }finally{await db.$disconnect();}

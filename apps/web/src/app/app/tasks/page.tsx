@@ -229,7 +229,7 @@ export default function TasksPage(){
     <button type="button" className="btn-secondary" disabled={!nextCursor||busy} onClick={()=>setCursor(nextCursor)}>Next page</button>
    </div>
   </Card>
-  {canCreate&&<Card title="Allocate a service task" description="Assign internal work to employees and optionally link it to a client service. Project assignments require project members.">
+  {canCreate&&<Card title="Create a task" description="Assign internal work to employees and optionally link it to a client service. Project assignments require project members.">
     <form className="grid gap-3 md:grid-cols-2" onSubmit={submitTask}>
      <label className="text-sm">Task title<input className="field mt-1 w-full" required minLength={2} maxLength={180}
        value={create.title} onChange={e=>setCreate(p=>({...p,title:e.target.value}))}/></label>
