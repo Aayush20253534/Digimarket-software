@@ -63,7 +63,7 @@ describe("optional recurrence for client deliveries",()=>{
  const base={clientId:"00000000-0000-4000-8000-000000000001",assigneeId:"00000000-0000-4000-8000-000000000002",title:"Website",startOn:"2026-11-05",endOn:"2026-11-05",weekdays:[]};
  it("accepts one-time services with no weekdays and allows editing them",()=>{
   expect(serviceDeliveryPlanSchema.safeParse(base).success).toBe(true);
-  const {clientId: _clientId,...update}=base;
+  const update={assigneeId:base.assigneeId,title:base.title,startOn:base.startOn,endOn:base.endOn,weekdays:base.weekdays};
   expect(serviceDeliveryPlanUpdateSchema.safeParse({...update,version:1,active:true}).success).toBe(true);
  });
  it("rejects zero-weekday ranges and preserves recurring service validation",()=>{
