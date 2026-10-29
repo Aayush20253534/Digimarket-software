@@ -139,6 +139,7 @@ export class ClientsService {
    const now=new Date();
    const monthStart=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),1));
    const nextMonth=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1));
+   const deliveryManager=a.permissions.has("clients.edit")&&a.roles.some(x=>["FOUNDER","ADMIN","SUPER_ADMIN"].includes(x));
    const projectAllowed=a.permissions.has("projects.read");
    const canSeeAllProjects=a.permissions.has("projects.assign");
    const projectScope:Prisma.ProjectWhereInput=canSeeAllProjects?{}:{
@@ -151,6 +152,8 @@ export class ClientsService {
        id:true,businessName:true,status:true,contractStartOn:true,contractEndOn:true,
        monthlyFee:true,monthlyAdBudget:true,
        services:{where:{status:"ACTIVE"},select:{id:true,name:true,monthlyTarget:true,status:true}},
+       deliverySchedules:{where:deliveryManager?{}:{assigneeId:a.userId},
+         select:{active:true,occurrences:{select:{status:true,scheduledOn:true}}}},
        projects:{where:projectAllowed?projectScope:{id:{in:[]}},select:{
          id:true,name:true,status:true,dueOn:true,
          deliverables:{select:{status:true}},
@@ -175,6 +178,9 @@ export class ClientsService {
        monthlyFee:a.permissions.has("finance.read.all")?row.monthlyFee:null,
        monthlyAdBudget:a.permissions.has("finance.read.all")?row.monthlyAdBudget:null,
        targets,
+       scheduledOccurrences:row.deliverySchedules.reduce((n,p)=>n+p.occurrences.length,0),
+       completedOccurrences:row.deliverySchedules.reduce((n,p)=>n+p.occurrences.filter(o=>o.status==="COMPLETED").length,0),
+       activeDeliverySchedules:row.deliverySchedules.filter(p=>p.active).length,
        projects:projects.map(project=>({
          id:project.id,name:project.name,status:project.status,dueOn:project.dueOn,
          totalDeliverables:project.deliverables.length,

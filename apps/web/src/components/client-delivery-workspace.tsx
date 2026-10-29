@@ -1,7 +1,7 @@
 "use client";
 import {FormEvent,useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
-import {CalendarDays,Check,Plus,RefreshCw,UserRound,RotateCcw} from "lucide-react";
+import {CalendarDays,Check,Plus,RefreshCw,UserRound} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 
 type Person={id:string;displayName:string};
