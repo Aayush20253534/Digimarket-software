@@ -479,13 +479,16 @@ export const notificationListSchema=z.strictObject({
 const serviceDeliveryPlanBase=z.strictObject({
  clientId:z.uuid(),serviceId:z.uuid().nullable().optional(),title:z.string().trim().min(2).max(180),
  assigneeId:z.uuid(),startOn:z.iso.date(),endOn:z.iso.date(),
- weekdays:z.array(z.number().int().min(0).max(6)).min(1).max(7)
+ weekdays:z.array(z.number().int().min(0).max(6)).max(7)
   .refine(values=>new Set(values).size===values.length,"Weekdays must be unique"),
 });
-export const serviceDeliveryPlanSchema=serviceDeliveryPlanBase.refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"});
+const validDeliveryFrequency=(x:{startOn:string;endOn:string;weekdays:number[]})=>x.weekdays.length>0||x.startOn===x.endOn;
+export const serviceDeliveryPlanSchema=serviceDeliveryPlanBase.refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"})
+ .refine(validDeliveryFrequency,{message:"One-time deliveries must have a single service date"});
 export const serviceDeliveryPlanUpdateSchema=serviceDeliveryPlanBase.omit({clientId:true}).extend({
  version:z.number().int().positive(),active:z.boolean(),
-}).refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"});
+}).refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"})
+ .refine(validDeliveryFrequency,{message:"One-time deliveries must have a single service date"});
 export const serviceDeliveryOccurrenceUpdateSchema=z.strictObject({
  version:z.number().int().positive(),completed:z.boolean(),
 });

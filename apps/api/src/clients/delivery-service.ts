@@ -10,6 +10,7 @@ const manage=(a:Principal)=>a.roles.some(role=>["SUPER_ADMIN","ADMIN","FOUNDER"]
 const date=(s:string)=>new Date(s+"T00:00:00.000Z");
 const onlyDate=(value:Date)=>value.toISOString().slice(0,10);
 export function datesInRange(start:string,end:string,weekdays:number[]){
+ if(weekdays.length===0)return start===end?[start]:[];
  const results:string[]=[],selected=new Set(weekdays);
  for(let time=date(start).getTime(),last=date(end).getTime();time<=last;time+=86_400_000){
    const current=new Date(time);if(selected.has(current.getUTCDay()))results.push(onlyDate(current));
@@ -38,6 +39,8 @@ export class ServiceDeliveryService {
   if(client.status!=="ACTIVE")throw invalid("Client must be active to schedule deliveries");
   if((date(input.endOn).getTime()-date(input.startOn).getTime())/86_400_000>366)
     throw invalid("A service delivery schedule may span at most 367 dates");
+  if(input.weekdays.length===0&&input.startOn!==input.endOn)
+    throw invalid("One-time deliveries must have the same start and end date");
   if(!datesInRange(input.startOn,input.endOn,input.weekdays).length)
     throw invalid("Choose at least one weekday within the selected dates");
   const assignee=await this.db.user.findFirst({where:{id:input.assigneeId,organizationId:a.organizationId,status:"ACTIVE"},select:{id:true}});

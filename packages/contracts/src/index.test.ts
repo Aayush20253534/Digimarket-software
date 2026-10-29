@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, serviceDeliveryPlanSchema, serviceDeliveryPlanUpdateSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -56,5 +56,19 @@ describe("lead decision pending stage",()=>{
   expect(leadStageSchema.parse("DECISION_PENDING")).toBe("DECISION_PENDING");
   expect(leadUpdateSchema.parse({version:2,status:"DECISION_PENDING",stageNote:"Awaiting confirmation"}).status).toBe("DECISION_PENDING");
   expect(leadListQuerySchema.parse({stage:"DECISION_PENDING"}).stage).toBe("DECISION_PENDING");
+ });
+});
+
+describe("optional recurrence for client deliveries",()=>{
+ const base={clientId:"00000000-0000-4000-8000-000000000001",assigneeId:"00000000-0000-4000-8000-000000000002",title:"Website",startOn:"2026-11-05",endOn:"2026-11-05",weekdays:[]};
+ it("accepts one-time services with no weekdays and allows editing them",()=>{
+  expect(serviceDeliveryPlanSchema.safeParse(base).success).toBe(true);
+  const {clientId: _clientId,...update}=base;
+  expect(serviceDeliveryPlanUpdateSchema.safeParse({...update,version:1,active:true}).success).toBe(true);
+ });
+ it("rejects zero-weekday ranges and preserves recurring service validation",()=>{
+  expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30"}).success).toBe(false);
+  expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30",weekdays:[4]}).success).toBe(true);
+  expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30",weekdays:[4,4]}).success).toBe(false);
  });
 });

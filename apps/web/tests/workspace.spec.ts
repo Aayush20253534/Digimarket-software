@@ -732,6 +732,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const deliveryAssignee=deliveryForm.getByLabel("Delivery assigned employee");
   await expect.poll(()=>deliveryAssignee.locator("option").count()).toBeGreaterThan(1);
   await deliveryAssignee.selectOption({index:1});
+  await deliveryForm.getByLabel("Repeat this service").check();
   await deliveryForm.getByLabel("Start date").fill("2025-10-28");
   await deliveryForm.getByLabel("End date").fill("2025-11-28");
   await deliveryForm.getByText("Thu",{exact:true}).click();
@@ -744,6 +745,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(firstShoot).toBeChecked();
   await expect(workspace.getByText("1/5 completed")).toBeVisible();
   await expect(workspace.getByRole("button",{name:"Edit schedule / reassign"})).toBeVisible();
+  await createDelivery.click();
+  await expect(deliveryForm.getByLabel("Repeat this service")).not.toBeChecked();
+  await expect(deliveryForm.getByLabel("End date")).toHaveCount(0);
+  await deliveryForm.getByLabel("Delivery service name").fill("CI one-time website");
+  await deliveryForm.getByLabel("Delivery assigned employee").selectOption({index:1});
+  await deliveryForm.getByLabel("Service date").fill("2025-11-07");
+  await expect(deliveryForm.getByText(/1 service date in this exact period/)).toBeVisible();
+  await deliveryForm.getByRole("button",{name:"Create one-time delivery"}).click();
+  await expect(workspace.getByRole("heading",{name:"CI one-time website"})).toBeVisible();
+  await expect(workspace.getByRole("checkbox",{name:/CI one-time website.*completed/})).toHaveCount(1);
   await clientTabs.getByRole("tab",{name:"Agreement"}).click();
   await expect(workspace.getByRole("heading",{name:"Client profile & agreement"})).toBeVisible();
   await expect(workspace.getByRole("heading",{name:"Client deliveries"})).toHaveCount(0);

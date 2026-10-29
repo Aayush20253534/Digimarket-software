@@ -9,10 +9,10 @@ type Service={id:string;name:string;status:string};
 type Occurrence={id:string;scheduledOn:string;status:"PENDING"|"COMPLETED";completedAt:string|null;completedBy:{displayName:string}|null;version:number};
 type Schedule={id:string;clientId:string;serviceId:string|null;title:string;startOn:string;endOn:string;weekdays:number[];active:boolean;version:number;
  assigneeId:string;assignee:Person;client:{id:string;businessName:string};service:Service|null;occurrences:Occurrence[]};
-type Draft={serviceId:string;title:string;startOn:string;endOn:string;assigneeId:string;weekdays:number[];active:boolean};
+type Draft={serviceId:string;title:string;startOn:string;endOn:string;assigneeId:string;weekdays:number[];repeat:boolean;active:boolean};
 const days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const presets=["Video shooting","Video editing","Reels","Posts","Website","SEO","AEO / GEO","Meta ads","Google ads"];
-const defaultDraft=(start="",end=""):Draft=>({serviceId:"",title:"Video shooting",startOn:start,endOn:end,assigneeId:"",weekdays:[],active:true});
+const defaultDraft=(start="",end=""):Draft=>({serviceId:"",title:"Video shooting",startOn:start,endOn:end,assigneeId:"",weekdays:[],repeat:false,active:true});
 const ymd=(value:string)=>value.slice(0,10);
 const format=(iso:string)=>new Date(ymd(iso)+"T12:00:00.000Z").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric",weekday:"short",timeZone:"Asia/Kolkata"});
 const today=()=>{const now=new Date(),parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Kolkata",day:"2-digit",month:"2-digit",year:"numeric"}).formatToParts(now);const pick=(key:string)=>parts.find(x=>x.type===key)?.value??"";return pick("year")+"-"+pick("month")+"-"+pick("day");};
@@ -20,6 +20,7 @@ export const scheduledDates=(start:string,end:string,weekdays:number[])=>{
  if(!start||!end||start>end)return [] as string[];
  const selected=new Set(weekdays),from=Date.parse(start+"T00:00:00Z"),to=Date.parse(end+"T00:00:00Z");
  if(!Number.isFinite(from)||!Number.isFinite(to)||to-from>366*86400000)return [] as string[];
+ if(weekdays.length===0)return start===end?[start]:[];
  const dates:string[]=[];for(let t=from;t<=to;t+=86400000){const date=new Date(t);if(selected.has(date.getUTCDay()))dates.push(date.toISOString().slice(0,10));}
  return dates;
 };
@@ -43,14 +44,14 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
  },[clientId,request]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!manager||!clientId)return;void request<Person[]>("/projects/assignees").then(setStaff).catch(e=>setError(e instanceof Error?e.message:"Could not load employees"));},[manager,clientId,request]);
- const validDates=useMemo(()=>scheduledDates(draft.startOn,draft.endOn,draft.weekdays),[draft.startOn,draft.endOn,draft.weekdays]);
+ const validDates=useMemo(()=>scheduledDates(draft.startOn,draft.repeat?draft.endOn:draft.startOn,draft.repeat?draft.weekdays:[]),[draft.startOn,draft.endOn,draft.weekdays,draft.repeat]);
  const reset=()=>{setDraft(defaultDraft(ymd(contractStartOn??""),ymd(contractEndOn??"")));setExpanded(false);setEditing(null);};
  const save=async(e:FormEvent)=>{
   e.preventDefault();if(!clientId||!manager||validDates.length===0||busy)return;
   setBusy(true);setError("");setSuccess("");
   try{
    const body={serviceId:draft.serviceId||null,title:draft.title.trim(),assigneeId:draft.assigneeId,
-    startOn:draft.startOn,endOn:draft.endOn,weekdays:draft.weekdays};
+    startOn:draft.startOn,endOn:draft.repeat?draft.endOn:draft.startOn,weekdays:draft.repeat?draft.weekdays:[]};
    if(editing){const old=plans.find(p=>p.id===editing);if(!old)throw Error("Schedule no longer exists");
     await request("/service-deliveries/"+editing,{method:"PUT",body:{...body,active:draft.active,version:old.version}});
    }else await request("/service-deliveries",{method:"POST",body:{...body,clientId}});
@@ -60,7 +61,7 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
  };
  const edit=(p:Schedule)=>{
   setEditing(p.id);setExpanded(true);
-  setDraft({title:p.title,serviceId:p.serviceId??"",startOn:ymd(p.startOn),endOn:ymd(p.endOn),weekdays:p.weekdays,assigneeId:p.assigneeId,active:p.active});
+  setDraft({title:p.title,serviceId:p.serviceId??"",startOn:ymd(p.startOn),endOn:ymd(p.endOn),weekdays:p.weekdays,repeat:p.weekdays.length>0,assigneeId:p.assigneeId,active:p.active});
   setError("");setSuccess("");
  };
  const check=async(p:Schedule,o:Occurrence)=>{
@@ -111,28 +112,29 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
      onChange={e=>setDraft(v=>({...v,assigneeId:e.target.value}))}>
      <option value="">Select employee</option>{staff.map(p=><option key={p.id} value={p.id}>{p.displayName}</option>)}
     </select></label>
-    <label>Start date<input type="date" className="field" required value={draft.startOn} onChange={e=>setDraft(v=>({...v,startOn:e.target.value}))}/></label>
-    <label>End date<input type="date" className="field" required min={draft.startOn||undefined} value={draft.endOn} onChange={e=>setDraft(v=>({...v,endOn:e.target.value}))}/></label>
-    <fieldset className="aw-client-wide"><legend className="text-sm font-semibold mb-2">Repeat on weekdays</legend>
+    <label className="aw-client-wide aw-client-check"><input type="checkbox" checked={draft.repeat} onChange={e=>setDraft(v=>({...v,repeat:e.target.checked}))}/>Repeat this service</label>
+    <label>{draft.repeat?"Start date":"Service date"}<input type="date" className="field" required value={draft.startOn} onChange={e=>setDraft(v=>({...v,startOn:e.target.value}))}/></label>
+    {draft.repeat&&<label>End date<input type="date" className="field" required min={draft.startOn||undefined} value={draft.endOn} onChange={e=>setDraft(v=>({...v,endOn:e.target.value}))}/></label>}
+    {draft.repeat&&<fieldset className="aw-client-wide"><legend className="text-sm font-semibold mb-2">Repeat on weekdays</legend>
      <div className="aw-delivery-weekdays">{days.map((day,index)=><label key={day} className={draft.weekdays.includes(index)?"selected":""}>
       <input type="checkbox" checked={draft.weekdays.includes(index)} onChange={()=>toggleDay(index)}/>{day.slice(0,3)}
      </label>)}</div>
-    </fieldset>
+    </fieldset>}
     {editing&&<label className="aw-client-wide aw-client-check"><input type="checkbox" checked={draft.active} onChange={e=>setDraft(v=>({...v,active:e.target.checked}))}/>Schedule active</label>}
     <p className="aw-client-wide aw-delivery-preview" aria-live="polite">{validDates.length} service date{validDates.length===1?"":"s"} in this exact period{validDates.length>0?": "+validDates.map(d=>new Date(d+"T12:00Z").toLocaleDateString("en-IN",{day:"numeric",month:"short",timeZone:"Asia/Kolkata"})).join(", "):""}.</p>
-    <div className="aw-client-actions"><button type="submit" className="aw-client-primary" disabled={busy||validDates.length===0||!draft.assigneeId}>{editing?"Save schedule changes":"Create dated checklist"}</button>
+    <div className="aw-client-actions"><button type="submit" className="aw-client-primary" disabled={busy||validDates.length===0||!draft.assigneeId}>{editing?"Save schedule changes":draft.repeat?"Create dated checklist":"Create one-time delivery"}</button>
      <button type="button" className="aw-client-btn" onClick={reset}>Cancel</button></div>
    </div>
   </form>}
   {!loaded&&<p role="status" className="aw-client-muted">Loading service deliveries…</p>}
-  {loaded&&!plans.length&&<div className="aw-client-empty"><CalendarDays size={22}/><h3>No service deliveries scheduled</h3><p>{clientId?"Create a service schedule above; choose exact dates, weekdays, and one responsible employee.":"No client delivery occurrences are currently assigned to you."}</p></div>}
+  {loaded&&!plans.length&&<div className="aw-client-empty"><CalendarDays size={22}/><h3>No service deliveries scheduled</h3><p>{clientId?"Create a one-time delivery or recurring schedule above, and assign one responsible employee.":"No client delivery occurrences are currently assigned to you."}</p></div>}
   <div className="aw-delivery-schedule-list">{plans.map(p=>{
    const completed=p.occurrences.filter(x=>x.status==="COMPLETED").length;
    const overdue=p.occurrences.filter(x=>x.status==="PENDING"&&ymd(x.scheduledOn)<today()).length;
    return <article key={p.id} className="aw-delivery-schedule">
     <div className="aw-client-panel-heading"><div><h3>{p.title}</h3>
-     <p>{p.client.businessName} · {format(p.startOn)} to {format(p.endOn)}</p>
-     <p className="aw-delivery-owner"><UserRound size={14}/>{p.assignee.displayName} · {p.weekdays.map(d=>days[d]).join(", ")}</p>
+     <p>{p.client.businessName} · {p.weekdays.length?format(p.startOn)+" to "+format(p.endOn):format(p.startOn)+" (one-time)"}</p>
+     <p className="aw-delivery-owner"><UserRound size={14}/>{p.assignee.displayName} · {p.weekdays.length?p.weekdays.map(d=>days[d]).join(", "):"One-time delivery"}</p>
     </div><div className="aw-client-actions"><span className="aw-client-project-state">{p.active?"Active":"Paused"}</span>
      {manager&&clientId&&<button type="button" className="aw-client-btn" onClick={()=>edit(p)}>Edit schedule / reassign</button>}
     </div></div>

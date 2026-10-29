@@ -65,6 +65,8 @@ try{
  const thursdays=datesInRange("2026-10-28","2026-11-28",[4]);
  assert.deepEqual(thursdays,["2026-10-29","2026-11-05","2026-11-12","2026-11-19","2026-11-26"]);
  assert.equal(datesInRange("2026-10-28","2026-11-28",[1]).length,4);
+ assert.deepEqual(datesInRange("2026-11-07","2026-11-07",[]),["2026-11-07"]);
+ assert.deepEqual(datesInRange("2026-11-07","2026-11-28",[]),[]);
  const managerSchedule=await deliveries.create(manager,{
   clientId:client.id,title:"Weekly video shooting",assigneeId:member.id,
   startOn:"2025-10-28",endOn:"2025-11-28",weekdays:[4],
@@ -87,6 +89,15 @@ try{
  assert.equal(changed.assigneeId,owner.id);
  assert.equal((await deliveries.list(assignee,{mine:"true"})).items.length,0);
  assert.equal((await deliveries.list(manager,{clientId:client.id})).items[0].occurrences.filter(x=>x.status==="COMPLETED").length,1);
+ const oneTime=await deliveries.create(manager,{clientId:client.id,title:"One-time website delivery",assigneeId:member.id,
+  startOn:"2025-11-07",endOn:"2025-11-07",weekdays:[]});
+ const single=await deliveries.list(manager,{clientId:client.id});
+ assert.equal(single.items.find(x=>x.id===oneTime.id)?.occurrences.length,1);
+ const onceOccurrence=single.items.find(x=>x.id===oneTime.id)?.occurrences[0];
+ assert.ok(onceOccurrence);
+ assert.equal((await deliveries.complete(assignee,oneTime.id,onceOccurrence.id,{version:onceOccurrence.version,completed:true})).status,"COMPLETED");
+ await assert.rejects(()=>deliveries.create(manager,{clientId:client.id,title:"Invalid one-time range",assigneeId:member.id,
+  startOn:"2025-11-07",endOn:"2025-11-08",weekdays:[]}),fail(422));
  assert.equal(await db.task.count({where:{organizationId:org.id}}),0);
  await assert.rejects(()=>deliveries.create(assignee,{clientId:client.id,title:"Unauthorized",assigneeId:member.id,
   startOn:"2026-10-28",endOn:"2026-11-28",weekdays:[4]}),fail(403));
