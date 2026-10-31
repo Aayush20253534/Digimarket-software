@@ -80,10 +80,10 @@ export default function QuotationsPage(){
      <h2 className="mb-4 text-lg font-bold text-[#4C207A]">1. Client & quotation</h2>
      <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><label className={label} htmlFor="quote-client">Client / business name *</label>
-       <input required minLength={2} maxLength={160} id="quote-client" className={field} value={form.clientName}
+       <input required minLength={2} maxLength={80} id="quote-client" className={field} value={form.clientName}
         onChange={e=>patch("clientName",e.target.value)} placeholder="Business or authorized legal name"/></div>
       <div className="sm:col-span-2"><label className={label} htmlFor="quote-title">Package title *</label>
-       <input required maxLength={100} id="quote-title" className={field} value={form.packageTitle} onChange={e=>patch("packageTitle",e.target.value)}/></div>
+       <input required maxLength={60} id="quote-title" className={field} value={form.packageTitle} onChange={e=>patch("packageTitle",e.target.value)}/></div>
       <div><label className={label} htmlFor="quote-date">Quotation date *</label>
        <input required type="date" id="quote-date" className={field} value={form.quoteDate} onChange={e=>patch("quoteDate",e.target.value)}/></div>
       <div className="flex items-end pb-2 text-sm text-[#766288]">Quotation number is assigned when saved.</div>
@@ -100,10 +100,10 @@ export default function QuotationsPage(){
         <button type="button" aria-label={"Remove service "+(index+1)} disabled={form.services.length===1} className="text-[#8D5A9C] disabled:opacity-40"
          onClick={()=>patch("services",form.services.filter((_,i)=>i!==index))}><Trash2 size={16}/></button></div>
        <label className={label} htmlFor={"quote-service-"+index}>Name *</label>
-       <input required maxLength={80} id={"quote-service-"+index} className={field} value={service.name}
+       <input required maxLength={52} id={"quote-service-"+index} className={field} value={service.name}
         onChange={e=>editService(index,"name",e.target.value)} placeholder="e.g. Social media management"/>
        <label className={label+" mt-3"} htmlFor={"quote-description-"+index}>Brief scope / deliverables *</label>
-       <textarea required minLength={2} maxLength={240} rows={3} id={"quote-description-"+index} className={field}
+       <textarea required minLength={2} maxLength={115} rows={3} id={"quote-description-"+index} className={field}
         value={service.description} onChange={e=>editService(index,"description",e.target.value)}
         placeholder="What is included, quantity and exclusions"/>
       </div>)}</div>
@@ -169,10 +169,10 @@ export default function QuotationsPage(){
        <input id="quote-validity" className={field} type="number" required min={1} max={180} value={form.validityDays}
         onChange={e=>patch("validityDays",Number(e.target.value))}/></div>
       <div><label className={label} htmlFor="quote-term">Service term *</label>
-       <input id="quote-term" className={field} required maxLength={100} value={form.serviceTerm}
+       <input id="quote-term" className={field} required maxLength={60} value={form.serviceTerm}
         onChange={e=>patch("serviceTerm",e.target.value)} placeholder="e.g. 3 months"/></div>
       <div className="sm:col-span-2"><label className={label} htmlFor="quote-exclusions">Additional exclusions (optional)</label>
-       <textarea id="quote-exclusions" className={field} rows={2} maxLength={500} value={form.exclusions}
+       <textarea id="quote-exclusions" className={field} rows={2} maxLength={110} value={form.exclusions}
         onChange={e=>patch("exclusions",e.target.value)} placeholder="Extra third-party costs or exclusions"/></div>
      </div>
     </section>
