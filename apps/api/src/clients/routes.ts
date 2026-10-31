@@ -70,6 +70,9 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.json({data:await deliveries.update(actor(res),parse(id,req.params.id),
      parse(serviceDeliveryPlanUpdateSchema,req.body))});
  });
+ app.delete("/api/v1/service-deliveries/:id",authenticated,async(req,res)=>{
+   res.json({data:await deliveries.delete(actor(res),parse(id,req.params.id))});
+ });
  app.put("/api/v1/service-deliveries/:id/occurrences/:occurrenceId",authenticated,async(req,res)=>{
    res.json({data:await deliveries.complete(actor(res),parse(id,req.params.id),
      parse(id,req.params.occurrenceId),parse(serviceDeliveryOccurrenceUpdateSchema,req.body))});

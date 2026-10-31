@@ -1,7 +1,7 @@
 "use client";
 import {FormEvent,useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
-import {CalendarDays,Check,Plus,RefreshCw,UserRound} from "lucide-react";
+import {CalendarDays,Check,Plus,RefreshCw,Trash2,UserRound} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 
 type Person={id:string;displayName:string};
@@ -46,6 +46,7 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
 }){
  const {session,request}=useAuth();
  const manager=!!session?.identity.roles.some(x=>["FOUNDER","ADMIN","SUPER_ADMIN"].includes(x))&&!!session.identity.permissions.includes("clients.edit");
+ const admin=!!session?.identity.roles.some(x=>["ADMIN","SUPER_ADMIN"].includes(x))&&!!session.identity.permissions.includes("clients.edit");
  const me=session?.identity.userId;
  const [plans,setPlans]=useState<Schedule[]>([]),[staff,setStaff]=useState<Person[]>([]);
  const [draft,setDraft]=useState<Draft>(()=>defaultDraft(ymd(contractStartOn??""),ymd(contractEndOn??"")));
@@ -106,6 +107,17 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
   }catch(e){
    await load();setError(e instanceof Error?e.message:"Unable to update this delivery");
   }finally{setBusy(false);}
+ };
+ const remove=async(p:Schedule)=>{
+  if(busy||!admin||!clientId)return;
+  if(!window.confirm('Delete "'+p.title+'" and its pending delivery dates? This cannot be undone.'))return;
+  setBusy(true);setError("");setSuccess("");
+  try{
+   await request("/service-deliveries/"+p.id,{method:"DELETE"});
+   if(editing===p.id)reset();
+   await load();setSuccess("Delivery schedule deleted.");
+  }catch(e){setError(e instanceof Error?e.message:"Could not delete the schedule");}
+  finally{setBusy(false);}
  };
  const toggleDay=(day:number)=>setDraft(p=>({...p,weekdays:p.weekdays.includes(day)?p.weekdays.filter(x=>x!==day):[...p.weekdays,day].sort()}));
  return <section className="aw-client-panel" aria-label="Service delivery schedules" data-testid="service-delivery-schedules">
@@ -178,7 +190,8 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
      <p>{p.client.businessName} · {p.weekdays.length||p.repeatEveryDays!==null?format(p.startOn)+" to "+format(p.endOn):format(p.startOn)+" (one-time)"}</p>
      <p className="aw-delivery-owner"><UserRound size={14}/>{p.assignee.displayName} · {p.repeatEveryDays!==null?"Every "+p.repeatEveryDays+" days":p.weekdays.length?p.weekdays.map(d=>days[d]).join(", "):"One-time delivery"}</p>
     </div><div className="aw-client-actions"><span className="aw-client-project-state">{p.active?"Active":"Paused"}</span>
-     {manager&&clientId&&<button type="button" className="aw-client-btn" onClick={()=>edit(p)}>Edit schedule / reassign</button>}
+     {manager&&clientId&&<button type="button" className="aw-client-btn" disabled={busy} onClick={()=>edit(p)}>Edit schedule / reassign</button>}
+     {admin&&clientId&&<button type="button" className="aw-client-btn" disabled={busy} aria-label={"Delete delivery schedule "+p.title} onClick={()=>void remove(p)}><Trash2 size={15}/>Delete</button>}
     </div></div>
     <div className="aw-delivery-progress"><span>{completed}/{p.occurrences.length} completed</span><span>{overdue} overdue</span></div>
     <div className="aw-delivery-week-toolbar" aria-label={"Week navigation for "+p.title}>
