@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
  BriefcaseBusiness, CalendarDays, CalendarClock, ChartNoAxesCombined, CheckSquare2,
- FileStack, FolderKanban, LayoutDashboard, NotebookPen, MessageCircle, Search, Settings2, History,
+ FileStack, FolderKanban, LayoutDashboard, NotebookPen, MessageCircle, Search, Settings2, History, FileText,
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
 
@@ -19,6 +19,7 @@ const sections:readonly Group[]=[
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
  {title:"Finance",items:[
+  {label:"Quotations",href:"/app/quotations",icon:FileText,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
   {label:"Income & expenses",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]}
  ]},
  {title:"Relationships",items:[
@@ -44,7 +45,7 @@ const sections:readonly Group[]=[
 export function permittedGroups(permissions:readonly string[],roles:readonly string[]=[]):Group[]{
   const admin=roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN");
  const granted=new Set(permissions);
- return sections.map(group=>({...group,items:group.items.filter(item=>(!admin||!item.operational)&&(!item.permits||item.permits.some(p=>granted.has(p))||item.roles?.some(r=>roles.includes(r))))}))
+ return sections.map(group=>({...group,items:group.items.filter(item=>(!admin||!item.operational)&&(!item.roles||item.roles.some(r=>roles.includes(r)))&&(!item.permits||item.permits.some(p=>granted.has(p))||item.roles?.some(r=>roles.includes(r))))}))
   .filter(group=>group.items.length>0);
 }
 export function currentSection(groups:Group[],pathname:string){

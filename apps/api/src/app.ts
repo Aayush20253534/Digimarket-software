@@ -10,6 +10,7 @@ import { registerInsightsRoutes } from "./insights/routes";
 import { registerCompanyRoutes } from "./company/routes";
 import { registerProfitabilityRoutes } from "./profitability/routes";
 import { registerBillingRoutes } from "./billing/routes";
+import { registerQuotationRoutes } from "./quotations/routes";
 import { registerContentRoutes } from "./content/routes";
 import { registerTaskRoutes } from "./tasks/routes";
 import { registerProjectRoutes } from "./projects/routes";
@@ -140,6 +141,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     registerCompanyRoutes(app, authService);
     registerProfitabilityRoutes(app, authService);
     registerBillingRoutes(app, authService);
+    registerQuotationRoutes(app, authService);
     registerContentRoutes(app, authService);
     registerTaskRoutes(app, authService);
     registerProjectRoutes(app, authService);

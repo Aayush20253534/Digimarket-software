@@ -226,6 +226,7 @@ model Organization {
   financialEntries FinancialTransaction[]
   invoiceCounter InvoiceCounter?
   invoices Invoice[]
+  quotations Quotation[]
   payments Payment[]
   billingSchedules BillingSchedule[]
   costAllocations CostAllocation[]
@@ -273,6 +274,7 @@ model User {
   approvalActions ApprovalDecision[] @relation("ApprovalActor")
   financialEntries FinancialTransaction[] @relation("FinancialSubmitter")
   invoicesCreated Invoice[] @relation("InvoiceCreator")
+  quotationsCreated Quotation[] @relation("QuotationCreator")
   invoicesIssued Invoice[] @relation("InvoiceIssuer")
   paymentsRecorded Payment[] @relation("PaymentRecorder")
   paymentsVerified Payment[] @relation("PaymentVerifier")
@@ -1351,4 +1353,26 @@ model ChatGptWrite {
   result         Json?
   createdAt      DateTime @default(now()) @db.Timestamptz(6)
   @@unique([grantId, key])
+}
+
+
+/// Immutable, numbered quotation snapshots. Draft invoices are unrelated.
+model Quotation {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  createdById    String       @db.Uuid
+  quoteNumber    String       @db.VarChar(36)
+  clientName     String       @db.VarChar(160)
+  quoteDate      DateTime     @db.Date
+  serviceFee     Decimal      @db.Decimal(19, 2)
+  adBudget       Decimal      @db.Decimal(19, 2)
+  taxAmount      Decimal      @db.Decimal(19, 2)
+  total          Decimal      @db.Decimal(19, 2)
+  payload        Json
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy      User         @relation("QuotationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, quoteNumber])
+  @@index([organizationId, createdAt])
 }
