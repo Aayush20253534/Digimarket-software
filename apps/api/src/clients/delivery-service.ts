@@ -7,6 +7,7 @@ import type { ServiceDeliveryPlanInput,ServiceDeliveryPlanUpdateInput,
 const missing=()=>new AuthError(404,"NOT_FOUND","Delivery schedule not found");
 const collision=()=>new AuthError(409,"VERSION_CONFLICT","Delivery changed; reload first");
 const manage=(a:Principal)=>a.roles.some(role=>["SUPER_ADMIN","ADMIN","FOUNDER"].includes(role))&&a.permissions.has("clients.edit");
+const admin=(a:Principal)=>a.roles.some(role=>["SUPER_ADMIN","ADMIN"].includes(role))&&a.permissions.has("clients.edit");
 const date=(s:string)=>new Date(s+"T00:00:00.000Z");
 const onlyDate=(value:Date)=>value.toISOString().slice(0,10);
 export function datesInRange(start:string,end:string,weekdays:number[],repeatEveryDays:number|null=null){
@@ -121,6 +122,23 @@ export class ServiceDeliveryService {
     afterRedacted:{assigneeId:input.assigneeId,active:input.active}}});
    return tx.serviceDeliverySchedule.findUniqueOrThrow({where:{id}});
   });
+ }
+ async delete(a:Principal,id:string){
+  if(!admin(a))throw forbidden();
+  const existing=await this.db.serviceDeliverySchedule.findFirst({where:{id,organizationId:a.organizationId},
+   select:{id:true,title:true,clientId:true,version:true,occurrences:{select:{status:true}}}});
+  if(!existing)throw missing();
+  // Preserve completed delivery history, but remove schedules that have never been completed.
+  if(existing.occurrences.some(o=>o.status==="COMPLETED"))
+   throw new AuthError(409,"DELIVERY_HISTORY_EXISTS","Completed service dates cannot be deleted. Pause this schedule instead.");
+  await this.db.$transaction(async tx=>{
+   await tx.serviceDeliveryOccurrence.deleteMany({where:{scheduleId:id}});
+   await tx.serviceDeliverySchedule.delete({where:{id,organizationId:a.organizationId,version:existing.version}});
+   await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
+    action:"deliveries.schedule_deleted",entityType:"ServiceDeliverySchedule",entityId:id,
+    beforeRedacted:{title:existing.title,clientId:existing.clientId,version:existing.version}}});
+  });
+  return {deleted:true};
  }
  async complete(a:Principal,id:string,occurrenceId:string,input:ServiceDeliveryOccurrenceUpdateInput){
   if(!a.permissions.has("clients.read"))throw forbidden();
