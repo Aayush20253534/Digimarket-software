@@ -45,7 +45,7 @@ const sections:readonly Group[]=[
 export function permittedGroups(permissions:readonly string[],roles:readonly string[]=[]):Group[]{
   const admin=roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN");
  const granted=new Set(permissions);
- return sections.map(group=>({...group,items:group.items.filter(item=>(!admin||!item.operational)&&(!item.permits||item.permits.some(p=>granted.has(p))||item.roles?.some(r=>roles.includes(r))))}))
+ return sections.map(group=>({...group,items:group.items.filter(item=>(!admin||!item.operational)&&(!item.roles||item.roles.some(r=>roles.includes(r)))&&(!item.permits||item.permits.some(p=>granted.has(p))||item.roles?.some(r=>roles.includes(r))))}))
   .filter(group=>group.items.length>0);
 }
 export function currentSection(groups:Group[],pathname:string){
