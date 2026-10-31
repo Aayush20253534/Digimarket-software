@@ -7,8 +7,8 @@ import { AuthError, unauthorized } from "../auth/errors";
 const money = z.string().regex(/^(0|[1-9]\d{0,8})(?:\.\d{1,2})?$/, "Enter a valid INR amount");
 const text = (max: number) => z.string().trim().max(max);
 const quoteInput = z.strictObject({
-  clientName: z.string().trim().min(2).max(160),
-  packageTitle: z.string().trim().min(2).max(100).default("CUSTOM MARKETING PACKAGE"),
+  clientName: z.string().trim().min(2).max(80),
+  packageTitle: z.string().trim().min(2).max(60).default("CUSTOM MARKETING PACKAGE"),
   quoteDate: z.iso.date(),
   serviceFee: money,
   feePeriod: z.enum(["monthly", "one-time"]),
@@ -26,12 +26,12 @@ const quoteInput = z.strictObject({
   reels: z.number().int().min(0).max(999),
   posts: z.number().int().min(0).max(999),
   validityDays: z.number().int().min(1).max(180),
-  serviceTerm: z.string().trim().min(1).max(100),
+  serviceTerm: z.string().trim().min(1).max(60),
   services: z.array(z.strictObject({
-    name: z.string().trim().min(2).max(80),
-    description: z.string().trim().min(2).max(240),
+    name: z.string().trim().min(2).max(52),
+    description: z.string().trim().min(2).max(115),
   })).min(1).max(6),
-  exclusions: text(500),
+  exclusions: text(110),
 });
 export type QuotationInput = z.infer<typeof quoteInput>;
 
