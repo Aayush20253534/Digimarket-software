@@ -61,7 +61,8 @@ export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{
  const stroke=(x:number,y:number,w:number,h:number,color:string)=>{g.strokeStyle=color;g.lineWidth=.8;g.strokeRect(x+.4,y+.4,w-.8,h-.8);};
  const text=(value:string,x:number,y:number,size:number,color=violet,bold=false,maxWidth?:number)=>{
   g.fillStyle=color;g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
-  g.fillText(value,x,y,...(maxWidth?[maxWidth]:[]));
+  if(maxWidth!==undefined)g.fillText(value,x,y,maxWidth);
+  else g.fillText(value,x,y);
  };
  const right=(value:string,rightX:number,y:number,size:number,color=violet,bold=false)=>{
   g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
