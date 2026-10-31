@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
  BriefcaseBusiness, CalendarDays, CalendarClock, ChartNoAxesCombined, CheckSquare2,
- FileStack, FolderKanban, LayoutDashboard, NotebookPen, MessageCircle, Search, Settings2, History,
+ FileStack, FolderKanban, LayoutDashboard, NotebookPen, MessageCircle, Search, Settings2, History, FileText,
  ShieldCheck, Users, UsersRound, Wallet
 } from "lucide-react";
 
@@ -19,6 +19,7 @@ const sections:readonly Group[]=[
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
  {title:"Finance",items:[
+  {label:"Quotations",href:"/app/quotations",icon:FileText,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
   {label:"Income & expenses",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]}
  ]},
  {title:"Relationships",items:[
