@@ -125,8 +125,7 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
   const origin = configuredOrigins();
   const base = "/api/v1/integrations/chatgpt";
   const resource = origin?.api + base + "/mcp";
-  // Disabled by default. Never make a publicly usable OAuth endpoint without exact HTTPS origins.
-  if (!origin) return;
+  // Management remains available even before OAuth has been configured.
   const limit = rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: "draft-8",
     legacyHeaders: false, message: { error: "rate_limited" } });
   const authUser = async (req: Request, res: Response, next: NextFunction) => {
@@ -145,6 +144,33 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
     } catch (e) { next(e); }
   };
   const managed = (res: Response) => res.locals.crmFounder as Principal;
+  app.get(base + "/connections", authUser, async (_req, res) => {
+    const p = managed(res);
+    if (!p.roles.some(r => ["FOUNDER", "ADMIN", "SUPER_ADMIN"].includes(r))) throw forbidden();
+    const admin = p.roles.some(r => ["ADMIN", "SUPER_ADMIN"].includes(r));
+    const records = await auth.database.chatGptGrant.findMany({
+      where: { organizationId: p.organizationId, ...(admin ? {} : { userId: p.userId }) },
+      select: { id: true, userId: true, scopes: true, createdAt: true, lastUsedAt: true,
+        accessExpiresAt: true, refreshExpiresAt: true, revokedAt: true },
+      orderBy: { createdAt: "desc" }, take: 100,
+    });
+    res.set("Cache-Control", "no-store").json({ data: { enabled: Boolean(origin), connections: records } });
+  });
+  app.post(base + "/connections/:id/revoke", authUser, async (req, res) => {
+    const p = managed(res), id = checked(uuid, req.params.id);
+    if (!p.roles.some(r => ["FOUNDER", "ADMIN", "SUPER_ADMIN"].includes(r))) throw forbidden();
+    const admin = p.roles.some(r => ["ADMIN", "SUPER_ADMIN"].includes(r));
+    const updated = await auth.database.chatGptGrant.updateMany({
+      where: { id, organizationId: p.organizationId, ...(admin ? {} : { userId: p.userId }) },
+      data: { revokedAt: new Date(), accessTokenHash: null, refreshTokenHash: null },
+    });
+    if (!updated.count) throw new AuthError(404, "NOT_FOUND", "Connection not found");
+    await auth.database.auditLog.create({ data: { organizationId: p.organizationId,
+      actorId: p.userId, action: "chatgpt.revoked", entityType: "ChatGptGrant", entityId: id } });
+    res.set("Cache-Control", "no-store").json({ data: { revoked: true } });
+  });
+  // Never expose OAuth discovery or token routes until HTTPS origins are configured.
+  if (!origin) return;
   const discover = {
     issuer: origin.api,
     authorization_endpoint: origin.api + base + "/oauth/authorize",
@@ -260,29 +286,5 @@ export function registerChatGptOAuthRoutes(app: Express, auth: AuthService) {
     if (!updated.count) return oauthFailure(res, "invalid_grant");
     return res.set("Cache-Control", "no-store").json(oauthTokens(access, refresh, grant.scopes));
   });
-  app.get(base + "/connections", authUser, async (_req, res) => {
-    const p = managed(res);
-    if (!p.roles.some(r => ["FOUNDER", "ADMIN", "SUPER_ADMIN"].includes(r))) throw forbidden();
-    const admin = p.roles.some(r => ["ADMIN", "SUPER_ADMIN"].includes(r));
-    const records = await auth.database.chatGptGrant.findMany({
-      where: { organizationId: p.organizationId, ...(admin ? {} : { userId: p.userId }) },
-      select: { id: true, userId: true, scopes: true, createdAt: true, lastUsedAt: true,
-        accessExpiresAt: true, refreshExpiresAt: true, revokedAt: true },
-      orderBy: { createdAt: "desc" }, take: 100,
-    });
-    res.set("Cache-Control", "no-store").json({ data: { enabled: true, connections: records } });
-  });
-  app.post(base + "/connections/:id/revoke", authUser, async (req, res) => {
-    const p = managed(res), id = checked(uuid, req.params.id);
-    if (!p.roles.some(r => ["FOUNDER", "ADMIN", "SUPER_ADMIN"].includes(r))) throw forbidden();
-    const admin = p.roles.some(r => ["ADMIN", "SUPER_ADMIN"].includes(r));
-    const updated = await auth.database.chatGptGrant.updateMany({
-      where: { id, organizationId: p.organizationId, ...(admin ? {} : { userId: p.userId }) },
-      data: { revokedAt: new Date(), accessTokenHash: null, refreshTokenHash: null },
-    });
-    if (!updated.count) throw new AuthError(404, "NOT_FOUND", "Connection not found");
-    await auth.database.auditLog.create({ data: { organizationId: p.organizationId,
-      actorId: p.userId, action: "chatgpt.revoked", entityType: "ChatGptGrant", entityId: id } });
-    res.set("Cache-Control", "no-store").json({ data: { revoked: true } });
-  });
+
 }
