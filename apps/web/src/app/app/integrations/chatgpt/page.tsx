@@ -18,6 +18,7 @@ export default function ChatGptIntegrationPage() {
   const roles = session?.identity.roles ?? [];
   const authorized = roles.some(r => ["FOUNDER", "ADMIN", "SUPER_ADMIN"].includes(r));
   const [data, setData] = useState<Grant[]>([]);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -26,7 +27,7 @@ export default function ChatGptIntegrationPage() {
     try {
       const response = await request<{ enabled: boolean; connections: Grant[] }>(
         "/integrations/chatgpt/connections");
-      setData(response.connections); setError("");
+      setData(response.connections); setEnabled(response.enabled); setError("");
     } catch (e) { setError(errorText(e)); }
     finally { setLoading(false); }
   }, [authorized, request]);
@@ -46,6 +47,7 @@ export default function ChatGptIntegrationPage() {
     {!authorized && <Notice kind="error">This page is restricted to founders and administrators.</Notice>}
     {authorized && <>
       {error && <Notice kind="error">{error}</Notice>}
+      {enabled === false && <Notice kind="error">ChatGPT OAuth is not configured on the API server. Set CHATGPT_API_ORIGIN and CHATGPT_WEB_ORIGIN to the HTTPS origins of the deployed API and website, then redeploy the API to enable connections.</Notice>}
       <Card title="Private CRM integration" description="The integration is installed separately in ChatGPT. Connections use OAuth, not shared administrator passwords.">
         <div className="space-y-2 text-sm text-slate-700">
           <p>Scope: leads, follow-ups, meetings, clients and CRM analytics.</p>
