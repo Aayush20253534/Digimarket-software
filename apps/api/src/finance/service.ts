@@ -16,6 +16,35 @@ type View="mine"|"all";
 export class FinanceService {
   constructor(private readonly db:PrismaClient){}
 
+  // Contract projections are separate from posted financial transactions.
+  async recurringIncome(actor:Principal){
+    need(actor,"finance.read.all");
+    const now=new Date();
+    const year=now.getUTCFullYear(),month=now.getUTCMonth();
+    const periodStart=new Date(Date.UTC(year,month,1));
+    const periodEnd=new Date(Date.UTC(year,month+1,1));
+    const clients=await this.db.client.findMany({
+      where:{organizationId:actor.organizationId,status:"ACTIVE",
+        OR:[{contractStartOn:null},{contractStartOn:{lt:periodEnd}}],
+        AND:[{OR:[{contractEndOn:null},{contractEndOn:{gte:periodStart}}]}]},
+      select:{id:true,businessName:true,monthlyFee:true,monthlyAdBudget:true,contractStartOn:true,contractEndOn:true},
+      orderBy:{businessName:"asc"},
+    });
+    const zero=new Prisma.Decimal(0);
+    let serviceTotal=zero,adBudgetTotal=zero;
+    const items=clients.filter(c=>c.monthlyFee!==null||c.monthlyAdBudget!==null).map(c=>{
+      const service=c.monthlyFee??zero,ads=c.monthlyAdBudget??zero;
+      serviceTotal=serviceTotal.add(service);adBudgetTotal=adBudgetTotal.add(ads);
+      return {id:c.id,businessName:c.businessName,monthlyServiceCharge:service.toFixed(4),
+        monthlyAdBudget:ads.toFixed(4),monthlyCombined:service.add(ads).toFixed(4),
+        contractStartOn:c.contractStartOn?.toISOString().slice(0,10)??null,
+        contractEndOn:c.contractEndOn?.toISOString().slice(0,10)??null};
+    });
+    return {month:periodStart.toISOString().slice(0,7),currency:"INR",items,
+      monthlyServiceTotal:serviceTotal.toFixed(4),monthlyAdBudgetTotal:adBudgetTotal.toFixed(4),
+      monthlyCombinedTotal:serviceTotal.add(adBudgetTotal).toFixed(4)};
+  }
+
   private scope(actor:Principal,view:View){
     if(view==="all")need(actor,"finance.read.all");
     else need(actor,"finance.entry.read.own");
