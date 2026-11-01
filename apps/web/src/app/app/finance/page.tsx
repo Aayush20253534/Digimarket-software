@@ -17,7 +17,7 @@ type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED"
   receiptAssetId?:string|null;enteredById:string;category:{id:string;name:string;active:boolean};
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
 type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
-  pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[]};
+  pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];recurringIncome?:RecurringIncome};
 type FinancePolicy={category:string;active:boolean};
 type RecurringIncome={month:string;monthlyServiceTotal:string;monthlyAdBudgetTotal:string;monthlyCombinedTotal:string;items:{id:string;businessName:string;monthlyServiceCharge:string;monthlyAdBudget:string;monthlyCombined:string;contractEndOn:string|null}[]};
 const zero:Totals={currency:"INR",postedIncome:"0.0000",postedExpense:"0.0000",postedNet:"0.0000",
@@ -93,7 +93,7 @@ export default function FinancePage(){
       setEntries(ledger.value);
       setHasLoadedEntries(true);
     }
-    if(sums.status==="fulfilled")setTotals(sums.value);
+    if(sums.status==="fulfilled"){setTotals(sums.value);setRecurring(target==="all"?sums.value.recurringIncome??null:null);}
     if(cats.status==="fulfilled")setCategories(cats.value);
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(
       p=>p.category==="FINANCE"&&p.active));
@@ -104,12 +104,6 @@ export default function FinancePage(){
     setError(problems.join(" "));
     setLoading(false);
   },[request,view,canReadOwn,canAll]);
-  useEffect(()=>{
-    if(!canAll){setRecurring(null);return;}
-    let active=true;
-    void request<RecurringIncome>("/finance/recurring-income").then(value=>{if(active)setRecurring(value);}).catch(()=>{if(active)setRecurring(null);});
-    return()=>{active=false;};
-  },[canAll,request]);
   useEffect(()=>{
     void reload();
     return()=>{reloadSequence.current+=1;};
