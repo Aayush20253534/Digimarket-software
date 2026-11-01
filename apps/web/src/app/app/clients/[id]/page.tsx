@@ -135,12 +135,13 @@ export default function ClientWorkspacePage(){
       <label>Status<select className="field" value={form.status} onChange={e=>setForm(v=>v?{...v,status:e.target.value as Status}:v)}><option>ACTIVE</option><option>PAUSED</option><option>ARCHIVED</option></select></label>
       <label>Agreement start<input className="field" type="date" value={form.contractStartOn} onChange={e=>setForm(v=>v?{...v,contractStartOn:e.target.value}:v)}/></label>
       <label>Agreement end<input className="field" type="date" min={form.contractStartOn||undefined} value={form.contractEndOn} onChange={e=>setForm(v=>v?{...v,contractEndOn:e.target.value}:v)}/></label>
-      {canFinance&&<><label>Monthly service fee (₹)<input className="field" inputMode="decimal" placeholder="15000" value={form.monthlyFee} onChange={e=>setForm(v=>v?{...v,monthlyFee:e.target.value}:v)}/></label>
-      <label>Monthly ad budget (₹)<input className="field" inputMode="decimal" placeholder="3000" value={form.monthlyAdBudget} onChange={e=>setForm(v=>v?{...v,monthlyAdBudget:e.target.value}:v)}/></label></>}
+      {canFinance&&<><label>Monthly service charge only (₹)<input className="field" inputMode="decimal" type="number" min="0" step="0.0001" placeholder="15000" value={form.monthlyFee} onChange={e=>setForm(v=>v?{...v,monthlyFee:e.target.value}:v)}/></label>
+      <label>Monthly ad budget (₹)<input className="field" inputMode="decimal" type="number" min="0" step="0.0001" placeholder="3000" value={form.monthlyAdBudget} onChange={e=>setForm(v=>v?{...v,monthlyAdBudget:e.target.value}:v)}/></label>
+      <div className="aw-client-wide"><strong>Monthly service charge + ad budget combined: {money(String(Number(form.monthlyFee||0)+Number(form.monthlyAdBudget||0)))}</strong><p>Projected agreement total only. Ad spend is not agency service income.</p></div></>}
       <label className="aw-client-wide">Client notes<textarea className="field" rows={4} value={form.notes} onChange={e=>setForm(v=>v?{...v,notes:e.target.value}:v)}/></label>
      </div>
      <div className="aw-client-actions"><button className="aw-client-primary" disabled={busy}>Save client & agreement</button></div>
-    </form>:<div className="aw-client-readonly"><p>Status: {client.status}</p><p>Phone: {client.phone||"—"}</p><p>Agreement: {form.contractStartOn||"Not set"} to {form.contractEndOn||"Not set"}</p>{canFinance&&<p>Fee: {money(client.monthlyFee)} · Ad budget: {money(client.monthlyAdBudget)}</p>}</div>}
+    </form>:<div className="aw-client-readonly"><p>Status: {client.status}</p><p>Phone: {client.phone||"—"}</p><p>Agreement: {form.contractStartOn||"Not set"} to {form.contractEndOn||"Not set"}</p>{canFinance&&<p>Service charge: {money(client.monthlyFee)} · Ad budget: {money(client.monthlyAdBudget)} · Combined: {money(String(Number(client.monthlyFee||0)+Number(client.monthlyAdBudget||0)))}</p>}</div>}
    </section>}
    {tab==="contacts"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Contacts</h2><p>People responsible for client-side coordination and approval.</p></div></div>
     <div className="aw-client-service-grid">{client.contacts.map(c=><article className="aw-client-service" key={c.id}><h3>{c.name}{c.isPrimary?" · Primary":""}</h3><p>{c.role||"Role not specified"}</p><p>{c.phone||"No phone"} · {c.email||"No email"}</p></article>)}</div>
