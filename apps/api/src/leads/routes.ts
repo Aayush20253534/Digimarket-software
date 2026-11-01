@@ -7,7 +7,11 @@ import { AuthError, unauthorized } from "../auth/errors";
 import { LeadsService } from "./service";
 function parse<T>(schema:z.ZodType<T>,value:unknown):T {
  const result=schema.safeParse(value);
- if(!result.success)throw new AuthError(422,"VALIDATION_ERROR","Invalid lead fields");
+ if(!result.success){
+  const issue=result.error.issues[0];
+  const field=issue?.path.map(String).join(".")||"request";
+  throw new AuthError(422,"VALIDATION_ERROR",`Invalid lead fields: ${field}: ${issue?.message??"Invalid value"}`);
+ }
  return result.data;
 }
 const id=z.uuid();
