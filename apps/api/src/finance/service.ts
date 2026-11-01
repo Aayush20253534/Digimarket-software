@@ -474,7 +474,8 @@ export class FinanceService {
     return {currency:"INR",postedIncome:income.toFixed(4),postedExpense:expense.toFixed(4),
       postedNet:income.minus(expense).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
-      pendingExpense:sum("EXPENSE","PENDING").toFixed(4),groups:entries};
+      pendingExpense:sum("EXPENSE","PENDING").toFixed(4),groups:entries,
+       ...(view==="all"?{recurringIncome:await this.recurringIncome(actor)}:{})};
   }
 
   async exportCsv(actor:Principal,view:View){
