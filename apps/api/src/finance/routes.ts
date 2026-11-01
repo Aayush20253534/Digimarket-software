@@ -77,6 +77,10 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   app.post("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.status(201).json({data:await finance.submit(actor(res),parse(financeEntryInputSchema,req.body))});
   });
+  app.get("/api/v1/finance/recurring-income",authenticate,async(_req,res)=>{
+    res.set("Cache-Control","no-store");
+    res.json({data:await finance.recurringIncome(actor(res))});
+  });
   app.get("/api/v1/finance/summary",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({data:await finance.totals(actor(res),view(req))});
