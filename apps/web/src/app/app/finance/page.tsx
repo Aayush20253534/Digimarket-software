@@ -19,6 +19,7 @@ type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED"
 type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
   pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[]};
 type FinancePolicy={category:string;active:boolean};
+type RecurringIncome={month:string;monthlyServiceTotal:string;monthlyAdBudgetTotal:string;monthlyCombinedTotal:string;items:{id:string;businessName:string;monthlyServiceCharge:string;monthlyAdBudget:string;monthlyCombined:string;contractEndOn:string|null}[]};
 const zero:Totals={currency:"INR",postedIncome:"0.0000",postedExpense:"0.0000",postedNet:"0.0000",
   pendingIncome:"0.0000",pendingExpense:"0.0000",groups:[]};
 const modes=["CASH","UPI","BANK_TRANSFER","CARD","OTHER"] as const;
@@ -52,6 +53,7 @@ export default function FinancePage(){
   const [entries,setEntries]=useState<Entry[]>([]);
   const [totals,setTotals]=useState<Totals>(zero);
   const [financeReady,setFinanceReady]=useState(false);
+  const [recurring,setRecurring]=useState<RecurringIncome|null>(null);
   const [loading,setLoading]=useState(true);
   const reloadSequence=useRef(0);
   const [hasLoadedEntries,setHasLoadedEntries]=useState(false);
@@ -102,6 +104,12 @@ export default function FinancePage(){
     setError(problems.join(" "));
     setLoading(false);
   },[request,view,canReadOwn,canAll]);
+  useEffect(()=>{
+    if(!canAll){setRecurring(null);return;}
+    let active=true;
+    void request<RecurringIncome>("/finance/recurring-income").then(value=>{if(active)setRecurring(value);}).catch(()=>{if(active)setRecurring(null);});
+    return()=>{active=false;};
+  },[canAll,request]);
   useEffect(()=>{
     void reload();
     return()=>{reloadSequence.current+=1;};
@@ -271,6 +279,19 @@ export default function FinancePage(){
     {!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}
+    {canAll&&<Card title="Recurring income from client agreements" description="Current-month contract projection, not received payments. Ad budgets are separate from agency service revenue.">
+      {recurring?<div className="space-y-4">
+        <p className="text-sm text-slate-500">Period: {recurring.month} · Active client agreements</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div><p className="text-sm">Monthly service charges</p><strong>{money(recurring.monthlyServiceTotal)}</strong></div>
+          <div><p className="text-sm">Monthly ad budgets</p><strong>{money(recurring.monthlyAdBudgetTotal)}</strong></div>
+          <div><p className="text-sm">Combined monthly commitment</p><strong>{money(recurring.monthlyCombinedTotal)}</strong></div>
+        </div>
+        <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr><th>Client</th><th>Service charge</th><th>Ad budget</th><th>Combined / month</th><th>Agreement ends</th></tr></thead>
+          <tbody>{recurring.items.map(c=><tr key={c.id}><td><Link href={"/app/clients/"+c.id} className="underline">{c.businessName}</Link></td><td>{money(c.monthlyServiceCharge)}</td><td>{money(c.monthlyAdBudget)}</td><td>{money(c.monthlyCombined)}</td><td>{c.contractEndOn??"Open-ended"}</td></tr>)}</tbody></table></div>
+        {!recurring.items.length&&<p className="text-sm">No active client agreements with monthly charges recorded for this month.</p>}
+      </div>:<p className="text-sm">Recurring agreement projection is unavailable.</p>}
+    </Card>}
     <div className="aw-finance-panels grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       {canCreate&&<Card title="New income or expense" description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
         <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
