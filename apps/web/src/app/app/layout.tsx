@@ -47,6 +47,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  useEffect(()=>{if(status==="unauthenticated")router.replace("/login");},[router,status]);
  useEffect(()=>{try{setCollapsed(window.localStorage.getItem("aw-sidebar-collapsed")==="1");}catch{/* optional preference */}},[]);
  useEffect(()=>{setMobileOpen(false);},[pathname]);
+ // Dismiss a mobile navigation dialog if the viewport becomes desktop-sized.
+ // Otherwise its modal backdrop can leave desktop controls inaccessible after rotation or resizing.
+ useEffect(()=>{
+  const closeOnDesktop=()=>{if(window.innerWidth>=768)setMobileOpen(false);};
+  window.addEventListener("resize",closeOnDesktop);
+  return()=>window.removeEventListener("resize",closeOnDesktop);
+ },[]);
  useEffect(()=>{
   if(!session)return;
   let mounted=true;
