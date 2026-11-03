@@ -27,7 +27,7 @@ const dateText=(value:string)=>new Date(value.slice(0,10)+"T12:00:00Z")
  .toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric",timeZone:"UTC"}).toUpperCase();
 
 async function loadBrand():Promise<HTMLImageElement>{
- const img=new Image();img.decoding="async";img.src="/brand/amplifyworld-wordmark.svg";
+ const img=new Image();img.decoding="async";img.src="/brand/amplifyworld-quotation-wordmark.svg";
  await img.decode();return img;
 }
 function pdfFromJpeg(bytes:Uint8Array,width:number,height:number):Uint8Array {
