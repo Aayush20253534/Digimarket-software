@@ -3,6 +3,7 @@
  * The existing approved SVG wordmark is loaded from the same-origin app assets.
  */
 export type QuotationFields = {
+ mode?:"default"|"new";
  clientName:string; packageTitle:string; quoteDate:string; serviceFee:string;
  feePeriod:"monthly"|"one-time"; servicePayment:"at signing"|"monthly"|"milestone";
  adBudget:string; adBudgetMode:"optional"|"mandatory"|"not applicable";
@@ -52,7 +53,117 @@ function pdfFromJpeg(bytes:Uint8Array,width:number,height:number):Uint8Array {
  return result;
 }
 
+
+function saveQuotationCanvas(c:HTMLCanvasElement,quote:SavedQuotation){
+ const b64=c.toDataURL("image/jpeg",.95).split(",")[1];
+ const binary=atob(b64);const jpeg=new Uint8Array(binary.length);
+ for(let i=0;i<binary.length;i++)jpeg[i]=binary.charCodeAt(i);
+ const pdf=pdfFromJpeg(jpeg,c.width,c.height);
+ const blob=new Blob([new Uint8Array(pdf).buffer],{type:"application/pdf"});
+ const url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download=quote.quoteNumber+"-"+quote.clientName.replace(/[^a-z0-9-_]+/gi,"-")+".pdf";
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),20000);
+}
+async function downloadFixedQuotationPdf(quote:SavedQuotation):Promise<void>{
+ const p=quote.payload;
+ const c=document.createElement("canvas");c.width=W*2;c.height=H*2;
+ const g=c.getContext("2d");
+ if(!g)throw new Error("Your browser cannot generate the quotation PDF.");
+ g.scale(2,2);g.fillStyle="#FFFFFF";g.fillRect(0,0,W,H);
+ const plum="#64258D",magenta="#C62FCB",soft="#887397",line="#E2D4EA",panel="#FAF6FC";
+ const box=(x:number,y:number,w:number,h:number,fill:string,border=line,radius=10)=>{
+  g.beginPath();g.roundRect(x,y,w,h,radius);g.fillStyle=fill;g.fill();
+  g.strokeStyle=border;g.lineWidth=.8;g.stroke();
+ };
+ const text=(value:string,x:number,y:number,size:number,color=plum,bold=false,maxWidth?:number)=>{
+  g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";g.fillStyle=color;
+  if(maxWidth===undefined)g.fillText(value,x,y);else g.fillText(value,x,y,maxWidth);
+ };
+ const right=(value:string,x:number,y:number,size:number,color=plum,bold=false)=>{
+  g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
+  text(value,x-g.measureText(value).width,y,size,color,bold);
+ };
+ const wrap=(value:string,x:number,y:number,width:number,size:number,leading:number,maxLines=2)=>{
+  g.font="400 "+size+"px Arial, Helvetica, sans-serif";
+  const words=value.trim().split(/\s+/);const rows:string[]=[];let current="";
+  for(const word of words){
+   const next=current?current+" "+word:word;
+   if(g.measureText(next).width<=width)current=next;
+   else{if(current)rows.push(current);current=word;}
+  }
+  if(current)rows.push(current);
+  for(let i=0;i<Math.min(rows.length,maxLines);i++)
+   text(rows[i],x,y+i*leading,size,soft,false,width);
+ };
+ // Reproduce the approved AS Builders A4 template, replacing only client,
+ // quotation metadata, and the two financial figures.
+ g.fillStyle=magenta;g.fillRect(0,0,W,7);
+ try{
+  const brand=await loadBrand();const natural=brand.naturalWidth/brand.naturalHeight||3.8;
+  const w=Math.min(225,natural*50),h=w/natural;
+  g.drawImage(brand,40,20+(51-h)/2,w,h);
+ }catch{text("AmplifyWorld",42,61,26,plum,true);}
+ right("SERVICE QUOTATION",554,33,11,plum,true);
+ right(dateText(p.quoteDate),554,49,8,soft);
+ g.fillStyle=line;g.fillRect(40,78,514,1);
+ text("CUSTOM MARKETING PACKAGE",40,103,17,plum,true);
+ text("Monthly digital marketing services for "+p.clientName+".",40,122,9,soft,false,510);
+ box(40,139,514,47,"#F6EDF9");
+ text("PREPARED FOR",55,155,8,magenta,true);
+ right("QUOTATION NO.",539,155,8,magenta,true);
+ text(p.clientName.toUpperCase(),55,175,11,plum,true,290);
+ right(quote.quoteNumber,539,175,10,plum,true);
+ box(40,199,252,80,panel);
+ box(302,199,252,80,panel);
+ g.fillStyle=magenta;g.fillRect(40,219,4,42);g.fillRect(302,219,4,42);
+ text("AGENCY SERVICE CHARGES",54,216,8,plum,true);
+ text("META ADS BUDGET",316,216,8,plum,true);
+ text(inr(quote.serviceFee),54,248,19,magenta,true,197);
+ text("/ month",224,251,8,soft);
+ text(inr(quote.adBudget),316,248,19,magenta,true,180);
+ text("/ month",489,251,8,soft);
+ box(40,292,514,45,"#FFFFFF",magenta,11);
+ text("TOTAL MONTHLY PACKAGE",53,319,10,plum,true);
+ right(inr(quote.total),540,320,20,magenta,true);
+ text("INCLUDED SERVICES",40,361,12,plum,true);
+ text("Scope of work within the proposed monthly package",40,377,8.5,soft);
+ const services=p.services;
+ for(let i=0;i<6;i++){
+  const col=i%2,row=Math.floor(i/2),x=40+col*262,y=393+row*68;
+  box(x,y,252,60,panel,line,10);
+  const service=services[i];if(!service)continue;
+  box(x+12,y+10,28,18,"#F2DDFC","#F2DDFC",5);
+  text(String(i+1).padStart(2,"0"),x+18,y+23,8,magenta,true);
+  text(service.name.toUpperCase(),x+47,y+23,8,plum,true,195);
+  wrap(service.description,x+14,y+41,224,7.7,10,2);
+ }
+ box(40,606,514,30,magenta,magenta,7);
+ text("MONTHLY CONTENT COMMITMENT",53,626,9,"#FFFFFF",true);
+ right("8 REELS  |  8 POSTS",540,626,10,"#FFFFFF",true);
+ text("COMMERCIAL TERMS",40,664,12,plum,true);
+ const terms=[
+  inr(quote.serviceFee)+"/month covers the services above; "+inr(quote.adBudget)+"/month is allocated to Meta ad spend.",
+  "Meta campaigns will run on Facebook and Instagram, with regular optimization and reporting.",
+  "Domain, hosting, paid tools and external third-party costs, if needed, are separately approved.",
+  "Any services beyond the agreed scope will be quoted and approved before execution.",
+  "Applicable taxes, if any, will be itemized on the final invoice. Quote valid for 7 days.",
+ ];
+ terms.forEach((value,i)=>{
+  const y=681+i*18;g.beginPath();g.arc(43,y-3,2.1,0,Math.PI*2);g.fillStyle=magenta;g.fill();
+  text(value,51,y,8,soft,false,498);
+ });
+ g.fillStyle=line;g.fillRect(40,781,514,.8);
+ text("For AmplifyWorld",40,799,9,plum,true);
+ right("Authorized Representative",554,799,9,plum);
+ g.fillStyle=line;g.fillRect(40,810,514,.8);
+ text("amplifyworld.in   |   amplifyworld.official@gmail.com   |   +91 89318 01405",40,828,7.5,soft);
+ right("1/1",554,828,7.5,soft);
+ saveQuotationCanvas(c,quote);
+}
+
 export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{
+ if(quote.payload.mode==="default")return downloadFixedQuotationPdf(quote);
  const c=document.createElement("canvas");c.width=W*2;c.height=H*2;
  const g=c.getContext("2d");
  if(!g)throw new Error("Your browser cannot generate the quotation PDF.");
@@ -142,13 +253,5 @@ export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{
  text("For "+p.clientName,313,signatureY,9,violet,true,256);
  rect(23,signatureY+18,220,.75,line);rect(313,signatureY+18,220,.75,line);
  right("amplifyworld.in   |   amplifyworld.official@gmail.com   |   +91 89318 01405",565,827,7.5,muted);
- const b64=c.toDataURL("image/jpeg",.95).split(",")[1];
- const binary=atob(b64);const jpeg=new Uint8Array(binary.length);
- for(let i=0;i<binary.length;i++)jpeg[i]=binary.charCodeAt(i);
- const pdf=pdfFromJpeg(jpeg,c.width,c.height);
- const blob=new Blob([new Uint8Array(pdf).buffer],{type:"application/pdf"});
- const url=URL.createObjectURL(blob),a=document.createElement("a");
- a.href=url;a.download=quote.quoteNumber+"-"+p.clientName.replace(/[^a-z0-9-_]+/gi,"-")+".pdf";
- document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),20000);
+ saveQuotationCanvas(c,quote);
 }
