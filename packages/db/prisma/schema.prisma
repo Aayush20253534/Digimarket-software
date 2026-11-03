@@ -227,6 +227,7 @@ model Organization {
   invoiceCounter InvoiceCounter?
   invoices Invoice[]
   quotations Quotation[]
+  agreements Agreement[]
   payments Payment[]
   billingSchedules BillingSchedule[]
   costAllocations CostAllocation[]
@@ -275,6 +276,7 @@ model User {
   financialEntries FinancialTransaction[] @relation("FinancialSubmitter")
   invoicesCreated Invoice[] @relation("InvoiceCreator")
   quotationsCreated Quotation[] @relation("QuotationCreator")
+  agreementsCreated Agreement[] @relation("AgreementCreator")
   invoicesIssued Invoice[] @relation("InvoiceIssuer")
   paymentsRecorded Payment[] @relation("PaymentRecorder")
   paymentsVerified Payment[] @relation("PaymentVerifier")
@@ -1374,5 +1376,28 @@ model Quotation {
   createdBy      User         @relation("QuotationCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, quoteNumber])
+  @@index([organizationId, createdAt])
+}
+
+
+/// Immutable agency/client service-agreement snapshots; signatures are completed outside the app.
+model Agreement {
+  id              String       @id @default(uuid()) @db.Uuid
+  organizationId  String       @db.Uuid
+  createdById     String       @db.Uuid
+  agreementNumber String       @db.VarChar(36)
+  clientName      String       @db.VarChar(160)
+  agreementDate   DateTime     @db.Date
+  startDate       DateTime     @db.Date
+  endDate         DateTime     @db.Date
+  serviceFee      Decimal      @db.Decimal(19, 2)
+  adBudget        Decimal      @db.Decimal(19, 2)
+  total           Decimal      @db.Decimal(19, 2)
+  payload         Json
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy       User         @relation("AgreementCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, agreementNumber])
   @@index([organizationId, createdAt])
 }
