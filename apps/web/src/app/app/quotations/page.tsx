@@ -90,12 +90,24 @@ export default function QuotationsPage(){
  }
  if(!session)return <Spinner label="Checking quotation access…"/>;
  if(!permitted)return <div className="p-6"><h1 className="text-xl font-bold">Quotations</h1><p>Only founder and administrator accounts can access quotations.</p></div>;
- return <div className="aw-module-root space-y-5" data-aw-module="quotations">
-  <PageHeader eyebrow="AMPLIFYWORLD • SALES" title="Quotations"
-   description="Create numbered, branded service quotations from the approved AmplifyWorld template. Quotations do not post income or create invoices."
-   actions={<button className={action} type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/> Refresh</button>}/>
-  {error&&<div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">{error}</div>}
-  {notice&&<div role="status" className="rounded border border-purple-200 bg-purple-50 p-3 text-sm text-purple-900">{notice}</div>}
+ return <div className="aw-quote-page space-y-5" data-aw-module="quotations">
+  <header className="flex flex-wrap items-start justify-between gap-4">
+   <div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#D65DEC]">AMPLIFYWORLD / SALES</p>
+    <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#FBF4FF]">Quotations</h1>
+    <p className="mt-2 max-w-2xl text-sm leading-6 text-[#C9B3D8]">Generate and save branded quotations. No income or invoice is created automatically.</p>
+   </div>
+   <button className={action} type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/>Refresh</button>
+  </header>
+  {error&&<div role="alert" className="rounded-xl border border-[#BA485E] bg-[#3C1A2A] p-3 text-sm text-[#FFCFD7]">{error}</div>}
+  {notice&&<div role="status" className="rounded-xl border border-[#6B398F] bg-[#29143A] p-3 text-sm text-[#F3D6FF]">{notice}</div>}
+  <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label="Quotation type">
+   <button type="button" aria-pressed={mode==="default"} className={"aw-quote-mode "+(mode==="default"?"aw-quote-mode-active":"")} onClick={()=>changeMode("default")}>
+    <span className="text-base font-bold">Default quotation</span><span className="mt-1 block text-xs">Fixed six-service package. Enter name and prices only.</span>
+   </button>
+   <button type="button" aria-pressed={mode==="new"} className={"aw-quote-mode "+(mode==="new"?"aw-quote-mode-active":"")} onClick={()=>changeMode("new")}>
+    <span className="text-base font-bold">New quotation</span><span className="mt-1 block text-xs">Select, edit, remove or add services and commercial terms.</span>
+   </button>
+  </div>
   <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(285px,.7fr)]" onSubmit={e=>void create(e)}>
    <div className="space-y-5">
     <section className={card}>
