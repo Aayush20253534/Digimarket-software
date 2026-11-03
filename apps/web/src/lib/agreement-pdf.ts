@@ -1,4 +1,4 @@
-/** Client-side two-page A4 agreement PDF using the same quotation-only wordmark. */
+/** Client-side four-page A4 agreement matching the approved AmplifyWorld legal template. */
 export type AgreementFields={
  mode:"default"|"custom";
  clientName:string;clientAddress:string;clientRepresentative:string;clientDesignation:string;clientEmail:string;
@@ -83,67 +83,151 @@ function pdfFromCanvases(canvases:HTMLCanvasElement[]):Uint8Array{
  const all=new Uint8Array(length);let n=0;for(const item of pieces){all.set(item,n);n+=item.length;}
  return all;
 }
+
 export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
  const p=row.payload;
- const first=painter(),second=painter();
+ const pages=[painter(),painter(),painter(),painter()];
+ const navy="#39204F", lavender="#F3ECF8", violet="#7225BB", pale="#EEDFF8";
  const brand=new Image();brand.decoding="async";brand.src="/brand/amplifyworld-quotation-wordmark.svg";
- try{await brand.decode();first.g.drawImage(brand,39,24,204,52);second.g.drawImage(brand,39,24,204,52);}
- catch{first.text("AmplifyWorld",40,59,23,purple,true);second.text("AmplifyWorld",40,59,23,purple,true);}
- const head=(a:Painter,n:number)=>{
-  a.g.fillStyle=magenta;a.g.fillRect(0,0,PW,6);
-  a.text("SERVICE AGREEMENT",390,42,12,purple,true);
-  a.text(row.agreementNumber,390,58,9,muted);
-  a.line(87);
-  a.line(795);
-  a.text("AmplifyWorld  |  Digital Marketing Services Agreement",40,812,8,muted);
-  a.text(n+" / 2",527,812,8,muted);
+ let branded=false;
+ try{await brand.decode();branded=true;}catch{/* Keep text fallback for offline PDFs. */}
+ pages.forEach((a,index)=>{
+  a.g.fillStyle=violet;a.g.fillRect(0,0,PW,7);
+  if(branded){
+   const ratio=brand.naturalWidth/brand.naturalHeight||4.5;
+   const width=Math.min(190,ratio*40);
+   a.g.drawImage(brand,40,19,width,width/ratio);
+  }else a.text("AmplifyWorld",40,49,24,navy,true);
+  a.text("STRATEGY / TECHNOLOGY / MARKETING",40,67,7,violet,true);
+  a.g.fillStyle="#DABBEA";a.g.fillRect(40,79,515,.8);
+  a.g.fillRect(40,790,515,.8);
+  a.text("amplifyworld.in  |  amplifyworld.official@gmail.com  |  +91 89318 01405",40,807,7,"#736681");
+  a.text("PAGE "+(index+1)+" / 4",510,807,7,navy,true);
+ });
+ const paragraph=(a:Painter,value:string,y:number)=>a.wrap(value,40,y,515,8.8,12.4,navy)+7;
+ const heading=(a:Painter,number:string,title:string,y:number)=>{
+  a.text(number+"  "+title.toUpperCase(),40,y,10,violet,true);
+  return y+18;
  };
- head(first,1);head(second,2);
- let y=114;
- first.text("DIGITAL MARKETING SERVICES AGREEMENT",40,y,15,purple,true);y+=27;
- y=first.wrap("This agreement is entered into on "+fmt(p.agreementDate)+" between AmplifyWorld (the Agency) and "+p.clientName+" (the Client).",40,y,514,9.5,15)+9;
- y=first.section("1. Parties and authorized representatives",y);
- y=first.wrap("AGENCY: AmplifyWorld, represented by "+p.agencyRepresentative+" ("+(p.agencyDesignation||"Authorized Representative")+").",40,y,514,9,13);
- y=first.wrap("CLIENT: "+p.clientName+", "+p.clientAddress+". Represented by "+p.clientRepresentative+" ("+(p.clientDesignation||"Authorized Representative")+").",40,y+5,514,9,13);
- if(p.clientEmail)y=first.wrap("Client email: "+p.clientEmail,40,y+5,514,9,13);
- y=first.section("2. Term and scope of services",y+18);
- y=first.wrap("Effective from "+fmt(p.startDate)+" through "+fmt(p.endDate)+". No automatic renewal is implied; any extension requires mutual written agreement.",40,y,514,9,13)+10;
- y=first.wrap("The Agency will provide the following agreed services and deliverables:",40,y,514,9,13)+6;
+ const section=(a:Painter,number:string,title:string,value:string,y:number)=>{
+  const top=heading(a,number,title,y);
+  return paragraph(a,value,top)+4;
+ };
+ const rowBox=(a:Painter,label:string,value:string,y:number,height=28)=>{
+  a.g.fillStyle=y%2<1?lavender:"#F9F5FC";
+  a.g.fillRect(40,y,515,height-1);
+  a.text(label.toUpperCase(),51,y+height/2+3,7.3,"#58446F",true);
+  a.wrap(value,248,y+height/2+3,295,8.4,10.5,navy,true);
+  return y+height;
+ };
+ const tax=p.taxMode==="inclusive"?"Applicable taxes included in quoted fees":p.taxMode==="extra"?"GST at "+p.gstRate+"% extra on agency charges":"No taxes charged";
+ const serviceFee=money(row.serviceFee),ads=money(row.adBudget),total=money(row.total);
+ const adsActive=p.adBudgetMode!=="not applicable";
+ const adsSummary=adsActive?ads+" | "+p.adBudgetMode+"; "+p.adPayment:"Not applicable";
+ const payment=p.servicePayment==="instalments"
+  ?"Instalments: "+p.paymentSchedule
+  :p.servicePayment==="full advance"?"Service fee payable at signing":"Monthly advance payments as agreed";
+ const servicePeriod=fmt(p.startDate)+" to "+fmt(p.endDate);
+ const optional=p.adBudgetMode==="optional";
+ const adsSentence=!adsActive?"No advertising budget is included.":
+  optional?"The advertising budget is optional at signing, but must be approved and funded before ads run.":
+  "The advertising budget must be approved and funded before ads run.";
+ const page1=pages[0];
+ page1.text("CLIENT SERVICES / DIGITAL MARKETING",40,98,7.4,violet,true);
+ page1.text("DIGITAL MARKETING SERVICES AGREEMENT",40,119,15,navy,true);
+ page1.text("AmplifyWorld × "+p.clientName+"  |  "+servicePeriod,40,137,8,"#746688");
+ let y=151;
+ y=rowBox(page1,"Client / business",p.clientName,y);
+ y=rowBox(page1,"Service term",servicePeriod,y);
+ y=rowBox(page1,"Agency service fee",serviceFee+" | "+p.feePeriod+" service charges",y);
+ y=rowBox(page1,"Advertising budget",adsSummary,y);
+ y=rowBox(page1,"Illustrative package value",total+" | "+tax,y);
+ y=rowBox(page1,"Payment terms",payment,y,36);
+ y=rowBox(page1,"Effective / start date",fmt(p.startDate)+" | Agreement dated "+fmt(p.agreementDate),y);
+ page1.g.fillStyle=pale;page1.g.fillRect(40,y+13,515,49);
+ page1.text("PAYMENT CLARITY:",52,y+30,8,violet,true);
+ page1.wrap("The Agency fee is "+serviceFee+" ("+p.feePeriod+"). Initial payment: "+money(p.advanceAmount)+". "+adsSentence+" No additional fee is payable without the Client's written approval.",52,y+43,490,8,11,violet);
+ y+=82;
+ y=section(page1,"01","Parties and appointment",
+  "This Digital Marketing Services Agreement (the Agreement) is entered into by AmplifyWorld, a marketing service provider operating in Prayagraj, Uttar Pradesh (the Agency), represented by "+p.agencyRepresentative+", and "+p.clientName+" (the Client), represented by "+p.clientRepresentative+". The Client appoints the Agency to perform the agreed services in Schedule A.",y);
+ y=section(page1,"02","Term and effective date",
+  "The services begin on "+fmt(p.startDate)+" and end on "+fmt(p.endDate)+". There is no automatic renewal. An extension requires documented consent of both parties. The agreed start date is subject to any applicable advance-payment conditions.",y);
+ y=section(page1,"03","Package amount and payment",
+  "The Agency fee is "+serviceFee+" "+(p.feePeriod==="monthly"?"per month":"on a one-time basis")+
+  ". "+payment+". An initial payment of "+money(p.advanceAmount)+" is agreed. "+
+  adsSentence+" The illustrative package value is "+total+". "+tax+". Any additional work or charge requires prior written approval.",y);
+ if(y>770)throw new Error("Agreement opening content exceeds page one. Shorten the payment schedule.");
+ const page2=pages[1];
+ page2.text("SERVICES, CAMPAIGNS & CLIENT RESPONSIBILITIES",40,111,14,navy,true);
+ y=140;
+ const scope=p.services.map((s,i)=>"("+String.fromCharCode(97+i)+") "+s.name+": "+s.description).join("; ")+".";
+ y=section(page2,"04","Agreed scope of services",
+  "During the agreed term the Agency shall provide the following services: "+scope+
+  " Monthly content targets, if applicable, are "+p.reels+" reels and "+p.posts+" branded posts. Advertising spend is separately controlled.",y);
+ y=section(page2,"05","Content, access and approval process",
+  "The Client shall supply accurate business details, pricing, branding, account access, permissions and timely approvals. Material messaging, creatives, budgets and publishing schedules are subject to Client approval, which may be recorded through acknowledged email or WhatsApp. Delays in access or third-party reviews may affect execution timelines.",y);
+ y=section(page2,"06","Advertising budget and records",
+  adsSentence+" The Agency shall not exceed an approved media budget without written consent. Platform fees or deductions are part of the agreed allocation. The Agency will summarize campaign spend and reconcile any unspent or uncommitted funds, refunding or crediting as applicable.",y);
+ y=section(page2,"07","Brand claims and platform guidelines",
+  "The Client is responsible for the accuracy, ownership and legality of supplied product claims, images, offers and testimonials. Campaign performance, reach and approval times depend on external platforms and market conditions; forecasts are planning estimates rather than guaranteed outcomes.",y);
+ y=section(page2,"08","Reporting, enquiries and account access",
+  "The Agency will provide relevant activity and campaign summaries based on available records. The Client remains responsible for responding to customer enquiries and providing its products or services. Account access shall be shared securely and returned or revoked when no longer required.",y);
+ if(y>770)throw new Error("Service descriptions exceed page two. Shorten the service scope.");
+ const page3=pages[2];
+ page3.text("RIGHTS, EXIT & GENERAL TERMS",40,111,14,navy,true);
+ y=140;
+ y=section(page3,"09","Scope changes and third-party costs",
+  "Agreed services and content targets are covered by the Agency fee. Additional deliverables, extra advertising spend, influencer collaborations, domain or hosting, software or special production costs require prior written approval of the scope and price. "+(p.exclusions?"Exclusions: "+p.exclusions:"No optional extras are compulsory."),y);
+ y=section(page3,"10","Client materials and intellectual property",
+  "The Client authorizes use of its supplied brand materials solely for this agreement and confirms the necessary rights. Upon payment of approved fees, final commissioned deliverables may be used by the Client, subject to third-party licenses and the Agency's pre-existing tools and templates. Client-owned accounts remain with their lawful owner.",y);
+ y=section(page3,"11","Confidentiality and data handling",
+  "Both parties will protect non-public business, account, campaign and customer information and use it only as necessary to perform this Agreement. Personal data will be handled according to applicable law. Upon completion, confidential materials will be returned or deleted on reasonable request, subject to lawful record-retention obligations.",y);
+ y=section(page3,"12","Suspension and early termination",
+  "The Agency may suspend work after reasonable notice if required payments, permissions or lawful approvals are withheld. Either party may terminate for material breach remaining uncured after "+p.noticeDays+" days' written notice, or immediately for fraud or unlawful activity. The parties shall reconcile performed services and approved commitments, and refund or credit unspent media funds as appropriate.",y);
+ y=section(page3,"13","Liability and independent status",
+  "The Agency acts as an independent contractor. Neither party is liable for speculative or indirect losses to the extent permitted by law. Subject to mandatory law, the Agency's contractual liability is limited to service fees received, excluding media pass-through funds, except for fraud, wilful misconduct or liability that cannot lawfully be excluded.",y);
+ y=section(page3,"14","Notices, governing law and entire agreement",
+  "Written communications may be made using acknowledged email or WhatsApp. The parties will first seek resolution through good-faith discussion for 30 days. Indian law governs this agreement, and competent courts in Prayagraj, Uttar Pradesh have jurisdiction, subject to mandatory rules. Schedule A forms part of the agreement; amendments require mutual written consent.",y);
+ if(p.additionalTerms)y=section(page3,"15","Additional agreed terms",p.additionalTerms,y);
+ if(y>770)throw new Error("Legal terms exceed page three. Shorten additional terms or exclusions.");
+ const page4=pages[3];
+ page4.text("SCHEDULE A / COMMERCIAL TERMS & SIGNATURES",40,111,11,violet,true);
+ page4.text("To be completed and accepted by both parties before execution.",40,133,8,"#746688");
+ y=147;
+ y=rowBox(page4,"Client / business",p.clientName,y,24);
+ y=rowBox(page4,"Registered legal name",p.clientName,y,24);
+ y=rowBox(page4,"Business address",p.clientAddress,y,31);
+ y=rowBox(page4,"Effective / start date",fmt(p.startDate),y,24);
+ y=rowBox(page4,"Service period",servicePeriod,y,24);
+ y=rowBox(page4,"Agency service charges",serviceFee+" / "+p.feePeriod,y,24);
+ y=rowBox(page4,"Advertising budget",adsSummary,y,24);
+ y=rowBox(page4,"Illustrative total",total,y,24);
+ y=rowBox(page4,"Tax treatment",tax,y,24);
+ y=rowBox(page4,"Payment at signing",money(p.advanceAmount)+" | "+payment,y,31);
+ y=rowBox(page4,"Monthly deliverables",p.reels+" reels + "+p.posts+" posts (where applicable)",y,24);
+ page4.text("INCLUDED SERVICES AND DELIVERABLES",40,y+18,9,violet,true);
+ y+=34;
  for(let i=0;i<p.services.length;i++){
-  const s=p.services[i];y=first.wrap(String(i+1)+". "+s.name+": "+s.description,48,y,498,8.5,12)+3;
-  if(y>735)throw new Error("Agreement scope exceeds page one. Shorten service descriptions.");
+  const s=p.services[i];
+  y=page4.wrap(String(i+1).padStart(2,"0")+"  "+s.name+" - "+s.description,42,y,509,8,10,navy)+3;
  }
- y=first.wrap("Content target: "+p.reels+" reels and "+p.posts+" posts per month (where applicable), subject to timely client approvals and assets.",40,y+9,514,9,13)+12;
- if(y>766)throw new Error("Agreement scope is too long for the PDF. Shorten the service descriptions.");
- let z=113;
- z=second.section("3. Fees, taxes and payment",z);
- z=second.wrap("Agency fee: "+money(row.serviceFee)+" "+(p.feePeriod==="monthly"?"per month":"one-time")+". Advertising budget: "+(p.adBudgetMode==="not applicable"?"not applicable":money(row.adBudget)+" ("+p.adBudgetMode+")")+".",40,z,514,9,13)+4;
- z=second.wrap("Quoted package value: "+money(row.total)+". Tax treatment: "+(p.taxMode==="extra"?"GST extra at "+p.gstRate+"% on agency fees":p.taxMode==="inclusive"?"applicable taxes included":"taxes not charged")+".",40,z,514,9,13)+4;
- z=second.wrap("Service payment: "+p.servicePayment+". Advance payable: "+money(p.advanceAmount)+". "+(p.paymentSchedule||"Remaining charges are payable on the agreed billing schedule.")+" Advertising spend is payable "+p.adPayment+". Optional advertising is payable only if approved before campaigns run.",40,z,514,9,13)+12;
- z=second.section("4. Client responsibilities and approvals",z);
- z=second.wrap("The Client will provide accurate information, brand assets, account access, timely approvals and lawful advertising materials. Delays in approvals or assets may alter delivery schedules. The Client retains responsibility for product and business claims.",40,z,514,9,13)+12;
- z=second.section("5. Third-party costs and additional work",z);
- z=second.wrap("Ad platform spend, influencers, domain/hosting, subscriptions and other third-party expenses are excluded unless expressly included above. Additional services or scope changes require written approval and may incur additional fees.",40,z,514,9,13)+7;
- if(p.exclusions)z=second.wrap("Additional exclusions: "+p.exclusions,40,z,514,9,13)+8;
- z=second.section("6. Confidentiality and intellectual property",z);
- z=second.wrap("Each party will protect non-public information received from the other. Client-provided materials remain the Client's property. Agency tools, templates and pre-existing materials remain the Agency's. Final agreed deliverables transfer to the Client after the applicable fees are paid, subject to third-party licenses.",40,z,514,9,13)+12;
- z=second.section("7. Performance and liability",z);
- z=second.wrap("The Agency will use reasonable professional care but cannot guarantee leads, revenue, rankings, reach or advertising-platform approvals. Neither party is liable for indirect or consequential losses, to the extent permitted by law.",40,z,514,9,13)+12;
- z=second.section("8. Termination and governing law",z);
- z=second.wrap("Either party may terminate with "+p.noticeDays+" days' written notice. Fees for services already performed and approved non-refundable third-party costs remain payable. Indian law applies, with disputes subject to competent courts in Prayagraj, Uttar Pradesh.",40,z,514,9,13)+10;
- if(p.additionalTerms)z=second.wrap("Additional agreed terms: "+p.additionalTerms,40,z,514,8.5,12)+8;
- if(z>682)throw new Error("Agreement terms exceed page two. Shorten custom terms or exclusions.");
- second.line(Math.max(z,685));
- const signatureY=Math.max(z+25,710);
- second.text("For AmplifyWorld",40,signatureY,9,purple,true);
- second.text("For "+p.clientName,313,signatureY,9,purple,true);
- second.text(p.agencyRepresentative,40,signatureY+19,9,muted);
- second.text(p.clientRepresentative,313,signatureY+19,9,muted);
- second.text(p.agencyDesignation||"Authorized Representative",40,signatureY+34,8,muted);
- second.text(p.clientDesignation||"Authorized Representative",313,signatureY+34,8,muted);
- second.text("Signature: ____________________",40,signatureY+55,8,purple);
- second.text("Signature: ____________________",313,signatureY+55,8,purple);
- const pdf=pdfFromCanvases([first.canvas,second.canvas]);
+ if(y>632)throw new Error("Schedule A exceeds page four. Shorten services or descriptions.");
+ page4.g.fillStyle=pale;page4.g.fillRect(40,Math.max(638,y+10),515,45);
+ const conditionY=Math.max(652,y+24);
+ page4.wrap("PAYMENT CONDITION: "+payment+". "+adsSentence+" Extra charges require written approval. "+tax+".",51,conditionY,492,8,11,violet);
+ const signedY=Math.max(706,y+87);
+ if(signedY>717)throw new Error("Signature section exceeds page four.");
+ page4.text("FOR AMPLIFYWORLD",40,signedY,8,violet,true);
+ page4.text("FOR "+p.clientName.toUpperCase(),311,signedY,8,violet,true);
+ page4.text("Signature: _____________________",40,signedY+20,8,navy);
+ page4.text("Signature: _____________________",311,signedY+20,8,navy);
+ page4.text("Name: "+p.agencyRepresentative,40,signedY+39,8,navy);
+ page4.text("Name: "+p.clientRepresentative,311,signedY+39,8,navy);
+ page4.text("Role: "+(p.agencyDesignation||"Authorized Signatory"),40,signedY+56,8,navy);
+ page4.text("Role: "+(p.clientDesignation||"Client / Authorized Signatory"),311,signedY+56,8,navy);
+ page4.text("Date: ______________________",40,signedY+73,8,navy);
+ page4.text("Date: ______________________",311,signedY+73,8,navy);
+ const pdf=pdfFromCanvases(pages.map(a=>a.canvas));
  const blob=new Blob([new Uint8Array(pdf).buffer],{type:"application/pdf"}),url=URL.createObjectURL(blob);
  const a=document.createElement("a");a.href=url;
  a.download=row.agreementNumber+"-"+row.clientName.replace(/[^a-z0-9-_]+/gi,"-")+".pdf";
