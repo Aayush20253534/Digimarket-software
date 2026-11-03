@@ -17,7 +17,7 @@ export type SavedAgreement={
  payload:AgreementFields;createdAt:string;
 };
 const PW=595,PH=842,scale=2;
-const purple="#51217B",magenta="#D816D3",muted="#50475A",border="#E0D3E9";
+const purple="#51217B",muted="#50475A",border="#E0D3E9";
 const money=(v:string)=>"INR "+Number(v).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmt=(value:string)=>new Date(value.slice(0,10)+"T12:00:00Z")
   .toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"});
