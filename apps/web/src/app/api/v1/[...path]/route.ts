@@ -58,6 +58,7 @@ const endpoints: Record<string, string[]> = {
   "content": ["GET","POST"],
   "invoices": ["GET","POST"],
   "quotations": ["GET","POST"],
+  "agreements": ["GET","POST"],
   "invoices/receivables": ["GET"],
   "payments": ["GET","POST"],
   "billing-schedules": ["GET","POST"],
@@ -98,6 +99,7 @@ const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
 const decisionPattern = /^approvals\/[0-9a-fA-F-]{36}\/(decision|cancel)$/;
 const profitExpensePattern=/^profitability\/expenses\/[0-9a-fA-F-]{36}\/allocations$/;
 const profitReversePattern=/^profitability\/recognitions\/[0-9a-fA-F-]{36}\/reverse$/;
+const agreementDetailPattern=/^agreements\/[0-9a-fA-F-]{36}$/;
 const quotationDetailPattern=/^quotations\/[0-9a-fA-F-]{36}$/;
 const invoiceDetailPattern=/^invoices\/[0-9a-fA-F-]{36}$/;
 const invoiceActionPattern=/^invoices\/[0-9a-fA-F-]{36}\/(issue|void)$/;
@@ -149,6 +151,7 @@ function permitted(path: string, method: string): boolean {
   if(founderDetailPattern.test(path))return method==="PUT";
   if(profitExpensePattern.test(path))return method==="PUT";
   if(profitReversePattern.test(path))return method==="POST";
+  if(agreementDetailPattern.test(path))return method==="GET";
   if(quotationDetailPattern.test(path))return method==="GET";
   if(invoiceDetailPattern.test(path))return ["GET","PUT"].includes(method);
   if(invoiceActionPattern.test(path))return method==="POST";
