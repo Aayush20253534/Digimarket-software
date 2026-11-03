@@ -20,6 +20,7 @@ const sections:readonly Group[]=[
  ]},
  {title:"Finance",items:[
   {label:"Quotations",href:"/app/quotations",icon:FileText,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
+  {label:"Agreements",href:"/app/agreements",icon:FileText,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
   {label:"Income & expenses",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]}
  ]},
  {title:"Relationships",items:[
