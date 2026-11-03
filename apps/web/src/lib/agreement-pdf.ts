@@ -128,7 +128,6 @@ export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
   ?"Instalments: "+p.paymentSchedule
   :p.servicePayment==="full advance"?"Service fee payable at signing":"Monthly advance payments as agreed";
  const servicePeriod=fmt(p.startDate)+" to "+fmt(p.endDate);
- const optional=p.adBudgetMode==="optional";
  const adsSentence=!adsActive?"No advertising budget is included.":
   optional?"The advertising budget is optional at signing, but must be approved and funded before ads run.":
   "The advertising budget must be approved and funded before ads run.";
