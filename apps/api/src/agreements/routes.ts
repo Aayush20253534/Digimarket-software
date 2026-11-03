@@ -37,12 +37,14 @@ const inputSchema = z.strictObject({
 });
 export type AgreementInput = z.infer<typeof inputSchema>;
 const standardServices: AgreementInput["services"] = [
-  {name:"Website Development",description:"Website setup and agreed updates."},
-  {name:"SEO, AEO & GEO",description:"Search, answer-engine and generative-engine optimization."},
-  {name:"Social Media Management",description:"Content planning, publishing and profile management."},
+  {name:"Website Development",description:"Website setup, core pages and agreed routine updates."},
+  {name:"SEO",description:"On-page optimization and relevant search visibility work."},
+  {name:"AEO",description:"Answer Engine Optimization for discoverability."},
+  {name:"GEO",description:"Generative Engine Optimization for relevant online visibility."},
+  {name:"Social Media Management",description:"Planning, captions, publishing and profile handling."},
   {name:"Meta Ads",description:"Facebook and Instagram campaign setup, monitoring and optimization."},
-  {name:"Video Shooting & Editing",description:"Production and editing of agreed monthly reels."},
-  {name:"Social Media Creatives",description:"Design and publishing of agreed monthly posts."},
+  {name:"Influencer Marketing",description:"Influencer outreach, campaign coordination and agreed collaboration fees."},
+  {name:"Monthly Reels and Posts",description:"Production, editing and publishing of 8 reels and 8 branded posts each month."},
 ];
 function paisa(value:string) {
   const [whole, decimals=""] = value.split(".");
