@@ -342,7 +342,7 @@ export default function FinancePage(){
         <div className="aw-finance-register-scroll" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
             {adminFinance&&<th className="pb-3 pr-4">Actions</th>}
-            {["Date","Type","Category","Source","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
+            {["Date","Type","Category","Source","Notes","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
           </tr></thead><tbody>{entries.map(row=><tr key={row.id} id={"finance-"+row.id}>
             {adminFinance&&<td className="py-3 pr-4">
               {row.status!=="CANCELLED"&&<div className="flex items-center gap-2">
@@ -356,6 +356,7 @@ export default function FinancePage(){
             <td><span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>{row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>} {row.kind==="INCOME"?"Income":"Expense"}</span></td>
             <td className="py-3 pr-4">{row.category.name}</td>
             <td className="py-3 pr-4">{row.merchantOrSource||"—"}</td>
+            <td className="py-3 pr-4"><div className="min-w-40 max-w-80 whitespace-pre-wrap break-words text-sm" title={row.description??undefined}>{row.description?.trim()||"—"}</div></td>
             <td className={"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>{money(row.amount)}</td>
             <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
             <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
