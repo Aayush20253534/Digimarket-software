@@ -1,0 +1,132 @@
+/* Quotations live in the dark workspace. White is reserved for the exported PDF. */
+.aw-workspace:has(.aw-quote-page) .aw-work-content {
+  background: #10091c;
+}
+.aw-quote-page {
+  color: #f7ecff;
+  color-scheme: dark;
+  min-height: 100%;
+  padding: clamp(14px, 2.2vw, 28px);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 85% 2%, rgba(174, 61, 202, .16), transparent 34%),
+    linear-gradient(160deg, #160b22 0%, #10091b 72%);
+}
+.aw-quote-page .aw-quote-panel {
+  background: #1b1029;
+  border-color: #482859;
+  box-shadow: 0 18px 40px rgba(2, 0, 10, .19);
+}
+.aw-quote-page .field,
+.aw-quote-page input,
+.aw-quote-page select,
+.aw-quote-page textarea {
+  color-scheme: dark;
+}
+.aw-quote-page .field {
+  background: #291832 !important;
+  border: 1px solid #674277 !important;
+  color: #f8efff !important;
+  border-radius: 10px;
+}
+.aw-quote-page .field:focus {
+  border-color: #d960f1 !important;
+  box-shadow: 0 0 0 3px rgba(216, 71, 241, .17) !important;
+}
+.aw-quote-page .field::placeholder {
+  color: #b59bc4;
+}
+.aw-quote-page select option {
+  color: #f8efff;
+  background: #281635;
+}
+.aw-quote-page .btn-secondary {
+  border: 1px solid #69417a;
+  background: #30203d !important;
+  color: #f4e4ff !important;
+}
+.aw-quote-page .btn-secondary:hover {
+  background: #422551 !important;
+}
+.aw-quote-page .btn-primary {
+  background: linear-gradient(115deg, #bc29ce, #7b2bb5);
+  color: #fff;
+}
+.aw-quote-page .btn-primary:hover {
+  background: linear-gradient(115deg, #d038e3, #913ac9);
+}
+.aw-quote-mode {
+  min-height: 106px;
+  text-align: left;
+  padding: 18px 20px;
+  color: #d1b8df;
+  background: #1c112a;
+  border: 1px solid #4a2c5e;
+  border-radius: 16px;
+  transition: border-color .15s, background-color .15s, box-shadow .15s;
+}
+.aw-quote-mode:hover {
+  background: #291736;
+  border-color: #9451aa;
+}
+.aw-quote-mode-active,
+.aw-quote-mode-active:hover {
+  background: #361a46;
+  border-color: #d74eea;
+  color: #f9efff;
+  box-shadow: inset 3px 0 0 #df3bdf, 0 0 0 1px rgba(211, 64, 222, .18);
+}
+.aw-quote-fixed-service {
+  display: flex;
+  gap: 12px;
+  background: #271634;
+  border: 1px solid #4c2b61;
+  border-radius: 12px;
+  padding: 13px;
+}
+.aw-quote-catalog-button {
+  min-height: 87px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  padding: 13px;
+  color: #ead4fa;
+  background: #29183a;
+  border: 1px solid #5c3873;
+  border-radius: 12px;
+}
+.aw-quote-catalog-button:hover:not(:disabled) {
+  background: #3b2150;
+  border-color: #ca62dc;
+}
+.aw-quote-catalog-button:disabled {
+  opacity: .66;
+}
+.aw-quote-catalog-button span span {
+  color: #bda6cf;
+}
+.aw-quote-page table {
+  color: #ead7f7;
+  border-collapse: collapse;
+}
+.aw-quote-page table tbody tr {
+  border-color: #4b2b60;
+}
+.aw-quote-page table tbody tr:hover {
+  background: #291a39;
+}
+.aw-quote-page table thead {
+  background: #31203d;
+}
+.aw-quote-page table th {
+  color: #e9cafa;
+}
+.aw-quote-page table td {
+  color: #ead7f7;
+}
+@media (max-width: 640px) {
+  .aw-quote-page { padding: 14px; border-radius: 14px; }
+  .aw-quote-mode { min-height: 90px; padding: 14px; }
+}
