@@ -128,15 +128,20 @@ try{
  assert.equal((await deliveries.complete(assignee,interval.id,firstInterval.id,{version:firstInterval.version,completed:true})).status,"COMPLETED");
  await assert.rejects(()=>deliveries.create(manager,{clientId:client.id,title:"Conflicting recurrence",assigneeId:member.id,
   startOn:"2026-11-01",endOn:"2026-11-20",weekdays:[2],repeatEveryDays:3}),fail(422));
+ const updatedStart=new Date(Date.now()+3*86_400_000).toISOString().slice(0,10);
+ const updatedStartTime=Date.parse(updatedStart+"T00:00:00Z");
+ const updatedEnd=new Date(updatedStartTime+12*86_400_000).toISOString().slice(0,10);
+ const expectedUpdatedDates=Array.from({length:7},(_,index)=>
+  new Date(updatedStartTime+index*2*86_400_000).toISOString().slice(0,10));
  const intervalUpdated=await deliveries.update(manager,interval.id,{
   version:interval.version,title:"Every other day reel editing",assigneeId:member.id,serviceId:null,
-  startOn:"2026-11-01",endOn:"2026-11-13",weekdays:[],repeatEveryDays:2,active:true,
+  startOn:updatedStart,endOn:updatedEnd,weekdays:[],repeatEveryDays:2,active:true,
  });
  assert.equal(intervalUpdated.repeatEveryDays,2);
  const afterInterval=(await deliveries.list(manager,{clientId:client.id})).items.find(x=>x.id===interval.id);
  assert.equal(afterInterval?.occurrences.filter(o=>o.status==="COMPLETED").length,1);
- assert.deepEqual(afterInterval?.occurrences.filter(o=>o.scheduledOn>=new Date("2026-11-01T00:00:00Z")).map(o=>o.scheduledOn.toISOString().slice(0,10)),
-  ["2026-11-01","2026-11-03","2026-11-05","2026-11-07","2026-11-09","2026-11-11","2026-11-13"]);
+ assert.deepEqual(afterInterval?.occurrences.filter(o=>o.scheduledOn>=new Date(updatedStartTime)).map(o=>o.scheduledOn.toISOString().slice(0,10)),
+  expectedUpdatedDates);
  assert.equal((await clients.deliverySummary(external)).items.length,0);
  await assert.rejects(()=>clients.deliverySummary(actor(member.id,org.id,[])),fail(403));
  assert.equal((await clients.list(manager,{limit:30,q:"Updated"})).items.length,1);
