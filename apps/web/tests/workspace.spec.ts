@@ -19,7 +19,7 @@ async function finishPasswordRotation(page:Page,next:string){
   await page.getByRole("button",{name:"Sign in",exact:true}).click();
 }
 async function createUser(page:Page,id:string,name:string,role:"FOUNDER"|"EMPLOYEE"){
-  await page.goto("/app/team/users");
+  await visitWorkspace(page,"/app/team/users");
   await page.getByRole("button",{name:"New account"}).click();
   await page.getByLabel("Display name").fill(name);
   await page.getByLabel("Login ID",{exact:true}).fill(id);
@@ -29,6 +29,14 @@ async function createUser(page:Page,id:string,name:string,role:"FOUNDER"|"EMPLOY
   await page.getByRole("button",{name:"Create account"}).click();
   await expect(page.getByText(name)).toBeVisible();
   return initial;
+}
+
+// Hard navigations remount the auth provider and rotate its HttpOnly session cookie.
+// Do not start the next browser action or navigation before authentication settles.
+async function visitWorkspace(page:Page,path:string){
+  await page.goto(path);
+  await expect(page.locator(".aw-workspace"),"Authenticated workspace at "+path)
+    .toBeVisible({timeout:20000});
 }
 
 test("admin policy, founder operations, note persistence, Drive, and employee permissions",async({page})=>{
@@ -53,7 +61,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Leads CRM"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow Ups"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
   await expect(page.locator(".aw-module-pill").first()).toHaveCSS("border-radius","3px");
   await expect(page.locator('[class*="rounded-2xl"]').first()).toHaveCSS("border-radius","4px");
@@ -85,16 +93,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.locator(".aw-register-page")).toHaveText(/^Page 1 of \d+ · Leads (?:0 of 0|1–\d+ of \d+)$/);
   await expect(page.getByRole("heading",{name:"Pending tasks"})).toHaveCount(0);
   await expect(page.getByRole("heading",{name:"Past deadline"})).toHaveCount(0);
-  await page.goto("/app/notes");
+  await visitWorkspace(page,"/app/notes");
   await expect(page.getByRole("heading",{name:"Start a new note"})).toBeVisible();
-  await page.goto("/app/tasks");
+  await visitWorkspace(page,"/app/tasks");
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
-  await page.goto("/app/approvals");
+  await visitWorkspace(page,"/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval workflows"})).toBeVisible();
   // Reporting must fit the document viewport. Overflow belongs to inner tables only.
   for(const width of [1440,1024,768,390]){
     await page.setViewportSize({width,height:800});
-    await page.goto("/app/reports");
+    await visitWorkspace(page,"/app/reports");
     await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
     await expect(page.getByRole("article",{name:"Lead conversion rate"})).toBeVisible();
     const bounds=await page.evaluate(()=>({
@@ -105,7 +113,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
       .toBeLessThanOrEqual(bounds.viewportWidth+1);
   }
   await page.setViewportSize({width:1366,height:768});
-  await page.goto("/app/reports");
+  await visitWorkspace(page,"/app/reports");
   // Both cash ledger totals open their own full breakdown, preserving the
   // selected report period in the URL and the drill-down date controls.
   const incomeLink=page.getByRole("link",{name:"View Income breakdown"});
@@ -205,7 +213,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.setViewportSize({width:1366,height:768});
   const assigneeResponse=page.waitForResponse(response=>
     response.url().includes("/api/v1/finance/assignees") && response.request().method()==="GET");
-  await page.goto("/app/finance");
+  await visitWorkspace(page,"/app/finance");
   expect((await assigneeResponse).status(),"Finance gateway must forward assignee lookups").toBe(200);
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
@@ -222,7 +230,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Add category"}).click();
   await expect(page.getByText("CI Revenue Category",{exact:true}).last()).toBeVisible();
   await expect(page.getByRole("link",{name:"Invoices & payments"})).toHaveCount(0);
-  await page.goto("/app/approvals");
+  await visitWorkspace(page,"/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval policy configuration"})).toBeVisible();
   await page.getByRole("button",{name:"Save policy"}).click();
   await expect(page.getByText("Routing policy saved.")).toBeVisible();
@@ -230,7 +238,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const employeeInitial=await createUser(page,"ci-employee","CI Employee","EMPLOYEE");
 
   // An administrator can revise task fields and assignments in one save.
-  await page.goto("/app/tasks");
+  await visitWorkspace(page,"/app/tasks");
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
   const teamTasksRequest=page.waitForRequest(req=>{
     const url=new URL(req.url());
@@ -277,7 +285,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // an admin reopens them, rather than being permanently archived.
   await page.getByLabel("Admin task status").selectOption("DONE");
   await expect(page.getByText("Task status updated.")).toBeVisible();
-  await page.goto("/app/task-history");
+  await visitWorkspace(page,"/app/task-history");
   await expect(page.getByTestId("task-history-page")).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"})
     .getByRole("link",{name:"Task history"})).toBeVisible();
@@ -288,7 +296,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByLabel("Admin task status")).toHaveValue("DONE");
   await page.getByLabel("Admin task status").selectOption("IN_PROGRESS");
   await expect(page.getByText("Task reopened in In Process.")).toBeVisible();
-  await page.goto("/app/task-history");
+  await visitWorkspace(page,"/app/task-history");
   await page.getByLabel("Task history scope").selectOption("team");
   await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toHaveCount(0);
   await page.getByRole("button",{name:"Sign out"}).click();
@@ -316,7 +324,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(founderNav.getByRole("link",{name:"Clients",exact:true})).toHaveCount(1);
   await expect(founderNav.getByRole("link",{name:"Client deliveries",exact:true})).toHaveCount(1);
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
-  await page.goto("/app/notes");
+  await visitWorkspace(page,"/app/notes");
   // The studio must reach the bottom of the visible desktop viewport at 75% zoom.
   const notesBottom=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect().bottom);
   const viewportHeight=await page.evaluate(()=>window.innerHeight);
@@ -380,7 +388,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Permanently delete CI Notes Studio"}).click();
   await expect(page.getByRole("button",{name:"Permanently delete CI Notes Studio"})).toHaveCount(0);
 
-  await page.goto("/app/assets");
+  await visitWorkspace(page,"/app/assets");
   await expect(page.getByRole("heading",{name:"My Drive"})).toBeVisible();
   // Regression: long filenames and upload progress must not stretch the modal.
   await page.getByRole("button",{name:"New",exact:true}).click();
@@ -439,7 +447,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const savedTrail=await page.evaluate(()=>JSON.parse(new URLSearchParams(window.location.search).get("folders")??"[]"));
   expect(savedTrail).toHaveLength(1);
   // Old builds could save repeated IDs into the URL; repair them on load.
-  await page.goto("/app/assets?folders="+encodeURIComponent(JSON.stringify([...savedTrail,...savedTrail])));
+  await visitWorkspace(page,"/app/assets?folders="+encodeURIComponent(JSON.stringify([...savedTrail,...savedTrail])));
   await expect(page.locator(".aw-drive-crumb")).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Open folder CI Campaign Artwork",exact:true}).click();
@@ -457,7 +465,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   expect((await zipped).headers()["content-type"]).toContain("application/zip");
   await page.getByRole("button",{name:"More actions for folder CI Brand Designs"}).click();
   await expect(page.getByRole("button",{name:"Delete empty folder CI Brand Designs"})).toHaveCount(0); // Founder cannot bypass assets.delete permissions.
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   // Saved CRM view choices survive both a browser reload and a manual Refresh.
   await page.getByLabel("Filter by stage").selectOption("FOLLOW_UP");
@@ -570,28 +578,28 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(scheduledTable.getByRole("link",{name:"9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
   await expect(scheduledTable.getByRole("link",{name:"Lead 9876543210"})).toBeVisible();
   await expect(scheduledTable.locator("tbody tr").getByText("Not recorded")).toBeVisible();
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   // Tomorrow's reminder is invisible today, irrespective of lead creation date.
   const futureResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups/today?date="));
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   expect((await futureResponse).status()).toBe(200);
   await expect(page.getByTestId("today-lead-followups")).toHaveCount(0);
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   await expect(page.getByLabel("Follow-up date")).toHaveValue(dueTomorrow);
   await page.getByLabel("Follow-up date").fill(dueToday);
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const todayResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups/today?date="));
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   expect((await todayResponse).status()).toBe(200);
   const dueCard=page.getByTestId("today-lead-followups");
   await expect(dueCard).toBeVisible();
   await expect(dueCard.getByText("Lead 9876543210")).toBeVisible();
   await expect(dueCard.locator(".aw-today-followup-card")).toHaveCSS("color","rgb(255, 255, 255)");
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   await page.getByLabel("Lead status").selectOption("CALL_NOT_PICKING");
@@ -644,26 +652,26 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(meetingRegister.getByText("17 Civil Lines, Prayagraj")).toBeVisible();
   await expect(meetingRegister.getByRole("link",{name:"Open Google Maps for Founder CI Lead"}))
     .toHaveAttribute("href","https://maps.app.goo.gl/abcdEFG123");
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   const futureMeeting=page.waitForResponse(res=>res.url().includes("/api/v1/leads/meetings/today?date="));
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   expect((await futureMeeting).status()).toBe(200);
   await expect(page.getByTestId("today-lead-meetings")).toHaveCount(0);
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   await page.getByLabel("Meeting date").fill(dueToday);
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const todayMeeting=page.waitForResponse(res=>res.url().includes("/api/v1/leads/meetings/today?date="));
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   expect((await todayMeeting).status()).toBe(200);
   const meetingCard=page.getByTestId("today-lead-meetings");
   await expect(meetingCard).toBeVisible();
   await expect(meetingCard.getByText("Founder CI Lead")).toBeVisible();
   await expect(meetingCard.locator("time")).toContainText("2:30");
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
   const savedMap=page.getByRole("link",{name:"Open Google Maps for CI Contact"});
@@ -673,12 +681,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Note for DECISION PENDING").fill("Awaiting customer confirmation");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const clearedMeeting=page.waitForResponse(res=>res.url().includes("/api/v1/leads/meetings/today?date="));
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   expect((await clearedMeeting).status()).toBe(200);
   await expect(page.getByTestId("today-lead-meetings")).toHaveCount(0);
-  await page.goto("/app/meetings");
+  await visitWorkspace(page,"/app/meetings");
   await expect(page.getByRole("table",{name:"Meetings register"}).locator("tbody tr")).toHaveCount(0);
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   // Under parallel browser CI, the session can complete hydration after navigation.
   // Retry one reload while still requiring the real authorized CRM table to render.
   const leadsAfterMeetings=page.getByRole("table",{name:"Leads directory"});
@@ -711,7 +719,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Note for APPROVED").fill("Agreed to onboard");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   await expect(page.getByText("Lead approved and automatically added to Clients.")).toBeVisible();
-  await page.goto("/app/clients");
+  await visitWorkspace(page,"/app/clients");
   await expect(page.getByRole("table",{name:"Clients directory"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add client"})).toHaveCount(0);
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
@@ -799,7 +807,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(newService.getByLabel("Monthly target")).toHaveCount(0);
   await expect(page.getByRole("dialog",{name:"Client details"})).toHaveCount(0);
   const clientUrl=page.url();
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   const pendingCard=page.getByTestId("client-deliveries-list").locator("article").filter({hasText:"Founder CI Lead"});
   await expect(pendingCard).toHaveClass(/aw-client-delivery-card--pending/);
   await expect(pendingCard.getByText("Completed service dates")).toHaveCount(0);
@@ -811,7 +819,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/clients$/);
   // Confirm the frontend gateway supports metrics and hard-deletion, and that
   // deleting an approved lead never removes its linked client.
-  await page.goto("/app/leads");
+  await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("region",{name:"CRM pipeline summary"})).toBeVisible();
   await expect(page.getByRole("region",{name:"CRM pipeline summary"}).getByText("FOLLOW UP",{exact:true})).toBeVisible();
   await expect(page.getByText("Conversion rate",{exact:true})).toHaveCount(0);
@@ -822,7 +830,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   page.once("dialog",dialog=>{void dialog.accept();});
   await page.getByRole("button",{name:"Delete lead"}).click();
   await expect(page.getByText("Lead permanently deleted from the database. Linked clients are preserved.")).toBeVisible();
-  await page.goto("/app/clients");
+  await visitWorkspace(page,"/app/clients");
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
   await page.getByRole("button",{name:"Sign out"}).click();
 
@@ -833,18 +841,18 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await expect(page.getByRole("link",{name:"Task history",exact:true}).first()).toBeVisible();
-  await page.goto("/app/task-history");
+  await visitWorkspace(page,"/app/task-history");
   await expect(page.getByTestId("task-history-page")).toBeVisible();
   await expect(page.getByLabel("Task history scope")).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Tasks",exact:true}).last()).toBeVisible();
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   // Overview is now client-delivery based. Task-status cards remain only in the delivery module.
   await page.setViewportSize({width:1366,height:812});
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await expect(page.locator('[data-testid="personal-pending"]')).toHaveCount(0);
   await expect(page.getByRole("link",{name:"All clients"})).toBeVisible();
   // Non-admin Task Register rows use the same four-color palette.
-  await page.goto("/app/tasks");
+  await visitWorkspace(page,"/app/tasks");
   const taskCardStyles=await page.locator('[data-aw-module="tasks"]').evaluate(container=>{
     return ["pending","in-process","completed","expired"].map(tone=>{
       const row=document.createElement("button");
@@ -863,12 +871,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     {background:"rgb(50, 130, 80)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
     {background:"rgb(56, 50, 61)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
   ]);
-  await page.goto("/app/dashboard");
+  await visitWorkspace(page,"/app/dashboard");
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await expect(page.locator('[data-testid="personal-completed"]')).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Team & accounts"})).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
-  await page.goto("/app/finance");
+  await visitWorkspace(page,"/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
   const financeCategory=page.getByLabel("Category",{exact:true});
   // No Person field on new transactions; the server records the submitting user.
@@ -888,7 +896,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("button",{name:"Agency totals"})).toHaveCount(0);
   for(const width of [320,360,375,390,430,768,1024,1366,1440]){
     await page.setViewportSize({width,height:812});
-    await page.goto("/app/dashboard");
+    await visitWorkspace(page,"/app/dashboard");
     expect(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+2)).toBe(false);
     if(width<=430){
       const cards=page.locator(".aw-personal-shortcut");
@@ -911,7 +919,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
       });
       expect(nav.contained,"Mobile navigation title must not collide with icons").toBe(true);
       expect(nav.right,"Mobile navigation actions must stay on-screen").toBe(true);
-      await page.goto("/app/finance");
+      await visitWorkspace(page,"/app/finance");
       const grid=await page.locator(".aw-finance-summary-grid").evaluate(el=>{
         const cards=[...el.children].map(x=>x.getBoundingClientRect());
         return {columns:getComputedStyle(el).gridTemplateColumns.split(" ").length,
@@ -919,7 +927,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
       });
       expect(grid.columns,"Finance summary should use two columns on phones").toBe(2);
       expect(grid.compact,"Finance cards should stay compact on phones: "+JSON.stringify(grid.heights)).toBe(true);
-      await page.goto("/app/notes");
+      await visitWorkspace(page,"/app/notes");
       const studio=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect());
       expect(studio.right,"Mobile notes must stay inside viewport")
         .toBeLessThanOrEqual(width+1);
@@ -930,7 +938,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Sign out"}).click();
   await login(page,"admin-e2e",UPDATED);
   await expect(page).toHaveURL(/\/app\/dashboard/);
-  await page.goto("/app/finance");
+  await visitWorkspace(page,"/app/finance");
   const incomeRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Revenue Category"});
   const expenseRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Admin Category Updated"});
   await expect(incomeRow.getByRole("button",{name:/Edit income/})).toBeVisible();
