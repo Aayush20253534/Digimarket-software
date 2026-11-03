@@ -7,6 +7,7 @@ import { AuthError, unauthorized } from "../auth/errors";
 const money = z.string().regex(/^(0|[1-9]\d{0,8})(?:\.\d{1,2})?$/, "Enter a valid INR amount");
 const text = (max: number) => z.string().trim().max(max);
 const quoteInput = z.strictObject({
+  mode: z.enum(["default", "new"]).default("new"),
   clientName: z.string().trim().min(2).max(80),
   packageTitle: z.string().trim().min(2).max(60).default("CUSTOM MARKETING PACKAGE"),
   quoteDate: z.iso.date(),
@@ -35,6 +36,15 @@ const quoteInput = z.strictObject({
 });
 export type QuotationInput = z.infer<typeof quoteInput>;
 
+const standardServices = [
+  { name: "WEBSITE", description: "Website setup, property listing pages and routine updates." },
+  { name: "SEO + AEO + GEO", description: "Search, answer-engine and generative-engine visibility optimization." },
+  { name: "SOCIAL MEDIA MANAGEMENT", description: "Content planning, captions, scheduling, posting and profile handling." },
+  { name: "META ADS: FB + INSTAGRAM", description: "Campaign setup, monitoring and optimization across both platforms." },
+  { name: "REELS: SHOOTING + EDITING", description: "Property showcase videos; 8 reels per month." },
+  { name: "BRANDED SOCIAL POSTS", description: "Graphic post creation and publishing; 8 posts per month." },
+];
+
 function requireFounder(p: Principal) {
   if (!p.roles.some(r => ["FOUNDER", "ADMIN", "SUPER_ADMIN"].includes(r))) {
     throw new AuthError(403, "FORBIDDEN", "Quotation management is restricted to founders and administrators.");
@@ -61,7 +71,30 @@ function validated(input: unknown): QuotationInput {
     const fields = [...new Set(parsed.error.issues.map(i => i.path.join(".") || "request"))].slice(0, 6);
     throw new AuthError(422, "VALIDATION_ERROR", "Invalid quotation fields: " + fields.join(", "));
   }
-  const value = parsed.data;
+  const raw = parsed.data;
+  // Default quotations must stay identical in scope and terms to the approved
+  // six-service package. Only client, issue date, and the two prices can vary.
+  const value: QuotationInput = raw.mode === "default" ? {
+    ...raw,
+    packageTitle: "CUSTOM MARKETING PACKAGE",
+    feePeriod: "monthly",
+    servicePayment: "monthly",
+    adBudgetMode: "mandatory",
+    adPlatform: "Meta",
+    adPayment: "before ads run",
+    adFlexibility: "client-adjustable",
+    taxMode: "not charged",
+    gstRate: 18,
+    gstin: "",
+    influencerFees: "not applicable",
+    domainHosting: "extra",
+    reels: 8,
+    posts: 8,
+    validityDays: 7,
+    serviceTerm: "1 month",
+    services: standardServices.map(service => ({ ...service })),
+    exclusions: "",
+  } : raw;
   if (value.adBudgetMode === "not applicable" && paisa(value.adBudget) !== 0) {
     throw new AuthError(422, "VALIDATION_ERROR", "Ad budget must be zero when not applicable.");
   }
