@@ -1,18 +1,32 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState,type FormEvent} from "react";
-import {Download,FileText,Plus,RefreshCw,Trash2} from "lucide-react";
+import {Check,Download,FileText,Plus,RefreshCw,Trash2} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {PageHeader,Spinner} from "@/components/ui";
 import {downloadQuotationPdf,type QuotationFields,type SavedQuotation} from "@/lib/quotation-pdf";
 
 type Service=QuotationFields["services"][number];
+type QuoteMode="default"|"new";
+const standardServices:Service[]=[
+ {name:"WEBSITE",description:"Website setup, property listing pages and routine updates."},
+ {name:"SEO + AEO + GEO",description:"Search, answer-engine and generative-engine visibility optimization."},
+ {name:"SOCIAL MEDIA MANAGEMENT",description:"Content planning, captions, scheduling, posting and profile handling."},
+ {name:"META ADS: FB + INSTAGRAM",description:"Campaign setup, monitoring and optimization across both platforms."},
+ {name:"REELS: SHOOTING + EDITING",description:"Property showcase videos; 8 reels per month."},
+ {name:"BRANDED SOCIAL POSTS",description:"Graphic post creation and publishing; 8 posts per month."},
+];
 const makeDate=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");};
 const initial=():QuotationFields=>({
- clientName:"",packageTitle:"CUSTOM MARKETING PACKAGE",quoteDate:makeDate(),
+ mode:"new",clientName:"",packageTitle:"CUSTOM MARKETING PACKAGE",quoteDate:makeDate(),
  serviceFee:"",feePeriod:"monthly",servicePayment:"at signing",
  adBudget:"0",adBudgetMode:"not applicable",adPlatform:"Meta",adPayment:"before ads run",adFlexibility:"client-adjustable",
  taxMode:"not charged",gstRate:18,gstin:"",influencerFees:"not applicable",domainHosting:"not applicable",
- reels:8,posts:8,validityDays:7,serviceTerm:"1 month",services:[{name:"",description:""}],exclusions:"",
+ reels:8,posts:8,validityDays:7,serviceTerm:"1 month",services:[],exclusions:"",
+});
+const defaultForm=():QuotationFields=>({
+ ...initial(),mode:"default",adBudget:"",adBudgetMode:"mandatory",
+ adPlatform:"Meta",feePeriod:"monthly",servicePayment:"monthly",adPayment:"before ads run",
+ domainHosting:"extra",services:standardServices.map(service=>({...service})),
 });
 const money=(v:number)=>"₹"+v.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 function cost(form:QuotationFields) {
@@ -22,20 +36,27 @@ function cost(form:QuotationFields) {
  return {service:service/100,ads:ads/100,tax:tax/100,total:(service+ads+tax)/100};
 }
 const field="field";
-const label="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#593978]";
-const card="rounded border border-[#E4CDEC] bg-white p-5 shadow-sm";
+const label="mb-1.5 block text-xs font-bold uppercase tracking-wide text-[#E8CFF8]";
+const card="aw-quote-panel rounded-2xl border border-[#412450] bg-[#190E26] p-5 shadow-sm";
 const action="btn-secondary";
 const reason=(e:unknown)=>e instanceof Error?e.message:"Quotation operation failed.";
 
 export default function QuotationsPage(){
  const {session,request}=useAuth();
  const permitted=!!session?.identity.roles.some(role=>["FOUNDER","ADMIN","SUPER_ADMIN"].includes(role));
- const [form,setForm]=useState<QuotationFields>(initial);
+ const [mode,setMode]=useState<QuoteMode>("default");
+ const [form,setForm]=useState<QuotationFields>(defaultForm);
  const [rows,setRows]=useState<SavedQuotation[]>([]);
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[downloading,setDownloading]=useState<string|null>(null);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [search,setSearch]=useState("");
  const patch=<K extends keyof QuotationFields>(key:K,value:QuotationFields[K])=>setForm(prev=>({...prev,[key]:value}));
+ const changeMode=(next:QuoteMode)=>{
+  setMode(next);setForm(next==="default"?defaultForm():initial());setError("");setNotice("");
+ };
+ const addCatalogueService=(service:Service)=>setForm(prev=>({
+   ...prev,services:prev.services.length>=6?prev.services:[...prev.services,{...service}],
+ }));
  const editService=(index:number,key:keyof Service,value:string)=>setForm(prev=>({
    ...prev,services:prev.services.map((s,i)=>i===index?{...s,[key]:value}:s),
  }));
@@ -55,11 +76,12 @@ export default function QuotationsPage(){
  }
  async function create(e:FormEvent<HTMLFormElement>){
   e.preventDefault();setError("");setNotice("");
+  if(!form.services.length){setError("Select or add at least one service.");return;}
   if(form.services.some(s=>!s.name.trim()||!s.description.trim())){setError("Every service needs a name and brief description.");return;}
   if(form.adBudgetMode==="not applicable"&&Number(form.adBudget)!==0){setError("Set the ad budget to zero when not applicable.");return;}
   setSaving(true);
   try {
-   const out=await request<SavedQuotation>("/quotations",{method:"POST",body:form});
+   const out=await request<SavedQuotation>("/quotations",{method:"POST",body:{...form,mode,quoteDate:makeDate()}});
    setRows(prev=>[out,...prev]);
    setNotice(out.quoteNumber+" saved. Your PDF has been prepared for download.");
    await download(out);
