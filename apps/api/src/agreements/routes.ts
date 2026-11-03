@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { AuthService, Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 
-const amount = z.string().regex(/^(0|[1-9]\\d{0,8})(?:\\.\\d{1,2})?$/, "Enter a valid INR amount");
+const amount = z.string().regex(/^(0|[1-9]\d{0,8})(?:\.\d{1,2})?$/, "Enter a valid INR amount");
 const text = (max: number) => z.string().trim().max(max);
 const inputSchema = z.strictObject({
   mode: z.enum(["default", "custom"]),
