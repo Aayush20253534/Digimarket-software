@@ -8,6 +8,7 @@ import { AuthError, forbidden, invalid } from "../auth/errors";
 const need=(actor:Principal,key:string)=>{if(!actor.permissions.has(key))throw forbidden();};
 const duplicate=()=>new AuthError(409,"DUPLICATE","A record with this identifier already exists");
 const normalize=(value:string)=>value.trim().replace(/\s+/g," ").toLocaleLowerCase("en-US");
+const isMetaAds=(name:string)=>/^meta[\s_-]*(?:ads?|advertising|advertisements?)$/i.test(name.trim());
 const csvCell=(value:string)=> {
   const safe=/^[=+@\-\t\r]/.test(value)?"'"+value:value;
   return '"'+safe.replaceAll('"','""')+'"';
@@ -45,10 +46,18 @@ export class FinanceService {
       monthlyCombinedTotal:serviceTotal.add(adBudgetTotal).toFixed(4)};
   }
 
-  private scope(actor:Principal,view:View){
+  private scope(actor:Principal,view:View,clientAds=false):Prisma.FinancialTransactionWhereInput{
     if(view==="all")need(actor,"finance.read.all");
     else need(actor,"finance.entry.read.own");
-    return {organizationId:actor.organizationId,...(view==="mine"?{enteredById:actor.userId}:{})};
+    return {organizationId:actor.organizationId,
+      ...(view==="mine"?{enteredById:actor.userId}:{}),
+      clientId:clientAds?{not:null}:null};
+  }
+
+  async metaAdClients(actor:Principal){
+    if(!actor.permissions.has("finance.entry.create")&&!actor.permissions.has("finance.category.manage"))throw forbidden();
+    return this.db.client.findMany({where:{organizationId:actor.organizationId,status:"ACTIVE"},
+      select:{id:true,businessName:true},orderBy:{businessName:"asc"},take:1000});
   }
 
   async categories(actor:Principal){
@@ -175,6 +184,14 @@ export class FinanceService {
           ...(input.categoryId===entry.categoryId?{}:{active:true})},
       });
       if(!category)throw invalid("Choose a valid "+entry.kind.toLowerCase()+" category in this organization");
+      const requestedClientId=input.clientId===undefined?entry.clientId:input.clientId;
+      if(requestedClientId&&!isMetaAds(category.name))
+        throw invalid("A client can only be linked to a Meta Ads expense");
+      if(requestedClientId){
+        const client=await tx.client.findFirst({where:{id:requestedClientId,organizationId:actor.organizationId},
+          select:{id:true}});
+        if(!client)throw invalid("Select a client in this workspace");
+      }
       const assignedUserId=input.enteredById??entry.enteredById;
       if(assignedUserId!==entry.enteredById){
         const assignedUser=await tx.user.findFirst({where:{
@@ -185,15 +202,15 @@ export class FinanceService {
       const updated=await tx.financialTransaction.update({where:{id},data:{
         categoryId:category.id,amount,occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
         method:input.method,merchantOrSource:input.merchantOrSource,description:input.description,
-        enteredById:assignedUserId,
+        clientId:requestedClientId??null,enteredById:assignedUserId,
       }});
       await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
         action:entry.kind==="INCOME"?"finance.income_edited":"finance.expense_edited",
         entityType:"FinancialTransaction",entityId:id,
         beforeRedacted:{amount:entry.amount.toFixed(4),categoryId:entry.categoryId,status:entry.status,
-          assignedUserId:entry.enteredById},
+          assignedUserId:entry.enteredById,clientId:entry.clientId},
         afterRedacted:{amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status,
-          assignedUserId:updated.enteredById},
+          assignedUserId:updated.enteredById,clientId:updated.clientId},
       }});
       // ApprovalRequest.requesterId remains immutable as the original submitter.
       return {id,amount:updated.amount.toFixed(4),categoryId:updated.categoryId,
@@ -268,6 +285,13 @@ export class FinanceService {
       this.db.user.findFirst({where:{id:enteredById,organizationId:actor.organizationId,status:"ACTIVE"},select:{id:true}}),
     ]);
     if(!category)throw invalid("Select an active category belonging to this workspace and type");
+    if(input.clientId){
+      if(input.kind!=="EXPENSE"||!isMetaAds(category.name))
+        throw invalid("A client can only be linked to a Meta Ads expense");
+      const client=await this.db.client.findFirst({where:{id:input.clientId,
+        organizationId:actor.organizationId,status:"ACTIVE"},select:{id:true}});
+      if(!client)throw invalid("Select an active client in this workspace");
+    }
     if(!assignedUser)throw invalid("Select an active person in this organization");
     if(!founder&&(!policy?.active||!policy.approverRoleKeys.length))throw invalid("An administrator must activate a FINANCE approval policy");
     if(!organization||organization.defaultCurrency!=="INR")throw invalid("This finance module currently supports INR workspaces only");
@@ -294,6 +318,7 @@ export class FinanceService {
         const entry=await tx.financialTransaction.create({data:{
           organizationId:actor.organizationId,enteredById,
           categoryId:category.id,approvalRequestId:approval.id,
+          clientId:input.clientId??null,
           idempotencyKey:input.idempotencyKey,kind:input.kind,
           amount:amount.toFixed(4),currencyCode:organization.defaultCurrency,
           occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
@@ -330,7 +355,7 @@ export class FinanceService {
   private breakdownScope(actor:Principal,input:FinanceBreakdownQuery){
     need(actor,"reports.business.read");
     need(actor,"finance.read.all");
-    const period={organizationId:actor.organizationId,kind:input.kind,status:"POSTED" as const,
+    const period={organizationId:actor.organizationId,clientId:null,kind:input.kind,status:"POSTED" as const,
       occurredOn:{gte:new Date(input.from+"T00:00:00.000Z"),lte:new Date(input.to+"T23:59:59.999Z")}};
     const query=input.q.trim();
     // Only match enum-valued methods when the query is itself a valid
@@ -445,50 +470,64 @@ export class FinanceService {
 
   private present(row:{id:string;kind:FinanceKind;amount:Prisma.Decimal;currencyCode:string;occurredOn:Date;status:string;
     categoryId:string;enteredById:string;approvalRequestId:string;description:string|null;merchantOrSource:string|null;
-    method:string;createdAt:Date;postedAt:Date|null}){
+    method:string;createdAt:Date;postedAt:Date|null;clientId:string|null}){
     return {...row,amount:row.amount.toFixed(4),occurredOn:row.occurredOn.toISOString().slice(0,10)};
   }
 
-  async entries(actor:Principal,view:View){
+  async entries(actor:Principal,view:View,scope:"agency"|"client_ads"="agency"){
     const rows=await this.db.financialTransaction.findMany({
-      where:this.scope(actor,view),orderBy:{createdAt:"desc"},take:200,
+      where:this.scope(actor,view,scope==="client_ads"),orderBy:{createdAt:"desc"},take:200,
       include:{category:{select:{id:true,name:true,active:true}},
+        client:{select:{id:true,businessName:true}},
         enteredBy:{select:{displayName:true,loginId:true}},
         approvalRequest:{select:{requester:{select:{displayName:true}}}}},
     });
-    return rows.map(r=>({...this.present(r),category:r.category,
+    return rows.map(r=>({...this.present(r),category:r.category,client:r.client,
       enteredBy:r.enteredBy,submittedBy:r.approvalRequest.requester}));
   }
 
   async totals(actor:Principal,view:View){
-    const grouped=await this.db.financialTransaction.groupBy({
-      by:["kind","status"],where:this.scope(actor,view),
-      _sum:{amount:true},_count:{_all:true},
-    });
+    const [grouped,clientGroups]=await Promise.all([
+      this.db.financialTransaction.groupBy({
+        by:["kind","status"],where:this.scope(actor,view),
+        _sum:{amount:true},_count:{_all:true},
+      }),
+      this.db.financialTransaction.groupBy({
+        by:["status"],where:{...this.scope(actor,view,true),kind:"EXPENSE"},
+        _sum:{amount:true},_count:{_all:true},
+      }),
+    ]);
     const entries=grouped.map(g=>({kind:g.kind,status:g.status,
       amount:(g._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:g._count._all}));
     const sum=(kind:FinanceKind,status:"POSTED"|"PENDING")=>grouped
       .filter(g=>g.kind===kind&&g.status===status)
       .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
     const income=sum("INCOME","POSTED"),expense=sum("EXPENSE","POSTED");
+    const clientSum=(status:"POSTED"|"PENDING")=>clientGroups
+      .filter(g=>g.status===status)
+      .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
     return {currency:"INR",postedIncome:income.toFixed(4),postedExpense:expense.toFixed(4),
       postedNet:income.minus(expense).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
       pendingExpense:sum("EXPENSE","PENDING").toFixed(4),groups:entries,
+      clientAdSpend:{posted:clientSum("POSTED").toFixed(4),pending:clientSum("PENDING").toFixed(4),
+        count:clientGroups.filter(g=>g.status!=="CANCELLED").reduce((n,g)=>n+g._count._all,0)},
        ...(view==="all"?{recurringIncome:await this.recurringIncome(actor)}:{})};
   }
 
-  async exportCsv(actor:Principal,view:View){
+  async exportCsv(actor:Principal,view:View,scope:"agency"|"client_ads"="agency"){
     const rows=await this.db.financialTransaction.findMany({
-      where:this.scope(actor,view),orderBy:[{createdAt:"desc"},{id:"desc"}],take:5001,
-      include:{category:{select:{name:true}},enteredBy:{select:{loginId:true}}},
+      where:this.scope(actor,view,scope==="client_ads"),
+      orderBy:[{createdAt:"desc"},{id:"desc"}],take:5001,
+      include:{category:{select:{name:true}},client:{select:{businessName:true}},
+        enteredBy:{select:{loginId:true}}},
     });
     if(rows.length>5000)throw new AuthError(422,"EXPORT_LIMIT","Export exceeds 5000 records; use a shorter reporting period when available");
-    const header=["id","kind","status","category","amount","currency","occurred_on","payment_method","merchant_or_source","description","entered_by","approval_request_id","posted_at"];
+    const header=["id","kind","status","category","amount","currency","occurred_on","payment_method","merchant_or_source","description","entered_by","approval_request_id","posted_at","client"];
     const records=rows.map(r=>[r.id,r.kind,r.status,r.category.name,r.amount.toFixed(4),
       r.currencyCode,r.occurredOn.toISOString().slice(0,10),r.method,r.merchantOrSource??"",
-      r.description??"",r.enteredBy.loginId,r.approvalRequestId,r.postedAt?.toISOString()??""]
+      r.description??"",r.enteredBy.loginId,r.approvalRequestId,r.postedAt?.toISOString()??"",r.client?.businessName??""]
       .map(csvCell).join(","));
-    return {filename:"digimarket-finance-"+view+".csv",csv:[header.join(","),...records].join("\r\n")+"\r\n"};
+    return {filename:"digimarket-finance-"+scope+"-"+view+".csv",csv:[header.join(","),...records].join("\r\n")+"\r\n"};
   }
 }

@@ -56,6 +56,8 @@ export type FinanceCategoryInput = z.infer<typeof financeCategoryInputSchema>;
 export const financeEntryInputSchema = z.strictObject({
   kind: financeKindSchema,
   categoryId: z.uuid(),
+  // Only Meta Ads expenses may link to a client. Null/absent means agency-funded.
+  clientId: z.uuid().nullable().optional(),
   // Explicit assignee for new UI entries. Optional for older API clients; server validates when supplied.
   enteredById: z.uuid().optional(),
   amount: z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),
@@ -70,7 +72,7 @@ export type FinanceEntryInput = z.infer<typeof financeEntryInputSchema>;
 // Financial administration stays role-protected and audited. No arbitrary status edits.
 export const financeCategoryEditSchema=z.strictObject({name:z.string().trim().min(2).max(120)});
 export const financeEntryAdminEditSchema=z.strictObject({
-  categoryId:z.uuid(),amount:financeEntryInputSchema.shape.amount,
+  categoryId:z.uuid(),clientId:z.uuid().nullable().optional(),amount:financeEntryInputSchema.shape.amount,
   occurredOn:z.iso.date(),method:financeEntryInputSchema.shape.method,
   merchantOrSource:z.string().trim().max(160),description:z.string().trim().max(2000),
   // Optional for compatibility with existing edit callers. Only admins may change it.

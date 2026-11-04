@@ -137,7 +137,7 @@ export class InsightsService{
   })());
   if(can(a,"finance.read.all"))work.push((async()=>{
     const sums=await this.db.financialTransaction.groupBy({by:["kind"],where:{
-      organizationId:org,status:"POSTED",occurredOn:{gte:start,lte:end}},
+      organizationId:org,clientId:null,status:"POSTED",occurredOn:{gte:start,lte:end}},
       _sum:{amount:true}});
     sections.cashLedger={currency:"INR",posted:sums.map(v=>({
       kind:v.kind,amount:v._sum.amount?.toFixed(2)??"0.00"}))};

@@ -31,7 +31,7 @@ export class ProfitabilityService{
  async expenses(a:Principal,from:string,to:string){
   this.read(a);
   const rows=await this.db.financialTransaction.findMany({where:{
-    organizationId:a.organizationId,status:"POSTED",kind:"EXPENSE",
+    organizationId:a.organizationId,status:"POSTED",kind:"EXPENSE",clientId:null,
     occurredOn:{gte:day(from),lte:day(to)}},
     orderBy:[{occurredOn:"desc"},{id:"desc"}],take:300,
     include:{category:{select:{name:true}},
@@ -47,7 +47,7 @@ export class ProfitabilityService{
   if(amounts.some(x=>!x.isFinite()||x.lte(0)))throw invalid("Each cost attribution must be positive");
   return repeat(()=>this.db.$transaction(async tx=>{
     const expense=await tx.financialTransaction.findFirst({where:{id,organizationId:a.organizationId,
-      kind:"EXPENSE",status:"POSTED"}});
+      kind:"EXPENSE",status:"POSTED",clientId:null}});
     if(!expense)throw absent();
     if(expense.costAllocationVersion!==input.version)throw stale();
     const total=sum(amounts);
@@ -63,7 +63,7 @@ export class ProfitabilityService{
         throw invalid("Linked project must belong to the same client");
     }
     const changed=await tx.financialTransaction.updateMany({where:{
-      id,organizationId:a.organizationId,status:"POSTED",kind:"EXPENSE",
+      id,organizationId:a.organizationId,status:"POSTED",kind:"EXPENSE",clientId:null,
       costAllocationVersion:input.version},
       data:{costAllocationVersion:{increment:1}}});
     if(changed.count!==1)throw stale();
@@ -171,7 +171,7 @@ export class ProfitabilityService{
       recognizedOn:window,...(period.clientId?{clientId:period.clientId}:{})},
       select:{clientId:true,amount:true}}),
     this.db.financialTransaction.findMany({where:{organizationId:a.organizationId,
-      kind:"EXPENSE",status:"POSTED",occurredOn:window},
+      kind:"EXPENSE",status:"POSTED",clientId:null,occurredOn:window},
       select:{amount:true,costAllocations:{select:{clientId:true,amount:true}}}}),
   ]);
   type Metrics={billedNet:Prisma.Decimal;billedTax:Prisma.Decimal;billedGross:Prisma.Decimal;

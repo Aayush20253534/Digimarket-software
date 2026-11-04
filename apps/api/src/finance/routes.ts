@@ -27,6 +27,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   };
   const actor=(res:Response)=>res.locals.principal as Principal;
   const view=(req:Request)=>parse(financeViewSchema,req.query.view??"mine");
+  const ledgerScope=(req:Request)=>parse(z.enum(["agency","client_ads"]).default("agency"),req.query.scope);
   app.post("/api/v1/finance/proof-intent",authenticate,async(req,res)=>{
     const body=parse(assetIntentSchema,req.body);
     res.status(201).json({data:await proofAssets.intent(actor(res),body,true)});
@@ -58,6 +59,10 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
     const id=parse(z.uuid(),req.params.id);
     res.json({data:await finance.removeCategory(actor(res),id)});
   });
+  app.get("/api/v1/finance/meta-ad-clients",authenticate,async(_req,res)=>{
+    res.set("Cache-Control","no-store");
+    res.json({data:await finance.metaAdClients(actor(res))});
+  });
   app.get("/api/v1/finance/assignees",authenticate,async(_req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({data:await finance.assignees(actor(res))});
@@ -72,7 +77,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.entries(actor(res),view(req))});
+    res.json({data:await finance.entries(actor(res),view(req),ledgerScope(req))});
   });
   app.post("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.status(201).json({data:await finance.submit(actor(res),parse(financeEntryInputSchema,req.body))});
@@ -95,6 +100,6 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/export",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.exportCsv(actor(res),view(req))});
+    res.json({data:await finance.exportCsv(actor(res),view(req),ledgerScope(req))});
   });
 }

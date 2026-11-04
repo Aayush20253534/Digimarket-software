@@ -11,18 +11,22 @@ type Kind="INCOME"|"EXPENSE";
 type View="mine"|"all";
 type Category={id:string;kind:Kind;name:string;active:boolean};
 type Assignee={id:string;displayName:string;loginId:string};
+type MetaAdClient={id:string;businessName:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
   amount:string;currencyCode:string;occurredOn:string;method:string;description:string|null;
   merchantOrSource:string|null;createdAt:string;approvalRequestId:string;
-  receiptAssetId?:string|null;enteredById:string;category:{id:string;name:string;active:boolean};
+  receiptAssetId?:string|null;enteredById:string;clientId:string|null;client:MetaAdClient|null;
+  category:{id:string;name:string;active:boolean};
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
 type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
-  pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];recurringIncome?:RecurringIncome};
+  pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];
+  clientAdSpend?:{posted:string;pending:string;count:number};recurringIncome?:RecurringIncome};
 type FinancePolicy={category:string;active:boolean};
 type RecurringIncome={month:string;monthlyServiceTotal:string;monthlyAdBudgetTotal:string;monthlyCombinedTotal:string;items:{id:string;businessName:string;monthlyServiceCharge:string;monthlyAdBudget:string;monthlyCombined:string;contractEndOn:string|null}[]};
 const zero:Totals={currency:"INR",postedIncome:"0.0000",postedExpense:"0.0000",postedNet:"0.0000",
   pendingIncome:"0.0000",pendingExpense:"0.0000",groups:[]};
 const modes=["CASH","UPI","BANK_TRANSFER","CARD","OTHER"] as const;
+const isMetaAdsCategory=(name:string)=>/^meta[\s_-]*(?:ads?|advertising|advertisements?)$/i.test(name.trim());
 function money(value:string){
   const negative=value.startsWith("-"),raw=negative?value.slice(1):value;
   const [whole,fraction=""]=raw.split(".");
@@ -46,11 +50,14 @@ export default function FinancePage(){
   const [editedCategoryName,setEditedCategoryName]=useState("");
   const [editingEntry,setEditingEntry]=useState<Entry|null>(null);
   const [entryEdit,setEntryEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",
-    merchantOrSource:"",description:"",enteredById:""});
+    merchantOrSource:"",description:"",enteredById:"",clientId:null as string|null});
+  const [editAdFunding,setEditAdFunding]=useState<"SELF"|"CLIENT">("SELF");
   const [assignees,setAssignees]=useState<Assignee[]>([]);
   const [assigneesError,setAssigneesError]=useState("");
   const [categories,setCategories]=useState<Category[]>([]);
   const [entries,setEntries]=useState<Entry[]>([]);
+  const [clientAdEntries,setClientAdEntries]=useState<Entry[]>([]);
+  const [metaAdClients,setMetaAdClients]=useState<MetaAdClient[]>([]);
   const [totals,setTotals]=useState<Totals>(zero);
   const [financeReady,setFinanceReady]=useState(false);
   const [recurring,setRecurring]=useState<RecurringIncome|null>(null);
@@ -62,6 +69,8 @@ export default function FinancePage(){
   const [success,setSuccess]=useState("");
   const [kind,setKind]=useState<Kind>("EXPENSE");
   const [categoryId,setCategoryId]=useState("");
+  const [adFunding,setAdFunding]=useState<"SELF"|"CLIENT">("SELF");
+  const [clientId,setClientId]=useState("");
   const [amount,setAmount]=useState("");
   const [occurredOn,setOccurredOn]=useState(()=>new Date().toISOString().slice(0,10));
   const [method,setMethod]=useState<(typeof modes)[number]>("UPI");
@@ -72,6 +81,7 @@ export default function FinancePage(){
   const [categoryKind,setCategoryKind]=useState<Kind>("EXPENSE");
   const [categoryName,setCategoryName]=useState("");
   const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind),[categories,kind]);
+  const metaAdsSelected=kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===categoryId)?.name??"");
   // An entry must start without a selected category.
   useEffect(()=>{if(categoryId&&!selected.some(c=>c.id===categoryId))setCategoryId("");},[selected,categoryId]);
 
@@ -82,8 +92,9 @@ export default function FinancePage(){
     const target=view==="all"&&canAll?"all":"mine";
     // Treat the ledger and summary independently: an unavailable summary must
     // never make saved transactions disappear from the register on refresh.
-    const [ledger,sums,cats,policies]=await Promise.allSettled([
+    const [ledger,clientAds,sums,cats,policies]=await Promise.allSettled([
       request<Entry[]>("/finance/entries?view="+target),
+      request<Entry[]>("/finance/entries?view="+target+"&scope=client_ads"),
       request<Totals>("/finance/summary?view="+target),
       request<Category[]>("/finance/categories"),
       request<FinancePolicy[]>("/approval-policies"),
@@ -93,12 +104,14 @@ export default function FinancePage(){
       setEntries(ledger.value);
       setHasLoadedEntries(true);
     }
+    if(clientAds.status==="fulfilled")setClientAdEntries(clientAds.value);
     if(sums.status==="fulfilled"){setTotals(sums.value);setRecurring(target==="all"?sums.value.recurringIncome??null:null);}
     if(cats.status==="fulfilled")setCategories(cats.value);
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(
       p=>p.category==="FINANCE"&&p.active));
     const problems=[
       ...(ledger.status==="rejected"?["Financial register could not be refreshed: "+readable(ledger.reason)]:[]),
+      ...(clientAds.status==="rejected"?["Client Meta Ads register could not be refreshed: "+readable(clientAds.reason)]:[]),
       ...(sums.status==="rejected"?["Financial totals could not be refreshed: "+readable(sums.reason)]:[]),
     ];
     setError(problems.join(" "));
@@ -120,14 +133,23 @@ export default function FinancePage(){
   },[adminFinance,request]);
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
-    if(!id||!entries.some(entry=>entry.id===id))return;
+    if(!id||![...entries,...clientAdEntries].some(entry=>entry.id===id))return;
     const frame=window.requestAnimationFrame(()=>{const row=document.getElementById("finance-"+id);row?.classList.add("aw-register-selected");row?.scrollIntoView({block:"center",behavior:"smooth"});});
     return ()=>window.cancelAnimationFrame(frame);
-  },[entries]);
+  },[entries,clientAdEntries]);
+  useEffect(()=>{
+    if(!canCreate&&!adminFinance)return;
+    let active=true;
+    void request<MetaAdClient[]>("/finance/meta-ad-clients")
+      .then(clients=>{if(active)setMetaAdClients(clients);})
+      .catch(()=>{if(active)setMetaAdClients([]);});
+    return()=>{active=false;};
+  },[request,canCreate,adminFinance]);
 
   async function submit(e:FormEvent){
     e.preventDefault();
     if(!categoryId){setError("Select a category before saving this entry.");return;}
+    if(metaAdsSelected&&adFunding==="CLIENT"&&!clientId){setError("Select the client paying for this Meta Ads expense.");return;}
     setBusy(true);setError("");setSuccess("");
     try{
       let receiptAssetId:string|null=null;
@@ -152,13 +174,16 @@ export default function FinancePage(){
       }
       setUploadStatus(isFounder?"Recording transaction…":"Submitting transaction for approval…");
       const saved=await request<{status:string}>("/finance/entries",{method:"POST",body:{
-        kind,categoryId,amount:amount.trim(),occurredOn,method,
+        kind,categoryId,clientId:metaAdsSelected&&adFunding==="CLIENT"?clientId:null,
+        amount:amount.trim(),occurredOn,method,
         merchantOrSource:source.trim(),description:description.trim(),
         idempotencyKey:crypto.randomUUID(),receiptAssetId,
       }});
-      setSuccess(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals.");
+      setSuccess(metaAdsSelected&&adFunding==="CLIENT"
+        ?(saved.status==="POSTED"?"Client Meta Ads spend saved separately from agency expenses.":"Client Meta Ads spend submitted for approval; it is excluded from agency expenses.")
+        :(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals."));
       setAmount("");setSource("");setDescription("");setReceipt(null);
-      setCategoryId("");
+      setCategoryId("");setAdFunding("SELF");setClientId("");
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
   }
@@ -197,17 +222,21 @@ export default function FinancePage(){
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
   function beginEntryEdit(row:Entry){
-    setEditingEntry(row);setError("");
+    setEditingEntry(row);setError("");setEditAdFunding(row.clientId?"CLIENT":"SELF");
     setEntryEdit({categoryId:row.category.id,
       amount:row.amount,occurredOn:row.occurredOn,method:row.method,
       merchantOrSource:row.merchantOrSource??"",description:row.description??"",
-      enteredById:row.enteredById});
+      enteredById:row.enteredById,clientId:row.clientId});
   }
   async function saveEntry(e:FormEvent){
     e.preventDefault();if(!editingEntry)return;
+    const editIsMeta=editingEntry.kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===entryEdit.categoryId)?.name??"");
+    if(editIsMeta&&editAdFunding==="CLIENT"&&!entryEdit.clientId){setError("Select a client for this Meta Ads expense.");return;}
     setBusy(true);setError("");setSuccess("");
     try{
-      await request("/finance/entries/"+editingEntry.id,{method:"PUT",body:entryEdit});
+      await request("/finance/entries/"+editingEntry.id,{method:"PUT",body:{
+        ...entryEdit,clientId:editIsMeta&&editAdFunding==="CLIENT"?entryEdit.clientId:null,
+      }});
       setEditingEntry(null);setSuccess("Finance entry updated and assigned user saved with an audit record.");
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
@@ -231,11 +260,11 @@ export default function FinancePage(){
      const link=document.createElement("a");link.href=proof.url;link.target="_blank";link.rel="noopener noreferrer";link.click();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
-  async function exportCsv(){
+  async function exportCsv(scope:"agency"|"client_ads"="agency"){
     setBusy(true);setError("");
     try{
       const target=view==="all"&&canAll?"all":"mine";
-      const response=await request<{filename:string;csv:string}>("/finance/export?view="+target);
+      const response=await request<{filename:string;csv:string}>("/finance/export?view="+target+"&scope="+scope);
       const blob=new Blob([response.csv],{type:"text/csv;charset=utf-8"});
       const url=URL.createObjectURL(blob);
       const a=document.createElement("a");a.href=url;a.download=response.filename;a.click();
@@ -291,9 +320,24 @@ export default function FinancePage(){
         <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
           <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" value={kind} onChange={e=>{setKind(e.target.value as Kind);setCategoryId("");}}>
             <option value="EXPENSE">Expense</option><option value="INCOME">Income</option></select></FormField>
-          <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>setCategoryId(e.target.value)}>
+          <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>{setCategoryId(e.target.value);setAdFunding("SELF");setClientId("");}}>
             <option value="">{selected.length?"Select a category":"Create a category first"}</option>
             {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></FormField>
+          {metaAdsSelected&&<>
+            <FormField id="finance-meta-funding" label="Meta Ads paid by">
+              <select id="finance-meta-funding" className="field" value={adFunding} onChange={e=>{setAdFunding(e.target.value as "SELF"|"CLIENT");setClientId("");}}>
+                <option value="SELF">Self (agency expense)</option>
+                <option value="CLIENT">Client (separate ad spend)</option>
+              </select>
+            </FormField>
+            {adFunding==="CLIENT"&&<FormField id="finance-meta-client" label="Client">
+              <select id="finance-meta-client" className="field" required value={clientId} onChange={e=>setClientId(e.target.value)}>
+                <option value="">Select paying client</option>
+                {metaAdClients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}
+              </select>
+            </FormField>}
+            <p className="sm:col-span-2 text-xs text-slate-500">Client-funded Meta Ads are tracked separately and do not affect agency expenses or net income.</p>
+          </>}
           <FormField id="finance-amount" label="Amount (INR)"><input id="finance-amount" className="field" inputMode="decimal" required
             pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" placeholder="1250.00"
             value={amount} onChange={e=>setAmount(e.target.value)}/></FormField>
@@ -335,6 +379,37 @@ export default function FinancePage(){
         </div>):<EmptyState title="No categories yet" description="An administrator can add expense and income categories." icon={Wallet}/>}</div>
       </Card>
     </div>
+    <Card title="Client Meta Ads spend" description="Only Meta Ads recorded against a client. These transactions are excluded from company expense and net totals.">
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div><p className="text-xs text-slate-500">Posted client ad spend</p><strong>{money(totals.clientAdSpend?.posted??"0.0000")}</strong></div>
+        <div><p className="text-xs text-slate-500">Pending client ad spend</p><strong>{money(totals.clientAdSpend?.pending??"0.0000")}</strong></div>
+        <div><p className="text-xs text-slate-500">Client entries (not cancelled)</p><strong>{totals.clientAdSpend?.count??0}</strong></div>
+      </div>
+      <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("client_ads")}>
+        <Download className="h-4 w-4"/> Export client ad spend CSV
+      </button>
+      {!clientAdEntries.length?<EmptyState title="No client Meta Ads recorded" description="Choose Meta Ads → Client when entering an expense to track spending here."/>:
+      <div className="aw-finance-register-scroll" role="region" aria-label="Client Meta Ads register" tabIndex={0}>
+        <table className="aw-finance-register"><thead><tr>
+          {adminFinance&&<th>Actions</th>}
+          {["Date","Client","Amount","Payment method","Status","Recorded by","Notes","Receipt","Approval"].map(label=><th key={label}>{label}</th>)}
+        </tr></thead><tbody>{clientAdEntries.map(row=><tr key={row.id} id={"finance-"+row.id}>
+          {adminFinance&&<td><div className="flex gap-2">
+            {row.status!=="CANCELLED"&&<>
+              <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>beginEntryEdit(row)}>Edit</button>
+              <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>void deleteEntry(row)}>Delete</button>
+            </>}
+          </div></td>}
+          <td>{row.occurredOn}</td>
+          <td>{row.client?<Link className="underline" href={"/app/clients/"+row.client.id}>{row.client.businessName}</Link>:"Unknown client"}</td>
+          <td>{money(row.amount)}</td><td>{row.method.replaceAll("_"," ")}</td>
+          <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
+          <td>{row.enteredBy.displayName}</td><td>{row.description||"—"}</td>
+          <td>{row.receiptAssetId?<button type="button" disabled={busy} className="btn-secondary text-xs" onClick={()=>void showReceipt(row.id)}>Proof</button>:"—"}</td>
+          <td><Link className="underline" href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)}>View approval</Link></td>
+        </tr>)}</tbody></table>
+      </div>}
+    </Card>
     <Card title={view==="all"?"Agency financial register":"My financial register"} description="Saved records, including pending, posted, rejected and cancelled entries. Latest 200 shown; CSV export includes up to 5,000.">
       {loading&&!hasLoadedEntries?<Spinner label="Loading financial entries…"/>:
         !entries.length&&!error?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
@@ -390,10 +465,27 @@ export default function FinancePage(){
         {assigneesError&&<Notice kind="error">{assigneesError}</Notice>}
         <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>void saveEntry(e)}>
           <FormField id="admin-expense-category" label={editingEntry.kind==="INCOME"?"Income category":"Expense category"}><select id="admin-expense-category" className="field" required value={entryEdit.categoryId}
-            onChange={e=>setEntryEdit(v=>({...v,categoryId:e.target.value}))}>
+            onChange={e=>{setEntryEdit(v=>({...v,categoryId:e.target.value,clientId:null}));setEditAdFunding("SELF");}}>
             {categories.filter(c=>c.kind===editingEntry.kind&&(c.active||c.id===editingEntry.category.id)).map(c=>
               <option key={c.id} value={c.id}>{c.name}{!c.active?" (archived)":""}</option>)}
           </select></FormField>
+          {editingEntry.kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===entryEdit.categoryId)?.name??"")&&<>
+            <FormField id="edit-meta-payer" label="Meta Ads paid by">
+              <select id="edit-meta-payer" className="field" value={editAdFunding} onChange={e=>{setEditAdFunding(e.target.value as "SELF"|"CLIENT");setEntryEdit(v=>({...v,clientId:null}));}}>
+                <option value="SELF">Self (agency expense)</option>
+                <option value="CLIENT">Client (separate ad spend)</option>
+              </select>
+            </FormField>
+            {editAdFunding==="CLIENT"&&<FormField id="edit-meta-client" label="Client">
+              <select id="edit-meta-client" className="field" required value={entryEdit.clientId??""}
+                onChange={e=>setEntryEdit(v=>({...v,clientId:e.target.value||null}))}>
+                <option value="">Select paying client</option>
+                {editingEntry.client&&!metaAdClients.some(c=>c.id===editingEntry.client?.id)&&
+                  <option value={editingEntry.client.id}>{editingEntry.client.businessName} (existing)</option>}
+                {metaAdClients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}
+              </select>
+            </FormField>}
+          </>}
           <FormField id="admin-expense-assignee" label={"Assign "+editingEntry.kind.toLowerCase()+" to"}>
             <select id="admin-expense-assignee" className="field" required value={entryEdit.enteredById}
               onChange={e=>setEntryEdit(v=>({...v,enteredById:e.target.value}))}>
