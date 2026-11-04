@@ -44,7 +44,10 @@ export default function ClientsPage(){
  return <div data-aw-module="clients" className="aw-client-directory aw-module-root space-y-5">
   <PageHeader eyebrow="CLIENT RELATIONSHIPS" title="Clients & delivery"
     description="Manage each client's agreement, services, projects and delivery from one place."
-    actions={<div className="flex gap-2 flex-wrap"><Link href="/app/leads" className="aw-client-btn">View leads</Link><button className="aw-client-btn" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
+    actions={<div className="flex gap-2 flex-wrap"><Link href="/app/leads" className="aw-client-btn">View leads</Link>
+    {!session.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&session.identity.permissions.includes("assets.read")&&
+     <Link href="/app/clients/assets" className="aw-client-btn">Files & Assets</Link>}
+    <button className="aw-client-btn" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
   <div className="aw-client-statrow">
    <div className="aw-client-stat"><Users size={18}/><span>Clients on this page</span><strong>{loading?"…":rows.length}</strong></div>
    <div className="aw-client-stat"><BriefcaseBusiness size={18}/><span>Active on this page</span><strong>{loading?"…":rows.filter(c=>c.status==="ACTIVE").length}</strong></div>
