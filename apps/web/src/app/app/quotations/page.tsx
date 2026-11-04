@@ -7,13 +7,13 @@ import {downloadQuotationPdf,type QuotationFields,type SavedQuotation} from "@/l
 
 type Service=QuotationFields["services"][number];
 type QuoteMode="default"|"new";
-const standardServices:Service[]=[
+const standardServices=(reels=8,posts=8):Service[]=>[
  {name:"WEBSITE",description:"Website setup, property listing pages and routine updates."},
  {name:"SEO + AEO + GEO",description:"Search, answer-engine and generative-engine visibility optimization."},
  {name:"SOCIAL MEDIA MANAGEMENT",description:"Content planning, captions, scheduling, posting and profile handling."},
  {name:"META ADS: FB + INSTAGRAM",description:"Campaign setup, monitoring and optimization across both platforms."},
- {name:"REELS: SHOOTING + EDITING",description:"Property showcase videos; 8 reels per month."},
- {name:"BRANDED SOCIAL POSTS",description:"Graphic post creation and publishing; 8 posts per month."},
+ {name:"REELS: SHOOTING + EDITING",description:`Property showcase videos; ${reels} reels per month.`},
+ {name:"BRANDED SOCIAL POSTS",description:`Graphic post creation and publishing; ${posts} posts per month.`},
 ];
 const makeDate=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");};
 const initial=():QuotationFields=>({
@@ -26,7 +26,7 @@ const initial=():QuotationFields=>({
 const defaultForm=():QuotationFields=>({
  ...initial(),mode:"default",adBudget:"",adBudgetMode:"mandatory",
  adPlatform:"Meta",feePeriod:"monthly",servicePayment:"monthly",adPayment:"before ads run",
- domainHosting:"extra",services:standardServices.map(service=>({...service})),
+ domainHosting:"extra",services:standardServices(8,8),
 });
 const money=(v:number)=>"₹"+v.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 function cost(form:QuotationFields) {
@@ -50,7 +50,12 @@ export default function QuotationsPage(){
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[downloading,setDownloading]=useState<string|null>(null);
  const [error,setError]=useState(""),[notice,setNotice]=useState("");
  const [search,setSearch]=useState("");
- const patch=<K extends keyof QuotationFields>(key:K,value:QuotationFields[K])=>setForm(prev=>({...prev,[key]:value}));
+ const patch=<K extends keyof QuotationFields>(key:K,value:QuotationFields[K])=>setForm(prev=>{
+  const next={...prev,[key]:value};
+  return prev.mode==="default"&&(key==="reels"||key==="posts")
+    ?{...next,services:standardServices(next.reels,next.posts)}
+    :next;
+ });
  const changeMode=(next:QuoteMode)=>{
   setMode(next);setForm(next==="default"?defaultForm():initial());setError("");setNotice("");
  };
@@ -102,7 +107,7 @@ export default function QuotationsPage(){
   {notice&&<div role="status" className="rounded-xl border border-[#6B398F] bg-[#29143A] p-3 text-sm text-[#F3D6FF]">{notice}</div>}
   <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label="Quotation type">
    <button type="button" aria-pressed={mode==="default"} className={"aw-quote-mode "+(mode==="default"?"aw-quote-mode-active":"")} onClick={()=>changeMode("default")}>
-    <span className="text-base font-bold">Default quotation</span><span className="mt-1 block text-xs">Fixed six-service package. Enter name and prices only.</span>
+    <span className="text-base font-bold">Default quotation</span><span className="mt-1 block text-xs">Six-service package. Edit client, prices, reels and posts.</span>
    </button>
    <button type="button" aria-pressed={mode==="new"} className={"aw-quote-mode "+(mode==="new"?"aw-quote-mode-active":"")} onClick={()=>changeMode("new")}>
     <span className="text-base font-bold">New quotation</span><span className="mt-1 block text-xs">Select, edit, remove or add services and commercial terms.</span>
@@ -112,7 +117,7 @@ export default function QuotationsPage(){
    <div className="space-y-5">
     {mode==="default"?<section className={card}>
      <div className="mb-5"><h2 className="text-xl font-bold text-[#F5E7FF]">Default marketing package</h2>
-      <p className="mt-1 text-sm leading-6 text-[#C6ABD9]">The six services, 8 reels, 8 posts and all commercial terms match the supplied AS Builders quotation. Only the client and prices change.</p></div>
+      <p className="mt-1 text-sm leading-6 text-[#C6ABD9]">Six included services and standard commercial terms. Monthly content starts at 8 reels and 8 posts, and both quantities are editable.</p></div>
      <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><label className={label} htmlFor="default-quote-client">Client / business name *</label>
        <input id="default-quote-client" required minLength={2} maxLength={80} className={field} value={form.clientName}
@@ -123,14 +128,20 @@ export default function QuotationsPage(){
       <div><label className={label} htmlFor="default-quote-ad">Meta ads budget (₹ / month) *</label>
        <input id="default-quote-ad" required min="0" max="999999999" type="number" step=".01" className={field}
         value={form.adBudget} onChange={e=>patch("adBudget",e.target.value)} placeholder="3000"/></div>
+      <div><label className={label} htmlFor="default-quote-reels">Reels per month</label>
+       <input id="default-quote-reels" required type="number" min={0} max={999} step={1} className={field}
+        value={form.reels} onChange={e=>patch("reels",Number(e.target.value))}/></div>
+      <div><label className={label} htmlFor="default-quote-posts">Posts per month</label>
+       <input id="default-quote-posts" required type="number" min={0} max={999} step={1} className={field}
+        value={form.posts} onChange={e=>patch("posts",Number(e.target.value))}/></div>
      </div>
      <div className="mt-6 grid gap-2 sm:grid-cols-2">
-      {standardServices.map((service,i)=><div className="aw-quote-fixed-service" key={service.name}>
+      {standardServices(form.reels,form.posts).map((service,i)=><div className="aw-quote-fixed-service" key={service.name}>
        <span className="text-xs font-bold text-[#EC74F1]">{String(i+1).padStart(2,"0")}</span>
        <div><p className="text-sm font-bold text-[#F5E7FF]">{service.name}</p><p className="mt-1 text-xs leading-5 text-[#C4ACD4]">{service.description}</p></div>
       </div>)}
      </div>
-     <p className="mt-5 text-xs leading-6 text-[#C4ACD4]">Monthly content: 8 reels and 8 posts. Commercial terms, quotation validity and service scope are fixed. The PDF date and quotation number are generated automatically.</p>
+     <p className="mt-5 text-xs leading-6 text-[#C4ACD4]">Monthly content: {form.reels} reels and {form.posts} posts. Commercial terms and the six service types remain fixed. The PDF date and quotation number are generated automatically.</p>
     </section>:<>
     <section className={card}>
      <h2 className="mb-4 text-lg font-bold text-[#F4DFFF]">1. Client & quotation</h2>
@@ -151,7 +162,7 @@ export default function QuotationsPage(){
        onClick={()=>patch("services",[...form.services,{name:"",description:""}])}><Plus size={15}/> Add custom service</button></div>
      <p className="mb-4 text-sm text-[#C4ACD4]">Choose approved services, edit their scope or add a custom service. Up to six appear in the PDF.</p>
      <div className="mb-5 grid gap-2 sm:grid-cols-2" aria-label="Available services">
-      {standardServices.map(service=>{
+      {standardServices().map(service=>{
        const added=form.services.some(s=>s.name===service.name);
        return <button type="button" key={service.name} disabled={added||form.services.length>=6}
         className="aw-quote-catalog-button" aria-label={(added?"Selected ":"Add ")+service.name}

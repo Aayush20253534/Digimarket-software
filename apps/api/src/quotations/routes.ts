@@ -36,13 +36,13 @@ const quoteInput = z.strictObject({
 });
 export type QuotationInput = z.infer<typeof quoteInput>;
 
-const standardServices = [
+const standardServices = (reels: number, posts: number) => [
   { name: "WEBSITE", description: "Website setup, property listing pages and routine updates." },
   { name: "SEO + AEO + GEO", description: "Search, answer-engine and generative-engine visibility optimization." },
   { name: "SOCIAL MEDIA MANAGEMENT", description: "Content planning, captions, scheduling, posting and profile handling." },
   { name: "META ADS: FB + INSTAGRAM", description: "Campaign setup, monitoring and optimization across both platforms." },
-  { name: "REELS: SHOOTING + EDITING", description: "Property showcase videos; 8 reels per month." },
-  { name: "BRANDED SOCIAL POSTS", description: "Graphic post creation and publishing; 8 posts per month." },
+  { name: "REELS: SHOOTING + EDITING", description: `Property showcase videos; ${reels} reels per month.` },
+  { name: "BRANDED SOCIAL POSTS", description: `Graphic post creation and publishing; ${posts} posts per month.` },
 ];
 
 function requireFounder(p: Principal) {
@@ -65,15 +65,15 @@ function price(input: QuotationInput) {
   return { serviceFee: amount(service), adBudget: amount(ads),
     taxAmount: amount(tax), total: amount(service + ads + tax) };
 }
-function validated(input: unknown): QuotationInput {
+export function validated(input: unknown): QuotationInput {
   const parsed = quoteInput.safeParse(input);
   if (!parsed.success) {
     const fields = [...new Set(parsed.error.issues.map(i => i.path.join(".") || "request"))].slice(0, 6);
     throw new AuthError(422, "VALIDATION_ERROR", "Invalid quotation fields: " + fields.join(", "));
   }
   const raw = parsed.data;
-  // Default quotations must stay identical in scope and terms to the approved
-  // six-service package. Only client, issue date, and the two prices can vary.
+  // Default quotations preserve the six service types and commercial terms,
+  // while allowing the monthly reels/posts commitment to vary per client.
   const value: QuotationInput = raw.mode === "default" ? {
     ...raw,
     packageTitle: "CUSTOM MARKETING PACKAGE",
@@ -88,11 +88,9 @@ function validated(input: unknown): QuotationInput {
     gstin: "",
     influencerFees: "not applicable",
     domainHosting: "extra",
-    reels: 8,
-    posts: 8,
     validityDays: 7,
     serviceTerm: "1 month",
-    services: standardServices.map(service => ({ ...service })),
+    services: standardServices(raw.reels,raw.posts),
     exclusions: "",
   } : raw;
   if (value.adBudgetMode === "not applicable" && paisa(value.adBudget) !== 0) {
