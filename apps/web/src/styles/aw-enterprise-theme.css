@@ -838,3 +838,76 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
   background:var(--ui-hover)!important;border-color:var(--ui-subtle)!important;
   filter:none!important;
 }
+
+/* Visual screenshot audit: legacy quotation, agreement, task archive and CRM
+   selectors had hardcoded purple surfaces despite the shared theme tokens. */
+.aw-workspace .aw-work-content .aw-quote-page {color-scheme:inherit!important;}
+.aw-workspace .aw-work-content [data-aw-module="agreements"] section.rounded-2xl.border {
+  background:var(--ui-surface)!important;background-image:none!important;
+  border:1px solid var(--ui-border)!important;color:var(--ui-strong)!important;
+  box-shadow:var(--ui-shadow)!important;border-radius:12px!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="agreements"] :is(label,legend) {
+  color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-work-content .aw-quote-page select option {
+  background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="quotations"] .aw-quote-panel.overflow-hidden > div:first-child {
+  background:var(--ui-raised)!important;background-image:none!important;
+  color:var(--ui-strong)!important;border-bottom:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="quotations"] .aw-quote-panel.overflow-hidden > div:first-child :is(h2,p,svg) {
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="quotations"] .aw-quote-panel .border-t {
+  color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content .aw-quote-fixed-service > span:first-child {
+  color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-work-content .aw-quote-fixed-service :is(strong,p) {
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content .aw-quote-fixed-service p + p {
+  color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="task-history"] .aw-personal-task-section {
+  background:var(--ui-surface)!important;background-image:none!important;
+  border:1px solid var(--ui-border)!important;color:var(--ui-strong)!important;
+  border-radius:12px!important;box-shadow:var(--ui-shadow)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="task-history"] .aw-personal-task-section :is(
+ label > span.rounded,.border-dashed,li.rounded
+){
+  background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="task-history"] .aw-personal-task-section :is(
+ label,.border-dashed,.border-t,span.text-xs
+){color:var(--ui-muted)!important;border-color:var(--ui-border)!important;}
+.aw-workspace .aw-work-content [data-aw-module="task-history"] .aw-personal-task-section input {
+  background:var(--ui-input)!important;color:var(--ui-strong)!important;
+  border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="task-history"] .aw-personal-task-section :is(
+ .aw-task-state,.aw-badge
+){color:var(--ui-strong);}
+.aw-workspace .aw-work-content :is(.aw-module-pill,.aw-module-pill-muted,.aw-module-count) {
+  background:var(--ui-raised)!important;background-image:none!important;
+  color:var(--ui-muted)!important;border:1px solid var(--ui-border)!important;
+  border-radius:7px!important;box-shadow:none!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="leads"] :is(
+ .aw-directory-empty-line,.aw-register-selected
+){
+  background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+  color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-work-content [data-aw-module="leads"] :is(
+ input[type="search"],input[type="text"],select
+){
+  color:var(--ui-strong)!important;background:var(--ui-input)!important;
+  border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-heading,.aw-report-headline) {text-shadow:none!important;}
