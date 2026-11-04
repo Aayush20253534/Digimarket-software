@@ -613,7 +613,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow-ups"}).click();
   expect((await scheduledResponse).status()).toBe(200);
   await expect(page).toHaveURL(/\/app\/follow-ups$/);
-  await expect(page.getByRole("heading",{name:"Follow-ups"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Follow Ups"})).toBeVisible();
   const scheduledTable=page.getByRole("table",{name:"Follow-up register"});
   await expect(scheduledTable.getByRole("columnheader")).toHaveText([
     "Follow-up date","Phone number","Business name","Contact name",
