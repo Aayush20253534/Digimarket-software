@@ -783,3 +783,53 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
 .aw-workspace[data-theme="light"] .aw-work-sidehead {
   background:var(--ui-side)!important;
 }
+
+/* Task status is now a small semantic label, not a neon-filled row/card. */
+.aw-workspace .aw-personal-dashboard .aw-personal-task-section {
+  background:var(--ui-surface)!important;background-image:none!important;
+  color:var(--ui-strong)!important;
+  border:1px solid var(--ui-border)!important;
+  box-shadow:var(--ui-shadow)!important;
+}
+.aw-workspace .aw-personal-dashboard .aw-personal-task-section .aw-personal-task-item {
+  background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-personal-dashboard .aw-personal-task-section :is(
+ .aw-personal-task-heading,.aw-personal-task-heading h2,.aw-personal-task-count,
+ .aw-personal-task-link,.aw-personal-task-description,.aw-action-meta,
+ .aw-action-status,.aw-action-item-link
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-personal-dashboard .aw-personal-task-section :is(.aw-badge,.aw-action-item-link,.aw-personal-task-icon) {
+  background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+  border-color:var(--ui-border)!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-pending {
+  --aw-task-fg:var(--stage-warning-fg);--aw-task-bg:var(--stage-warning-bg);--aw-task-border:var(--stage-warning-border);
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-in-process {
+  --aw-task-fg:var(--stage-info-fg);--aw-task-bg:var(--stage-info-bg);--aw-task-border:var(--stage-info-border);
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-completed {
+  --aw-task-fg:var(--stage-success-fg);--aw-task-bg:var(--stage-success-bg);--aw-task-border:var(--stage-success-border);
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-expired {
+  --aw-task-fg:var(--stage-danger-fg);--aw-task-bg:var(--stage-danger-bg);--aw-task-border:var(--stage-danger-border);
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-card {
+  background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+  border:1px solid var(--ui-border)!important;background-image:none!important;
+  box-shadow:none!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-card :is(p,small,strong) {
+  color:var(--ui-strong)!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-card .aw-task-state {
+  background:var(--aw-task-bg,var(--stage-neutral-bg))!important;
+  border:1px solid var(--aw-task-border,var(--stage-neutral-border))!important;
+  color:var(--aw-task-fg,var(--stage-neutral-fg))!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-assignee-task-card:hover {
+  background:var(--ui-hover)!important;border-color:var(--ui-subtle)!important;
+  filter:none!important;
+}
