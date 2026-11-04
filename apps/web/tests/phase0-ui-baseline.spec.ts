@@ -8,7 +8,7 @@ import path from "node:path";
  * Never point this at a production account or record screenshots of real clients.
  */
 const enabled=process.env.UI_BASELINE_CAPTURE==="1";
-const OUTPUT=path.resolve(process.cwd(),"test-results/phase0-baseline");
+const OUTPUT=path.resolve(process.cwd(),"artifacts/ui-v2-phase0");
 const routes=[
  {slug:"overview",href:"/app/dashboard"},
  {slug:"leads",href:"/app/leads"},
