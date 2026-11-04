@@ -886,7 +886,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await capturePhase0Role(page,"employee");
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
-  await expect(page.getByRole("link",{name:"Task history",exact:true}).first()).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Tasks",exact:true})).toBeVisible();
   await visitWorkspace(page,"/app/task-history");
   await expect(page.getByTestId("task-history-page")).toBeVisible();
   await expect(page.getByLabel("Task history scope")).toHaveCount(0);
