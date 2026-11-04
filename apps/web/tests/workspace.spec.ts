@@ -560,8 +560,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-yet-to-call");
   await expect(yetToCallBadge).toHaveText("YET TO CALL");
-  await expect(yetToCallBadge).toHaveCSS("background-color","rgb(0, 0, 0)");
-  await expect(yetToCallBadge).toHaveCSS("color","rgb(255, 255, 255)");
+  await expect(yetToCallBadge).toHaveCSS("background-color","rgb(40, 40, 43)");
+  await expect(yetToCallBadge).toHaveCSS("color","rgb(228, 228, 231)");
   await page.getByLabel("Lead status").selectOption("FOLLOW_UP");
   await expect(page.getByLabel("Follow-up date")).toBeVisible();
   const agencyDay=(offset:number)=>new Intl.DateTimeFormat("en-CA",{
@@ -576,8 +576,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const followUpBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-badge");
   await expect(followUpBadge).toHaveText("FOLLOW UP");
-  await expect(followUpBadge).toHaveCSS("background-color","rgb(91, 245, 39)");
-  await expect(followUpBadge).toHaveCSS("color","rgb(0, 0, 0)");
+  await expect(followUpBadge).toHaveCSS("background-color","rgb(20, 49, 38)");
+  await expect(followUpBadge).toHaveCSS("color","rgb(134, 239, 172)");
   // The dedicated sidebar register always lists scheduled leads by follow-up date.
   const scheduledResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups?"));
   await page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow Ups"}).click();
@@ -613,7 +613,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const dueCard=page.getByTestId("today-lead-followups");
   await expect(dueCard).toBeVisible();
   await expect(dueCard.getByText("Lead 9876543210")).toBeVisible();
-  await expect(dueCard.locator(".aw-today-followup-card")).toHaveCSS("color","rgb(255, 255, 255)");
+  await expect(dueCard.locator(".aw-today-followup-card")).toHaveCSS("color","rgb(245, 245, 245)");
   await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
@@ -622,13 +622,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-not-picking");
   await expect(notPickingBadge).toHaveText("CALL NOT PICKING");
-  await expect(notPickingBadge).toHaveCSS("background-color","rgb(255, 0, 255)");
+  await expect(notPickingBadge).toHaveCSS("background-color","rgb(40, 40, 43)");
   await page.getByLabel("Lead status").selectOption("REJECTED");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const rejectedBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-rejected");
   await expect(rejectedBadge).toHaveText("REJECTED");
-  await expect(rejectedBadge).toHaveCSS("background-color","rgb(255, 0, 0)");
+  await expect(rejectedBadge).toHaveCSS("background-color","rgb(59, 29, 37)");
   await page.getByLabel("Contact name",{exact:true}).fill("CI Contact");
   await page.getByLabel("Business name",{exact:true}).fill("Founder CI Lead");
   await page.getByLabel("Business type",{exact:true}).fill("Retail");
@@ -715,8 +715,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const decisionBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-decision-pending");
   await expect(decisionBadge).toHaveText("DECISION PENDING");
-  await expect(decisionBadge).toHaveCSS("background-color","rgb(164, 130, 242)");
-  await expect(decisionBadge).toHaveCSS("color","rgb(255, 255, 255)");
+  await expect(decisionBadge).toHaveCSS("background-color","rgb(54, 43, 23)");
+  await expect(decisionBadge).toHaveCSS("color","rgb(252, 211, 77)");
   await page.getByLabel("Filter by stage").selectOption("DECISION_PENDING");
   await expect(page.getByRole("table",{name:"Leads directory"}).getByText("DECISION PENDING")).toBeVisible();
   await page.getByLabel("Filter by stage").selectOption("");
@@ -725,8 +725,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const agreementBadge=page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-agreement-pending");
   await expect(agreementBadge).toHaveText("AGREEMENT PENDING");
-  await expect(agreementBadge).toHaveCSS("background-color","rgb(14, 246, 188)");
-  await expect(agreementBadge).toHaveCSS("color","rgb(255, 255, 255)");
+  await expect(agreementBadge).toHaveCSS("background-color","rgb(18, 54, 47)");
+  await expect(agreementBadge).toHaveCSS("color","rgb(110, 231, 183)");
   await page.getByLabel("Filter by stage").selectOption("AGREEMENT_PENDING");
   await expect(page.getByRole("table",{name:"Leads directory"}).getByText("AGREEMENT PENDING")).toBeVisible();
   await page.getByLabel("Filter by stage").selectOption("");
