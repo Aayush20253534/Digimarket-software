@@ -14,6 +14,8 @@ const label=(s:string)=>s.replace(/([A-Z])/g," $1").replace(/_/g," ").replace(/^
 const themes=["violet","cyan","coral","mint","amber","pink"] as const;
 const icons=[ChartNoAxesCombined,Users,TrendingUp,Wallet,Activity,BarChart3];
 const format=(value:MetricValue)=>Array.isArray(value)?value.map(v=>v.kind+": "+v.amount).join(" · "):typeof value==="number"?new Intl.NumberFormat("en-IN").format(value):String(value);
+const numeric=(v:MetricValue|undefined)=>typeof v==="number"?v:
+ typeof v==="string"&&Number.isFinite(Number(v))?Number(v):0;
 export default function ReportsPage(){
  const {session,request}=useAuth();
  const can=!!session?.identity.permissions.includes("reports.business.read");
@@ -45,6 +47,21 @@ export default function ReportsPage(){
  if(!session)return <Spinner label="Checking reporting permissions…"/>;
  if(!can)return <Notice kind="error">Business reporting permission required.</Notice>;
  const cards=Object.entries(report?.sections??{}).filter(([key])=>key!=="invoices");
+ const leadStages=report?.sections.leads?[
+   {name:"Pending",value:numeric(report.sections.leads.pending)},
+   {name:"Follow-up",value:numeric(report.sections.leads.followUp)},
+   {name:"Meeting",value:numeric(report.sections.leads.meetingProcess)},
+   {name:"Decision",value:numeric(report.sections.leads.decisionPending)},
+   {name:"Agreement",value:numeric(report.sections.leads.agreementPending)},
+   {name:"Approved",value:numeric(report.sections.leads.approved)},
+  ]:[];
+ const ledger=report?.sections.cashLedger?.posted;
+ const financeBars=Array.isArray(ledger)?(["INCOME","EXPENSE"] as const).map(kind=>({
+   name:kind==="INCOME"?"Income":"Expenses",
+   value:Math.max(0,Number(ledger.find(item=>item.kind===kind)?.amount??"0")),
+ } )):[];
+ const leadMax=Math.max(1,...leadStages.map(x=>x.value));
+ const financeMax=Math.max(1,...financeBars.map(x=>x.value));
  const leadConversionRate=report?.sections.leads?.conversionRatePercent;
  const leadConversionValue=typeof leadConversionRate==="number" ? leadConversionRate:
    typeof leadConversionRate==="string" ? Number(leadConversionRate):null;
@@ -66,6 +83,37 @@ export default function ReportsPage(){
   {report&&<>
    <div className="aw-report-sectionhead"><div><p>BUSINESS OVERVIEW</p><h2>Key performance indicators</h2></div>
     <span><ShieldCheck size={15}/> Live, role-protected metrics</span></div>
+   {(leadStages.length>0||financeBars.length>0)&&<section className="aw-report-visuals" aria-label="Operational charts">
+    {leadStages.length>0&&<div className="aw-insights-card">
+     <div className="aw-insights-head">
+      <div><h3 className="aw-insights-title">Lead pipeline by current stage</h3>
+       <p className="aw-insights-hint">Leads created in the reporting period</p></div>
+      <BarChart3 className="text-violet-400" size={19} aria-hidden="true"/>
+     </div>
+     <div className="aw-insights-bar-list" role="img" aria-label={leadStages.map(x=>x.name+": "+x.value).join("; ")}>
+      {leadStages.map(item=><div key={item.name}>
+       <div className="aw-insights-label"><span>{item.name}</span><strong>{item.value.toLocaleString("en-IN")}</strong></div>
+       <div className="aw-insights-track"><div className="aw-insights-fill" style={{width:item.value/leadMax*100+"%"}}/></div>
+      </div>)}
+     </div>
+     <p className="aw-insights-chart-note">Current stage counts, not a chronological conversion funnel.</p>
+    </div>}
+    {financeBars.length>0&&<div className="aw-insights-card">
+     <div className="aw-insights-head">
+      <div><h3 className="aw-insights-title">Posted income versus expenses</h3>
+       <p className="aw-insights-hint">Actual agency ledger entries in the selected period</p></div>
+      <Wallet className="text-violet-400" size={19} aria-hidden="true"/>
+     </div>
+     <div className="aw-insights-bar-list" role="img"
+       aria-label={financeBars.map(x=>x.name+": "+new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(x.value)).join("; ")}>
+      {financeBars.map(item=><div key={item.name}>
+       <div className="aw-insights-label"><span>{item.name}</span><strong>{new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(item.value)}</strong></div>
+       <div className="aw-insights-track"><div className="aw-insights-fill" style={{width:item.value/financeMax*100+"%"}}/></div>
+      </div>)}
+     </div>
+     <p className="aw-insights-chart-note">Client-funded Meta Ads spending is excluded from agency expenses.</p>
+    </div>}
+   </section>}
    <div className="aw-report-grid">
     {leadConversionValue!==null&&Number.isFinite(leadConversionValue)&&
      <article className="aw-report-card aw-report-mint" aria-label="Lead conversion rate">
