@@ -35,7 +35,7 @@ const choices = [
 const topics = [
   {label:"Leads CRM",permits:["leads.read"],href:"/app/leads",icon:BriefcaseBusiness,detail:"Pipeline, follow-ups, and conversions"},
   {label:"Clients",permits:["clients.read"],href:"/app/clients",icon:Users,detail:"Client contacts and service delivery"},
-  {label:"Client Deliveries",permits:["clients.read"],href:"/app/clients",icon:FolderKanban,detail:"Agreements, projects, milestones and service targets"},
+  {label:"Client Deliveries",permits:["clients.read"],href:"/app/deliveries",icon:FolderKanban,detail:"Agreements, projects, milestones and service targets"},
   {label:"Tasks",permits:["tasks.read"],href:"/app/tasks",icon:CheckCircle2,detail:"Assignments and recurring work"},
     {label:"Income & expenses",permits:["finance.entry.read.own","finance.read.all"],href:"/app/finance",icon:Wallet,detail:"Your permitted financial records"},
   {label:"Approval workflows",permits:["approvals.read"],href:"/app/approvals",icon:Workflow,detail:"Reviews and decisions"},
@@ -53,7 +53,7 @@ export default function Dashboard() {
   const grants=session?.identity.permissions ?? [];
   const permitted=useMemo(()=>new Set(grants),[grants]);
   const isAdmin=session?.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")??false;
-  const available=useMemo(()=>topics.filter(x=>(!isAdmin||!["/app/leads","/app/content","/app/assets","/app/finance"].includes(x.href))&&x.permits.some(p=>permitted.has(p))),[permitted,isAdmin]);
+  const available=useMemo(()=>topics.filter(x=>(!isAdmin||!["/app/leads","/app/content","/app/assets","/app/clients/assets","/app/finance"].includes(x.href))&&x.permits.some(p=>permitted.has(p))),[permitted,isAdmin]);
   const nav=useMemo(()=>permittedGroups(grants,session?.identity.roles??[]).flatMap(group=>group.items),[grants]);
 
   const load=useCallback(async()=>{
