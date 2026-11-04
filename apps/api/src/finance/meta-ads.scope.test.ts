@@ -61,9 +61,10 @@ describe("Meta Ads register scopes", () => {
     const { service, findTransactions, findCategories } = fixture();
     await service.entries(actor, "mine");
     expect(findTransactions.mock.calls[0][0].where).toMatchObject({
-      kind: undefined,
+      organizationId: actor.organizationId,
       clientId: null,
     });
+    expect(findTransactions.mock.calls[0][0].where).not.toHaveProperty("kind");
     expect(findCategories).not.toHaveBeenCalled();
   });
 
