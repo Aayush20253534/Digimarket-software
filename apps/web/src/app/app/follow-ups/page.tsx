@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
-import {CalendarClock,ChevronLeft,ChevronRight,Clock3,Search,RefreshCw} from "lucide-react";
+import {CalendarClock,ChevronLeft,ChevronRight,Search,RefreshCw} from "lucide-react";
 import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {useAuth} from "@/components/auth-provider";
 import {AWNotice} from "@/components/aw-ui";
