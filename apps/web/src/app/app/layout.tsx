@@ -47,14 +47,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
  useEffect(()=>{if(status==="unauthenticated")router.replace("/login");},[router,status]);
  useEffect(()=>{
-  // The preference belongs to the browser, not an agency user or database record.
-  // Use the OS preference until the person explicitly selects a workspace theme.
+  // The user explicitly selected dark as the default for UI v2. An existing
+  // light-mode choice still wins and remains a browser-local preference.
   try{
    const stored=window.localStorage.getItem("aw-workspace-theme");
-   if(stored==="dark"||stored==="light"){setTheme(stored);return;}
-   setTheme(window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
-  }catch{/* Storage is optional in restricted browser environments. */}
+   if(stored==="dark"||stored==="light")setTheme(stored);
+  }catch{/* Browsers may block optional local storage. */}
  },[]);
+ useEffect(()=>{
+  // Document scrolling (and browser-native form popovers) live outside the
+  // workspace component. Mirror the theme on <html> for both scrollbar engines.
+  const root=document.documentElement;
+  root.dataset.awTheme=theme;
+  const meta=document.querySelector('meta[name="theme-color"]');
+  meta?.setAttribute("content",theme==="dark"?"#0B0B0C":"#F6F6F7");
+  return()=>{
+   if(root.dataset.awTheme===theme)delete root.dataset.awTheme;
+   meta?.setAttribute("content","#0B0B0C");
+  };
+ },[theme]);
  function switchTheme(){
   setTheme(current=>{
    const next=current==="dark"?"light":"dark";

@@ -247,11 +247,10 @@
 @media(max-width:560px){.aw-notes-create-choices{grid-template-columns:1fr}.aw-notes-home{justify-content:flex-start;padding:22px 12px}.aw-studio-header{align-items:flex-start}.aw-studio-head-actions{justify-content:flex-start}}
  
 
-/* Notes Studio is inside a desktop workspace with zoom:.75.
-   Its height must be specified in the unscaled coordinate system. */
+/* Notes Studio fills the available workspace height at normal 100% zoom. */
 @media(min-width:1024px){
   .aw-studio:not(.aw-studio-fullscreen){
-    height:calc(133.333333dvh - 72px);
+    height:calc(100dvh - 68px);
     min-height:0;
     border-radius:0;
     border-bottom:0;
@@ -262,11 +261,11 @@
   }
 }
 @media(min-width:640px) and (max-width:1023px){
-  .aw-studio:not(.aw-studio-fullscreen){height:calc(100dvh - 72px);min-height:0}
+  .aw-studio:not(.aw-studio-fullscreen){height:calc(100dvh - 68px);min-height:0}
 }
 @media(max-width:639px){
   .aw-studio:not(.aw-studio-fullscreen){
-    height:calc(100dvh - 60px);
+    height:calc(100dvh - 64px);
     min-height:0;
     border-radius:0;
   }
@@ -373,14 +372,14 @@
 .aw-task-state{display:inline-flex;border:1px solid #7c5499;background:#362048;color:#f3e1fd;padding:6px 10px;border-radius:99px;font-size:11px;font-weight:750;white-space:nowrap}
 .aw-task-state.aw-task-expired{border-color:#a64d68;background:#492136;color:#ffbecf}
 
-/* Desktop workspace uses 75% zoom; compensate its effective height. */
+/* The retained Notes list uses ordinary viewport geometry. */
 @media(min-width:1024px){
  .aw-workspace:has(.aw-notes-list-page) .aw-work-content,
  .aw-workspace:has(.aw-notes-list-page) .aw-work-content-width,
- .aw-workspace:has(.aw-notes-list-page) .aw-notes-list-page{min-height:calc(133.3334dvh - 72px)!important}
+ .aw-workspace:has(.aw-notes-list-page) .aw-notes-list-page{min-height:calc(100dvh - 68px)!important}
 }
 
-/* Profile photo: proportional crop + circular mask; account page uses 75% workspace zoom. */
+/* Profile photo: proportional crop and circular mask at native scaling. */
 .aw-workspace .aw-profile-photo-section{min-height:220px;align-items:center;gap:24px}
 .aw-workspace .aw-profile-photo-frame{width:220px;height:220px;min-width:220px;min-height:220px;flex:0 0 220px;aspect-ratio:1/1;overflow:hidden;border-radius:50%;border:3px solid #bd76e8}
 .aw-workspace .aw-profile-photo-frame .aw-profile-photo-large{display:block;width:100%!important;height:100%!important;max-width:none;aspect-ratio:1/1;object-fit:cover;object-position:center;border-radius:50%!important}

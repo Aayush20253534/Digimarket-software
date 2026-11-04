@@ -37,8 +37,26 @@ async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
   viewport:{width:number;height:number},captures:Captured[]){
  await page.setViewportSize(viewport);
  await page.goto(entry.href);
- await expect(page.locator(".aw-workspace"),"Protected workspace on "+entry.href).toBeVisible({timeout:20000});
- await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme",theme,{timeout:15000});
+ const workspace=page.locator(".aw-workspace");
+ // Capturing dozens of full document navigations can expire isolated E2E
+ // sessions. Recover a login redirect once; do not ignore real route errors.
+ try{
+  await workspace.waitFor({state:"visible",timeout:9000});
+ }catch{
+  const currentPath=new URL(page.url()).pathname;
+  if(currentPath==="/login"){
+   const pwd=process.env.E2E_ADMIN_UPDATED_PASSWORD;
+   if(!pwd)throw new Error("Cannot recover isolated E2E session without admin password");
+   await page.getByLabel("Login ID").fill(process.env.BOOTSTRAP_ADMIN_LOGIN??"admin-e2e");
+   await page.getByLabel("Password",{exact:true}).fill(pwd);
+   await page.getByRole("button",{name:"Sign in",exact:true}).click();
+  }
+  // One retry also handles a transient hydration/session refresh race.
+  await page.goto(entry.href);
+ }
+ await expect(workspace,"Protected workspace on "+entry.href+" (actual: "+page.url()+")")
+  .toBeVisible({timeout:20000});
+ await expect(workspace).toHaveAttribute("data-theme",theme,{timeout:15000});
  // Font readiness and transitions matter for stable screenshot review. No
  // networkidle wait: the workspace may keep notification connections alive.
  await page.evaluate(()=>document.fonts.ready);
@@ -57,6 +75,10 @@ async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
  await mkdir(path.dirname(destination),{recursive:true});
  await page.screenshot({path:destination,animations:"disabled",fullPage:false,timeout:20000});
  captures.push({role:"admin",route:entry.href,theme,viewport,...metrics,screenshot:screenshot.replaceAll(path.sep,"/")});
+ // Keep partial CI evidence when a later route fails. Never store credentials.
+ await writeFile(path.join(OUTPUT,"admin-manifest.json"),JSON.stringify({
+   kind:"UI v2 isolated browser capture",isolatedCiData:true,captures,
+ },null,2),"utf8");
 }
 
 test("Phase 0 capture: existing admin navigation, two themes, and responsive surfaces",async({page})=>{
@@ -72,6 +94,19 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  await page.getByLabel("Password",{exact:true}).fill(password);
  await page.getByRole("button",{name:"Sign in",exact:true}).click();
  await expect(page.locator(".aw-workspace")).toBeVisible({timeout:30000});
+ // Approved Phase 1 behaviour: dark is the default without a stored choice.
+ await page.evaluate(()=>localStorage.removeItem("aw-workspace-theme"));
+ await page.reload();
+ await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","dark");
+ await expect(page.locator("html")).toHaveAttribute("data-aw-theme","dark");
+ const darkRoot=await page.evaluate(()=>({
+   background:getComputedStyle(document.documentElement).backgroundColor,
+   bodyBackground:getComputedStyle(document.body).backgroundColor,
+   scrollbar:getComputedStyle(document.documentElement).scrollbarColor,
+ }));
+ expect(darkRoot.background).toBe("rgb(11, 11, 12)");
+ expect(darkRoot.bodyBackground).toBe("rgb(11, 11, 12)");
+ expect(darkRoot.scrollbar).not.toBe("auto");
  const captures:Captured[]=[];
  // Verify the existing theme control and browser storage behavior without
  // modifying application code. Phase 1 is allowed to replace its CSS.
@@ -80,6 +115,16 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","dark");
  await page.getByRole("button",{name:"Switch to light theme"}).click();
  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","light");
+ await expect(page.locator("html")).toHaveAttribute("data-aw-theme","light");
+ const lightRoot=await page.evaluate(()=>({
+   background:getComputedStyle(document.documentElement).backgroundColor,
+   bodyBackground:getComputedStyle(document.body).backgroundColor,
+   scrollbar:getComputedStyle(document.documentElement).scrollbarColor,
+ }));
+ expect(lightRoot.background).toBe("rgb(246, 246, 247)");
+ expect(lightRoot.bodyBackground).toBe("rgb(246, 246, 247)");
+ expect(lightRoot.scrollbar).not.toBe("auto");
+ expect(lightRoot.scrollbar).not.toBe(darkRoot.scrollbar);
  expect(await page.evaluate(()=>localStorage.getItem("aw-workspace-theme"))).toBe("light");
  await page.reload();
  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","light");

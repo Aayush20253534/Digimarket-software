@@ -33,7 +33,7 @@ const label=(v:string)=>v==="META_LEADS"?"Meta Leads":v==="COLD_CALL"?"Cold Call
 const date=(value:string|null)=>value?new Date(value).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}):"Not set";
 const pct=(n:number)=>n.toLocaleString("en-IN",{maximumFractionDigits:2})+"%";
 const getError=(e:unknown)=>e instanceof Error?e.message:"Lead analytics unavailable";
-const hues=["#c979ff","#ee75c8","#68d7e8","#f0ba77","#99e6b4","#8489ff","#e39b8b","#aeb7c9","#9d72ce","#65b19d"];
+const hues=["var(--aw-chart-1)","var(--aw-chart-2)","var(--aw-chart-3)","var(--aw-chart-4)","var(--aw-chart-5)","var(--aw-chart-6)","var(--aw-chart-7)","var(--aw-chart-8)","var(--aw-chart-9)","var(--aw-chart-10)"];
 
 function Bars({items,maxRows=12}: {items:Count[];maxRows?:number}){
  const rows=items.slice(0,maxRows),maximum=Math.max(1,...rows.map(x=>x.count));
@@ -56,11 +56,11 @@ function Trend({rows}: {rows:Count[]}){
   <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img"
    aria-label={"New leads over time, from "+rows[0].name+" to "+rows[rows.length-1].name}>
    {[0,.25,.5,.75,1].map(t=><g key={t}>
-    <line x1={padX} y1={height-padY-t*(height-2*padY)} x2={width-padX} y2={height-padY-t*(height-2*padY)} stroke="#614771" strokeDasharray="3 5"/>
-    <text x={4} y={height-padY-t*(height-2*padY)+4} fill="#d1b9de" fontSize={10}>{Math.round(maximum*t)}</text>
+    <line x1={padX} y1={height-padY-t*(height-2*padY)} x2={width-padX} y2={height-padY-t*(height-2*padY)} stroke="var(--ui-grid)" strokeDasharray="3 5"/>
+    <text x={4} y={height-padY-t*(height-2*padY)+4} fill="var(--ui-muted)" fontSize={10}>{Math.round(maximum*t)}</text>
    </g>)}
-   {points.length>1&&<polyline points={points.map(p=>p.x+","+p.y).join(" ")} fill="none" stroke="#d884ff" strokeWidth={3} strokeLinejoin="round" strokeLinecap="round"/>}
-   {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={4} fill="#f5d7ff" stroke="#8733b9" strokeWidth={2}>
+   {points.length>1&&<polyline points={points.map(p=>p.x+","+p.y).join(" ")} fill="none" stroke="var(--ui-strong)" strokeWidth={3} strokeLinejoin="round" strokeLinecap="round"/>}
+   {points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={4} fill="var(--ui-strong)" stroke="var(--ui-canvas)" strokeWidth={2}>
     <title>{rows[i].name+": "+count(rows[i].count)+" leads"}</title>
    </circle>)}
   </svg>
@@ -73,7 +73,7 @@ function Donut({items}: {items:Count[]}){
  const gradient=items.map((x,i)=>{const from=running;running+=total?x.count/total*100:0;
   return `${hues[i%hues.length]} ${from}% ${running}%`;}).join(",");
  return <div className="aw-lead-donut-layout">
-  <div className="aw-lead-donut" style={{background:total?`conic-gradient(${gradient})`:"#43324f"}}
+  <div className="aw-lead-donut" style={{background:total?`conic-gradient(${gradient})`:"var(--ui-raised)"}}
    role="img" aria-label={items.map(x=>label(x.name)+" "+x.count).join(", ")}>
    <span><strong>{count(total)}</strong><small>leads</small></span>
   </div>
