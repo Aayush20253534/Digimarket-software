@@ -27,7 +27,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   };
   const actor=(res:Response)=>res.locals.principal as Principal;
   const view=(req:Request)=>parse(financeViewSchema,req.query.view??"mine");
-  const ledgerScope=(req:Request)=>parse(z.enum(["agency","client_ads"]).default("agency"),req.query.scope);
+  const ledgerScope=(req:Request)=>parse(z.enum(["agency","client_ads","meta_ads"]).default("agency"),req.query.scope);
   app.post("/api/v1/finance/proof-intent",authenticate,async(req,res)=>{
     const body=parse(assetIntentSchema,req.body);
     res.status(201).json({data:await proofAssets.intent(actor(res),body,true)});

@@ -56,7 +56,7 @@ export default function FinancePage(){
   const [assigneesError,setAssigneesError]=useState("");
   const [categories,setCategories]=useState<Category[]>([]);
   const [entries,setEntries]=useState<Entry[]>([]);
-  const [clientAdEntries,setClientAdEntries]=useState<Entry[]>([]);
+  const [metaAdEntries,setMetaAdEntries]=useState<Entry[]>([]);
   const [metaAdClients,setMetaAdClients]=useState<MetaAdClient[]>([]);
   const [metaAdClientsError,setMetaAdClientsError]=useState("");
   const [totals,setTotals]=useState<Totals>(zero);
@@ -93,9 +93,10 @@ export default function FinancePage(){
     const target=view==="all"&&canAll?"all":"mine";
     // Treat the ledger and summary independently: an unavailable summary must
     // never make saved transactions disappear from the register on refresh.
-    const [ledger,clientAds,sums,cats,policies]=await Promise.allSettled([
+    const [ledger,clientAds,metaAds,sums,cats,policies]=await Promise.allSettled([
       request<Entry[]>("/finance/entries?view="+target),
       request<Entry[]>("/finance/entries?view="+target+"&scope=client_ads"),
+      request<Entry[]>("/finance/entries?view="+target+"&scope=meta_ads"),
       request<Totals>("/finance/summary?view="+target),
       request<Category[]>("/finance/categories"),
       request<FinancePolicy[]>("/approval-policies"),
@@ -105,14 +106,28 @@ export default function FinancePage(){
       setEntries(ledger.value);
       setHasLoadedEntries(true);
     }
-    if(clientAds.status==="fulfilled")setClientAdEntries(clientAds.value);
+    // Defensively filter by the Meta Ads category as an older API version
+    // may ignore unsupported scope query parameters and return unrelated entries.
+    // Combine the scoped and legacy registers during a staggered deployment.
+    const sources=[ledger,clientAds,metaAds].flatMap(result=>
+      result.status==="fulfilled"?result.value:[]);
+    if([ledger,clientAds,metaAds].some(result=>result.status==="fulfilled")){
+      const unique=new Map<string,Entry>();
+      for(const row of sources){
+        if(row.kind==="EXPENSE"&&isMetaAdsCategory(row.category?.name??""))unique.set(row.id,row);
+      }
+      setMetaAdEntries([...unique.values()]
+        .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
+        .slice(0,200));
+    }
     if(sums.status==="fulfilled"){setTotals(sums.value);setRecurring(target==="all"?sums.value.recurringIncome??null:null);}
     if(cats.status==="fulfilled")setCategories(cats.value);
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(
       p=>p.category==="FINANCE"&&p.active));
     const problems=[
       ...(ledger.status==="rejected"?["Financial register could not be refreshed: "+readable(ledger.reason)]:[]),
-      ...(clientAds.status==="rejected"?["Client Meta Ads register could not be refreshed: "+readable(clientAds.reason)]:[]),
+      ...([ledger,clientAds,metaAds].every(result=>result.status==="rejected")
+        ?["Meta Ads register could not be refreshed."]:[]),
       ...(sums.status==="rejected"?["Financial totals could not be refreshed: "+readable(sums.reason)]:[]),
     ];
     setError(problems.join(" "));
@@ -134,10 +149,10 @@ export default function FinancePage(){
   },[adminFinance,request]);
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
-    if(!id||![...entries,...clientAdEntries].some(entry=>entry.id===id))return;
-    const frame=window.requestAnimationFrame(()=>{const row=document.getElementById("finance-"+id);row?.classList.add("aw-register-selected");row?.scrollIntoView({block:"center",behavior:"smooth"});});
+    if(!id||![...entries,...metaAdEntries].some(entry=>entry.id===id))return;
+    const frame=window.requestAnimationFrame(()=>{const row=document.getElementById("finance-meta-"+id)??document.getElementById("finance-"+id);row?.classList.add("aw-register-selected");row?.scrollIntoView({block:"center",behavior:"smooth"});});
     return ()=>window.cancelAnimationFrame(frame);
-  },[entries,clientAdEntries]);
+  },[entries,metaAdEntries]);
   useEffect(()=>{
     if(!canCreate&&!adminFinance)return;
     let active=true;
@@ -290,7 +305,7 @@ export default function FinancePage(){
      const link=document.createElement("a");link.href=proof.url;link.target="_blank";link.rel="noopener noreferrer";link.click();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
-  async function exportCsv(scope:"agency"|"client_ads"="agency"){
+  async function exportCsv(scope:"agency"|"client_ads"|"meta_ads"="agency"){
     setBusy(true);setError("");
     try{
       const target=view==="all"&&canAll?"all":"mine";
@@ -316,7 +331,7 @@ export default function FinancePage(){
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
     </div>
-    <div className="aw-finance-summary-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Financial totals">
+    <div className="aw-finance-summary-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="Financial totals">
       {([
         ["Posted income",totals.postedIncome],
         ["Posted expenses",totals.postedExpense],
@@ -328,6 +343,11 @@ export default function FinancePage(){
         <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(value)}</p>
         <p className="mt-2 text-xs text-slate-500">{view==="all"?"Organization":"Your entries"} · {totals.currency}</p>
       </Card>)}
+      <Card>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Client Meta Ads spend</p>
+        <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(totals.clientAdSpend?.posted??"0.0000")}</p>
+        <p className="mt-2 text-xs text-slate-500">Posted · Pending: {money(totals.clientAdSpend?.pending??"0.0000")}</p>
+      </Card>
     </div>
     {!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
@@ -411,21 +431,16 @@ export default function FinancePage(){
         </div>):<EmptyState title="No categories yet" description="An administrator can add expense and income categories." icon={Wallet}/>}</div>
       </Card>
     </div>
-    <Card title="Client Meta Ads spend" description="Only Meta Ads recorded against a client. These transactions are excluded from company expense and net totals.">
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <div><p className="text-xs text-slate-500">Posted client ad spend</p><strong>{money(totals.clientAdSpend?.posted??"0.0000")}</strong></div>
-        <div><p className="text-xs text-slate-500">Pending client ad spend</p><strong>{money(totals.clientAdSpend?.pending??"0.0000")}</strong></div>
-        <div><p className="text-xs text-slate-500">Client entries (not cancelled)</p><strong>{totals.clientAdSpend?.count??0}</strong></div>
-      </div>
-      <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("client_ads")}>
-        <Download className="h-4 w-4"/> Export client ad spend CSV
+    <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Client-funded spending does not affect agency expense or net totals. Latest 200 entries shown.">
+      <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("meta_ads")}>
+        <Download className="h-4 w-4"/> Export Meta Ads CSV
       </button>
-      {!clientAdEntries.length?<EmptyState title="No client Meta Ads recorded" description="Choose Meta Ads → Client when entering an expense to track spending here."/>:
-      <div className="aw-finance-register-scroll" role="region" aria-label="Client Meta Ads register" tabIndex={0}>
+      {!metaAdEntries.length?<EmptyState title="No Meta Ads expenses recorded" description="Expenses categorized as Meta Ads appear here, whether paid by Self or a client."/>:
+      <div className="aw-finance-register-scroll" role="region" aria-label="All Meta Ads register" tabIndex={0}>
         <table className="aw-finance-register"><thead><tr>
           {adminFinance&&<th>Actions</th>}
-          {["Date","Client","Amount","Payment method","Status","Recorded by","Notes","Receipt","Approval"].map(label=><th key={label}>{label}</th>)}
-        </tr></thead><tbody>{clientAdEntries.map(row=><tr key={row.id} id={"finance-"+row.id}>
+          {["Date","Paid by","Client","Amount","Payment method","Status","Recorded by","Notes","Receipt","Approval"].map(label=><th key={label}>{label}</th>)}
+        </tr></thead><tbody>{metaAdEntries.map(row=><tr key={row.id} id={"finance-meta-"+row.id}>
           {adminFinance&&<td><div className="flex gap-2">
             {row.status!=="CANCELLED"&&<>
               <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>beginEntryEdit(row)}>Edit</button>
@@ -433,7 +448,10 @@ export default function FinancePage(){
             </>}
           </div></td>}
           <td>{row.occurredOn}</td>
-          <td>{row.client?<Link className="underline" href={"/app/clients/"+row.client.id}>{row.client.businessName}</Link>:"Unknown client"}</td>
+          <td>{row.clientId?"Client":"Self"}</td>
+          <td>{row.clientId
+            ?(row.client?<Link className="underline" href={"/app/clients/"+row.client.id}>{row.client.businessName}</Link>:"Client unavailable")
+            :"—"}</td>
           <td>{money(row.amount)}</td><td>{row.method.replaceAll("_"," ")}</td>
           <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
           <td>{row.enteredBy.displayName}</td><td>{row.description||"—"}</td>
