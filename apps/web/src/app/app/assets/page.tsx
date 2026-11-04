@@ -64,6 +64,12 @@ export default function AssetsPage(){
  const [filter,setFilter]=useState<"ACTIVE"|"ARCHIVED">("ACTIVE");
  const [search,setSearch]=useState("");
  const [filterClient,setFilterClient]=useState("");
+ useEffect(()=>{
+  // Existing /app/assets?clientId= and the relocated Clients asset route
+  // share one permission-checked backend query. Never trust the URL as a grant.
+  const selected=new URLSearchParams(window.location.search).get("clientId");
+  if(selected&&/^[0-9a-f]{8}-[0-9a-f-]{27,}$/.test(selected))setFilterClient(selected);
+ },[]);
  const [cursor,setCursor]=useState<string|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [legacySort,setLegacySort]=useState(false);

@@ -73,8 +73,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   for(const label of ["Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Leads CRM"})).toBeVisible();
-  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow Ups"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow-ups"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
+  // Phase 2 retains live Notes data but hides its navigation and header shortcut.
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"My notes"})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Account menu"})).toBeVisible();
   await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
   await expect(page.locator(".aw-module-pill").first()).toHaveCSS("border-radius",panelRadius);
@@ -301,8 +304,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByText("Task status updated.")).toBeVisible();
   await visitWorkspace(page,"/app/task-history");
   await expect(page.getByTestId("task-history-page")).toBeVisible();
-  await expect(page.getByRole("navigation",{name:"Workspace navigation"})
-    .getByRole("link",{name:"Task history"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Task sections"})
+    .getByRole("link",{name:"History"})).toBeVisible();
   await page.getByLabel("Task history scope").selectOption("team");
   await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toBeVisible();
   await expect(page.getByText(/Completed:/)).toBeVisible();
@@ -328,16 +331,43 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     res.url().includes("/api/v1/clients/deliveries")&&res.request().method()==="GET");
   await page.reload();
   expect((await deliverySummaryResponse).status(),"Client deliveries gateway must reach the API").toBe(200);
-  // Finance is a top-level sidebar section immediately below Workspace.
+  // Phase 2: grouped sidebar, single Documents destination and hidden Notes.
   const founderNav=page.getByRole("navigation",{name:"Workspace navigation"});
-  await expect(founderNav.getByRole("link",{name:"Income & expenses"})).toBeVisible();
+  await expect(founderNav.getByRole("link",{name:"Finance",exact:true})).toBeVisible();
+  await expect(founderNav.getByRole("link",{name:"Documents",exact:true})).toBeVisible();
   const founderSections=await founderNav.locator(".aw-nav-group").allTextContents();
-  expect(founderSections.indexOf("Finance"),"Finance should follow Workspace in the sidebar")
-    .toBe(founderSections.indexOf("Workspace")+1);
-  const workspaceLinks=await founderNav.locator(".aw-nav-section").first().locator(".aw-nav-name").allTextContents();
-  expect(workspaceLinks.slice(0,3),"Clients and Client deliveries must follow Overview").toEqual(["Overview","Clients","Client deliveries"]);
+  expect(founderSections).toEqual(["Workspace","Sales & CRM","Operations","Business","Communication","Administration"]);
   await expect(founderNav.getByRole("link",{name:"Clients",exact:true})).toHaveCount(1);
-  await expect(founderNav.getByRole("link",{name:"Client deliveries",exact:true})).toHaveCount(1);
+  await expect(founderNav.getByRole("link",{name:"Client Deliveries",exact:true})).toHaveCount(1);
+  for(const label of ["My notes","Content calendar","Quotations","Agreements","Task history","Approvals","Founders & responsibilities"])
+   await expect(founderNav.getByRole("link",{name:label,exact:true})).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"Open saved notes"})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Approval inbox"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Account menu"})).toBeVisible();
+  // Collapsible navigation is a user preference, not a permission change.
+  const crmToggle=founderNav.getByRole("button",{name:"Toggle Sales & CRM navigation"});
+  await expect(crmToggle).toHaveAttribute("aria-expanded","true");
+  await crmToggle.click();
+  await expect(founderNav.getByRole("link",{name:"Leads CRM"})).toBeHidden();
+  await crmToggle.click();
+  await expect(founderNav.getByRole("link",{name:"Leads CRM"})).toBeVisible();
+  // Approval inbox is a non-mutating preview; decisions remain in the legacy
+  // permission-checked approval workflow.
+  await page.getByRole("button",{name:"Approval inbox"}).click();
+  await expect(page.getByRole("dialog",{name:"Approval inbox panel"})).toBeVisible();
+  await expect(page.getByRole("link",{name:"Open all approval workflows"})).toBeVisible();
+  await page.getByRole("button",{name:"Close approval inbox"}).click();
+  // Documents is one visible section with both fully retained form workflows.
+  await visitWorkspace(page,"/app/documents/quotations");
+  await expect(page.getByRole("navigation",{name:"Documents sections"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
+  await page.getByRole("navigation",{name:"Documents sections"}).getByRole("link",{name:"Agreements"}).click();
+  await expect(page).toHaveURL(/\/app\/documents\/agreements$/);
+  await expect(page.getByRole("heading",{name:"Agreements",exact:true})).toBeVisible();
+  // Old bookmarks still load the same original workflows, not a deleted page.
+  await visitWorkspace(page,"/app/quotations");
+  await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
+  await visitWorkspace(page,"/app/dashboard");
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await visitWorkspace(page,"/app/notes");
   // The studio still reaches the viewport edge at the normal desktop zoom.
@@ -580,7 +610,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(followUpBadge).toHaveCSS("color","rgb(134, 239, 172)");
   // The dedicated sidebar register always lists scheduled leads by follow-up date.
   const scheduledResponse=page.waitForResponse(res=>res.url().includes("/api/v1/leads/follow-ups?"));
-  await page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow Ups"}).click();
+  await page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Follow-ups"}).click();
   expect((await scheduledResponse).status()).toBe(200);
   await expect(page).toHaveURL(/\/app\/follow-ups$/);
   await expect(page.getByRole("heading",{name:"Follow Ups"})).toBeVisible();
@@ -856,7 +886,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await capturePhase0Role(page,"employee");
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
-  await expect(page.getByRole("link",{name:"Task history",exact:true}).first()).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Tasks",exact:true})).toBeVisible();
   await visitWorkspace(page,"/app/task-history");
   await expect(page.getByTestId("task-history-page")).toBeVisible();
   await expect(page.getByLabel("Task history scope")).toHaveCount(0);

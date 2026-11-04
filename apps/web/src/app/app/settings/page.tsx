@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useState,type FormEvent} from "react";
 import Link from "next/link";
+import {UsersRound,Users,Plug,Building2,ArrowUpRight} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
 import {Card,Notice,PageHeader,Spinner} from "@/components/ui";
@@ -46,10 +47,29 @@ export default function CompanySettingsPage(){
   }catch(e){setError(err(e));}finally{setBusy(false);}
  };
  if(!session)return <Spinner label="Checking settings access…"/>;
- if(!canManage)return <><PageHeader title="Company settings"/><Notice kind="error">Organization settings management permission required.</Notice></>;
+ const grants=session.identity.permissions;
+ const canFounders=grants.includes("founders.read");
+ const canTeam=grants.includes("users.read");
+ const canIntegrate=canManage&&session.identity.roles.includes("FOUNDER");
+ const sections=[
+  ...(canManage?[{label:"Company settings",href:"/app/settings",description:"Organization, billing and policies",icon:Building2}]:[]),
+  ...(canTeam?[{label:"Team & Access",href:"/app/team/users",description:"Accounts and permissions",icon:Users}]:[]),
+  ...(canFounders?[{label:"Founders",href:"/app/founders",description:"Responsibilities and governance",icon:UsersRound}]:[]),
+  ...(canIntegrate?[{label:"Integrations",href:"/app/integrations/chatgpt",description:"Connected CRM integrations",icon:Plug}]:[]),
+ ];
+ const hub=<nav aria-label="Settings sections" className="aw-v2-settings-grid">
+  {sections.map(({label,href,description,icon:Icon})=><Link key={href} href={href}
+    className="aw-v2-settings-link"><Icon size={19} aria-hidden="true"/>
+    <span><strong>{label}</strong><small>{description}</small></span><ArrowUpRight size={16} aria-hidden="true"/></Link>)}
+ </nav>;
+ if(!canManage)return <div className="space-y-5">
+  <PageHeader eyebrow="Administration" title="Settings" description="Available administration areas depend on your existing permissions."/>
+  {sections.length?hub:<Notice kind="error">Settings access is restricted to authorized roles.</Notice>}
+ </div>;
  return <div className="space-y-6">
-  <PageHeader eyebrow="Administration" title="Company settings"
-   description="Manage workspace identity, team governance, finance categories and approval policies."/>
+  <PageHeader eyebrow="Administration" title="Settings"
+   description="Company settings, team, founders and integrations are grouped here."/>
+  {hub}
   {error&&<Notice kind="error">{error}</Notice>}
   {success&&<Notice kind="success">{success}</Notice>}
   {loading&&<Spinner label="Loading company configuration…"/>}
