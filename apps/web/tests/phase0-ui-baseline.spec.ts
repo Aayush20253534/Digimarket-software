@@ -78,7 +78,7 @@ async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
  // Keep partial CI evidence when a later route fails. Never store credentials.
  await writeFile(path.join(OUTPUT,"admin-manifest.json"),JSON.stringify({
    kind:"UI v2 isolated browser capture",isolatedCiData:true,captures,
- },null,2)+"\\n","utf8");
+ },null,2),"utf8");
 }
 
 test("Phase 0 capture: existing admin navigation, two themes, and responsive surfaces",async({page})=>{
