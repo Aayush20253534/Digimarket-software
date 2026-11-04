@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, LogOut, Menu, NotebookPen, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
+import { ChevronRight, LogOut, Menu, NotebookPen, PanelLeftClose, PanelLeftOpen, Search, Sun, Moon, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { AWButton, AWNotice } from "@/components/aw-ui";
@@ -37,6 +37,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const { status, session, refresh, logout, request }=useAuth();
  const [photo,setPhoto]=useState<string|null>(null);
  const [collapsed,setCollapsed]=useState(false);
+ const [theme,setTheme]=useState<"dark"|"light">("dark");
  const [mobileOpen,setMobileOpen]=useState(false);
  const [signingOut,setSigningOut]=useState(false);
  const [signOutError,setSignOutError]=useState("");
@@ -45,6 +46,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const triggerRef=useRef<HTMLButtonElement>(null);
 
  useEffect(()=>{if(status==="unauthenticated")router.replace("/login");},[router,status]);
+ useEffect(()=>{
+  // The preference belongs to the browser, not an agency user or database record.
+  // Use the OS preference until the person explicitly selects a workspace theme.
+  try{
+   const stored=window.localStorage.getItem("aw-workspace-theme");
+   if(stored==="dark"||stored==="light"){setTheme(stored);return;}
+   setTheme(window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");
+  }catch{/* Storage is optional in restricted browser environments. */}
+ },[]);
+ function switchTheme(){
+  setTheme(current=>{
+   const next=current==="dark"?"light":"dark";
+   try{window.localStorage.setItem("aw-workspace-theme",next);}catch{/* Optional storage. */}
+   return next;
+  });
+ }
  useEffect(()=>{try{setCollapsed(window.localStorage.getItem("aw-sidebar-collapsed")==="1");}catch{/* optional preference */}},[]);
  useEffect(()=>{setMobileOpen(false);},[pathname]);
  // Dismiss a mobile navigation dialog if the viewport becomes desktop-sized.
@@ -108,7 +125,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
- return <div className="aw-theme aw-workspace" data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/quotations","/app/agreements","/app/reports","/app/settings","/app/integrations/chatgpt","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes","/app/task-history","/app/follow-ups","/app/meetings"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/deliveries","/app/projects","/app/tasks","/app/content","/app/approvals"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"}>
+ return <div className="aw-theme aw-workspace" data-theme={theme} data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/quotations","/app/agreements","/app/reports","/app/settings","/app/integrations/chatgpt","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes","/app/task-history","/app/follow-ups","/app/meetings"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/deliveries","/app/projects","/app/tasks","/app/content","/app/approvals"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"}>
   <a href="#workspace-content" className="aw-skip-link">Skip to workspace content</a>
   <aside aria-label="Workspace sidebar" className="aw-work-sidebar">
    <div className="aw-work-sidehead">{brand}
@@ -154,11 +171,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      {canSearch&&<Link href="/app/search" aria-label="Search workspace" className="aw-work-search">
       <Search size={17} aria-hidden="true"/><span>Search workspace</span>
      </Link>}
+     <button type="button" className="aw-work-icon aw-theme-toggle" onClick={switchTheme}
+      aria-label={theme==="dark"?"Switch to light theme":"Switch to dark theme"}
+      aria-pressed={theme==="light"} title={theme==="dark"?"Light appearance":"Dark appearance"}>
+      {theme==="dark"?<Sun size={19} aria-hidden="true"/>:<Moon size={19} aria-hidden="true"/>}
+     </button>
      <AWNotificationBell/>
      <Link href="/app/profile" aria-label="Open my account" className="aw-work-header-avatar"><Avatar name={name} photo={photo}/></Link>
     </div>
    </header>
-   {/* Legacy module surfaces remain light until page migrations (Phases 4-6). */}
+   {/* Workspace appearance is centrally themed; module APIs and permissions are unchanged. */}
    <main id="workspace-content" className="aw-work-content">
     <div className="aw-work-content-width">
      {signOutError&&<div className="mb-5"><AWNotice tone="error">{signOutError}</AWNotice></div>}
