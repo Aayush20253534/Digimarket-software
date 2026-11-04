@@ -23,6 +23,7 @@
 @import "../styles/aw-client-workspace.css";
 @import "../styles/aw-quotations.css";
 @import "../styles/aw-enterprise-theme.css";
+@import "../styles/aw-navigation-v2.css";
 
 :root {
   color-scheme: light;
