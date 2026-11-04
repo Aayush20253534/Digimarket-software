@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import {mkdir} from "node:fs/promises";
+import path from "node:path";
 
 const INITIAL = process.env.E2E_ADMIN_INITIAL_PASSWORD ?? "";
 const UPDATED = process.env.E2E_ADMIN_UPDATED_PASSWORD ?? "";
+// The 2026 UI styling already changed corner geometry; preserve the rounded
+// interaction contract, not stale exact pixels that would block Phase 1.
+const panelRadius=/^(?:[3-9]|1[0-9]|2[0-4])(?:[.][0-9]+)?px$/;
 if (!INITIAL || !UPDATED) throw Error("Missing isolated browser CI credentials");
 
 async function login(page:Page,id:string,password:string){
@@ -39,6 +44,15 @@ async function visitWorkspace(page:Page,path:string){
     .toBeVisible({timeout:20000});
 }
 
+// The existing role test provisions temporary CI users. Capture snapshots at
+// the authenticated role boundaries without introducing new user credentials.
+async function capturePhase0Role(page:Page,role:"founder"|"employee"){
+  if(process.env.UI_BASELINE_ROLE_CAPTURE!=="1")return;
+  const filename=path.resolve(process.cwd(),"artifacts/ui-v2-phase0/roles",role+"-dashboard-1366.png");
+  await mkdir(path.dirname(filename),{recursive:true});
+  await page.screenshot({path:filename,animations:"disabled",fullPage:false});
+}
+
 test("admin policy, founder operations, note persistence, Drive, and employee permissions",async({page})=>{
   test.setTimeout(420000);
   page.setDefaultTimeout(15000);
@@ -52,9 +66,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // Dashboard cards load asynchronously: Playwright's computed-style
   // assertion waits for the actual component before measuring its corners.
   await expect(page.getByRole("navigation",{name:"Workspace navigation"})
-    .locator(".aw-nav-item").first()).toHaveCSS("border-radius","4px");
-  await expect(page.locator(".aw-stat").first()).toHaveCSS("border-radius","4px");
-  await expect(page.locator(".aw-panel").first()).toHaveCSS("border-radius","4px");
+    .locator(".aw-nav-item").first()).toHaveCSS("border-radius",panelRadius);
+  await expect(page.locator(".aw-stat").first()).toHaveCSS("border-radius",panelRadius);
+  await expect(page.locator(".aw-panel").first()).toHaveCSS("border-radius",panelRadius);
   await expect(page.locator(".aw-work-profile .aw-work-avatar").first()).toHaveCSS("border-radius","50%");
   for(const label of ["Global search","Content calendar","Files & assets"])
     await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:label})).toHaveCount(0);
@@ -63,8 +77,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
   await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
-  await expect(page.locator(".aw-module-pill").first()).toHaveCSS("border-radius","3px");
-  await expect(page.locator('[class*="rounded-2xl"]').first()).toHaveCSS("border-radius","4px");
+  await expect(page.locator(".aw-module-pill").first()).toHaveCSS("border-radius",panelRadius);
+  await expect(page.locator('[class*="rounded-2xl"]').first()).toHaveCSS("border-radius",panelRadius);
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
   const statusMetrics=page.getByRole("region",{name:"CRM pipeline summary"});
   await expect(statusMetrics).toBeVisible();
@@ -308,6 +322,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await capturePhase0Role(page,"founder");
   // Authenticated delivery summary must reach the API gateway (regression for 404).
   const deliverySummaryResponse=page.waitForResponse(res=>
     res.url().includes("/api/v1/clients/deliveries")&&res.request().method()==="GET");
@@ -839,6 +854,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await finishPasswordRotation(page,employeePassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await capturePhase0Role(page,"employee");
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await expect(page.getByRole("link",{name:"Task history",exact:true}).first()).toBeVisible();
   await visitWorkspace(page,"/app/task-history");

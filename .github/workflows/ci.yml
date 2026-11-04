@@ -26,6 +26,8 @@ jobs:
           node-version-file: .node-version
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Enforce UI v2 route compatibility baseline
+        run: node apps/web/scripts/verify-route-compat.mjs
       - name: Generate Prisma client
         run: pnpm --filter @digimarket/db db:generate
       - name: Lint
