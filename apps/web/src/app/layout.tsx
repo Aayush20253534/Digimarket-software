@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "AmplifyWorld Workspace", statusBarStyle: "black-translucent" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#10091C" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0B0B0C" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en"><body><AuthProvider><PWAProvider>{children}</PWAProvider></AuthProvider></body></html>;
