@@ -22,6 +22,7 @@
 @import "../styles/aw-task-status-cards.css";
 @import "../styles/aw-client-workspace.css";
 @import "../styles/aw-quotations.css";
+@import "../styles/aw-enterprise-theme.css";
 
 :root {
   color-scheme: light;
