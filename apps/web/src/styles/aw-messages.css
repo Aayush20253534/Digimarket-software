@@ -56,7 +56,7 @@
  .aw-messages-page{height:calc(100dvh - 68px);min-height:calc(100dvh - 68px)}
 }
 @media(max-width:720px){
- .aw-messages-page{grid-template-columns:minmax(140px,36%) minmax(0,1fr);height:calc(100dvh - 64px);min-height:0}
+ .aw-messages-page{grid-template-columns:minmax(140px,36%) minmax(0,1fr);height:calc(100dvh - 68px);min-height:0}
  .aw-chat-directory-header{padding:15px 9px}.aw-chat-directory-header h1{font-size:17px}
  .aw-chat-search{margin:0 7px 12px;padding:8px}.aw-chat-directory-caption{padding-left:10px}
  .aw-chat-contacts{padding:0 5px}.aw-chat-contact{padding:9px 5px;gap:7px}.aw-chat-contact .aw-chat-avatar{width:30px!important;height:30px!important}
@@ -69,6 +69,7 @@
 @media(prefers-reduced-motion:reduce){.aw-chat-contact{transition:none}}
 
 .aw-chat-back{display:none;place-items:center;width:34px;height:34px;flex:none;color:#e6c9f7;border:1px solid #65467c;border-radius:8px}
+@media(max-width:639px){.aw-messages-page{height:calc(100dvh - 64px)}}
 @media(max-width:580px){
  .aw-messages-page{grid-template-columns:minmax(0,1fr)}
  .aw-messages-page:has(.aw-chat-conversation-header) .aw-chat-directory{display:none}
