@@ -46,12 +46,24 @@ export class FinanceService {
       monthlyCombinedTotal:serviceTotal.add(adBudgetTotal).toFixed(4)};
   }
 
-  private scope(actor:Principal,view:View,clientAds=false):Prisma.FinancialTransactionWhereInput{
+  private scope(actor:Principal,view:View,owner:"agency"|"client_ads"|"all"="agency"):Prisma.FinancialTransactionWhereInput{
     if(view==="all")need(actor,"finance.read.all");
     else need(actor,"finance.entry.read.own");
     return {organizationId:actor.organizationId,
       ...(view==="mine"?{enteredById:actor.userId}:{}),
-      clientId:clientAds?{not:null}:null};
+      ...(owner==="all"?{}:{clientId:owner==="client_ads"?{not:null}:null})};
+  }
+
+  // Never infer Meta advertising from a non-null client ID: that would also
+  // include travel, software and other historical expenses in the ad register.
+  private async metaAdsWhere(actor:Principal,view:View,owner:"all"|"client_ads"):Promise<Prisma.FinancialTransactionWhereInput>{
+    const base=this.scope(actor,view,owner);
+    const categories=await this.db.financialCategory.findMany({
+      where:{organizationId:actor.organizationId,kind:"EXPENSE"},
+      select:{id:true,name:true},
+    });
+    return {...base,kind:"EXPENSE",
+      categoryId:{in:categories.filter(c=>isMetaAds(c.name)).map(c=>c.id)}};
   }
 
   async metaAdClients(actor:Principal){
@@ -474,9 +486,11 @@ export class FinanceService {
     return {...row,amount:row.amount.toFixed(4),occurredOn:row.occurredOn.toISOString().slice(0,10)};
   }
 
-  async entries(actor:Principal,view:View,scope:"agency"|"client_ads"="agency"){
+  async entries(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency"){
+    const where=scope==="agency"?this.scope(actor,view):
+      await this.metaAdsWhere(actor,view,scope==="client_ads"?"client_ads":"all");
     const rows=await this.db.financialTransaction.findMany({
-      where:this.scope(actor,view,scope==="client_ads"),orderBy:{createdAt:"desc"},take:200,
+      where,orderBy:[{createdAt:"desc"},{id:"desc"}],take:200,
       include:{category:{select:{id:true,name:true,active:true}},
         client:{select:{id:true,businessName:true}},
         enteredBy:{select:{displayName:true,loginId:true}},
@@ -487,13 +501,14 @@ export class FinanceService {
   }
 
   async totals(actor:Principal,view:View){
+    const clientAdWhere=await this.metaAdsWhere(actor,view,"client_ads");
     const [grouped,clientGroups]=await Promise.all([
       this.db.financialTransaction.groupBy({
         by:["kind","status"],where:this.scope(actor,view),
         _sum:{amount:true},_count:{_all:true},
       }),
       this.db.financialTransaction.groupBy({
-        by:["status"],where:{...this.scope(actor,view,true),kind:"EXPENSE"},
+        by:["status"],where:clientAdWhere,
         _sum:{amount:true},_count:{_all:true},
       }),
     ]);
@@ -515,9 +530,11 @@ export class FinanceService {
        ...(view==="all"?{recurringIncome:await this.recurringIncome(actor)}:{})};
   }
 
-  async exportCsv(actor:Principal,view:View,scope:"agency"|"client_ads"="agency"){
+  async exportCsv(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency"){
+    const where=scope==="agency"?this.scope(actor,view):
+      await this.metaAdsWhere(actor,view,scope==="client_ads"?"client_ads":"all");
     const rows=await this.db.financialTransaction.findMany({
-      where:this.scope(actor,view,scope==="client_ads"),
+      where,
       orderBy:[{createdAt:"desc"},{id:"desc"}],take:5001,
       include:{category:{select:{name:true}},client:{select:{businessName:true}},
         enteredBy:{select:{loginId:true}}},
