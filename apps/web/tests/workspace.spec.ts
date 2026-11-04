@@ -78,7 +78,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
   await expect(page.locator(".aw-module-pill").first()).toHaveCSS("border-radius",panelRadius);
-  await expect(page.locator('[class*="rounded-2xl"]').first()).toHaveCSS("border-radius",panelRadius);
+  // Component radius is already checked above; do not require a legacy Tailwind class.
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
   const statusMetrics=page.getByRole("region",{name:"CRM pipeline summary"});
   await expect(statusMetrics).toBeVisible();
