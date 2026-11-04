@@ -150,7 +150,7 @@ export default function FinancePage(){
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
     if(!id||![...entries,...metaAdEntries].some(entry=>entry.id===id))return;
-    const frame=window.requestAnimationFrame(()=>{const row=document.getElementById("finance-"+id);row?.classList.add("aw-register-selected");row?.scrollIntoView({block:"center",behavior:"smooth"});});
+    const frame=window.requestAnimationFrame(()=>{const row=document.getElementById("finance-meta-"+id)??document.getElementById("finance-"+id);row?.classList.add("aw-register-selected");row?.scrollIntoView({block:"center",behavior:"smooth"});});
     return ()=>window.cancelAnimationFrame(frame);
   },[entries,metaAdEntries]);
   useEffect(()=>{
@@ -440,7 +440,7 @@ export default function FinancePage(){
         <table className="aw-finance-register"><thead><tr>
           {adminFinance&&<th>Actions</th>}
           {["Date","Paid by","Client","Amount","Payment method","Status","Recorded by","Notes","Receipt","Approval"].map(label=><th key={label}>{label}</th>)}
-        </tr></thead><tbody>{metaAdEntries.map(row=><tr key={row.id} id={"finance-"+row.id}>
+        </tr></thead><tbody>{metaAdEntries.map(row=><tr key={row.id} id={"finance-meta-"+row.id}>
           {adminFinance&&<td><div className="flex gap-2">
             {row.status!=="CANCELLED"&&<>
               <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>beginEntryEdit(row)}>Edit</button>
