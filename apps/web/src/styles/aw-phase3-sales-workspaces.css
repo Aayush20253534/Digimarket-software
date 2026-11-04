@@ -189,6 +189,21 @@
 .aw-workspace [data-aw-module="leads"] .aw-lead-toolbar{
  gap:10px;margin:4px 0 5px;
 }
+.aw-workspace [data-aw-module="leads"] .aw-lead-toolbar .field,
+.aw-workspace [data-aw-module="leads"] .aw-lead-toolbar :is(input,select){
+ background:var(--ui-input)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:9px!important;box-shadow:none!important;
+ min-height:42px;color-scheme:inherit!important;
+}
+.aw-workspace [data-aw-module="leads"] .aw-lead-toolbar .field:focus,
+.aw-workspace [data-aw-module="leads"] .aw-lead-toolbar :is(input,select):focus{
+ border-color:var(--ui-subtle)!important;
+ outline:2px solid var(--ui-focus)!important;outline-offset:1px;
+}
+.aw-workspace [data-aw-module="leads"] .aw-lead-toolbar input::placeholder{
+ color:var(--ui-muted)!important;
+}
 .aw-workspace [data-aw-module="leads"] .aw-register-scroll{
  border:1px solid var(--ui-border)!important;border-radius:10px!important;
  background:var(--ui-surface)!important;scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
