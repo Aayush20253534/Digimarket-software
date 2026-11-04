@@ -2,13 +2,13 @@
 import {FormEvent,useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
-import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,ClipboardList,FolderKanban,RefreshCw,Users} from "lucide-react";
+import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,ClipboardList,FolderKanban,RefreshCw,Users,FolderOpen} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ClientDeliveryWorkspace} from "@/components/client-delivery-workspace";
 import {Spinner} from "@/components/ui";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
-type ClientTab="delivery"|"services"|"agreement"|"contacts";
+type ClientTab="delivery"|"services"|"agreement"|"contacts"|"files";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
 type Service={id:string;name:string;description:string|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Detail={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;notes:string|null;
@@ -18,7 +18,7 @@ type Editing={businessName:string;businessType:string;phone:string;email:string;
  contractStartOn:string;contractEndOn:string;monthlyFee:string;monthlyAdBudget:string;status:Status};
 type ServiceDraft={name:string;description:string;status:Service["status"]};
 const blankService:ServiceDraft={name:"",description:"",status:"ACTIVE"};
-const tabs=[["delivery","Delivery",FolderKanban],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users]] as const;
+const tabs=[["delivery","Delivery",FolderKanban],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users],["files","Files & Assets",FolderOpen]] as const;
 function formFrom(c:Detail):Editing{return {
  businessName:c.businessName,businessType:c.businessType??"",phone:c.phone??"",email:c.email??"",location:c.location??"",notes:c.notes??"",
  contractStartOn:c.contractStartOn?.slice(0,10)??"",contractEndOn:c.contractEndOn?.slice(0,10)??"",
@@ -97,7 +97,18 @@ export default function ClientWorkspacePage(){
   {error&&<div className="aw-client-alert" role="alert">{error}</div>}
   {success&&<div className="aw-client-success" role="status">{success}</div>}
   <div id="client-workspace-panel" role="tabpanel" aria-labelledby={"client-tab-"+tab} data-testid="client-workspace-active-panel">
-   {tab==="delivery"&&<>
+   {tab==="files"&&<section className="aw-client-panel" aria-label="Client files and assets">
+   <div className="aw-client-panel-heading"><div><h2>Files & Assets</h2>
+    <p>Files linked to this client can be opened in the shared asset library. Unassigned agency files remain available through the full library for authorised members.</p></div></div>
+   {!session.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&session.identity.permissions.includes("assets.read")?
+    <div className="aw-client-actions">
+     <Link className="aw-client-primary" href={"/app/clients/assets?clientId="+encodeURIComponent(client.id)}>
+      <FolderOpen size={16} aria-hidden="true"/>Open this client's files</Link>
+     <Link className="aw-client-btn" href="/app/clients/assets">All agency files</Link>
+    </div>:
+    <p className="aw-client-muted">You do not have access to the shared asset library.</p>}
+  </section>}
+  {tab==="delivery"&&<>
     {client.services.length===0&&<div className="aw-client-callout"><div><strong>Start with the service agreement</strong><p>No service commitments are recorded. You can record an agreed service or schedule a named delivery directly.</p></div>
      <button className="aw-client-btn" type="button" onClick={()=>setTab("services")}>Add services <ArrowRight size={15}/></button></div>}
     <ClientDeliveryWorkspace clientId={client.id} contractStartOn={client.contractStartOn} contractEndOn={client.contractEndOn} services={client.services}/>
