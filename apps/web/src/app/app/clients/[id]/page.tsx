@@ -5,6 +5,7 @@ import {useParams} from "next/navigation";
 import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,ClipboardList,FolderKanban,RefreshCw,Users,FolderOpen} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ClientDeliveryWorkspace} from "@/components/client-delivery-workspace";
+import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {Spinner} from "@/components/ui";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
@@ -73,6 +74,7 @@ export default function ClientWorkspacePage(){
  if(loading)return <div className="aw-client-workspace"><Spinner label="Loading client workspace…"/></div>;
  if(!client||!form)return <div className="aw-client-workspace"><Link className="aw-client-back" href="/app/clients"><ArrowLeft size={16}/>Back to Clients</Link><p role="alert">{error||"Client could not be found"}</p></div>;
  return <div className="aw-client-workspace" data-testid="client-workspace-page" data-aw-module="clients">
+  <SalesWorkspaceNav/>
   <nav className="aw-client-crumb"><Link href="/app/clients"><ArrowLeft size={15}/>All clients</Link><span>/</span><span>{client.businessName}</span></nav>
   <header className="aw-client-hero">
    <div className="aw-client-hero-top">

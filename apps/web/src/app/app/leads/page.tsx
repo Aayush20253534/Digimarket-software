@@ -5,6 +5,7 @@ import { Download, MapPin, PhoneCall, Plus, RefreshCw, Trash2 } from "lucide-rea
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryModal } from "@/components/directory-modal";
+import { SalesWorkspaceNav } from "@/components/sales-workspace-nav";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
@@ -255,6 +256,7 @@ export default function LeadsPage(){
  if(!session)return <Spinner label="Checking CRM access…"/>;
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
  return <div data-aw-module="leads" className="aw-module-root space-y-7">
+   <SalesWorkspaceNav/>
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
      description="Track Cold Call, Meta Leads and Referral separately. New WhatsApp leads are automatically classified as Meta Leads."
      actions={<div className="flex flex-wrap gap-2">
@@ -268,11 +270,38 @@ export default function LeadsPage(){
        ["REJECTED",metrics.rejected],["YET TO CALL",metrics.yetToCall],
        ["MEETING PROCESS",metrics.meetingProcess],["DECISION PENDING",metrics.decisionPending],
        ["AGREEMENT PENDING",metrics.agreementPending],["FOLLOW UP",metrics.followUp]] as const).map(([label,value])=>
-       <div key={label} className="rounded-xl border border-slate-200/15 p-3">
+       <div key={label} className="aw-v3-pipeline-metric">
          <p className="text-xs text-slate-500">{label}</p>
          <p className="mt-1 text-xl font-semibold">{value}</p>
        </div>)}
    </section>}
+   {metrics&&<div className="aw-v3-lead-panels">
+    <section className="aw-v3-chart-card" aria-label="Live sales pipeline distribution">
+     <div className="aw-v3-chart-heading"><div><h2>Pipeline distribution</h2>
+      <p>Live stage counts across all accessible leads, not just the current table page.</p></div>
+      <Link href="/app/reports" className="aw-v3-chart-action">Reporting</Link>
+     </div>
+     <div className="aw-v3-bars">
+      {([["Follow up",metrics.followUp],["Meeting process",metrics.meetingProcess],
+        ["Decision pending",metrics.decisionPending],["Agreement pending",metrics.agreementPending],
+        ["Approved",metrics.approved]] as const).map(([label,value])=>
+       <div className="aw-v3-bar-row" key={label}>
+        <span className="aw-v3-bar-label">{label}</span>
+        <span className="aw-v3-bar-track" role="img" aria-label={label+": "+value+" leads"}>
+         <span style={{width:(metrics.total?value/metrics.total*100:0)+"%"}}/>
+        </span><strong>{value}</strong>
+       </div>)}
+     </div>
+    </section>
+    <section className="aw-v3-chart-card aw-v3-conversion-card" aria-label="Pipeline conversion summary">
+     <div className="aw-v3-chart-heading"><div><h2>Conversion performance</h2>
+      <p>Based on the latest CRM metrics.</p></div></div>
+     <div className="aw-v3-conversion-value">{Number(metrics.conversionRatePercent).toLocaleString("en-IN",{maximumFractionDigits:1})}%</div>
+     <p className="aw-v3-conversion-detail">{metrics.converted} converted from {metrics.total} total leads</p>
+     <div className="aw-v3-conversion-track"><span style={{width:Math.min(100,Math.max(0,Number(metrics.conversionRatePercent)))+"%"}}/></div>
+     <div className="aw-v3-chart-links"><Link href="/app/follow-ups">Follow-ups</Link><Link href="/app/meetings">Meetings</Link><Link href="/app/clients">Clients</Link></div>
+    </section>
+   </div>}
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage?stageLabel(stage as Stage):"ALL STAGES"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}

@@ -2,7 +2,8 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
-import {ArrowRight,BriefcaseBusiness,RefreshCw,Users} from "lucide-react";
+import {ArrowRight,BriefcaseBusiness,RefreshCw,Users,Search,PauseCircle,Archive} from "lucide-react";
+import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
 import {PageHeader,Spinner} from "@/components/ui";
@@ -42,6 +43,7 @@ export default function ClientsPage(){
  if(!session)return <Spinner label="Checking client access…"/>;
  if(!canRead)return <div className="aw-client-directory"><h1>Clients access denied</h1><p>Your account cannot view client records.</p></div>;
  return <div data-aw-module="clients" className="aw-client-directory aw-module-root space-y-5">
+  <SalesWorkspaceNav/>
   <PageHeader eyebrow="CLIENT RELATIONSHIPS" title="Clients & delivery"
     description="Manage each client's agreement, services, projects and delivery from one place."
     actions={<div className="flex gap-2 flex-wrap"><Link href="/app/leads" className="aw-client-btn">View leads</Link>
@@ -51,13 +53,24 @@ export default function ClientsPage(){
   <div className="aw-client-statrow">
    <div className="aw-client-stat"><Users size={18}/><span>Clients on this page</span><strong>{loading?"…":rows.length}</strong></div>
    <div className="aw-client-stat"><BriefcaseBusiness size={18}/><span>Active on this page</span><strong>{loading?"…":rows.filter(c=>c.status==="ACTIVE").length}</strong></div>
-   <div className="aw-client-stat"><ArrowRight size={18}/><span>Client onboarding</span><strong>Lead approval</strong></div>
+   <div className="aw-client-stat"><PauseCircle size={18}/><span>Paused on this page</span><strong>{loading?"…":rows.filter(c=>c.status==="PAUSED").length}</strong></div>
+   <div className="aw-client-stat"><Archive size={18}/><span>Archived on this page</span><strong>{loading?"…":rows.filter(c=>c.status==="ARCHIVED").length}</strong></div>
   </div>
-  {error&&<div role="alert" className="aw-client-alert">{error}</div>}
+  <div className="aw-v3-client-distribution" aria-label="Client status distribution on this page">
+   <div className="aw-v3-client-distribution-head"><span>Current page status mix</span><strong>{loading?"…":rows.length} records</strong></div>
+   <div className="aw-v3-client-distribution-track" role="img"
+    aria-label={loading?"Loading client statuses":rows.filter(c=>c.status==="ACTIVE").length+" active, "+rows.filter(c=>c.status==="PAUSED").length+" paused, "+rows.filter(c=>c.status==="ARCHIVED").length+" archived"}>
+    <span className="is-active" style={{width:(rows.length?rows.filter(c=>c.status==="ACTIVE").length/rows.length*100:0)+"%"}}/>
+    <span className="is-paused" style={{width:(rows.length?rows.filter(c=>c.status==="PAUSED").length/rows.length*100:0)+"%"}}/>
+    <span className="is-archived" style={{width:(rows.length?rows.filter(c=>c.status==="ARCHIVED").length/rows.length*100:0)+"%"}}/>
+   </div>
+   <div className="aw-v3-client-distribution-foot"><span><i className="is-active"/>Active</span><span><i className="is-paused"/>Paused</span><span><i className="is-archived"/>Archived</span></div>
+  </div>
+    {error&&<div role="alert" className="aw-client-alert">{error}</div>}
   <section className="aw-client-panel">
    <div className="aw-client-panel-heading"><div><h2>Client directory</h2><p>Select a client to open their dedicated workspace. Records originate from approved leads.</p></div></div>
    <div className="aw-client-controls">
-    <input aria-label="Search clients" className="field" placeholder="Search business, location, phone or email" value={search} onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}}/>
+    <label className="aw-v3-directory-search"><Search size={17} aria-hidden="true"/><input aria-label="Search clients" className="field" placeholder="Search business, location, phone or email" value={search} onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}}/></label>
     <select aria-label="Filter clients" className="field" value={filter} onChange={e=>{setFilter(e.target.value);setCursor(null);setHistory([]);}}>
      <option value="">All statuses</option><option value="ACTIVE">Active</option><option value="PAUSED">Paused</option><option value="ARCHIVED">Archived</option>
     </select>
@@ -71,7 +84,10 @@ export default function ClientsPage(){
     <table className="aw-client-table" aria-label="Clients directory">
      <thead><tr><th>Business</th><th>Category</th><th>Phone</th><th>Location</th><th>Services</th><th>Status</th><th>Workspace</th></tr></thead>
      <tbody>{sorted.map(c=><tr key={c.id}>
-       <td><strong>{c.businessName}</strong>{c.sourceLeadId&&<small>Converted from lead</small>}</td>
+       <td><div className="aw-v3-client-identity">
+         <span aria-hidden="true" className="aw-v3-client-avatar">{c.businessName.trim().slice(0,2).toUpperCase()}</span>
+         <span><strong>{c.businessName}</strong>{c.sourceLeadId&&<small>Converted from lead</small>}</span>
+        </div></td>
        <td>{c.businessType||"Not set"}</td><td>{c.phone||"—"}</td><td>{c.location||"—"}</td><td>{c._count?.services??0}</td>
        <td><span className={"aw-client-status aw-client-status-"+c.status.toLowerCase()}>{c.status}</span></td>
        <td><Link className="aw-client-open" href={"/app/clients/"+c.id}>Open workspace <ArrowRight size={15}/></Link></td>
