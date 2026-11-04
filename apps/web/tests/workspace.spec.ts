@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import {mkdir} from "node:fs/promises";
+import path from "node:path";
 
 const INITIAL = process.env.E2E_ADMIN_INITIAL_PASSWORD ?? "";
 const UPDATED = process.env.E2E_ADMIN_UPDATED_PASSWORD ?? "";
@@ -37,6 +39,15 @@ async function visitWorkspace(page:Page,path:string){
   await page.goto(path);
   await expect(page.locator(".aw-workspace"),"Authenticated workspace at "+path)
     .toBeVisible({timeout:20000});
+}
+
+// The existing role test provisions temporary CI users. Capture snapshots at
+// the authenticated role boundaries without introducing new user credentials.
+async function capturePhase0Role(page:Page,role:"founder"|"employee"){
+  if(process.env.UI_BASELINE_ROLE_CAPTURE!=="1")return;
+  const filename=path.resolve(process.cwd(),"artifacts/ui-v2-phase0/roles",role+"-dashboard-1366.png");
+  await mkdir(path.dirname(filename),{recursive:true});
+  await page.screenshot({path:filename,animations:"disabled",fullPage:false});
 }
 
 test("admin policy, founder operations, note persistence, Drive, and employee permissions",async({page})=>{
@@ -308,6 +319,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await capturePhase0Role(page,"founder");
   // Authenticated delivery summary must reach the API gateway (regression for 404).
   const deliverySummaryResponse=page.waitForResponse(res=>
     res.url().includes("/api/v1/clients/deliveries")&&res.request().method()==="GET");
@@ -839,6 +851,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await finishPasswordRotation(page,employeePassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await capturePhase0Role(page,"employee");
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await expect(page.getByRole("link",{name:"Task history",exact:true}).first()).toBeVisible();
   await visitWorkspace(page,"/app/task-history");
