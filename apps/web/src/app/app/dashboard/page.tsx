@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity, ArrowRight, ArrowUpRight, BadgeCheck, BriefcaseBusiness, CheckCircle2,
-  CircleHelp, FileStack, FolderKanban, KeyRound, Layers, NotebookPen, RefreshCw, ShieldCheck,
+  CircleHelp, FileStack, FolderKanban, KeyRound, Layers, RefreshCw, ShieldCheck,
   Sparkles, Users, Wallet, Workflow
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
@@ -37,10 +37,9 @@ const topics = [
   {label:"Clients",permits:["clients.read"],href:"/app/clients",icon:Users,detail:"Client contacts and service delivery"},
   {label:"Client Deliveries",permits:["clients.read"],href:"/app/clients",icon:FolderKanban,detail:"Agreements, projects, milestones and service targets"},
   {label:"Tasks",permits:["tasks.read"],href:"/app/tasks",icon:CheckCircle2,detail:"Assignments and recurring work"},
-  {label:"Content calendar",permits:["content.read"],href:"/app/content",icon:Layers,detail:"Editorial planning and approvals"},
-  {label:"Income & expenses",permits:["finance.entry.read.own","finance.read.all"],href:"/app/finance",icon:Wallet,detail:"Your permitted financial records"},
+    {label:"Income & expenses",permits:["finance.entry.read.own","finance.read.all"],href:"/app/finance",icon:Wallet,detail:"Your permitted financial records"},
   {label:"Approval workflows",permits:["approvals.read"],href:"/app/approvals",icon:Workflow,detail:"Reviews and decisions"},
-  {label:"Files & assets",permits:["assets.read"],href:"/app/assets",icon:FileStack,detail:"Protected brand resources"},
+  {label:"Client files",permits:["assets.read"],href:"/app/clients/assets",icon:FileStack,detail:"Client-linked and agency resources"},
 ];
 
 export default function Dashboard() {
@@ -107,10 +106,36 @@ export default function Dashboard() {
   const firstName=session?.user.displayName.split(" ")[0]??"there";
   if(!session)return null;
   const leadership=isAdmin;
-  if(!leadership)return <div className="aw-dashboard space-y-5"><AWBusinessInsights/><PWAInstallCard/><AWTodayMeetings/><AWTodayFollowUps/><AWClientDeliveries/></div>;
+  if(!leadership){
+   const founder=session.identity.roles.includes("FOUNDER");
+   const destinations=[
+    {label:"Leads CRM",href:"/app/leads",description:"Manage your pipeline",icon:BriefcaseBusiness,allowed:permitted.has("leads.read")},
+    {label:"Follow-ups",href:"/app/follow-ups",description:"Review scheduled calls",icon:Activity,allowed:permitted.has("leads.read")},
+    {label:"Meetings",href:"/app/meetings",description:"Track upcoming meetings",icon:Workflow,allowed:permitted.has("leads.read")},
+    {label:"Clients",href:"/app/clients",description:"Accounts and agreements",icon:Users,allowed:permitted.has("clients.read")},
+    {label:"Tasks",href:"/app/tasks",description:"Assigned work",icon:CheckCircle2,allowed:permitted.has("tasks.read")},
+    {label:"Deliveries",href:"/app/deliveries",description:"Client commitments",icon:FolderKanban,allowed:permitted.has("clients.read")},
+   ].filter(link=>link.allowed);
+   return <div className="aw-dashboard aw-v3-dashboard space-y-6" data-dashboard-role={founder?"founder":"member"}>
+    <header className="aw-v3-page-hero">
+     <div><p className="aw-v3-eyebrow">{founder?"Founder workspace":"My workspace"}</p>
+      <h1>Welcome back, {firstName}</h1>
+      <p>{founder?"Agency performance, team coordination and upcoming priorities in one place.":
+       "Assigned work, meetings and client commitments relevant to your access."}</p></div>
+     <Link href="/app/profile" className="aw-v3-hero-action"><ShieldCheck size={16} aria-hidden="true"/>My account</Link>
+    </header>
+    <nav className="aw-v3-dashboard-shortcuts" aria-label="Workspace quick actions">
+     {destinations.map(({label,href,description,icon:Icon})=><Link href={href} key={href} className="aw-v3-dashboard-shortcut">
+      <Icon size={19} aria-hidden="true"/><span><strong>{label}</strong><small>{description}</small></span>
+      <ArrowUpRight size={16} aria-hidden="true"/>
+     </Link>)}
+    </nav>
+    <AWBusinessInsights/><PWAInstallCard/><AWTodayMeetings/><AWTodayFollowUps/><AWClientDeliveries/>
+   </div>;
+  }
   const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
   overview?.records.forEach(x=>{groupCounts[x.source]++;});
-  return <div className="aw-dashboard space-y-7" data-testid="amplifyworld-dashboard">
+  return <div className="aw-dashboard aw-v3-dashboard space-y-7" data-testid="amplifyworld-dashboard" data-dashboard-role="admin">
     <header className="aw-dashboard-hero">
       <div className="min-w-0">
         <p className="aw-eyebrow"><Sparkles size={14} className="mr-2 inline" aria-hidden="true"/>Agency command center</p>
@@ -229,7 +254,6 @@ export default function Dashboard() {
         </AWPanel>
       </div>
     </div>
-    {!isAdmin&&<div className="mt-4 flex justify-end"><Link href="/app/notes" className="aw-dashboard-refresh"><NotebookPen size={16} aria-hidden="true"/> Open or save a note</Link></div>}
     <footer className="aw-dashboard-footer">
       <Activity size={15} aria-hidden="true"/> AmplifyWorld Workspace · Live account context
     </footer>
