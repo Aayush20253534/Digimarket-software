@@ -37,8 +37,26 @@ async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
   viewport:{width:number;height:number},captures:Captured[]){
  await page.setViewportSize(viewport);
  await page.goto(entry.href);
- await expect(page.locator(".aw-workspace"),"Protected workspace on "+entry.href).toBeVisible({timeout:20000});
- await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme",theme,{timeout:15000});
+ const workspace=page.locator(".aw-workspace");
+ // Capturing dozens of full document navigations can expire isolated E2E
+ // sessions. Recover a login redirect once; do not ignore real route errors.
+ try{
+  await workspace.waitFor({state:"visible",timeout:9000});
+ }catch{
+  const currentPath=new URL(page.url()).pathname;
+  if(currentPath==="/login"){
+   const pwd=process.env.E2E_ADMIN_UPDATED_PASSWORD;
+   if(!pwd)throw new Error("Cannot recover isolated E2E session without admin password");
+   await page.getByLabel("Login ID").fill(process.env.BOOTSTRAP_ADMIN_LOGIN??"admin-e2e");
+   await page.getByLabel("Password",{exact:true}).fill(pwd);
+   await page.getByRole("button",{name:"Sign in",exact:true}).click();
+  }
+  // One retry also handles a transient hydration/session refresh race.
+  await page.goto(entry.href);
+ }
+ await expect(workspace,"Protected workspace on "+entry.href+" (actual: "+page.url()+")")
+  .toBeVisible({timeout:20000});
+ await expect(workspace).toHaveAttribute("data-theme",theme,{timeout:15000});
  // Font readiness and transitions matter for stable screenshot review. No
  // networkidle wait: the workspace may keep notification connections alive.
  await page.evaluate(()=>document.fonts.ready);
@@ -57,6 +75,10 @@ async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
  await mkdir(path.dirname(destination),{recursive:true});
  await page.screenshot({path:destination,animations:"disabled",fullPage:false,timeout:20000});
  captures.push({role:"admin",route:entry.href,theme,viewport,...metrics,screenshot:screenshot.replaceAll(path.sep,"/")});
+ // Keep partial CI evidence when a later route fails. Never store credentials.
+ await writeFile(path.join(OUTPUT,"admin-manifest.json"),JSON.stringify({
+   kind:"UI v2 isolated browser capture",isolatedCiData:true,captures,
+ },null,2)+"\\n","utf8");
 }
 
 test("Phase 0 capture: existing admin navigation, two themes, and responsive surfaces",async({page})=>{
