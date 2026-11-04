@@ -79,9 +79,11 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  await expect(page.locator("html")).toHaveAttribute("data-aw-theme","dark");
  const darkRoot=await page.evaluate(()=>({
    background:getComputedStyle(document.documentElement).backgroundColor,
+   bodyBackground:getComputedStyle(document.body).backgroundColor,
    scrollbar:getComputedStyle(document.documentElement).scrollbarColor,
  }));
  expect(darkRoot.background).toBe("rgb(11, 11, 12)");
+ expect(darkRoot.bodyBackground).toBe("rgb(11, 11, 12)");
  expect(darkRoot.scrollbar).not.toBe("auto");
  const captures:Captured[]=[];
  // Verify the existing theme control and browser storage behavior without
@@ -94,9 +96,11 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  await expect(page.locator("html")).toHaveAttribute("data-aw-theme","light");
  const lightRoot=await page.evaluate(()=>({
    background:getComputedStyle(document.documentElement).backgroundColor,
+   bodyBackground:getComputedStyle(document.body).backgroundColor,
    scrollbar:getComputedStyle(document.documentElement).scrollbarColor,
  }));
  expect(lightRoot.background).toBe("rgb(246, 246, 247)");
+ expect(lightRoot.bodyBackground).toBe("rgb(246, 246, 247)");
  expect(lightRoot.scrollbar).not.toBe("auto");
  expect(lightRoot.scrollbar).not.toBe(darkRoot.scrollbar);
  expect(await page.evaluate(()=>localStorage.getItem("aw-workspace-theme"))).toBe("light");
