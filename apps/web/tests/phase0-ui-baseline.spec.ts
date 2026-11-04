@@ -72,6 +72,17 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  await page.getByLabel("Password",{exact:true}).fill(password);
  await page.getByRole("button",{name:"Sign in",exact:true}).click();
  await expect(page.locator(".aw-workspace")).toBeVisible({timeout:30000});
+ // Approved Phase 1 behaviour: dark is the default without a stored choice.
+ await page.evaluate(()=>localStorage.removeItem("aw-workspace-theme"));
+ await page.reload();
+ await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","dark");
+ await expect(page.locator("html")).toHaveAttribute("data-aw-theme","dark");
+ const darkRoot=await page.evaluate(()=>({
+   background:getComputedStyle(document.documentElement).backgroundColor,
+   scrollbar:getComputedStyle(document.documentElement).scrollbarColor,
+ }));
+ expect(darkRoot.background).toBe("rgb(11, 11, 12)");
+ expect(darkRoot.scrollbar).not.toBe("auto");
  const captures:Captured[]=[];
  // Verify the existing theme control and browser storage behavior without
  // modifying application code. Phase 1 is allowed to replace its CSS.
@@ -80,6 +91,14 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","dark");
  await page.getByRole("button",{name:"Switch to light theme"}).click();
  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","light");
+ await expect(page.locator("html")).toHaveAttribute("data-aw-theme","light");
+ const lightRoot=await page.evaluate(()=>({
+   background:getComputedStyle(document.documentElement).backgroundColor,
+   scrollbar:getComputedStyle(document.documentElement).scrollbarColor,
+ }));
+ expect(lightRoot.background).toBe("rgb(246, 246, 247)");
+ expect(lightRoot.scrollbar).not.toBe("auto");
+ expect(lightRoot.scrollbar).not.toBe(darkRoot.scrollbar);
  expect(await page.evaluate(()=>localStorage.getItem("aw-workspace-theme"))).toBe("light");
  await page.reload();
  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","light");
