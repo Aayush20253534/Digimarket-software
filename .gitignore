@@ -39,6 +39,9 @@ tmp/
 temp/
 uploads/
 
+# Isolated Playwright visual baselines (uploaded as CI artifacts)
+apps/web/artifacts/ui-v2-phase0/
+
 # Private database backups, encrypted recovery packages, and key materials
 *.age
 *.dump
