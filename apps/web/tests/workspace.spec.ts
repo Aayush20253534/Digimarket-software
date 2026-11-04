@@ -344,6 +344,30 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("link",{name:"Open saved notes"})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Approval inbox"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Account menu"})).toBeVisible();
+  // Collapsible navigation is a user preference, not a permission change.
+  const crmToggle=founderNav.getByRole("button",{name:"Toggle Sales & CRM navigation"});
+  await expect(crmToggle).toHaveAttribute("aria-expanded","true");
+  await crmToggle.click();
+  await expect(founderNav.getByRole("link",{name:"Leads CRM"})).toBeHidden();
+  await crmToggle.click();
+  await expect(founderNav.getByRole("link",{name:"Leads CRM"})).toBeVisible();
+  // Approval inbox is a non-mutating preview; decisions remain in the legacy
+  // permission-checked approval workflow.
+  await page.getByRole("button",{name:"Approval inbox"}).click();
+  await expect(page.getByRole("dialog",{name:"Approval inbox panel"})).toBeVisible();
+  await expect(page.getByRole("link",{name:"Open all approval workflows"})).toBeVisible();
+  await page.getByRole("button",{name:"Close approval inbox"}).click();
+  // Documents is one visible section with both fully retained form workflows.
+  await visitWorkspace(page,"/app/documents/quotations");
+  await expect(page.getByRole("navigation",{name:"Documents sections"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
+  await page.getByRole("navigation",{name:"Documents sections"}).getByRole("link",{name:"Agreements"}).click();
+  await expect(page).toHaveURL(/\/app\/documents\/agreements$/);
+  await expect(page.getByRole("heading",{name:"Agreements",exact:true})).toBeVisible();
+  // Old bookmarks still load the same original workflows, not a deleted page.
+  await visitWorkspace(page,"/app/quotations");
+  await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
+  await visitWorkspace(page,"/app/dashboard");
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await visitWorkspace(page,"/app/notes");
   // The studio still reaches the viewport edge at the normal desktop zoom.
