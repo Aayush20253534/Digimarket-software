@@ -598,3 +598,86 @@
 @media(prefers-reduced-motion:reduce){
  .aw-workspace .aw-v3-sales-link,.aw-workspace .aw-v3-dashboard-shortcut{transition:none!important;}
 }
+
+/* Overview-specific legacy modules must share the monochrome system.
+   Keep original uploaded/project art and PWA icon unchanged. */
+.aw-workspace .aw-v3-dashboard .aw-pwa-card{
+ background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;box-shadow:var(--ui-shadow)!important;
+ padding:18px 20px!important;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-logo{
+ background:var(--ui-raised)!important;border:1px solid var(--ui-border)!important;
+ border-radius:10px!important;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-eyebrow,
+.aw-workspace .aw-v3-dashboard .aw-pwa-copy>p:not(.aw-pwa-eyebrow){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-copy h2{
+ color:var(--ui-strong)!important;font-size:17px;font-weight:730;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-install{
+ background:var(--ui-primary)!important;background-image:none!important;
+ color:var(--ui-action-text)!important;border:1px solid var(--ui-primary)!important;
+ border-radius:9px!important;box-shadow:none!important;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-help-toggle{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:9px!important;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-help-toggle:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-help{
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v3-dashboard .aw-pwa-help p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-client-delivery-card,
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-client-delivery-card--pending,
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .rounded-xl.border.border-violet-500\/30{
+ background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ box-shadow:none!important;border-radius:12px!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-client-delivery-card--pending{
+ border-color:var(--stage-warning-border)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] :is(h2,p,a){
+ color:var(--ui-strong);
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] :is(.text-\[\#BFAAD1\],.text-\[\#CBB9D9\]){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-client-delivery-card :is(a,p),
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-personal-quick a{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-client-delivery-card p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-client-delivery-card>a,
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-client-delivery-card :is(.border-violet-500\/40,.text-purple-200){
+ color:var(--ui-strong)!important;background:var(--ui-raised)!important;
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-personal-quick{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-personal-shortcut{
+ background:var(--ui-surface)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;box-shadow:none!important;
+ color:var(--ui-strong)!important;border-radius:10px!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-personal-shortcut :is(strong,svg){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-personal-shortcut small{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-personal-shortcut:hover{
+ background:var(--ui-raised)!important;
+}
