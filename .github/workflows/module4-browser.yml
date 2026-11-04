@@ -79,4 +79,15 @@ jobs:
           pnpm --filter @digimarket/web start > /tmp/module4-web.log 2>&1 &
           WEB_PID=$!
           trap 'kill "$API_PID" "$WEB_PID" 2>/dev/null || true; tail -n 120 /tmp/module4-api.log; tail -n 120 /tmp/module4-web.log' EXIT
-          pnpm --filter @digimarket/web test:e2e
+          UI_BASELINE_ROLE_CAPTURE=1 pnpm --filter @digimarket/web test:e2e
+          # The existing suite rotates admin-e2e's password and provisions
+          # temporary Founder/Employee accounts. Capture the admin UI last.
+          UI_BASELINE_CAPTURE=1 pnpm --filter @digimarket/web exec playwright test tests/phase0-ui-baseline.spec.ts
+      - name: Archive isolated UI v2 Phase 0 screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digimarket-ui-v2-phase0-baseline
+          path: apps/web/artifacts/ui-v2-phase0/
+          if-no-files-found: warn
+          retention-days: 30
