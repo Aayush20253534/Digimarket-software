@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, serviceDeliveryPlanSchema, serviceDeliveryPlanUpdateSchema, clientServiceSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, serviceDeliveryPlanSchema, serviceDeliveryPlanUpdateSchema, clientServiceSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -96,4 +96,27 @@ describe("interval recurrence for service deliveries",()=>{
   expect(serviceDeliveryPlanUpdateSchema.safeParse({...plan,repeatEveryDays:2,active:true,version:1}).success).toBe(true);
   expect(serviceDeliveryPlanUpdateSchema.safeParse({...plan,weekdays:[4],repeatEveryDays:null,active:true,version:1}).success).toBe(true);
  });
+});
+
+describe("Meta Ads financial entry ownership",()=>{
+  const base={
+    kind:"EXPENSE",categoryId:"00000000-0000-4000-8000-000000000001",
+    amount:"350.00",occurredOn:"2026-11-04",method:"UPI",
+    idempotencyKey:"00000000-0000-4000-8000-000000000002",
+  };
+  const clientId="00000000-0000-4000-8000-000000000003";
+  it("preserves old self-funded entries with no clientId",()=>{
+    expect(financeEntryInputSchema.parse(base).clientId).toBeUndefined();
+    expect(financeEntryInputSchema.parse({...base,clientId:null}).clientId).toBeNull();
+  });
+  it("accepts client-linked Meta Ads submissions and rejects malformed client IDs",()=>{
+    expect(financeEntryInputSchema.parse({...base,clientId}).clientId).toBe(clientId);
+    expect(financeEntryInputSchema.safeParse({...base,clientId:"another-workspace"}).success).toBe(false);
+  });
+  it("accepts ownership changes on edited finance entries",()=>{
+    const edit={categoryId:base.categoryId,amount:base.amount,occurredOn:base.occurredOn,
+      method:base.method,merchantOrSource:"Meta",description:"Ad campaign"};
+    expect(financeEntryAdminEditSchema.parse({...edit,clientId}).clientId).toBe(clientId);
+    expect(financeEntryAdminEditSchema.parse({...edit,clientId:null}).clientId).toBeNull();
+  });
 });
