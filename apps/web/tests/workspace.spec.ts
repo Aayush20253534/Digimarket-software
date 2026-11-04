@@ -867,7 +867,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await expect(page.locator('[data-testid="personal-pending"]')).toHaveCount(0);
   await expect(page.getByRole("link",{name:"All clients"})).toBeVisible();
-  // Non-admin Task Register rows use the same four-color palette.
+  // Non-admin Task Register rows share neutral surfaces, using semantic status pills.
   await visitWorkspace(page,"/app/tasks");
   const taskCardStyles=await page.locator('[data-aw-module="tasks"]').evaluate(container=>{
     return ["pending","in-process","completed","expired"].map(tone=>{
@@ -882,10 +882,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     });
   });
   expect(taskCardStyles).toEqual([
-    {background:"rgb(195, 73, 73)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
-    {background:"rgb(185, 86, 43)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
-    {background:"rgb(50, 130, 80)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
-    {background:"rgb(56, 50, 61)",text:"rgb(255, 255, 255)",status:"rgb(255, 255, 255)"},
+    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(252, 211, 77)"},
+    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(147, 197, 253)"},
+    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(134, 239, 172)"},
+    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(253, 164, 175)"},
   ]);
   await visitWorkspace(page,"/app/dashboard");
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
