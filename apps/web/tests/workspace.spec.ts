@@ -63,6 +63,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
+  await expect(page.getByTestId("amplifyworld-dashboard")).toHaveAttribute("data-dashboard-role","admin");
   // Dashboard cards load asynchronously: Playwright's computed-style
   // assertion waits for the actual component before measuring its corners.
   await expect(page.getByRole("navigation",{name:"Workspace navigation"})
@@ -80,6 +81,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("button",{name:"Account menu"})).toBeVisible();
   await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("heading",{name:"Leads CRM"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Sales workspace sections"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Sales workspace sections"}).getByRole("link",{name:"Leads"}))
+   .toHaveAttribute("aria-current","page");
+  await expect(page.getByRole("region",{name:"Live sales pipeline distribution"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Pipeline conversion summary"})).toBeVisible();
   await expect(page.locator(".aw-module-pill").first()).toHaveCSS("border-radius",panelRadius);
   // Component radius is already checked above; do not require a legacy Tailwind class.
   await expect(page.getByRole("button",{name:"Add lead"})).toHaveCount(0);
@@ -326,6 +332,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await capturePhase0Role(page,"founder");
+  await expect(page.locator('[data-dashboard-role="founder"]')).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Workspace quick actions"}).getByRole("link",{name:/Follow-ups/})).toBeVisible();
   // Authenticated delivery summary must reach the API gateway (regression for 404).
   const deliverySummaryResponse=page.waitForResponse(res=>
     res.url().includes("/api/v1/clients/deliveries")&&res.request().method()==="GET");
@@ -619,6 +627,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     "Follow-up date","Phone number","Business name","Contact name",
   ]);
   await expect(scheduledTable.locator("tbody tr")).toHaveCount(1);
+  await expect(page.getByRole("region",{name:"Follow-up status on this page"})).toBeVisible();
+  await expect(page.getByRole("group",{name:"Follow-up date filter"}).getByRole("button",{name:"All"}))
+   .toHaveAttribute("aria-pressed","true");
+  await page.getByRole("textbox",{name:"Search visible follow-ups"}).fill("not-a-matching-client");
+  await expect(scheduledTable.locator("tbody tr")).toHaveCount(0);
+  await page.getByRole("textbox",{name:"Search visible follow-ups"}).fill("");
+  await expect(scheduledTable.locator("tbody tr")).toHaveCount(1);
   await expect(scheduledTable.locator("tbody tr time")).toHaveAttribute("dateTime",dueTomorrow);
   await expect(scheduledTable.getByRole("link",{name:"9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
   await expect(scheduledTable.getByRole("link",{name:"Lead 9876543210"})).toBeVisible();
@@ -768,6 +783,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("table",{name:"Clients directory"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add client"})).toHaveCount(0);
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Sales workspace sections"}).getByRole("link",{name:"Clients"}))
+   .toHaveAttribute("aria-current","page");
+  await expect(page.getByRole("img",{name:/active, .* paused, .* archived/})).toBeVisible();
   // Client records open as real pages, not as cramped modal drawers.
   const openClient=page.getByRole("table",{name:"Clients directory"}).getByRole("row")
     .filter({hasText:"Founder CI Lead"}).getByRole("link",{name:"Open workspace"});
@@ -885,6 +903,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await capturePhase0Role(page,"employee");
+  await expect(page.locator('[data-dashboard-role="member"]')).toBeVisible();
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Tasks",exact:true})).toBeVisible();
   await visitWorkspace(page,"/app/task-history");
