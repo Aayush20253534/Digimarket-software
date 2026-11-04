@@ -3,6 +3,7 @@ import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { TeamMultiSelect } from "@/components/team-multi-select";
+import {TaskSectionTabs} from "@/components/task-section-tabs";
 import { Pencil, Trash2 } from "lucide-react";
 import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
 
@@ -197,6 +198,7 @@ export default function TasksPage(){
  if(!session)return <Spinner label="Checking task permissions…"/>;
  if(!canRead)return <><PageHeader title="Task access denied"/><Notice kind="error">Task read permission required.</Notice></>;
  return <div data-aw-module="tasks" className="aw-module-root space-y-6">
+  <TaskSectionTabs/>
   <PageHeader eyebrow="Delivery operations" title="Tasks & recurring work"
    description="Assign team work, track progress through comments and schedule automatic occurrences."/>
   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Task management</span><span className="aw-module-count">{tasks.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="mine"?"My tasks":"Team tasks"}</span></div>}
