@@ -6,7 +6,7 @@ const INITIAL = process.env.E2E_ADMIN_INITIAL_PASSWORD ?? "";
 const UPDATED = process.env.E2E_ADMIN_UPDATED_PASSWORD ?? "";
 // The 2026 UI styling already changed corner geometry; preserve the rounded
 // interaction contract, not stale exact pixels that would block Phase 1.
-const panelRadius=/^(?:[3-9]|1[0-9]|2[0-4])(?:\\.\\d+)?px$/;
+const panelRadius=/^(?:[3-9]|1[0-9]|2[0-4])(?:[.][0-9]+)?px$/;
 if (!INITIAL || !UPDATED) throw Error("Missing isolated browser CI credentials");
 
 async function login(page:Page,id:string,password:string){
