@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, LogOut, Menu, NotebookPen, PanelLeftClose, PanelLeftOpen, Search, Sun, Moon, X } from "lucide-react";
+import { ChevronDown, ChevronRight, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, Sun, Moon, UserRound, Settings2, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { AWButton, AWNotice } from "@/components/aw-ui";
 import { currentSection, permittedGroups, WorkspaceNav } from "@/components/workspace-navigation";
 import { AWNotificationBell } from "@/components/aw-notification-bell";
+import { AWApprovalInbox } from "@/components/aw-approval-inbox";
 
 function Avatar({ name, photo }: { name: string; photo?:string|null }) {
  if(photo)return <img src={photo} alt="" width={64} height={64} className="aw-work-avatar" style={{objectFit:"cover",objectPosition:"center",borderRadius:"50%"}}/>;
@@ -39,6 +40,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const [collapsed,setCollapsed]=useState(false);
  const [theme,setTheme]=useState<"dark"|"light">("dark");
  const [mobileOpen,setMobileOpen]=useState(false);
+ const [accountOpen,setAccountOpen]=useState(false);
+ const accountRef=useRef<HTMLDivElement>(null);
  const [signingOut,setSigningOut]=useState(false);
  const [signOutError,setSignOutError]=useState("");
  const dialogRef=useRef<HTMLDialogElement>(null);
@@ -74,7 +77,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   });
  }
  useEffect(()=>{try{setCollapsed(window.localStorage.getItem("aw-sidebar-collapsed")==="1");}catch{/* optional preference */}},[]);
- useEffect(()=>{setMobileOpen(false);},[pathname]);
+ useEffect(()=>{setMobileOpen(false);setAccountOpen(false);},[pathname]);
+ useEffect(()=>{
+  if(!accountOpen)return;
+  const outside=(e:MouseEvent)=>{if(!accountRef.current?.contains(e.target as Node))setAccountOpen(false);};
+  const esc=(e:KeyboardEvent)=>{if(e.key==="Escape")setAccountOpen(false);};
+  document.addEventListener("mousedown",outside);
+  document.addEventListener("keydown",esc);
+  return()=>{document.removeEventListener("mousedown",outside);document.removeEventListener("keydown",esc);};
+ },[accountOpen]);
  // Dismiss a mobile navigation dialog if the viewport becomes desktop-sized.
  // Otherwise its modal backdrop can leave desktop controls inaccessible after rotation or resizing.
  useEffect(()=>{
@@ -136,7 +147,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
- return <div className="aw-theme aw-workspace" data-theme={theme} data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/quotations","/app/agreements","/app/reports","/app/settings","/app/integrations/chatgpt","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes","/app/task-history","/app/follow-ups","/app/meetings"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/deliveries","/app/projects","/app/tasks","/app/content","/app/approvals"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"}>
+ return <div className="aw-theme aw-workspace" data-theme={theme} data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/quotations","/app/agreements","/app/reports","/app/settings","/app/integrations/chatgpt","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes","/app/documents","/app/clients/assets","/app/task-history","/app/follow-ups","/app/meetings"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/deliveries","/app/projects","/app/tasks","/app/content","/app/approvals"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"}>
   <a href="#workspace-content" className="aw-skip-link">Skip to workspace content</a>
   <aside aria-label="Workspace sidebar" className="aw-work-sidebar">
    <div className="aw-work-sidehead">{brand}
@@ -178,7 +189,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      </div>
     </div>
     <div className="aw-work-topactions">
-     {<Link href="/app/notes" aria-label="Open saved notes" title="My notes" className="aw-work-icon"><NotebookPen size={19} aria-hidden="true"/></Link>}
      {canSearch&&<Link href="/app/search" aria-label="Search workspace" className="aw-work-search">
       <Search size={17} aria-hidden="true"/><span>Search workspace</span>
      </Link>}
@@ -187,15 +197,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       aria-pressed={theme==="light"} title={theme==="dark"?"Light appearance":"Dark appearance"}>
       {theme==="dark"?<Sun size={19} aria-hidden="true"/>:<Moon size={19} aria-hidden="true"/>}
      </button>
+     <AWApprovalInbox/>
      <AWNotificationBell/>
-     <Link href="/app/profile" aria-label="Open my account" className="aw-work-header-avatar"><Avatar name={name} photo={photo}/></Link>
+     <div className="aw-v2-account-wrap" ref={accountRef}>
+      <button type="button" className="aw-v2-account-trigger"
+       aria-label="Account menu" aria-haspopup="menu" aria-expanded={accountOpen}
+       onClick={()=>setAccountOpen(v=>!v)}>
+       <span className="aw-work-header-avatar"><Avatar name={name} photo={photo}/></span>
+       <ChevronDown size={14} aria-hidden="true"/>
+      </button>
+      {accountOpen&&<div className="aw-v2-account-menu" role="menu" aria-label="Account actions">
+       <div className="aw-v2-account-summary"><strong>{name}</strong><small>{session.identity.roles.join(", ")||"Member"}</small></div>
+       <Link href="/app/profile" role="menuitem" onClick={()=>setAccountOpen(false)}>
+        <UserRound size={16} aria-hidden="true"/>My profile</Link>
+       {groups.some(g=>g.items.some(i=>i.href==="/app/settings"))&&
+        <Link href="/app/settings" role="menuitem" onClick={()=>setAccountOpen(false)}>
+         <Settings2 size={16} aria-hidden="true"/>Settings</Link>}
+       <button type="button" role="menuitem" disabled={signingOut} onClick={()=>void signOut()}>
+        <LogOut size={16} aria-hidden="true"/>Sign out</button>
+      </div>}
+     </div>
     </div>
    </header>
    {/* Workspace appearance is centrally themed; module APIs and permissions are unchanged. */}
    <main id="workspace-content" className="aw-work-content">
     <div className="aw-work-content-width">
      {signOutError&&<div className="mb-5"><AWNotice tone="error">{signOutError}</AWNotice></div>}
-     {isAdmin&&["/app/search","/app/content","/app/assets"].some(p=>pathname===p||pathname.startsWith(p+"/"))?<AWNotice tone="error">This operational module is not available to administrator accounts.</AWNotice>:children}
+     {isAdmin&&["/app/search","/app/content","/app/assets","/app/clients/assets"].some(p=>pathname===p||pathname.startsWith(p+"/"))?<AWNotice tone="error">This operational module is not available to administrator accounts.</AWNotice>:children}
     </div>
    </main>
   </div>
