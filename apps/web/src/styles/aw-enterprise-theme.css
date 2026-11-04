@@ -225,3 +225,23 @@
  .aw-workspace .aw-insights-metrics .aw-stat{padding:13px;min-height:122px;}
  .aw-workspace .aw-insights-metrics .aw-stat-description{font-size:11px;}
 }
+
+/* Contrast fixes for legacy gradient text and sidebar/surface composition. */
+.aw-workspace[data-theme="light"] .aw-gradient-text{
+  background:linear-gradient(115deg,#4E238F 0%,#7636B7 55%,#9B34A9 100%);
+  background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-dashboard-title,.aw-report-hero-value,.aw-report-hero-label,.aw-insights-number) {
+  text-shadow:none;
+}
+.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-report-card,.aw-stat,.aw-panel,.aw-card) {
+  background-image:none!important;
+}
+.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-client-table,.aw-finance-register,.aw-register-table,.aw-followups-table,.aw-meetings-table) tr:nth-child(2n) {
+  background:var(--ui-raised);
+}
+.aw-workspace[data-theme="light"] .aw-work-content .aw-report-sectionhead :is(p,span) {color:var(--ui-muted);}
+.aw-workspace[data-theme="light"] .aw-work-content .aw-report-sectionhead h2 {color:var(--ui-strong);}
+.aw-workspace[data-theme="light"] .aw-work-content .aw-report-footnote {
+  background:var(--ui-surface);color:var(--ui-strong);border:1px solid var(--ui-border);
+}
