@@ -681,3 +681,60 @@
 .aw-workspace .aw-v3-dashboard [data-testid="client-deliveries-overview"] .aw-personal-shortcut:hover{
  background:var(--ui-raised)!important;
 }
+
+/* Today's meetings and follow-ups appear only when an item is due. They still
+   must match the dashboard when populated, not revert to neon theme cards. */
+.aw-workspace .aw-v3-dashboard :is(.aw-today-followups,.aw-today-meetings){
+ background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;box-shadow:var(--ui-shadow)!important;
+}
+.aw-workspace .aw-v3-dashboard :is(.aw-today-followup-card,.aw-meeting-card){
+ background:var(--ui-raised)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:10px!important;
+}
+.aw-workspace .aw-v3-dashboard :is(.aw-today-followups,.aw-today-meetings) :is(h2,h3){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v3-dashboard :is(
+ .aw-today-followups-heading p,.aw-meeting-heading p,
+ .aw-today-followup-card p,.aw-meeting-card p,
+ .aw-today-followups-more,.aw-meeting-overflow,
+ .aw-meeting-card-top,.aw-today-followup-top,
+ .aw-meeting-kicker,.aw-today-followups-kicker
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-v3-dashboard :is(.aw-meeting-card .aw-meeting-time,.aw-today-followup-card h3){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v3-dashboard :is(.aw-meeting-count,.aw-today-followups-count){
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:8px!important;
+}
+.aw-workspace .aw-v3-dashboard :is(
+ .aw-today-followups-heading button,.aw-meeting-refresh,
+ .aw-today-followup-actions a,.aw-meeting-card-links a
+){
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:8px!important;
+}
+.aw-workspace .aw-v3-dashboard :is(
+ .aw-today-followups-heading button,.aw-meeting-refresh,
+ .aw-today-followup-actions a,.aw-meeting-card-links a
+):hover{background:var(--ui-hover)!important;}
+.aw-workspace .aw-v3-dashboard :is(.aw-today-followup-note,.aw-meeting-note){
+ background:var(--ui-surface)!important;color:var(--ui-muted)!important;
+ border:1px solid var(--ui-border)!important;
+}
+/* Preserve the meaning of a scheduled status, not a saturated panel fill. */
+.aw-workspace [data-aw-module="leads"] :is(.aw-lead-followup-field,.aw-lead-meeting-field){
+ background:var(--ui-raised)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+}
+.aw-workspace [data-aw-module="leads"] :is(.aw-lead-followup-field,.aw-lead-meeting-field) p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace [data-aw-module="leads"] :is(.aw-lead-followup-scheduled,.aw-lead-meeting-scheduled){
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border-left-color:var(--stage-info-border)!important;
+}
