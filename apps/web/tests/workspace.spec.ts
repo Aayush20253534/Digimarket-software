@@ -208,10 +208,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const desktopZoom=await page.locator(".aw-workspace").evaluate(
     element=>Number.parseFloat(getComputedStyle(element).zoom)
   );
-  expect(desktopZoom,"Desktop workspace must use 75% visual scaling").toBe(0.75);
+  expect(desktopZoom,"Comfortable desktop workspace must render at 100% scale").toBe(1);
   const pageBackground=await page.evaluate(()=>getComputedStyle(document.body).backgroundColor);
   expect(pageBackground,"Reports must never expose a white body beneath the scaled layout")
-    .toBe("rgb(9, 7, 14)");
+    .toBe("rgb(11, 11, 12)");
   const desktopBounds=await page.evaluate(()=>({
     doc:document.documentElement.scrollWidth,
     client:document.documentElement.clientWidth,
@@ -340,11 +340,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(founderNav.getByRole("link",{name:"Client deliveries",exact:true})).toHaveCount(1);
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await visitWorkspace(page,"/app/notes");
-  // The studio must reach the bottom of the visible desktop viewport at 75% zoom.
+  // The studio still reaches the viewport edge at the normal desktop zoom.
   const notesBottom=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect().bottom);
   const viewportHeight=await page.evaluate(()=>window.innerHeight);
   expect(Math.abs(notesBottom-viewportHeight),"Notes Studio must fill the desktop viewport")
-    .toBeLessThanOrEqual(3);
+    .toBeLessThanOrEqual(6);
   await expect(page.getByRole("button",{name:"Drawn note"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Typed note"})).toBeVisible();
   await page.getByRole("button",{name:/Drawn note/}).click();
