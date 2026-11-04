@@ -96,8 +96,8 @@ async function downloadFixedQuotationPdf(quote:SavedQuotation):Promise<void>{
   for(let i=0;i<Math.min(rows.length,maxLines);i++)
    text(rows[i],x,y+i*leading,size,soft,false,width);
  };
- // Reproduce the approved AS Builders A4 template, replacing only client,
- // quotation metadata, and the two financial figures.
+ // Preserve the approved six-service A4 layout while reflecting the
+ // selected monthly content counts in the service scopes and commitment.
  g.fillStyle=magenta;g.fillRect(0,0,W,7);
  try{
   const brand=await loadBrand();const natural=brand.naturalWidth/brand.naturalHeight||3.8;
@@ -140,7 +140,7 @@ async function downloadFixedQuotationPdf(quote:SavedQuotation):Promise<void>{
  }
  box(40,606,514,30,magenta,magenta,7);
  text("MONTHLY CONTENT COMMITMENT",53,626,9,"#FFFFFF",true);
- right("8 REELS  |  8 POSTS",540,626,10,"#FFFFFF",true);
+ right(p.reels+" REELS  |  "+p.posts+" POSTS",540,626,10,"#FFFFFF",true);
  text("COMMERCIAL TERMS",40,664,12,plum,true);
  const terms=[
   inr(quote.serviceFee)+"/month covers the services above; "+inr(quote.adBudget)+"/month is allocated to Meta ad spend.",
