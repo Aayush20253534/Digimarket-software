@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Check, Clock3, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner } from "@/components/ui";
@@ -21,6 +21,7 @@ const errorText=(error:unknown)=>error instanceof ApiError?error.message:"The op
 export default function ApprovalsPage() {
   const {session,request}=useAuth();
   const [view,setView]=useState<"mine"|"queue"|"history">("mine");
+  const fetchSequence=useRef(0);
   useEffect(()=>{
    // Header inbox links carry the desired view, preserving old /app/approvals
    // URLs and the existing server-side decision checks.
@@ -48,14 +49,17 @@ export default function ApprovalsPage() {
 
   const reload=useCallback(async ()=>{
     if(!canRead){setLoading(false);return;}
+    const active=++fetchSequence.current;
     setLoading(true);
     try {
       const [requests,rules]=await Promise.all([
         request<Approval[]>("/approvals?view="+(view!=="mine"&&canDecide?view:"mine")),
         request<Policy[]>("/approval-policies"),
       ]);
+      if(active!==fetchSequence.current)return;
       setItems(requests);setPolicies(rules);setError("");
-    }catch(e){setError(errorText(e));}finally{setLoading(false);}
+    }catch(e){if(active===fetchSequence.current)setError(errorText(e));}
+    finally{if(active===fetchSequence.current)setLoading(false);}
   },[request,view,canRead,canDecide]);
   useEffect(()=>{void reload();},[reload]);
   useEffect(()=>{
