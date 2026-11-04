@@ -517,6 +517,9 @@ model FinancialTransaction {
   approvalRequestId String @unique @db.Uuid
   receiptAssetId String? @db.Uuid
   receiptAsset Asset? @relation("FinanceReceipt",fields:[receiptAssetId],references:[id],onDelete:Restrict)
+  // Non-null only for client-funded Meta Ads; excluded from the agency expense ledger.
+  clientId String? @db.Uuid
+  client Client? @relation("ClientMetaAdSpend", fields:[clientId], references:[id], onDelete:Restrict)
   idempotencyKey    String @db.Uuid
   kind              FinanceKind
   amount            Decimal @db.Decimal(19,4)
@@ -537,6 +540,7 @@ model FinancialTransaction {
   costAllocations CostAllocation[]
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId,receiptAssetId])
+  @@index([organizationId,clientId,occurredOn])
   @@index([organizationId, status, kind, occurredOn])
   @@index([organizationId, enteredById, createdAt])
 }
@@ -650,6 +654,7 @@ model Client {
   payments Payment[]
   billingSchedules BillingSchedule[]
   costAllocations CostAllocation[]
+  metaAdSpend FinancialTransaction[] @relation("ClientMetaAdSpend")
   revenueRecognitions RevenueRecognition[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
