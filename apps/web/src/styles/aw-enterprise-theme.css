@@ -42,14 +42,19 @@ html[data-aw-theme] :is(body,.aw-workspace,.aw-workspace *) {
   scrollbar-width:thin;
   scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
 }
+html[data-aw-theme]::-webkit-scrollbar,
 html[data-aw-theme] ::-webkit-scrollbar { width:10px;height:10px; }
+html[data-aw-theme]::-webkit-scrollbar-track,
 html[data-aw-theme] ::-webkit-scrollbar-track {background:var(--mono-scroll-track);}
+html[data-aw-theme]::-webkit-scrollbar-thumb,
 html[data-aw-theme] ::-webkit-scrollbar-thumb {
   background:var(--mono-scroll-thumb);
   border-radius:8px;
   border:2px solid var(--mono-scroll-track);
 }
+html[data-aw-theme]::-webkit-scrollbar-thumb:hover,
 html[data-aw-theme] ::-webkit-scrollbar-thumb:hover {background:var(--mono-scroll-hover);}
+html[data-aw-theme]::-webkit-scrollbar-corner,
 html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-track);}
 
 .aw-workspace[data-theme="dark"] {
