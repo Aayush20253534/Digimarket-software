@@ -21,6 +21,12 @@ const errorText=(error:unknown)=>error instanceof ApiError?error.message:"The op
 export default function ApprovalsPage() {
   const {session,request}=useAuth();
   const [view,setView]=useState<"mine"|"queue"|"history">("mine");
+  useEffect(()=>{
+   // Header inbox links carry the desired view, preserving old /app/approvals
+   // URLs and the existing server-side decision checks.
+   const requested=new URLSearchParams(window.location.search).get("view");
+   if(requested==="mine"||requested==="queue"||requested==="history")setView(requested);
+  },[]);
   const [items,setItems]=useState<Approval[]>([]);
   const [policies,setPolicies]=useState<Policy[]>([]);
   const [loading,setLoading]=useState(true);
