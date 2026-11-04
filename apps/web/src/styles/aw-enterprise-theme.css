@@ -59,6 +59,9 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
   --ui-scrollbar:#49494D;--ui-track:#303034;--ui-shadow:0 4px 18px #00000026;
   --ui-danger:#FDA4AF;--ui-warning:#FCD34D;--ui-success:#86EFAC;
   --ui-focus:#D1D1D6;
+  --aw-chart-1:#E4E4E7;--aw-chart-2:#B7B7BC;--aw-chart-3:#88888D;
+  --aw-chart-4:#68686D;--aw-chart-5:#C9C9CD;--aw-chart-6:#9F9FA4;
+  --aw-chart-7:#77777C;--aw-chart-8:#D7D7DB;--aw-chart-9:#ABABB0;--aw-chart-10:#56565C;
 }
 .aw-workspace[data-theme="light"] {
   color-scheme:light;
@@ -70,6 +73,9 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
   --ui-scrollbar:#B7B7BD;--ui-track:#EBEBED;--ui-shadow:0 4px 18px #1010120B;
   --ui-danger:#B91C1C;--ui-warning:#92400E;--ui-success:#166534;
   --ui-focus:#26262A;
+  --aw-chart-1:#222225;--aw-chart-2:#4B4B50;--aw-chart-3:#75757B;
+  --aw-chart-4:#98989F;--aw-chart-5:#37373B;--aw-chart-6:#66666B;
+  --aw-chart-7:#85858A;--aw-chart-8:#303034;--aw-chart-9:#5A5A60;--aw-chart-10:#A8A8AD;
 }
 .aw-workspace {
   --ui-accent:var(--ui-primary);--ui-contrast:var(--ui-action-text);
@@ -503,4 +509,175 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
   .aw-workspace :is(.aw-work-icon,.aw-quick-link,.aw-insights-fill,.aw-summary-item){
     animation:none!important;transition:none!important;
   }
+}
+
+/* Older page-local style sheets still contain saturated literal colors.
+   These last-in-cascade rules normalize their actual interactive surfaces
+   while keeping the calendar, notes editor and task mechanisms operational. */
+.aw-workspace .aw-work-content :is(
+ .aw-lead-filter,.aw-lead-panel,.aw-lead-kpi,.aw-lead-definitions,
+ .aw-report-card,.aw-lead-results,.aw-drive-toolbar,.aw-drive-folder-tile,
+ .aw-drive-file,.aw-drive-empty,.aw-drive-new-menu,.aw-drive-item-menu,
+ .aw-directory-details-panel,.aw-directory-modal-content,
+ .aw-finance-admin-modal,.aw-team-trigger,.aw-team-options,.aw-team-security-note,
+ .aw-chat-directory,.aw-chat-conversation,.aw-chat-conversation-header,
+ .aw-chat-composer,.aw-chat-search,.aw-chat-message-bubble,.aw-chat-note-attachment,
+ .aw-chat-file-link,.aw-chat-contact-count,.aw-bell-panel,.aw-bell-item,
+ .aw-followups-register,.aw-meetings-register,.aw-register-open
+) {
+  background:var(--ui-surface)!important;background-image:none!important;
+  border-color:var(--ui-border)!important;color:var(--ui-strong)!important;
+  box-shadow:none!important;
+}
+.aw-workspace .aw-work-content :is(.aw-team-options,.aw-drive-new-menu,.aw-drive-item-menu,.aw-bell-panel) {
+  box-shadow:0 18px 48px #0003!important;
+}
+.aw-workspace .aw-work-content :is(
+ .aw-chat-search,.aw-chat-contact-count,.aw-chat-message-bubble,
+ .aw-chat-note-attachment,.aw-chat-file-link,.aw-drive-file,
+ .aw-drive-folder-tile,.aw-team-trigger,.aw-team-options
+){background:var(--ui-raised)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-chat-contact[aria-current="true"],.aw-drive-file.is-selected,
+ .aw-drive-view-switch button[aria-pressed="true"],.aw-client-tab-current
+){background:var(--ui-nav-active)!important;border-color:var(--ui-subtle)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-chat-contact:hover,.aw-team-option:hover,.aw-drive-new-menu button:hover,
+ .aw-drive-item-menu button:hover,.aw-client-tab:hover
+){background:var(--ui-hover)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-chat-avatar-fallback,.aw-chat-unread,.aw-drive-file-icon
+){background:var(--ui-strong)!important;background-image:none!important;color:var(--ui-canvas)!important;}
+.aw-workspace .aw-work-content .aw-chat-message-own .aw-chat-message-bubble {
+  background:var(--ui-nav-active)!important;border-color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-work-content .aw-messages-page {
+  background:var(--ui-canvas)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content :is(
+ .aw-chat-directory-header h1,.aw-chat-peer-label h2,.aw-chat-message-bubble > p,
+ .aw-client-directory > header h1,.aw-client-panel h2,.aw-client-panel h3,
+ .aw-client-hero h1,.aw-drive-heading h1,.aw-drive-section h2,
+ .aw-followups-title,.aw-meetings-title,.aw-lead-panel-title h2,
+ .aw-lead-definitions h2,.aw-lead-kpi strong,.aw-report-sectionhead h2
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-client-kicker,.aw-client-crumb a,.aw-client-stat svg,
+ .aw-report-toolbar-title > svg,.aw-followups-title svg,.aw-meetings-title svg,
+ .aw-lead-kpi-icon,.aw-drive-file-icon,.aw-meetings-map
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-chat-eyebrow,.aw-chat-directory-caption,.aw-chat-contact-details small,
+ .aw-chat-peer-label p,.aw-chat-message-bubble time,
+ .aw-chat-empty-list,.aw-drive-heading p,.aw-drive-file-name small,
+ .aw-client-muted,.aw-client-stat span,.aw-client-panel-heading p,
+ .aw-followups-description,.aw-meetings-description,
+ .aw-lead-muted,.aw-lead-kpi p,.aw-lead-kpi small,.aw-lead-panel-title p
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-client-tab,.aw-client-btn,.aw-client-open,.aw-lead-back,
+ .aw-lead-presets button,.aw-lead-reset,.aw-lead-page-nav button,
+ .aw-followups-refresh,.aw-followups-pagination button,.aw-meetings-refresh,
+ .aw-meetings-pagination button,.aw-drive-icon-button,.aw-drive-select,
+ .aw-drive-view-switch,.aw-chat-attach,.aw-register-open,
+ .aw-team-done,.aw-drive-menu-trigger
+){
+  background:var(--ui-raised)!important;background-image:none!important;
+  color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+  box-shadow:none!important;
+}
+.aw-workspace .aw-work-content :is(
+ .aw-client-primary,.aw-lead-primary,.aw-drive-new-button
+){
+  background:var(--ui-primary)!important;background-image:none!important;
+  color:var(--ui-action-text)!important;border-color:var(--ui-primary)!important;
+  box-shadow:none!important;
+}
+.aw-workspace .aw-work-content :is(
+ .aw-chat-input,.aw-drive-search,.aw-drive-search input,
+ .aw-lead-breakdown input,.aw-lead-breakdown select,.aw-chat-search input,
+ .aw-report-dates input,.aw-quote-page .field
+){
+  background:var(--ui-input)!important;color:var(--ui-strong)!important;
+  border-color:var(--ui-border)!important;color-scheme:inherit!important;
+}
+.aw-workspace .aw-work-content :is(.aw-quote-page,.aw-lead-breakdown,.aw-drive-shell) {
+  background:transparent!important;background-image:none!important;
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-quote-panel,.aw-quote-fixed-service,.aw-quote-mode) {
+  background:var(--ui-surface)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-report-dates label,.aw-lead-filter-row label,.aw-lead-filter-grid label) {
+  color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-work-content :is(
+ .aw-client-tab-current,.aw-quote-mode-active,.aw-quote-catalog-button[aria-pressed="true"]
+){box-shadow:inset 0 -2px 0 var(--ui-strong)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-followups-number,.aw-followups-business,.aw-meetings-number,
+ .aw-meetings-business,.aw-meetings-map,.aw-lead-back
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-followups-table td,.aw-meetings-table td,.aw-lead-register td,
+ .aw-register-table td,.aw-finance-register td
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-followups-pagination,.aw-meetings-pagination,.aw-followups-empty,
+ .aw-meetings-empty,.aw-followups-loading,.aw-meetings-loading
+){background:var(--ui-surface)!important;color:var(--ui-muted)!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-bell-item.unread,.aw-register-table tr:nth-child(even),
+ .aw-finance-register tr:nth-child(even),.aw-team-table tr:nth-child(even)
+){background:var(--ui-raised)!important;}
+.aw-workspace .aw-work-content :is(.aw-register-selected,.aw-register-table tr:hover){
+  background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-work-content .aw-bell-unread {background:var(--ui-strong)!important;color:var(--ui-canvas)!important;}
+.aw-workspace .aw-work-content :is(.aw-bell-dot,.aw-bell-item.unread .aw-bell-dot){background:var(--ui-strong)!important;}
+.aw-workspace .aw-work-content :is(.aw-bell-panel,.aw-bell-head,.aw-bell-actions,.aw-bell-item) {
+  border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-team-filter,.aw-bell-head,.aw-chat-composer,.aw-chat-directory) {
+  border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content .aw-v2-notice {
+  background:var(--ui-raised);color:var(--ui-strong);border-color:var(--ui-border);
+}
+.aw-workspace .aw-work-content .aw-v2-notice-error {
+  background:color-mix(in srgb,var(--ui-danger) 11%,var(--ui-surface));
+  color:var(--ui-danger);border-color:color-mix(in srgb,var(--ui-danger) 30%,var(--ui-border));
+}
+.aw-workspace .aw-work-content .aw-v2-notice-success {
+  background:color-mix(in srgb,var(--ui-success) 11%,var(--ui-surface));
+  color:var(--ui-success);border-color:color-mix(in srgb,var(--ui-success) 30%,var(--ui-border));
+}
+.aw-workspace .aw-work-content .aw-v2-spinner {
+  border-color:var(--ui-border);border-top-color:var(--ui-strong);
+}
+.aw-workspace .aw-work-content :is(.aw-v2-page-header,.aw-v2-card){
+  min-width:0;
+}
+.aw-workspace .aw-work-content .aw-v2-eyebrow {color:var(--ui-muted);letter-spacing:.09em;}
+.aw-workspace .aw-work-content .aw-v2-label {color:var(--ui-strong);}
+.aw-workspace .aw-work-content :is(.aw-lead-kpi-icon,.aw-drive-file-icon){
+  background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-content .aw-lead-donut {border-color:var(--ui-border)!important;}
+.aw-workspace .aw-work-content .aw-lead-donut span {
+  background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content .aw-lead-trend-scroll {
+  scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+
+/* Accessible comfortable desktop dimensions. The previous global 75% zoom
+   made labels and click targets too small and had to fake viewport height. */
+@media(min-width:1024px){
+  .aw-workspace {
+    zoom:1!important;width:100%!important;max-width:100%!important;
+    min-height:100svh!important;
+  }
+  .aw-workspace .aw-work-main{min-height:100svh!important;}
+  .aw-workspace .aw-work-content{min-height:calc(100svh - 68px)!important;}
 }
