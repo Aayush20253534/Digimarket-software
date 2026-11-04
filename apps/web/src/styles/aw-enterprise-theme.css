@@ -681,3 +681,88 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
   .aw-workspace .aw-work-main{min-height:100svh!important;}
   .aw-workspace .aw-work-content{min-height:calc(100svh - 68px)!important;}
 }
+
+/* Semantic status tones replace the former neon/magenta/violet badges.
+   Colour communicates workflow state, not decorative branding. */
+.aw-workspace[data-theme="dark"] {
+  --stage-neutral-bg:#28282B;--stage-neutral-fg:#E4E4E7;--stage-neutral-border:#515156;
+  --stage-success-bg:#143126;--stage-success-fg:#86EFAC;--stage-success-border:#28573E;
+  --stage-info-bg:#172D43;--stage-info-fg:#93C5FD;--stage-info-border:#2E577D;
+  --stage-warning-bg:#362B17;--stage-warning-fg:#FCD34D;--stage-warning-border:#725923;
+  --stage-teal-bg:#12362F;--stage-teal-fg:#6EE7B7;--stage-teal-border:#266957;
+  --stage-danger-bg:#3B1D25;--stage-danger-fg:#FDA4AF;--stage-danger-border:#7B3546;
+}
+.aw-workspace[data-theme="light"] {
+  --stage-neutral-bg:#F0F0F1;--stage-neutral-fg:#404047;--stage-neutral-border:#D4D4D8;
+  --stage-success-bg:#E4F8EC;--stage-success-fg:#166534;--stage-success-border:#A3DDB8;
+  --stage-info-bg:#E7F1FD;--stage-info-fg:#1D4F91;--stage-info-border:#B3CFF4;
+  --stage-warning-bg:#FFF5DC;--stage-warning-fg:#854D0E;--stage-warning-border:#EBCB90;
+  --stage-teal-bg:#DBF8EE;--stage-teal-fg:#146C54;--stage-teal-border:#8DDBC4;
+  --stage-danger-bg:#FDE8EA;--stage-danger-fg:#A61B2B;--stage-danger-border:#ECA7B3;
+}
+.aw-workspace :is(.aw-status-badge,.aw-finance-status,.aw-badge,.aw-module-pill) {
+  box-shadow:none!important;text-shadow:none!important;
+}
+.aw-workspace [data-aw-module="leads"] :is(.aw-status-yet-to-call,.aw-status-not-picking),
+.aw-workspace .aw-finance-status:not(.status-posted,.status-pending,.status-rejected,.status-cancelled) {
+  background:var(--stage-neutral-bg)!important;color:var(--stage-neutral-fg)!important;
+  border:1px solid var(--stage-neutral-border)!important;
+}
+.aw-workspace [data-aw-module="leads"] .aw-status-follow-up {
+  background:var(--stage-success-bg)!important;color:var(--stage-success-fg)!important;
+  border:1px solid var(--stage-success-border)!important;
+}
+.aw-workspace [data-aw-module="leads"] .aw-status-meeting {
+  background:var(--stage-info-bg)!important;color:var(--stage-info-fg)!important;
+  border:1px solid var(--stage-info-border)!important;
+}
+.aw-workspace [data-aw-module="leads"] .aw-status-decision-pending,
+.aw-workspace .aw-finance-status.status-pending {
+  background:var(--stage-warning-bg)!important;color:var(--stage-warning-fg)!important;
+  border:1px solid var(--stage-warning-border)!important;
+}
+.aw-workspace .aw-status-agreement-pending {
+  background:var(--stage-teal-bg)!important;color:var(--stage-teal-fg)!important;
+  border:1px solid var(--stage-teal-border)!important;
+}
+.aw-workspace [data-aw-module="leads"] .aw-status-rejected,
+.aw-workspace .aw-finance-status:is(.status-rejected,.status-cancelled) {
+  background:var(--stage-danger-bg)!important;color:var(--stage-danger-fg)!important;
+  border:1px solid var(--stage-danger-border)!important;
+}
+.aw-workspace .aw-finance-status.status-posted {
+  background:var(--stage-success-bg)!important;color:var(--stage-success-fg)!important;
+  border:1px solid var(--stage-success-border)!important;
+}
+/* The Notes route is retained but hidden in Phase 2; maintain accessible
+   monochrome controls without touching the paper canvas or colour-picker ink. */
+.aw-workspace .aw-studio {
+  background:var(--ui-canvas)!important;color:var(--ui-strong)!important;
+  border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-studio :is(
+ .aw-studio-library,.aw-studio-main,.aw-studio-inspector,.aw-studio-tools,
+ .aw-studio-header,.aw-studio-modebar
+){background:var(--ui-surface)!important;background-image:none!important;border-color:var(--ui-border)!important;}
+.aw-workspace .aw-studio :is(
+ .aw-studio-new,.aw-studio-mode-switch button[aria-pressed="true"],
+ .aw-studio-tools button[aria-pressed="true"],.aw-studio-note-item.active
+){background:var(--ui-nav-active)!important;background-image:none!important;border-color:var(--ui-border)!important;color:var(--ui-strong)!important;box-shadow:none!important;}
+.aw-workspace .aw-studio :is(
+ .aw-studio-head-actions button,.aw-studio-mode-switch button,.aw-studio-utility button,
+ .aw-studio-search,.aw-studio-note-item:hover
+){background:var(--ui-raised)!important;background-image:none!important;color:var(--ui-strong)!important;border-color:var(--ui-border)!important;}
+.aw-workspace .aw-studio :is(
+ .aw-studio-brand strong,.aw-studio-header-name input,.aw-studio-note-item strong
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-studio :is(
+ .aw-studio-brand span,.aw-studio-section-title,.aw-studio-note-item small,
+ .aw-studio-search,.aw-studio-directory-caption
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-studio .aw-studio-header-name input {
+  background:var(--ui-input)!important;border-color:var(--ui-border)!important;
+}
+/* Never recolour editable note-paper, user-drawn content or chosen ink swatches. */
+.aw-workspace .aw-studio :is(.aw-studio-sheet,.aw-studio-note-preview){
+  color-scheme:light;
+}
