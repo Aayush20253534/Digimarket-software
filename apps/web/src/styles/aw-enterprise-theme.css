@@ -32,8 +32,11 @@ html[data-aw-theme] body {
   color-scheme:inherit;
   scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
 }
-html[data-aw-theme] body:has(.aw-workspace) {
-  background:var(--ui-canvas)!important;
+html[data-aw-theme="dark"] body:has(.aw-workspace) {
+  background:#0B0B0C!important;
+}
+html[data-aw-theme="light"] body:has(.aw-workspace) {
+  background:#F6F6F7!important;
 }
 html[data-aw-theme] :is(body,.aw-workspace,.aw-workspace *) {
   scrollbar-width:thin;
@@ -765,4 +768,18 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
 /* Never recolour editable note-paper, user-drawn content or chosen ink swatches. */
 .aw-workspace .aw-studio :is(.aw-studio-sheet,.aw-studio-note-preview){
   color-scheme:light;
+}
+
+/* The original logo has metallic white lettering, so give it a deliberate
+   charcoal mounting surface in light mode rather than recolouring the SVG. */
+.aw-workspace[data-theme="light"] .aw-work-brand {
+  background:#18181A!important;
+  border:1px solid #303034;border-radius:10px!important;
+  padding:6px 8px;
+}
+.aw-workspace[data-theme="light"] .aw-work-brand :is(.aw-brand-wordmark,.aw-brand-symbol) {
+  filter:none!important;
+}
+.aw-workspace[data-theme="light"] .aw-work-sidehead {
+  background:var(--ui-side)!important;
 }
