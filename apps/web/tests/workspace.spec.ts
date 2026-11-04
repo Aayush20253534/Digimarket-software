@@ -210,7 +210,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   );
   expect(desktopZoom,"Comfortable desktop workspace must render at 100% scale").toBe(1);
   const pageBackground=await page.evaluate(()=>getComputedStyle(document.body).backgroundColor);
-  expect(pageBackground,"Reports must never expose a white body beneath the scaled layout")
+  expect(pageBackground,"Reports must preserve an explicit dark document background")
     .toBe("rgb(11, 11, 12)");
   const desktopBounds=await page.evaluate(()=>({
     doc:document.documentElement.scrollWidth,
