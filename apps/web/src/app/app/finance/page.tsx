@@ -58,6 +58,7 @@ export default function FinancePage(){
   const [entries,setEntries]=useState<Entry[]>([]);
   const [clientAdEntries,setClientAdEntries]=useState<Entry[]>([]);
   const [metaAdClients,setMetaAdClients]=useState<MetaAdClient[]>([]);
+  const [metaAdClientsError,setMetaAdClientsError]=useState("");
   const [totals,setTotals]=useState<Totals>(zero);
   const [financeReady,setFinanceReady]=useState(false);
   const [recurring,setRecurring]=useState<RecurringIncome|null>(null);
@@ -140,9 +141,38 @@ export default function FinancePage(){
   useEffect(()=>{
     if(!canCreate&&!adminFinance)return;
     let active=true;
-    void request<MetaAdClient[]>("/finance/meta-ad-clients")
-      .then(clients=>{if(active)setMetaAdClients(clients);})
-      .catch(()=>{if(active)setMetaAdClients([]);});
+    // The Clients directory already reads this endpoint. Use it first rather than
+    // depending on the separately deployed, newer finance-only backend route.
+    const load=async()=>{
+      try{
+        const clients:MetaAdClient[]=[];
+        let cursor:string|null=null;
+        for(let page=0;page<50;page++){
+          const query=new URLSearchParams({status:"ACTIVE",limit:"100"});
+          if(cursor)query.set("cursor",cursor);
+          const response=await request<{items:MetaAdClient[];nextCursor:string|null}>("/clients?"+query);
+          clients.push(...response.items);
+          if(!response.nextCursor){cursor=null;break;}
+          if(response.nextCursor===cursor)throw new Error("Client directory returned a repeated page.");
+          cursor=response.nextCursor;
+        }
+        if(cursor)throw new Error("Client directory has more than 5,000 records. Narrow this list before selecting a client.");
+        if(active){setMetaAdClients(clients.sort((a,b)=>a.businessName.localeCompare(b.businessName)));setMetaAdClientsError("");}
+      }catch(directoryError){
+        try{
+          // A finance-only user may not have clients.read. Keep the narrow
+          // finance endpoint as a fallback once the API is deployed.
+          const clients=await request<MetaAdClient[]>("/finance/meta-ad-clients");
+          if(active){setMetaAdClients(clients);setMetaAdClientsError("");}
+        }catch(lookupError){
+          if(active){
+            setMetaAdClients([]);
+            setMetaAdClientsError("Could not load paying clients. Directory: "+readable(directoryError)+" Finance API: "+readable(lookupError));
+          }
+        }
+      }
+    };
+    void load();
     return()=>{active=false;};
   },[request,canCreate,adminFinance]);
 
@@ -335,6 +365,8 @@ export default function FinancePage(){
                 <option value="">Select paying client</option>
                 {metaAdClients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}
               </select>
+              {metaAdClientsError&&<p className="mt-2 text-sm text-red-400" role="alert">{metaAdClientsError}</p>}
+              {!metaAdClientsError&&!metaAdClients.length&&<p className="mt-2 text-xs text-slate-400">No active clients available in this workspace.</p>}
             </FormField>}
             <p className="sm:col-span-2 text-xs text-slate-500">Client-funded Meta Ads are tracked separately and do not affect agency expenses or net income.</p>
           </>}
@@ -484,6 +516,8 @@ export default function FinancePage(){
                   <option value={editingEntry.client.id}>{editingEntry.client.businessName} (existing)</option>}
                 {metaAdClients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}
               </select>
+              {metaAdClientsError&&<p className="mt-2 text-sm text-red-400" role="alert">{metaAdClientsError}</p>}
+              {!metaAdClientsError&&!metaAdClients.length&&<p className="mt-2 text-xs text-slate-400">No active clients available in this workspace.</p>}
             </FormField>}
           </>}
           <FormField id="admin-expense-assignee" label={"Assign "+editingEntry.kind.toLowerCase()+" to"}>
