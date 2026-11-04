@@ -1,247 +1,506 @@
-/* DigiMarket enterprise visual foundation.
-   Final import so the legacy phased styles retain functional layout while
-   all workspace surfaces share the same dark/light semantic tokens. */
+/*
+ * DigiMarket UI v2 / Phase 1
+ * One monochrome token system for the authenticated application.
+ * Earlier route-level CSS remains for geometry and functional layouts until
+ * its owner page is migrated in later phases. This is the only colour layer.
+ * Keep semantic status/validation colours and the original brand assets.
+ */
+
+/* Browser-level colours control the PAGE scrollbar, even when the scrollbar
+   belongs to <html> outside .aw-workspace. Nested scrollbars inherit tokens. */
+html[data-aw-theme="dark"] {
+  color-scheme:dark;
+  background:#0B0B0C;
+  --mono-scroll-track:#151517;
+  --mono-scroll-thumb:#49494D;
+  --mono-scroll-hover:#747478;
+}
+html[data-aw-theme="light"] {
+  color-scheme:light;
+  background:#F6F6F7;
+  --mono-scroll-track:#F0F0F1;
+  --mono-scroll-thumb:#C1C1C5;
+  --mono-scroll-hover:#929297;
+}
+html[data-aw-theme] {
+  scrollbar-width:thin;
+  scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+html[data-aw-theme] body {
+  min-height:100svh;
+  background:inherit;
+  color-scheme:inherit;
+  scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+html[data-aw-theme] body:has(.aw-workspace) {
+  background:var(--ui-canvas)!important;
+}
+html[data-aw-theme] :is(body,.aw-workspace,.aw-workspace *) {
+  scrollbar-width:thin;
+  scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+html[data-aw-theme] ::-webkit-scrollbar { width:10px;height:10px; }
+html[data-aw-theme] ::-webkit-scrollbar-track {background:var(--mono-scroll-track);}
+html[data-aw-theme] ::-webkit-scrollbar-thumb {
+  background:var(--mono-scroll-thumb);
+  border-radius:8px;
+  border:2px solid var(--mono-scroll-track);
+}
+html[data-aw-theme] ::-webkit-scrollbar-thumb:hover {background:var(--mono-scroll-hover);}
+html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-track);}
+
 .aw-workspace[data-theme="dark"] {
-  color-scheme: dark;
-  --ui-canvas:#0C0B12; --ui-surface:#171521; --ui-raised:#201C2D;
-  --ui-hover:#292336; --ui-border:#343042; --ui-strong:#F4F1FA;
-  --ui-muted:#B2ACBF; --ui-subtle:#928CA4; --ui-accent:#C1A5FF;
-  --ui-primary:#8653EC; --ui-contrast:#FFFFFF;
-  --ui-input:#171321; --ui-shadow:0 8px 24px rgba(0,0,0,.16);
-  --ui-grid:#393245; --ui-track:#2A2435;
+  color-scheme:dark;
+  --ui-canvas:#0B0B0C;--ui-surface:#171719;--ui-raised:#202022;
+  --ui-hover:#2A2A2C;--ui-border:#343436;--ui-strong:#F5F5F5;
+  --ui-muted:#A6A6AA;--ui-subtle:#8D8D92;--ui-primary:#FFFFFF;
+  --ui-action-text:#101011;--ui-input:#1C1C1E;--ui-side:#111113;
+  --ui-nav-active:#28282B;--ui-nav-text:#B7B7BB;--ui-grid:#343436;
+  --ui-scrollbar:#49494D;--ui-track:#303034;--ui-shadow:0 4px 18px #00000026;
+  --ui-danger:#FDA4AF;--ui-warning:#FCD34D;--ui-success:#86EFAC;
+  --ui-focus:#D1D1D6;
 }
 .aw-workspace[data-theme="light"] {
-  color-scheme: light;
-  --ui-canvas:#F6F7FB; --ui-surface:#FFFFFF; --ui-raised:#F8F7FC;
-  --ui-hover:#F1EDFA; --ui-border:#E4E3EE; --ui-strong:#222036;
-  --ui-muted:#656177; --ui-subtle:#7B778D; --ui-accent:#5A2BA5;
-  --ui-primary:#6D39C5; --ui-contrast:#FFFFFF;
-  --ui-input:#FFFFFF; --ui-shadow:0 6px 20px rgba(34,21,59,.045);
-  --ui-grid:#E8E4F1; --ui-track:#EEEAF5;
+  color-scheme:light;
+  --ui-canvas:#F6F6F7;--ui-surface:#FFFFFF;--ui-raised:#F5F5F6;
+  --ui-hover:#EEEEF0;--ui-border:#E4E4E6;--ui-strong:#19191B;
+  --ui-muted:#616167;--ui-subtle:#77777D;--ui-primary:#171719;
+  --ui-action-text:#FFFFFF;--ui-input:#FFFFFF;--ui-side:#FFFFFF;
+  --ui-nav-active:#EDEDEE;--ui-nav-text:#505055;--ui-grid:#E6E6E8;
+  --ui-scrollbar:#B7B7BD;--ui-track:#EBEBED;--ui-shadow:0 4px 18px #1010120B;
+  --ui-danger:#B91C1C;--ui-warning:#92400E;--ui-success:#166534;
+  --ui-focus:#26262A;
 }
-.aw-workspace {background:var(--ui-canvas);color:var(--ui-strong);}
-.aw-workspace .aw-work-main {min-height:100svh;}
-.aw-workspace .aw-work-content {min-height:calc(100svh - 72px);background:var(--ui-canvas)!important;color:var(--ui-strong);color-scheme:inherit;}
-.aw-workspace .aw-work-content-width {max-width:1540px;padding:clamp(18px,2.2vw,30px);}
-.aw-workspace .aw-work-sidebar,.aw-workspace .aw-work-drawer {background:#11101A;color:#EAE6F5;border-color:#302B40;}
-.aw-workspace .aw-work-sidehead {min-height:72px;border-color:#302B40;}
+.aw-workspace {
+  --ui-accent:var(--ui-primary);--ui-contrast:var(--ui-action-text);
+  --aw-ink:var(--ui-strong);--aw-muted:var(--ui-muted);
+  --aw-muted-strong:var(--ui-strong);--aw-canvas:var(--ui-canvas);
+  --aw-surface:var(--ui-surface);--aw-surface-raised:var(--ui-raised);
+  --aw-surface-hover:var(--ui-hover);--aw-border:var(--ui-border);
+  --aw-border-strong:var(--ui-muted);--aw-violet:var(--ui-primary);
+  --aw-purple:var(--ui-primary);--aw-magenta:var(--ui-muted);
+  --aw-focus:var(--ui-focus);
+  --aw-radius-xs:4px;--aw-radius-sm:7px;--aw-radius-md:10px;
+  --aw-radius-lg:12px;--aw-radius-xl:14px;--aw-compact-corner:10px;
+  --aw-font-sans:"Geist","Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:var(--ui-canvas)!important;color:var(--ui-strong);
+  font-family:var(--aw-font-sans);
+  font-optical-sizing:auto;-webkit-font-smoothing:antialiased;
+  scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+.aw-workspace ::selection {background:var(--ui-strong);color:var(--ui-canvas);}
+.aw-workspace .aw-work-main {min-height:100svh;min-width:0;}
+.aw-workspace .aw-work-content {
+  background:var(--ui-canvas)!important;color:var(--ui-strong)!important;
+  color-scheme:inherit;min-width:0;min-height:calc(100svh - 68px);
+}
+.aw-workspace .aw-work-content-width {
+  max-width:1540px;min-width:0;padding:clamp(20px,2.3vw,32px);
+}
+.aw-workspace .aw-work-sidebar,.aw-workspace .aw-work-drawer {
+  background:var(--ui-side)!important;
+  background-image:none!important;
+  color:var(--ui-strong)!important;
+  border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-work-sidehead {
+  background:var(--ui-side);border-color:var(--ui-border);min-height:72px;
+}
 .aw-workspace .aw-work-topbar {
-  height:68px;background:var(--ui-surface);color:var(--ui-strong);
-  border-bottom:1px solid var(--ui-border);backdrop-filter:blur(16px);
+  height:68px;background:var(--ui-surface)!important;
+  color:var(--ui-strong);border-bottom:1px solid var(--ui-border);
+  backdrop-filter:blur(14px);box-shadow:none;
 }
-.aw-workspace .aw-work-breadcrumb{color:var(--ui-subtle);font-size:11px;}
-.aw-workspace .aw-work-title{color:var(--ui-strong);font-size:14px;}
-.aw-workspace .aw-work-icon,.aw-workspace .aw-work-search {
-  background:var(--ui-raised);border-color:var(--ui-border);color:var(--ui-muted);
-  border-radius:9px;transition:background-color .16s,border-color .16s,color .16s;
+.aw-workspace .aw-work-breadcrumb {color:var(--ui-subtle);font-size:11px;}
+.aw-workspace .aw-work-title {color:var(--ui-strong);font-size:14px;font-weight:650;}
+.aw-workspace .aw-nav-scroller,.aw-workspace .aw-work-footer {
+  background:transparent!important;border-color:var(--ui-border);
 }
-.aw-workspace .aw-work-icon:hover,.aw-workspace .aw-work-search:hover {
-  background:var(--ui-hover);border-color:var(--ui-accent);color:var(--ui-strong);
+.aw-workspace .aw-nav-group {
+  color:var(--ui-subtle);font-size:10px;font-weight:650;letter-spacing:.105em;
 }
-.aw-workspace .aw-theme-toggle{flex-shrink:0;}
-.aw-workspace .aw-theme-toggle:focus-visible{outline:2px solid var(--ui-primary);outline-offset:3px;}
-.aw-workspace .aw-nav-item {min-height:41px;margin:2px 0;border-radius:9px;color:#ADA6BD;font-weight:550;font-size:13px;}
-.aw-workspace .aw-nav-item:hover {background:#252035;color:#FFFFFF;}
-.aw-workspace .aw-nav-selected,.aw-workspace .aw-nav-selected:hover {
-  background:#2D2146;border-color:#5B418A;color:#F2E8FF;
+.aw-workspace .aw-nav-item,.aw-workspace .aw-work-signout {
+  min-height:42px;margin:2px 0;padding-inline:11px;
+  border:1px solid transparent;border-radius:9px;
+  background:transparent!important;color:var(--ui-nav-text)!important;
+  font-size:13px;font-weight:550;box-shadow:none!important;
+  transition:background-color .16s ease,color .16s ease;
 }
-.aw-workspace .aw-nav-selected svg {color:#C4A5FF;}
-.aw-workspace .aw-nav-group {color:#91879E;letter-spacing:.11em;}
-.aw-workspace .aw-work-profile{background:#1D1928;border-color:#373042;box-shadow:none;}
-.aw-workspace .aw-work-toggle{background:#201B2C;border-color:#43364F;}
-.aw-workspace .aw-work-avatar{background:linear-gradient(135deg,#7450D6,#A65DD7);}
-.aw-workspace .aw-work-content :is(.aw-card,.aw-panel,.aw-stat) {
-  background:var(--ui-surface);border:1px solid var(--ui-border);box-shadow:var(--ui-shadow);border-radius:12px;
+.aw-workspace .aw-nav-item:hover,.aw-workspace .aw-work-signout:hover {
+  background:var(--ui-hover)!important;color:var(--ui-strong)!important;
 }
-.aw-workspace .aw-work-content :is(.aw-card,.aw-panel,.aw-stat) {color:var(--ui-strong);}
-.aw-workspace .aw-work-content :is(.aw-panel-heading,.aw-card-title,.aw-stat-value) {color:var(--ui-strong);}
-.aw-workspace .aw-work-content :is(.aw-panel-description,.aw-card-description,.aw-stat-description,.aw-stat-label) {color:var(--ui-muted);}
-.aw-workspace .aw-work-content :is(.aw-button-secondary,.btn-secondary) {
-  background:var(--ui-raised);border:1px solid var(--ui-border);color:var(--ui-strong);box-shadow:none;
+.aw-workspace :is(.aw-nav-selected,.aw-nav-selected:hover) {
+  background:var(--ui-nav-active)!important;color:var(--ui-strong)!important;
+  border-color:var(--ui-border)!important;font-weight:660;
 }
-.aw-workspace .aw-work-content :is(.aw-button-secondary,.btn-secondary):hover:not(:disabled) {
-  background:var(--ui-hover);border-color:var(--ui-accent);
+.aw-workspace .aw-nav-item svg {color:currentColor;}
+.aw-workspace .aw-work-toggle,.aw-workspace .aw-work-icon,.aw-workspace .aw-work-search {
+  background:var(--ui-raised)!important;border:1px solid var(--ui-border)!important;
+  color:var(--ui-strong)!important;border-radius:9px!important;
+  box-shadow:none!important;min-height:40px;
 }
-.aw-workspace .aw-work-content :is(.aw-button-primary,.btn-primary) {
-  background:var(--ui-primary);border-color:var(--ui-primary);color:var(--ui-contrast);box-shadow:none;
+.aw-workspace :is(.aw-work-toggle,.aw-work-icon,.aw-work-search):hover {
+  background:var(--ui-hover)!important;border-color:var(--ui-subtle)!important;
 }
-.aw-workspace .aw-work-content :is(.aw-button-primary,.btn-primary):hover:not(:disabled) {filter:brightness(1.07);}
-.aw-workspace .aw-work-content :is(.field,.aw-field) {
-  background:var(--ui-input);border-color:var(--ui-border);color:var(--ui-strong);border-radius:9px;
-  min-height:42px;box-shadow:none;
+.aw-workspace .aw-work-profile {
+  background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+  box-shadow:none!important;border-radius:10px;
 }
-.aw-workspace .aw-work-content :is(.field,.aw-field):focus {
-  border-color:var(--ui-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--ui-primary) 19%,transparent);
+.aw-workspace .aw-work-profile-details :is(span,strong) {color:var(--ui-strong);}
+.aw-workspace .aw-work-profile-details .text-\[\#B6A5C7\] {color:var(--ui-muted)!important;}
+.aw-workspace .aw-work-avatar {
+  background:var(--ui-strong)!important;color:var(--ui-canvas)!important;
+  background-image:none!important;
 }
-.aw-workspace .aw-work-content :is(.field,.aw-field)::placeholder {color:var(--ui-subtle);}
-.aw-workspace .aw-work-content :is(.aw-table-scroll,.aw-register-scroll,.aw-finance-register-scroll,.aw-dashboard-table-wrap) {
-  border-color:var(--ui-border);border-radius:10px;
+.aw-workspace .aw-work-dialog {
+  background:var(--ui-side);color:var(--ui-strong);
+  border-color:var(--ui-border);
 }
-.aw-workspace .aw-work-content :is(.aw-table,.aw-register-table,.aw-dashboard-table,.aw-finance-register) {
-  color:var(--ui-strong);font-size:13px;font-variant-numeric:tabular-nums;
+.aw-workspace .aw-work-dialog::backdrop {background:rgba(0,0,0,.64);}
+
+/* Surface hierarchy shared by both component systems and their legacy page
+   consumers. Do not force dimensions; route layouts own geometry. */
+.aw-workspace .aw-work-content :is(
+  .aw-card,.aw-panel,.aw-stat,.aw-insights-card,.aw-report-card,
+  .aw-report-toolbar,.aw-report-footnote,.aw-client-panel,.aw-client-hero,
+  .aw-quote-panel,.aw-finance-panels > *,.aw-live-card,.aw-module-card,
+  .aw-followups-register,.aw-meetings-register,.aw-directory-modal,
+  .aw-v2-card,section.rounded-2xl.bg-white
+) {
+  background:var(--ui-surface)!important;background-image:none!important;
+  color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+  box-shadow:var(--ui-shadow)!important;border-radius:12px!important;
+  backdrop-filter:none;
 }
-.aw-workspace .aw-work-content :is(.aw-table,.aw-register-table,.aw-dashboard-table,.aw-finance-register) th {
-  color:var(--ui-muted);background:var(--ui-raised);font-size:11px;
-  letter-spacing:.035em;font-weight:650;
+.aw-workspace .aw-work-content :is(.aw-report-card,.aw-report-toolbar,.aw-client-hero,.aw-quote-panel,.aw-insights-card)::before {
+  background:none!important;box-shadow:none!important;opacity:0;
 }
-.aw-workspace .aw-work-content :is(.aw-table,.aw-register-table,.aw-dashboard-table,.aw-finance-register) td {
-  color:var(--ui-strong);border-color:var(--ui-border);
+.aw-workspace .aw-work-content :is(.aw-panel,.aw-insights-card,.aw-report-card,.aw-stat){padding:20px;}
+.aw-workspace .aw-work-content :is(.aw-report-card-top,.aw-report-icon,.aw-insights-icon,.aw-stat-icon,.aw-quick-icon) {
+  background:var(--ui-raised)!important;background-image:none!important;
+  border-color:var(--ui-border)!important;color:var(--ui-strong)!important;
+  box-shadow:none!important;
 }
-.aw-workspace .aw-work-content :is(.aw-table,.aw-register-table,.aw-dashboard-table,.aw-finance-register) tbody tr:hover {
-  background:var(--ui-hover);
+.aw-workspace .aw-work-content :is(
+ .aw-stat-value,.aw-report-hero-value,.aw-insights-number,.aw-summary-number,
+ .aw-dashboard-title,.aw-panel-heading,.aw-card-title,.aw-insights-title,
+ .aw-v2-title,.aw-report-sectionhead h2,.aw-client-hero h1
+){color:var(--ui-strong)!important;text-shadow:none!important;}
+.aw-workspace .aw-work-content :is(
+ .aw-stat-label,.aw-stat-description,.aw-report-card-label,.aw-report-hero-label,
+ .aw-insights-hint,.aw-insights-label,.aw-insights-overline,.aw-panel-description,
+ .aw-card-description,.aw-dashboard-subtitle,.aw-module-meta,.aw-insights-eyebrow,
+ .aw-v2-description,.aw-quick-link small,.aw-report-footnote p
+){color:var(--ui-muted)!important;text-shadow:none;}
+.aw-workspace .aw-work-content :is(.aw-dashboard-title,.aw-v2-title) {
+  font-size:clamp(1.75rem,2.6vw,2.4rem);font-weight:720;letter-spacing:-.042em;
 }
-.aw-workspace .aw-dashboard {color:var(--ui-strong);}
-.aw-workspace .aw-dashboard-title,.aw-workspace .aw-dashboard-title span {color:var(--ui-strong);}
-.aw-workspace .aw-dashboard-title {font-size:clamp(1.7rem,2.5vw,2.35rem);font-weight:740;letter-spacing:-.045em;}
-.aw-workspace .aw-dashboard-subtitle {color:var(--ui-muted);}
-.aw-workspace .aw-dashboard-refresh {
-  background:var(--ui-surface);color:var(--ui-strong);border-color:var(--ui-border);box-shadow:none;
+.aw-workspace .aw-work-content :is(.aw-eyebrow,.aw-v2-eyebrow,.aw-gradient-text) {
+  color:var(--ui-muted)!important;background:none!important;
+  -webkit-background-clip:initial;-webkit-text-fill-color:currentColor!important;
+  text-shadow:none;
 }
-.aw-workspace .aw-dashboard-refresh:hover {background:var(--ui-hover);}
-.aw-workspace .aw-stat-grid {grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;}
-.aw-workspace .aw-stat {padding:18px;}
-.aw-workspace .aw-stat-icon {background:var(--ui-raised);color:var(--ui-primary);border-radius:10px;}
-.aw-workspace .aw-stat-accent {border-color:color-mix(in srgb,var(--ui-primary) 37%,var(--ui-border));}
-.aw-workspace .aw-dashboard-table th {background:var(--ui-raised);}
-.aw-workspace .aw-dashboard-table tbody tr:hover {background:var(--ui-hover);}
-.aw-workspace .aw-row-name {color:var(--ui-strong);}
-.aw-workspace .aw-records-summary {gap:12px;}
-.aw-workspace .aw-summary-item,.aw-workspace .aw-quick-link {
-  background:var(--ui-surface);border-color:var(--ui-border);color:var(--ui-strong);
-  box-shadow:var(--ui-shadow);border-radius:10px;
+.aw-workspace .aw-work-content :is(.aw-summary-item,.aw-quick-link,.aw-client-stat,.aw-client-mini-card,.aw-v2-empty) {
+  background:var(--ui-surface)!important;background-image:none!important;
+  border:1px solid var(--ui-border)!important;box-shadow:none!important;
+  color:var(--ui-strong)!important;border-radius:10px!important;
 }
-.aw-workspace .aw-summary-item:hover,.aw-workspace .aw-quick-link:hover {background:var(--ui-hover);border-color:var(--ui-accent);}
-.aw-workspace .aw-summary-number,.aw-workspace .aw-quick-icon {color:var(--ui-primary);}
-.aw-workspace .aw-quick-icon {background:var(--ui-raised);}
-.aw-workspace .aw-dashboard-footer {color:var(--ui-subtle);border-color:var(--ui-border);}
-.aw-workspace .aw-data-toolbar :is(input,select) {color:var(--ui-strong);}
-.aw-workspace .aw-data-toolbar :is(.aw-field,.aw-data-filter) {background:var(--ui-input);}
-.aw-workspace .aw-page-button,.aw-workspace .aw-row-open {
-  background:var(--ui-raised);border-color:var(--ui-border);color:var(--ui-primary);
+.aw-workspace .aw-work-content :is(.aw-summary-item,.aw-quick-link):hover {
+  background:var(--ui-raised)!important;border-color:var(--ui-muted)!important;
 }
-.aw-workspace .aw-page-button:hover,.aw-workspace .aw-row-open:hover{background:var(--ui-hover);}
-.aw-workspace .aw-insights-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(255px,.8fr);gap:14px;}
-.aw-workspace .aw-insights-card{min-width:0;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;padding:20px;box-shadow:var(--ui-shadow);}
-.aw-workspace .aw-insights-head{display:flex;align-items:start;justify-content:space-between;gap:12px;margin-bottom:18px;}
-.aw-workspace .aw-insights-title{color:var(--ui-strong);font-size:15px;font-weight:720;line-height:1.3;}
-.aw-workspace .aw-insights-hint{color:var(--ui-muted);font-size:12px;margin-top:5px;line-height:1.55;}
-.aw-workspace .aw-insights-bar-list{display:grid;gap:14px;}
-.aw-workspace .aw-insights-label{display:flex;justify-content:space-between;gap:12px;align-items:center;color:var(--ui-muted);font-size:12px;}
-.aw-workspace .aw-insights-label strong{color:var(--ui-strong);font-variant-numeric:tabular-nums;}
-.aw-workspace .aw-insights-track{height:9px;background:var(--ui-track);border-radius:999px;overflow:hidden;margin-top:7px;}
-.aw-workspace .aw-insights-fill{height:100%;min-width:0;background:linear-gradient(90deg,var(--ui-primary),#AE8BF4);border-radius:inherit;}
-.aw-workspace .aw-insights-overline {display:flex;align-items:center;gap:7px;color:var(--ui-muted);font-size:12px;}
-.aw-workspace .aw-insights-number {font-size:clamp(1.5rem,3vw,2rem);color:var(--ui-strong);font-weight:770;letter-spacing:-.045em;}
-.aw-workspace .aw-insights-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--ui-raised);color:var(--ui-primary);}
-.aw-workspace .aw-insights-divider {height:1px;background:var(--ui-border);margin:16px 0;}
-.aw-workspace .aw-insights-link {color:var(--ui-primary);font-size:12px;font-weight:650;text-decoration:none;}
-.aw-workspace .aw-insights-link:hover{text-decoration:underline;}
-/* The light theme explicitly corrects phased hard-coded dark surfaces while
-   leaving status/priority badges intact: their semantic colors must survive. */
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-module-root,.aw-dashboard,.aw-quote-page,.aw-report-page,.aw-client-directory,.aw-client-workspace,.aw-followups-page,.aw-meetings-page) {
+.aw-workspace .aw-work-content .aw-work-content-width :is(
+ .bg-white,.bg-slate-50,.bg-indigo-50,.bg-slate-100,.bg-indigo-100
+){background:var(--ui-surface)!important;}
+.aw-workspace .aw-work-content :is(
+ .border-slate-100,.border-slate-200,.border-indigo-100,.border-indigo-200
+){border-color:var(--ui-border)!important;}
+.aw-workspace .aw-work-content :is(
+ .text-slate-950,.text-slate-900,.text-slate-800,.text-slate-700,
+ .text-indigo-900,.text-indigo-800,.text-indigo-700,.text-indigo-600
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-work-content :is(
+ .text-slate-600,.text-slate-500,.text-slate-400,.text-slate-300,
+ .text-indigo-500,.text-violet-400,.text-purple-400
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-work-content :is(.aw-report-grid,.aw-stat-grid,.aw-finance-summary-grid){gap:14px;}
+.aw-workspace .aw-work-content .aw-stat-icon {
+  display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:9px;
+}
+
+/* Shared forms and actions: preserve semantic danger and status buttons. */
+.aw-workspace :is(.aw-button-primary,.btn-primary,.aw-v2-button-primary) {
+  background:var(--ui-primary)!important;background-image:none!important;
+  color:var(--ui-action-text)!important;
+  border:1px solid var(--ui-primary)!important;
+  box-shadow:none!important;border-radius:9px;
+  font-weight:640;
+}
+.aw-workspace :is(.aw-button-primary,.btn-primary,.aw-v2-button-primary):hover:not(:disabled) {
+  opacity:.88;filter:none!important;transform:none;
+}
+.aw-workspace :is(.aw-button-secondary,.btn-secondary,.aw-button-ghost,.aw-v2-button-secondary) {
+  background:var(--ui-raised)!important;background-image:none!important;
+  color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+  box-shadow:none!important;border-radius:9px;
+}
+.aw-workspace :is(.aw-button-secondary,.btn-secondary,.aw-button-ghost,.aw-v2-button-secondary):hover:not(:disabled) {
+  background:var(--ui-hover)!important;border-color:var(--ui-subtle)!important;
+  transform:none;
+}
+.aw-workspace :is(.btn-danger,.aw-button-danger) {
+  background:color-mix(in srgb,var(--ui-danger) 12%,var(--ui-surface))!important;
+  color:var(--ui-danger)!important;border-color:color-mix(in srgb,var(--ui-danger) 28%,var(--ui-border))!important;
+}
+.aw-workspace :is(.field,.aw-field,.aw-v2-field) {
+  background:var(--ui-input)!important;background-image:none!important;
   color:var(--ui-strong)!important;
+  border:1px solid var(--ui-border)!important;
+  box-shadow:none!important;border-radius:9px!important;
+  min-height:42px;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(h1,h2,h3,h4,legend,.aw-heading,.aw-panel-heading,.aw-card-title) {
-  color:var(--ui-strong)!important;
+.aw-workspace :is(.field,.aw-field,.aw-v2-field)::placeholder {color:var(--ui-subtle)!important;opacity:1;}
+.aw-workspace :is(.field,.aw-field,.aw-v2-field):focus {
+  outline:none;border-color:var(--ui-subtle)!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ui-strong) 14%,transparent)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.text-slate-900,.text-slate-950,.text-slate-800,.text-slate-700,.text-\[\#F4DFFF\]) {color:var(--ui-strong)!important;}
-.aw-workspace[data-theme="light"] .aw-work-content :is(.text-slate-600,.text-slate-500,.text-slate-400,.aw-description,.aw-module-meta,.aw-report-muted) {color:var(--ui-muted)!important;}
-.aw-workspace[data-theme="light"] .aw-work-content :is(.bg-white,.bg-slate-50,.bg-indigo-50,.bg-slate-100,.bg-indigo-100) {background:var(--ui-surface)!important;}
-.aw-workspace[data-theme="light"] .aw-work-content :is(.border-slate-200,.border-slate-100,.border-indigo-200) {border-color:var(--ui-border)!important;}
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-card,.aw-panel,.aw-stat,section.rounded-2xl.bg-white,.aw-client-panel,.aw-client-hero,.aw-quote-panel,.aw-report-card,.aw-report-toolbar,.aw-followups-register,.aw-meetings-register,.aw-finance-panels>*) {
-  background:var(--ui-surface)!important;border-color:var(--ui-border)!important;
-  box-shadow:var(--ui-shadow)!important;color:var(--ui-strong)!important;
+.aw-workspace .aw-work-content :is(
+ input[type="text"],input[type="email"],input[type="number"],input[type="tel"],
+ input[type="date"],input[type="datetime-local"],input[type="search"],
+ input[type="password"],select,textarea
+) {
+  accent-color:var(--ui-primary);color-scheme:inherit;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-register-table,.aw-client-table,.aw-finance-register,.aw-lead-table,.aw-followups-table,.aw-meetings-table,.aw-team-table,.aw-dashboard-table,.aw-table) {
-  background:var(--ui-surface);color:var(--ui-strong)!important;
+.aw-workspace .aw-work-content :is(
+ input[type="text"],input[type="email"],input[type="number"],input[type="tel"],
+ input[type="date"],input[type="datetime-local"],input[type="search"],
+ input[type="password"],select,textarea
+):not(.aw-field,.field) {
+  background-color:var(--ui-input);color:var(--ui-strong);
+  border-color:var(--ui-border);
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-register-table,.aw-client-table,.aw-finance-register,.aw-followups-table,.aw-meetings-table,.aw-team-table,.aw-table,.aw-dashboard-table) th {
+.aw-workspace .aw-work-content :is(input,textarea,select)::placeholder {
+  color:var(--ui-subtle);opacity:1;
+}
+.aw-workspace .aw-work-content :is(input,textarea,select):focus-visible,
+.aw-workspace :is(button,a,[role="button"]):focus-visible {
+  outline:2px solid var(--ui-focus)!important;outline-offset:3px;
+}
+.aw-workspace :is(.aw-label,.aw-v2-label) {color:var(--ui-strong)!important;font-size:13px;font-weight:620;}
+.aw-workspace .aw-work-content :is(label.text-slate-700,label.text-slate-800){color:var(--ui-strong)!important;}
+.aw-workspace :is(.aw-help,.aw-v2-help){color:var(--ui-muted)!important;}
+
+/* Shared tables, including the nested horizontal scroll regions. */
+.aw-workspace .aw-work-content :is(
+ .aw-table-scroll,.aw-register-scroll,.aw-finance-register-scroll,
+ .aw-dashboard-table-wrap,.aw-directory-table-scroll,.aw-client-table-wrap,
+ .aw-v2-table-viewport,.overflow-x-auto
+){border-color:var(--ui-border);scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);}
+.aw-workspace .aw-work-content :is(
+ .aw-table,.aw-register-table,.aw-finance-register,.aw-client-table,
+ .aw-lead-table,.aw-followups-table,.aw-meetings-table,.aw-team-table,
+ .aw-dashboard-table,.aw-v2-table,table
+){color:var(--ui-strong);font-size:13px;font-variant-numeric:tabular-nums;}
+.aw-workspace .aw-work-content :is(table,.aw-table) thead,
+.aw-workspace .aw-work-content :is(table,.aw-table) th {
   background:var(--ui-raised)!important;color:var(--ui-muted)!important;
+  border-color:var(--ui-border)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-register-table,.aw-client-table,.aw-finance-register,.aw-followups-table,.aw-meetings-table,.aw-team-table,.aw-table,.aw-dashboard-table) td {
-  background:transparent;color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+.aw-workspace .aw-work-content :is(table,.aw-table) td {
+  border-color:var(--ui-border)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-register-table,.aw-client-table,.aw-finance-register,.aw-followups-table,.aw-meetings-table,.aw-team-table,.aw-table,.aw-dashboard-table) tbody tr:hover {
+.aw-workspace .aw-work-content :is(table,.aw-table) tbody tr:hover {
   background:var(--ui-hover)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-quote-page,.aw-client-panel,.aw-client-hero,.aw-report-card,.aw-report-toolbar,.aw-followups-page,.aw-meetings-page) {
-  background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+.aw-workspace .aw-work-content :is(.aw-register-table,.aw-table,.aw-finance-register) td {
+  background:transparent;color:var(--ui-strong);
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.field,.aw-field,.aw-quote-page .field) {
-  background:var(--ui-input)!important;color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+.aw-workspace .aw-work-content .aw-data-toolbar :is(input,select) {
+  color:var(--ui-strong)!important;background:var(--ui-input)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.btn-secondary,.aw-button-secondary,.aw-report-refresh,.aw-client-btn,.aw-dashboard-refresh) {
-  background:var(--ui-raised)!important;color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+.aw-workspace :is(.aw-page-button,.aw-row-open,.aw-sort-button) {
+  color:var(--ui-strong)!important;background:var(--ui-raised)!important;
+  border-color:var(--ui-border)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-report-card-label,.aw-report-hero-label,.aw-report-details dt,.aw-client-crumb,.aw-client-hero p,.aw-quote-page p,.aw-quote-page label,.aw-panel-description,.aw-stat-description) {
-  color:var(--ui-muted)!important;
+
+/* Neutral pills and information notices. Semantic success/warning/error stay
+   tinted, so approvals and lead statuses remain distinguishable by meaning. */
+.aw-workspace :is(.aw-badge-neutral,.aw-badge-accent,.aw-v2-badge-neutral) {
+  color:var(--ui-strong)!important;background:var(--ui-raised)!important;
+  border-color:var(--ui-border)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-report-hero-value,.aw-insights-number,.aw-dashboard-title,.aw-summary-number,.aw-client-hero h1) {color:var(--ui-strong)!important;}
-.aw-workspace[data-theme="light"] .aw-work-content .aw-quote-page :is(.aw-quote-fixed-service,.aw-quote-mode,.aw-quote-catalog-button) {
-  background:var(--ui-raised)!important;border-color:var(--ui-border)!important;color:var(--ui-strong)!important;
+.aw-workspace :is(.aw-badge,.aw-module-pill,.aw-module-count,.aw-status-badge) {
+  border-radius:6px!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content .aw-quote-page :is(.aw-quote-fixed-service,.aw-quote-mode,.aw-quote-catalog-button) :is(p,span,strong) {
+.aw-workspace .aw-notice-info {
+  background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
   color:var(--ui-strong)!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content .aw-quote-page :is(.aw-quote-mode-active) {
-  border-color:var(--ui-primary)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-primary) 15%,transparent)!important;
+.aw-workspace .aw-notice-error,.aw-workspace .aw-notice-success {
+  background-image:none!important;
 }
-.aw-workspace[data-theme="light"] .aw-work-content .aw-work-content-width .aw-module-root :is(.aw-client-panel,.aw-directory-layout,.aw-lead-details) {color:var(--ui-strong);}
-.aw-workspace[data-theme="light"] .aw-work-content .aw-quick-link :is(strong,small),
-.aw-workspace[data-theme="light"] .aw-work-content .aw-summary-item :is(span,strong) {color:var(--ui-strong)!important;}
-.aw-workspace[data-theme="light"] .aw-work-content .aw-quick-link small {color:var(--ui-muted)!important;}
-.aw-workspace[data-theme="light"] .aw-work-content .aw-module-root :is(.aw-register-table td strong,.aw-register-table td span:not(.aw-status-badge)) {color:var(--ui-strong);}
-.aw-workspace :is(button,a,input,select,textarea):focus-visible {outline:2px solid var(--ui-primary);outline-offset:3px;}
-@media (max-width:1200px){.aw-workspace .aw-insights-grid{grid-template-columns:1fr;}.aw-workspace .aw-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
-@media (max-width:639px){
+/* Charts: remove all saturated gradients and chart overlays, not the actual data. */
+.aw-workspace .aw-work-content :is(
+ .aw-insights-fill,.aw-lead-bar-fill,.aw-lead-trend-area,.aw-report-progress,
+ .aw-summary-progress,.aw-progress-fill
+){background:var(--ui-strong)!important;background-image:none!important;}
+.aw-workspace .aw-work-content .aw-insights-track {
+  background:var(--ui-track);height:8px;border-radius:99px;
+}
+.aw-workspace .aw-work-content .aw-insights-fill {background:var(--ui-strong)!important;border-radius:inherit;}
+.aw-workspace .aw-work-content .aw-insights-card,
+.aw-workspace .aw-work-content .aw-report-card {
+  --aw-rgb:140,140,144;
+  backdrop-filter:none!important;
+}
+.aw-workspace .aw-work-content .aw-report-icon {
+  background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content .aw-report-card-top {
+  color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-quick-icon,.aw-summary-number,.aw-insights-link,.aw-quick-link strong){
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-report-mint,.aw-report-coral,.aw-report-cyan,.aw-report-pink,.aw-report-violet,.aw-report-amber){
+  background:var(--ui-surface)!important;--aw-rgb:140,140,144;
+}
+
+/* Prevent the old deep-purple route background and hero gradients from
+   leaking into either theme. Keep all specialised page layout rules intact. */
+.aw-workspace .aw-work-content :is(
+ .aw-quote-page,.aw-client-directory,.aw-client-workspace,.aw-followups-page,
+ .aw-meetings-page,.aw-report-page,.aw-finance-page,.aw-module-root,
+ .aw-dashboard,.aw-task-page,.aw-tasks-page
+){color:var(--ui-strong);background-color:transparent;}
+.aw-workspace .aw-work-content :is(
+ .aw-quote-fixed-service,.aw-quote-mode,.aw-quote-catalog-button,
+ .aw-report-toolbar,.aw-report-footnote,.aw-client-statrow > *,
+ .aw-cash-ledger,.aw-report-details,.aw-today-followup-card,
+ .aw-today-meeting-card,.aw-delivery-client,.aw-delivery-card
+){
+  background:var(--ui-surface)!important;background-image:none!important;
+  color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+  box-shadow:none!important;
+}
+.aw-workspace .aw-work-content :is(.aw-quote-mode-active,.aw-quote-catalog-button[aria-pressed="true"]){
+  border-color:var(--ui-strong)!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--ui-strong) 14%,transparent)!important;
+}
+.aw-workspace .aw-work-content :is(
+ .aw-client-crumb,.aw-client-hero p,.aw-quote-page p,.aw-quote-page label,
+ .aw-report-details dt,.aw-finance-muted,.aw-cash-ledger-currency
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-work-content .aw-quote-page :is(h1,h2,h3) {
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-report-toolbar,.aw-report-footnote,.aw-quote-panel){
+  border-radius:12px!important;
+}
+.aw-workspace .aw-work-content :is(.aw-report-card,.aw-insights-card) :is(.aw-report-hero-value,.aw-insights-number) {
+  color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-work-content :is(.aw-skeleton,.aw-lead-skeleton) {
+  background:linear-gradient(90deg,var(--ui-raised),var(--ui-hover),var(--ui-raised))!important;
+  background-size:200% 100%!important;
+}
+.aw-workspace .aw-work-content .aw-dialog,
+.aw-workspace .aw-dialog {
+  color:var(--ui-strong)!important;background:var(--ui-surface)!important;
+  border:1px solid var(--ui-border)!important;box-shadow:0 22px 70px #0005!important;
+}
+.aw-workspace .aw-dialog::backdrop {background:rgba(0,0,0,.65);}
+.aw-workspace .aw-dialog-content {background:var(--ui-surface);}
+.aw-workspace .aw-empty,.aw-workspace .aw-v2-empty {
+  background:var(--ui-raised);color:var(--ui-muted);border-color:var(--ui-border);
+}
+.aw-workspace .aw-empty-title {color:var(--ui-strong);}
+.aw-workspace .aw-divider {background:var(--ui-border);}
+.aw-workspace [aria-current="page"],.aw-workspace [aria-selected="true"] {
+  text-decoration-thickness:2px;
+}
+
+/* Keep the existing working dashboard / reporting charts, change colour only. */
+.aw-workspace .aw-live-insights {display:grid;gap:16px;}
+.aw-workspace .aw-insights-section-header {
+  display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px;
+}
+.aw-workspace .aw-insights-section-header h2 {color:var(--ui-strong);font-size:19px;font-weight:720;}
+.aw-workspace .aw-insights-section-header p {color:var(--ui-muted);font-size:12px;}
+.aw-workspace .aw-insights-eyebrow {color:var(--ui-muted)!important;letter-spacing:.1em;}
+.aw-workspace .aw-insights-metrics {grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;}
+.aw-workspace .aw-insights-metrics .aw-stat {min-height:128px;}
+.aw-workspace .aw-insights-metrics .aw-stat-value {
+  color:var(--ui-strong);font-size:clamp(1.5rem,2.5vw,1.95rem);font-weight:730;
+}
+.aw-workspace .aw-insights-grid {
+  display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.8fr);gap:14px;
+}
+.aw-workspace .aw-insights-head {
+  display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:18px;
+}
+.aw-workspace .aw-insights-title {color:var(--ui-strong);font-size:15px;font-weight:680;}
+.aw-workspace .aw-insights-hint {color:var(--ui-muted);font-size:12px;line-height:1.55;}
+.aw-workspace .aw-insights-bar-list {display:grid;gap:13px;}
+.aw-workspace .aw-insights-label {display:flex;justify-content:space-between;gap:12px;color:var(--ui-muted);font-size:12px;}
+.aw-workspace .aw-insights-label strong {color:var(--ui-strong);}
+.aw-workspace .aw-insights-track {margin-top:6px;}
+.aw-workspace .aw-insights-icon {
+  background:var(--ui-raised);color:var(--ui-strong);
+  border:1px solid var(--ui-border);border-radius:9px;
+}
+.aw-workspace .aw-insights-number {color:var(--ui-strong);font-size:clamp(1.5rem,3vw,2rem);font-weight:740;}
+.aw-workspace .aw-insights-divider {height:1px;background:var(--ui-border);margin:16px 0;}
+.aw-workspace .aw-insights-link {color:var(--ui-strong)!important;text-decoration:underline;text-underline-offset:3px;}
+.aw-workspace .aw-report-visuals {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.aw-workspace .aw-insights-card .aw-insights-chart-note {
+  font-size:11px;color:var(--ui-muted);margin-top:16px;
+}
+.aw-workspace :is(.aw-dashboard-refresh,.aw-report-refresh) {
+  background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+  border:1px solid var(--ui-border)!important;box-shadow:none!important;
+}
+.aw-workspace .aw-dashboard-title {font-size:clamp(1.75rem,2.5vw,2.4rem);}
+
+/* Restore legibility in modules still using hardcoded violet-era text. */
+.aw-workspace .aw-work-content :is(h1,h2,h3,h4,legend) {
+  color:var(--ui-strong);
+}
+.aw-workspace[data-theme="light"] .aw-work-content :is(
+ .aw-quote-page,.aw-report-page,.aw-client-panel,.aw-client-hero,.aw-followups-page,
+ .aw-meetings-page,.aw-stat,.aw-panel,.aw-card,.aw-report-card
+) :is(p,span,small,dt,dd) {color:inherit;}
+.aw-workspace[data-theme="light"] .aw-work-content :is(
+ .aw-stat-label,.aw-stat-description,.aw-report-card-label,.aw-report-hero-label,
+ .aw-panel-description,.aw-insights-hint,.aw-insights-overline
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-work-content :is(.aw-module-root,.aw-report-page,.aw-client-directory) a:not(.btn-primary,.aw-button-primary) {
+  text-underline-offset:3px;
+}
+
+/* The brand wordmark and client-provided images are never colour-filtered. */
+.aw-workspace :is(.aw-brand-wordmark,.aw-brand-symbol,img,video,canvas) {filter:none;}
+@media(max-width:1200px){
+  .aw-workspace .aw-insights-grid{grid-template-columns:1fr;}
+  .aw-workspace .aw-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:950px){
+  .aw-workspace .aw-report-visuals{grid-template-columns:1fr;}
+}
+@media(max-width:639px){
   .aw-workspace .aw-work-topbar{height:64px;}
   .aw-workspace .aw-work-content{min-height:calc(100svh - 64px);}
-  .aw-workspace .aw-work-content-width{padding:16px 13px 30px;}
+  .aw-workspace .aw-work-content-width{padding:16px 14px 30px;}
   .aw-workspace .aw-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .aw-workspace .aw-insights-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .aw-workspace .aw-insights-metrics .aw-stat{min-height:120px;padding:14px;}
   .aw-workspace .aw-insights-card{padding:16px;}
   .aw-workspace .aw-work-topactions{gap:5px;}
   .aw-workspace .aw-work-topactions .aw-theme-toggle{width:36px;min-width:36px;height:36px;}
-  .aw-workspace .aw-dashboard-title{font-size:1.7rem;}
+  .aw-workspace .aw-work-content :is(.field,.aw-field,input,textarea,select){font-size:16px;}
 }
-@media(prefers-reduced-motion:reduce) {
-  .aw-workspace :is(.aw-work-icon,.aw-quick-link,.aw-summary-item,.aw-insights-fill){animation:none!important;transition:none!important;}
-}
-
-/* Live analytics patterns used by Dashboard and Reports. */
-.aw-workspace .aw-live-insights{display:grid;gap:14px;}
-.aw-workspace .aw-insights-section-header{display:flex;align-items:end;justify-content:space-between;flex-wrap:wrap;gap:12px;}
-.aw-workspace .aw-insights-section-header h2{color:var(--ui-strong);font-size:19px;letter-spacing:-.028em;font-weight:740;margin-top:5px;}
-.aw-workspace .aw-insights-section-header p:not(.aw-insights-eyebrow){color:var(--ui-muted);font-size:12px;margin-top:4px;}
-.aw-workspace .aw-insights-eyebrow{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.105em;font-weight:760;color:var(--ui-primary);}
-.aw-workspace .aw-insights-metrics{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;}
-.aw-workspace .aw-insights-metrics .aw-stat{min-height:128px;}
-.aw-workspace .aw-insights-metrics .aw-stat-value{font-size:clamp(1.5rem,2.5vw,1.9rem);line-height:1.25;}
-.aw-workspace .aw-insights-error{padding:12px 14px;background:var(--ui-raised);border:1px solid var(--ui-border);border-radius:9px;color:var(--ui-muted);font-size:13px;}
-.aw-workspace .aw-report-visuals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
-.aw-workspace .aw-insights-card .aw-insights-chart-note{color:var(--ui-subtle);font-size:11px;margin-top:16px;}
-@media(max-width:950px){.aw-workspace .aw-report-visuals{grid-template-columns:1fr;}}
-@media(max-width:639px){
- .aw-workspace .aw-insights-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}
- .aw-workspace .aw-insights-metrics .aw-stat{padding:13px;min-height:122px;}
- .aw-workspace .aw-insights-metrics .aw-stat-description{font-size:11px;}
-}
-
-/* Contrast fixes for legacy gradient text and sidebar/surface composition. */
-.aw-workspace[data-theme="light"] .aw-gradient-text{
-  background:linear-gradient(115deg,#4E238F 0%,#7636B7 55%,#9B34A9 100%);
-  background-clip:text;-webkit-background-clip:text;-webkit-text-fill-color:transparent;
-}
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-dashboard-title,.aw-report-hero-value,.aw-report-hero-label,.aw-insights-number) {
-  text-shadow:none;
-}
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-report-card,.aw-stat,.aw-panel,.aw-card) {
-  background-image:none!important;
-}
-.aw-workspace[data-theme="light"] .aw-work-content :is(.aw-client-table,.aw-finance-register,.aw-register-table,.aw-followups-table,.aw-meetings-table) tr:nth-child(2n) {
-  background:var(--ui-raised);
-}
-.aw-workspace[data-theme="light"] .aw-work-content .aw-report-sectionhead :is(p,span) {color:var(--ui-muted);}
-.aw-workspace[data-theme="light"] .aw-work-content .aw-report-sectionhead h2 {color:var(--ui-strong);}
-.aw-workspace[data-theme="light"] .aw-work-content .aw-report-footnote {
-  background:var(--ui-surface);color:var(--ui-strong);border:1px solid var(--ui-border);
+@media(prefers-reduced-motion:reduce){
+  .aw-workspace :is(.aw-work-icon,.aw-quick-link,.aw-insights-fill,.aw-summary-item){
+    animation:none!important;transition:none!important;
+  }
 }
