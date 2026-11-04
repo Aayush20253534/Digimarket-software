@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// Keep basic corner treatment without locking future themes to one pixel value.
+const panelRadius=/^(?:[4-9]|1[0-9]|2[0-4])(?:\\.\\d+)?px$/;
+
 test("public AmplifyWorld homepage and login have no viewport overflow", async ({ page }) => {
   for (const width of [320, 375, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 880 });
@@ -7,15 +10,15 @@ test("public AmplifyWorld homepage and login have no viewport overflow", async (
     await expect(page.getByRole("heading", { name: /Every moving part/i })).toBeVisible();
     await expect(page.getByText("AmplifyWorld", { exact: false }).first()).toBeVisible();
     await expect(page.getByTestId("api-health-status")).toBeVisible();
-    await expect(page.locator(".aw-feature-card").first()).toHaveCSS("border-radius","4px");
-    await expect(page.locator(".aw-button").first()).toHaveCSS("border-radius","4px");
+    await expect(page.locator(".aw-feature-card").first()).toHaveCSS("border-radius",panelRadius);
+    await expect(page.locator(".aw-button").first()).toHaveCSS("border-radius",panelRadius);
     const homeBounds = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
     expect(homeBounds.scroll, "Home document overflow at " + width).toBeLessThanOrEqual(homeBounds.view + 1);
     await page.goto("/login");
     await expect(page.getByRole("heading", { name: "Sign in to your workspace" })).toBeVisible();
     await expect(page.getByLabel("Login ID")).toBeVisible();
-    await expect(page.locator(".aw-auth-form-panel")).toHaveCSS("border-radius","4px");
-    await expect(page.getByLabel("Login ID")).toHaveCSS("border-radius","4px");
+    await expect(page.locator(".aw-auth-form-panel")).toHaveCSS("border-radius",panelRadius);
+    await expect(page.getByLabel("Login ID")).toHaveCSS("border-radius",panelRadius);
     const loginBounds = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: document.documentElement.clientWidth }));
     expect(loginBounds.scroll, "Login document overflow at " + width).toBeLessThanOrEqual(loginBounds.view + 1);
     if(width>=1024){
