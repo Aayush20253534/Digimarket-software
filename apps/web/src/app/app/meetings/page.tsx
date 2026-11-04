@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
-import {CalendarDays,ChevronLeft,ChevronRight,MapPin,RefreshCw} from "lucide-react";
+import {CalendarDays,ChevronLeft,ChevronRight,MapPin,RefreshCw,Search} from "lucide-react";
+import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {useAuth} from "@/components/auth-provider";
 import {AWNotice} from "@/components/aw-ui";
 
@@ -30,6 +31,8 @@ export default function MeetingsPage(){
  const [total,setTotal]=useState<number|null>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
+ const [query,setQuery]=useState("");
+ const [dateView,setDateView]=useState<"all"|"today"|"upcoming"|"past">("all");
  const sequence=useRef(0);
 
  const load=useCallback(async()=>{
@@ -64,8 +67,16 @@ export default function MeetingsPage(){
    if(loading||!nextCursor)return;
    setHistory(h=>[...h,cursor]);setCursor(nextCursor);
  };
- if(!session)return <p role="status" className="aw-meetings-loading">Checking meeting access…</p>;
+ const todayIndia=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Kolkata"}).format(new Date());
+ const dateKey=(iso:string)=>new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Kolkata"}).format(new Date(iso));
+ const meetingGroup=(item:ScheduledMeeting)=>dateKey(item.meetingAt)<todayIndia?"past":dateKey(item.meetingAt)===todayIndia?"today":"upcoming";
+ const todays=rows.filter(item=>meetingGroup(item)==="today").length;
+ const upcoming=rows.filter(item=>meetingGroup(item)==="upcoming").length;
+ const visible=rows.filter(item=>(dateView==="all"||meetingGroup(item)===dateView)&&
+  (!query.trim()||[item.businessName,item.contactName??"",item.phone??"",item.location??""].some(value=>value.toLowerCase().includes(query.trim().toLowerCase()))));
+  if(!session)return <p role="status" className="aw-meetings-loading">Checking meeting access…</p>;
  return <div className="aw-meetings-page" data-testid="meetings-page">
+   <SalesWorkspaceNav/>
    <header className="aw-meetings-header">
      <div>
        <p className="aw-eyebrow">LEADS CRM / SCHEDULE</p>
@@ -78,6 +89,21 @@ export default function MeetingsPage(){
      </button>
    </header>
    {!canRead&&<AWNotice tone="error">You do not have permission to view leads.</AWNotice>}
+   {canRead&&<>
+    <section className="aw-v3-schedule-summary" aria-label="Meeting status on this page">
+     {([["Total scheduled",total],["On this page",rows.length],["Today",todays],["Upcoming",upcoming]] as const).map(([label,value])=>
+      <div key={label} className="aw-v3-schedule-stat"><span>{label}</span><strong>{loading?"…":value??"—"}</strong></div>)}
+    </section>
+    <div className="aw-v3-schedule-toolbar">
+     <label className="aw-v3-search"><Search size={17} aria-hidden="true"/><span className="sr-only">Search visible meetings</span>
+      <input aria-label="Search visible meetings" value={query} placeholder="Find business, contact or location on this page"
+       onChange={e=>setQuery(e.target.value)}/></label>
+     <div role="group" aria-label="Meeting date filter" className="aw-v3-chip-row">
+      {([["all","All"],["today","Today"],["upcoming","Upcoming"],["past","Past"]] as const).map(([key,label])=>
+       <button type="button" key={key} aria-pressed={dateView===key} onClick={()=>setDateView(key)}>{label}</button>)}
+     </div>
+    </div>
+   </>}
    {canRead&&<section className="aw-meetings-register" aria-label="Scheduled meetings">
      {error&&<div className="aw-meetings-error"><AWNotice tone="error">{error}</AWNotice></div>}
      {loading&&<p className="aw-meetings-loading" role="status">Loading scheduled meetings…</p>}
@@ -91,7 +117,7 @@ export default function MeetingsPage(){
            <th scope="col">Phone number</th>
            <th scope="col">Address</th>
          </tr></thead>
-         <tbody>{rows.map(meeting=><tr key={meeting.id}>
+         <tbody>{visible.map(meeting=><tr key={meeting.id}>
            <td><time dateTime={meeting.meetingAt}>{dateText(meeting.meetingAt)}</time></td>
            <td><time dateTime={meeting.meetingAt}>{timeText(meeting.meetingAt)}</time></td>
            <td><Link className="aw-meetings-business" href={"/app/leads?focus="+encodeURIComponent(meeting.id)}>
@@ -107,8 +133,8 @@ export default function MeetingsPage(){
          </tr>)}</tbody>
        </table>
      </div>
-     {!loading&&!error&&rows.length===0&&
-       <p className="aw-meetings-empty">No meetings are currently scheduled. Set a meeting date and time in Leads CRM.</p>}
+     {!loading&&!error&&visible.length===0&&
+       <p className="aw-meetings-empty">{rows.length?"No meetings match this page filter. Clear the search or choose All.":"No meetings are currently scheduled. Set a meeting date and time in Leads CRM."}</p>}
      <nav className="aw-meetings-pagination" aria-label="Meetings pages">
        <button type="button" onClick={previous} disabled={loading||history.length===0}>
          <ChevronLeft size={16}/>Previous
