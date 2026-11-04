@@ -109,7 +109,7 @@ CI runs an isolated Postgres instance and bootstraps `admin-e2e`; **no real clie
 
 - `apps/web/tests/phase0-ui-baseline.spec.ts` captures current authenticated **admin** routes with dark/light desktop screenshots and representative tablet/mobile views.
 - The existing `workspace.spec.ts` captures one current **founder** and one **employee** dashboard after each role has authenticated, without changing their workflows.
-- Files are emitted to `apps/web/test-results/phase0-baseline/` and uploaded from **Module 4 Browser Integration** as `digimarket-ui-v2-phase0-baseline` for each CI run. The screenshot evidence is a CI artifact, not a permanent pixel-by-pixel approval test.
+- Files are emitted to `apps/web/artifacts/ui-v2-phase0/` and uploaded from **Module 4 Browser Integration** as `digimarket-ui-v2-phase0-baseline` for each CI run. The screenshot evidence is a CI artifact, not a permanent pixel-by-pixel approval test.
 - A JSON manifest records role, route, theme, viewport, document overflow measurements and sidebar labels. This documents known layout defects without asserting that the existing UI is already perfect.
 - The login/public pages already have responsive browser tests in `public-auth.spec.ts` and `design-preview.spec.ts`.
 
