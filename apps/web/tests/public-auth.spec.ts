@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // Keep basic corner treatment without locking future themes to one pixel value.
-const panelRadius=/^(?:[4-9]|1[0-9]|2[0-4])(?:\\.\\d+)?px$/;
+const panelRadius=/^(?:[4-9]|1[0-9]|2[0-4])(?:[.][0-9]+)?px$/;
 
 test("public AmplifyWorld homepage and login have no viewport overflow", async ({ page }) => {
   for (const width of [320, 375, 390, 768, 1024, 1440]) {
