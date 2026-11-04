@@ -257,20 +257,7 @@
 .aw-finance-register td:nth-child(7){min-width:145px}
 .aw-finance-admin-modal .field{min-width:0;width:100%}
 
-/* Compact desktop density: scale the application as one cohesive unit without
-   expanding its percentage width beyond the document viewport. Mobile retains
-   natural 100% sizing and accessible touch targets. */
-@media (min-width:1024px){
-  .aw-workspace{
-    zoom:.75;
-    width:100%;
-    max-width:100%;
-    /* CSS zoom scales the visual box too. Compensate the viewport height. */
-    min-height:133.3334svh;
-  }
-  .aw-workspace .aw-work-main{min-height:133.3334svh}
-  .aw-workspace .aw-work-content{min-height:calc(133.3334svh - 72px)}
-}
+/* DigiMarket UI v2 uses native 100% desktop scaling for legibility. */
 /* If a scaled page ends before the viewport, never reveal the public light theme. */
 body:has(> #__next .aw-workspace),
 body:has(.aw-workspace){background:#09070e}
