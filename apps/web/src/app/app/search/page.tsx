@@ -53,7 +53,7 @@ export default function SearchPage(){
    </form>
   </Card>
   {error&&<Notice kind="error">{error}</Notice>}
-  {submitted&&<Card title={"Results for "+submitted} description="The backend enforces user ownership, assignment and module permissions.">
+  {submitted&&!error&&<Card title={"Results for "+submitted} description="The backend enforces user ownership, assignment and module permissions.">
    {busy?<p role="status" className="aw-v7-search-status">Searching your permitted records…</p>:
     !completed?null:
     !results.length?<EmptyState title="No matching records" description="Try another title or business name."/>:
