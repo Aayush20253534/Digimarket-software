@@ -191,7 +191,7 @@ describe("Meta Ads register scopes", () => {
     expect(all.filter(x=>x.sourceType==="SALARY").reduce((n,x)=>n.plus(x.amount),new Prisma.Decimal(0)).toFixed(2))
       .toBe("5000.00");
     expect(all.filter(x=>x.sourceType==="SALARY").map(x=>x.enteredById).sort()).toEqual([founderA,founderB].sort());
-    expect(findTransactions).not.toHaveBeenCalled();
+    expect(findTransactions).toHaveBeenCalledTimes(3);
     const csv=await service.exportCsv(admin,"all");
     expect(csv.csv).toContain("salary:00000000-0000-4000-8000-000000000021");
     expect(csv.csv).toContain("salary:00000000-0000-4000-8000-000000000022");
