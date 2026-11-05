@@ -1,6 +1,7 @@
 "use client";
 import {useCallback,useEffect,useState,type FormEvent} from "react";
 import Link from "next/link";
+import {usePathname} from "next/navigation";
 import {UsersRound,Users,Plug,Building2,ArrowUpRight} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
@@ -16,6 +17,7 @@ const err=(e:unknown)=>e instanceof ApiError?e.message:e instanceof Error?e.mess
 const categoryOrder=["GENERAL","FINANCE","CONTENT","DELIVERABLE"];
 export default function CompanySettingsPage(){
  const {session,request}=useAuth();
+ const pathname=usePathname();
  const canManage=!!session?.identity.permissions.includes("organization.settings.manage");
  const [settings,setSettings]=useState<Settings|null>(null);
  const [org,setOrg]=useState({name:"",timezone:"Asia/Kolkata"});
@@ -51,25 +53,32 @@ export default function CompanySettingsPage(){
  const canFounders=grants.includes("founders.read");
  const canTeam=grants.includes("users.read");
  const canIntegrate=canManage&&session.identity.roles.includes("FOUNDER");
+ const canFinance=grants.includes("finance.read.all")||grants.includes("finance.entry.read.own");
  const sections=[
   ...(canManage?[{label:"Company settings",href:"/app/settings",description:"Organization, billing and policies",icon:Building2}]:[]),
   ...(canTeam?[{label:"Team & Access",href:"/app/team/users",description:"Accounts and permissions",icon:Users}]:[]),
   ...(canFounders?[{label:"Founders",href:"/app/founders",description:"Responsibilities and governance",icon:UsersRound}]:[]),
   ...(canIntegrate?[{label:"Integrations",href:"/app/integrations/chatgpt",description:"Connected CRM integrations",icon:Plug}]:[]),
  ];
- const hub=<nav aria-label="Settings sections" className="aw-v2-settings-grid">
+ const hub=<nav aria-label="Settings sections" className="aw-v2-settings-grid aw-v6-settings-hub">
   {sections.map(({label,href,description,icon:Icon})=><Link key={href} href={href}
-    className="aw-v2-settings-link"><Icon size={19} aria-hidden="true"/>
+    className="aw-v2-settings-link" aria-current={pathname===href?"page":undefined}><Icon size={19} aria-hidden="true"/>
     <span><strong>{label}</strong><small>{description}</small></span><ArrowUpRight size={16} aria-hidden="true"/></Link>)}
  </nav>;
- if(!canManage)return <div className="space-y-5">
+ if(!canManage)return <div className="aw-v6-settings-page space-y-5" data-aw-module="settings">
   <PageHeader eyebrow="Administration" title="Settings" description="Available administration areas depend on your existing permissions."/>
   {sections.length?hub:<Notice kind="error">Settings access is restricted to authorized roles.</Notice>}
  </div>;
- return <div className="space-y-6">
+ return <div className="aw-v6-settings-page space-y-6" data-aw-module="settings">
   <PageHeader eyebrow="Administration" title="Settings"
    description="Company settings, team, founders and integrations are grouped here."/>
   {hub}
+  {settings&&<section className="aw-v6-settings-summary" aria-label="Configuration summary">
+    <div><span>Organization</span><strong>{settings.organization.name}</strong></div>
+    <div><span>Default currency</span><strong>{settings.organization.defaultCurrency}</strong></div>
+    <div><span>Active finance categories</span><strong>{settings.financeCategories.reduce((n,c)=>n+c.activeCount,0)}</strong></div>
+    <div><span>Active approval policies</span><strong>{settings.approvalPolicies.filter(p=>p.active).length}</strong></div>
+   </section>}
   {error&&<Notice kind="error">{error}</Notice>}
   {success&&<Notice kind="success">{success}</Notice>}
   {loading&&<Spinner label="Loading company configuration…"/>}
@@ -99,8 +108,8 @@ export default function CompanySettingsPage(){
        <span>{kind==="INCOME"?"Income":"Expense"} categories</span>
        <b>{settings.financeCategories.find(c=>c.kind===kind)?.activeCount??0} active</b></div>)}</div>
      <div className="mt-4 flex flex-wrap gap-2">
-      {session.identity.permissions.includes("finance.category.manage")&&<Link href="/app/finance" className="btn-secondary">Manage finance categories</Link>}
-      <Link href="/app/finance" className="text-sm text-indigo-700 underline">Finance ledger</Link>
+      {canFinance&&session.identity.permissions.includes("finance.category.manage")&&<Link href="/app/finance" className="btn-secondary">Manage finance categories</Link>}
+      {canFinance&&<Link href="/app/finance" className="btn-secondary">Finance ledger</Link>}
      </div>
     </Card>
     <Card title="Approval policies" description="Content, deliverable, finance and general approvals retain their own policy controls and role checks.">
@@ -116,7 +125,7 @@ export default function CompanySettingsPage(){
    </div>
    <Card title="Team governance" description="Manage roles without changing historical finance data.">
     <div className="flex flex-wrap gap-2">
-     <Link href="/app/founders" className="btn-secondary">Founder responsibilities</Link>
+     {canFounders&&<Link href="/app/founders" className="btn-secondary">Founder responsibilities</Link>}
      {session.identity.permissions.includes("users.read")&&<Link href="/app/team/users" className="btn-secondary">Account management</Link>}
     </div>
    </Card>
