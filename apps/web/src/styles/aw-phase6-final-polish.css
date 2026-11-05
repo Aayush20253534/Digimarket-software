@@ -390,3 +390,26 @@
   transition:none!important;animation:none!important;
  }
 }
+
+/* Final specificity correction for old [data-restyled] Tailwind overrides.
+ * The old violet-era rule targets .aw-work-content .text-slate-* with higher
+ * specificity than plain page headings. Match that context explicitly so
+ * both light/dark card titles and supporting descriptions remain legible. */
+.aw-workspace[data-restyled="true"] .aw-work-content :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(h1,h2,h3,h4,strong,.text-slate-900,.text-slate-950,.text-slate-800,.text-slate-700){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(.text-slate-600,.text-slate-500,.text-slate-400){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(.text-indigo-600,.text-indigo-700,.text-indigo-800){
+ color:var(--ui-strong)!important;
+}
