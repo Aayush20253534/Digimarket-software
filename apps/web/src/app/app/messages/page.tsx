@@ -146,11 +146,11 @@ export default function MessagesPage(){
    if(!valid())return;
    setAttachment({name:file.name,mime:file.type||"application/octet-stream",data:String(reader.result)});
    setError("");setReadingFile(false);
-   activeReader.current=null;
+   if(activeReader.current===reader)activeReader.current=null;
   };
   reader.onerror=()=>{
    if(valid()){setError("File could not be read.");setReadingFile(false);}
-   activeReader.current=null;
+   if(activeReader.current===reader)activeReader.current=null;
   };
   reader.readAsDataURL(file);
  };
