@@ -24,44 +24,73 @@ export default function MessagesPage(){
  const [items,setItems]=useState<Message[]>([]);
  const [draft,setDraft]=useState("");
  const [attachment,setAttachment]=useState<Attachment|null>(null);
+ const [readingFile,setReadingFile]=useState(false);
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
  const [loadingMembers,setLoadingMembers]=useState(true);
  const [loadingChat,setLoadingChat]=useState(false);
  const selectedRef=useRef("");
+ const activeUserRef=useRef(session?.identity.userId);
+ activeUserRef.current=session?.identity.userId;
+ const membersSequence=useRef(0);
+ const threadSequence=useRef(0);
+ const attachmentSequence=useRef(0);
+ const activeReader=useRef<FileReader|null>(null);
  const bottom=useRef<HTMLDivElement>(null);
  const threadRef=useRef<HTMLDivElement>(null);
  const userId=session?.identity.userId;
 
  const reloadMembers=useCallback(async()=>{
-  if(!session)return;
+  const owner=session?.identity.userId;
+  if(!owner)return;
+  const run=++membersSequence.current;
   try{
    const response=await request<{items:Person[]}>("/messages/users");
+   if(run!==membersSequence.current||activeUserRef.current!==owner)return;
    setPeople(response.items);
-   setError("");
-  }catch(e){setError(e instanceof Error?e.message:"Cannot load members");}
-  finally{setLoadingMembers(false);}
- },[request,session]);
+  }catch(e){
+   if(run===membersSequence.current&&activeUserRef.current===owner)
+    setError(e instanceof Error?e.message:"Cannot load members");
+  }finally{
+   if(run===membersSequence.current&&activeUserRef.current===owner)setLoadingMembers(false);
+  }
+ },[request,session?.identity.userId]);
+ useEffect(()=>{
+  // A background member refresh or file read must never survive an account
+  // switch with the previous account's messages or attachment in React state.
+  membersSequence.current++;
+  threadSequence.current++;
+  attachmentSequence.current++;
+  activeReader.current?.abort();
+  activeReader.current=null;
+  selectedRef.current="";
+  setPeer("");setPeople([]);setItems([]);setDraft("");setAttachment(null);setReadingFile(false);
+  setMemberQuery("");setMemberFilter("all");setBusy(false);setLoadingChat(false);
+  setError("");setLoadingMembers(Boolean(userId));
+ },[userId]);
  useEffect(()=>{
   if(!session)return;
   void reloadMembers();
   const handle=window.setInterval(()=>{if(document.visibilityState==="visible")void reloadMembers();},12000);
   return()=>window.clearInterval(handle);
- },[session,reloadMembers]);
+ },[session?.identity.userId,reloadMembers]);
 
  const loadThread=useCallback(async(target:string)=>{
-  if(!target)return;
+  const owner=activeUserRef.current;
+  if(!target||!owner)return;
+  const run=++threadSequence.current;
+  const stillCurrent=()=>run===threadSequence.current&&selectedRef.current===target&&activeUserRef.current===owner;
   try{
    const data=await request<{items:Message[]}>("/messages?with="+encodeURIComponent(target));
-   if(selectedRef.current!==target)return;
+   if(!stillCurrent())return;
    setItems(data.items);
    if(document.visibilityState==="visible"){
     await request("/messages/read/"+target,{method:"POST",body:{}});
-    if(selectedRef.current===target)setPeople(prev=>prev.map(p=>p.id===target?{...p,unreadCount:0}:p));
+    if(stillCurrent())setPeople(prev=>prev.map(p=>p.id===target?{...p,unreadCount:0}:p));
    }
-   setError("");
-  }catch(e){if(selectedRef.current===target)setError(e instanceof Error?e.message:"Conversation could not load");}
-  finally{if(selectedRef.current===target)setLoadingChat(false);}
+   if(stillCurrent())setError("");
+  }catch(e){if(stillCurrent())setError(e instanceof Error?e.message:"Conversation could not load");}
+  finally{if(stillCurrent())setLoadingChat(false);}
  },[request]);
  useEffect(()=>{
   if(!peer)return;
@@ -80,29 +109,58 @@ export default function MessagesPage(){
 
  const choose=(id:string)=>{
   if(peer===id){void loadThread(id);return;}
+  // Invalidate old thread loads and file reads even if this peer is later reopened.
+  threadSequence.current++;
+  attachmentSequence.current++;
+  activeReader.current?.abort();
+  activeReader.current=null;
   selectedRef.current=id;
-  setPeer(id);setDraft("");setAttachment(null);setError("");
+  setPeer(id);setItems([]);setLoadingChat(Boolean(id));setDraft("");setAttachment(null);setReadingFile(false);setError("");
  };
  const send=async()=>{
-  if(!peer||(!draft.trim()&&!attachment)||busy)return;
+  const target=peer,owner=activeUserRef.current;
+  if(!target||!owner||(!draft.trim()&&!attachment)||busy||readingFile)return;
+  const body={recipientId:target,text:draft,...(attachment?{attachment}:{})};
   setBusy(true);setError("");
   try{
-   await request("/messages",{method:"POST",body:{recipientId:peer,text:draft,...(attachment?{attachment}:{})}});
-   setDraft("");setAttachment(null);
-   await loadThread(peer);await reloadMembers();
-  }catch(e){setError(e instanceof Error?e.message:"Message could not be sent");}
-  finally{setBusy(false);}
+   await request("/messages",{method:"POST",body});
+   if(activeUserRef.current!==owner)return;
+   if(selectedRef.current===target){
+    setDraft("");setAttachment(null);
+    attachmentSequence.current++;
+    await loadThread(target);
+   }
+   await reloadMembers();
+  }catch(e){
+   if(activeUserRef.current===owner&&selectedRef.current===target)
+    setError(e instanceof Error?e.message:"Message could not be sent");
+  }finally{if(activeUserRef.current===owner)setBusy(false);}
  };
  const addFile=(file?:File)=>{
-  if(!file)return;
+  if(!file||!peer)return;
+  const target=peer,owner=activeUserRef.current,run=++attachmentSequence.current;
+  activeReader.current?.abort();
+  activeReader.current=null;
+  setAttachment(null);setReadingFile(false);
   if(file.size>1024*1024){setError("Attachments must be 1 MB or smaller.");return;}
+  setError("");setReadingFile(true);
   const reader=new FileReader();
-  reader.onload=()=>setAttachment({name:file.name,mime:file.type||"application/octet-stream",data:String(reader.result)});
-  reader.onerror=()=>setError("File could not be read.");
+  activeReader.current=reader;
+  const valid=()=>run===attachmentSequence.current&&selectedRef.current===target&&activeUserRef.current===owner;
+  reader.onload=()=>{
+   if(!valid())return;
+   setAttachment({name:file.name,mime:file.type||"application/octet-stream",data:String(reader.result)});
+   setError("");setReadingFile(false);
+   if(activeReader.current===reader)activeReader.current=null;
+  };
+  reader.onerror=()=>{
+   if(valid()){setError("File could not be read.");setReadingFile(false);}
+   if(activeReader.current===reader)activeReader.current=null;
+  };
   reader.readAsDataURL(file);
  };
  const current=people.find(p=>p.id===peer);
- const filtered=people.filter(p=>(memberFilter==="all"||p.unreadCount>0)&&
+ const filtered=people.filter(p=>(memberFilter==="all"||p.unreadCount>0||p.id===peer)&&
   (p.displayName+" "+p.loginId).toLowerCase().includes(memberQuery.trim().toLowerCase()));
  const unreadTotal=people.reduce((sum,p)=>sum+p.unreadCount,0);
  return <div className="aw-messages-page aw-v6-messages" data-testid="workspace-messages">
@@ -158,6 +216,7 @@ export default function MessagesPage(){
      <div ref={bottom}/>
     </div>
     <div className="aw-chat-composer">
+     {readingFile&&<p className="aw-v7-chat-file-status" role="status">Preparing attachment…</p>}
      {attachment&&<div className="aw-chat-upload-preview"><Paperclip size={16}/><span>{attachment.name}</span>
        <button type="button" aria-label="Remove attachment" onClick={()=>setAttachment(null)}><X size={16}/></button></div>}
      <form onSubmit={e=>{e.preventDefault();void send();}} className="aw-chat-compose-row">
@@ -166,7 +225,7 @@ export default function MessagesPage(){
       </label>
       <input className="aw-chat-input" aria-label="Message" placeholder={"Message "+current.displayName+"..."} value={draft} maxLength={5000}
         onChange={e=>setDraft(e.target.value)}/>
-      <button type="submit" className="aw-chat-send" disabled={busy||(!draft.trim()&&!attachment)} aria-label="Send message"><Send size={19}/></button>
+      <button type="submit" className="aw-chat-send" disabled={busy||readingFile||(!draft.trim()&&!attachment)} aria-label="Send message"><Send size={19}/></button>
      </form>
     </div>
    </>:<div className="aw-chat-blank"><span className="aw-chat-blank-icon"><Users size={40}/></span>

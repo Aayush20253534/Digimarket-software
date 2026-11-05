@@ -404,6 +404,29 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(conversations.getByRole("button",{name:/Unread/})).toHaveAttribute("aria-pressed","true");
   await conversations.getByRole("button",{name:"All members"}).click();
   await expect(conversations.getByRole("button",{name:"All members"})).toHaveAttribute("aria-pressed","true");
+  // Phase 7 privacy: a FileReader can finish after leaving a conversation.
+  // The isolated founder fixture may have just one activated contact; verify
+  // clearing on close/reopen without assuming an additional production user.
+  const contacts=page.locator(".aw-chat-contact");
+  await expect(contacts.first()).toBeVisible();
+  await contacts.first().click();
+  await page.evaluate(()=>{
+   const OriginalFileReader=window.FileReader;
+   window.FileReader=class extends OriginalFileReader{
+    readAsDataURL(blob:Blob){
+     window.setTimeout(()=>super.readAsDataURL(blob),200);
+    }
+   };
+  });
+  await page.getByLabel("Attach file").setInputFiles({
+   name:"phase7-private.txt",mimeType:"text/plain",buffer:Buffer.from("CI attachment; never send")
+  });
+  await page.locator(".aw-chat-back").evaluate(button=>(button as HTMLButtonElement).click());
+  await contacts.first().click();
+  await expect(page.locator(".aw-chat-upload-preview")).toHaveCount(0);
+  await page.waitForTimeout(240);
+  await expect(page.locator(".aw-chat-upload-preview")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Send message"})).toBeDisabled();
   await expect(page.getByRole("link",{name:"Open Notes Studio"})).toHaveCount(0);
   // Theme tokens must reach internal chat scroll containers, not only the app shell.
   if(await page.getByRole("button",{name:"Switch to dark theme"}).count()){
@@ -972,6 +995,38 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await capturePhase0Role(page,"employee");
+  // Phase 7: a slow search response cannot replace newer results. This uses
+  // only the isolated CI account, and mocks reads without mutating records.
+  await visitWorkspace(page,"/app/search");
+  await expect(page.getByRole("heading",{name:"My workspace search"})).toBeVisible();
+  let releaseOld:()=>void=()=>{};
+  let acknowledgeOld:()=>void=()=>{};
+  const oldGate=new Promise<void>(resolve=>{releaseOld=resolve;});
+  const oldDelivered=new Promise<void>(resolve=>{acknowledgeOld=resolve;});
+  const pattern="**/api/v1/search?*";
+  await page.route(pattern,async route=>{
+   const term=new URL(route.request().url()).searchParams.get("q")??"";
+   if(term==="phase7-old")await oldGate;
+   await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{
+    query:term,items:[{id:term,kind:"task",
+     title:term==="phase7-old"?"Old result":"Latest result",
+     detail:"Isolated test response",href:"/app/tasks"}]
+   }})});
+   if(term==="phase7-old")acknowledgeOld();
+  });
+  const queryBox=page.getByPlaceholder("Client, task, invoice number…");
+  await queryBox.fill("phase7-old");
+  await page.getByRole("button",{name:"Search",exact:true}).click();
+  await expect(page.getByRole("status").getByText("Searching your permitted records…")).toBeVisible();
+  await queryBox.fill("phase7-new");
+  await page.getByRole("button",{name:"Search again"}).click();
+  await expect(page.getByRole("link",{name:/Latest result/})).toBeVisible();
+  releaseOld();
+  await oldDelivered;
+  await expect(page.getByRole("link",{name:/Latest result/})).toBeVisible();
+  await expect(page.getByRole("link",{name:/Old result/})).toHaveCount(0);
+  await page.unroute(pattern);
+  await visitWorkspace(page,"/app/dashboard");
   await expect(page.locator('[data-dashboard-role="member"]')).toBeVisible();
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Tasks",exact:true})).toBeVisible();

@@ -1,0 +1,39 @@
+/*
+ * DigiMarket UI v2 — Phase 7: async operation feedback and privacy safeguards.
+ * No new backend state, permissions or data model changes.
+ */
+.aw-workspace .aw-v7-search-status{
+ display:flex;align-items:center;gap:10px;
+ padding:15px 17px;min-height:56px;
+ background:var(--ui-raised);color:var(--ui-muted)!important;
+ border:1px solid var(--ui-border);border-radius:9px;
+ font-size:12px;line-height:1.55;
+}
+.aw-workspace .aw-v7-search-status::before{
+ content:"";width:13px;height:13px;flex:none;
+ border:2px solid var(--ui-subtle);
+ border-top-color:var(--ui-strong);
+ border-radius:50%;animation:aw-v7-search-spin .75s linear infinite;
+}
+.aw-workspace .aw-v7-chat-file-status{
+ display:flex;align-items:center;gap:9px;
+ font-size:12px;line-height:1.5;
+ padding:10px 11px;margin-bottom:11px;
+ color:var(--ui-muted)!important;background:var(--ui-raised);
+ border:1px solid var(--ui-border);border-radius:9px;
+}
+.aw-workspace .aw-v7-chat-file-status::before{
+ content:"";width:12px;height:12px;flex:none;
+ border:2px solid var(--ui-subtle);
+ border-top-color:var(--ui-strong);
+ border-radius:50%;animation:aw-v7-search-spin .75s linear infinite;
+}
+.aw-workspace .aw-v6-messages .aw-chat-send:disabled{
+ opacity:.55;cursor:not-allowed;
+}
+@keyframes aw-v7-search-spin{to{transform:rotate(360deg);}}
+@media(prefers-reduced-motion:reduce){
+ .aw-workspace :is(.aw-v7-search-status,.aw-v7-chat-file-status)::before{
+  animation:none!important;
+ }
+}
