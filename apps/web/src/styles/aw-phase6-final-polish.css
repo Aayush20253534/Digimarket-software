@@ -436,3 +436,26 @@
  background:var(--ui-raised)!important;background-image:none!important;
  border:1px solid var(--ui-border)!important;
 }
+
+/* Keep profile borders neutral, and let account status badges retain their
+ * semantic meaning instead of the violet-era global Tailwind colour mapping. */
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ .aw-profile-photo-frame{
+ border:1px solid var(--ui-border)!important;
+ box-shadow:none!important;outline:0!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ :is(.border-slate-200,.max-h-52,.bg-slate-100){
+ border-color:var(--ui-border)!important;
+ background:var(--ui-raised)!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ .bg-emerald-50.text-emerald-700{
+ color:var(--stage-success-fg)!important;background:var(--stage-success-bg)!important;
+ border:1px solid var(--stage-success-border)!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ .bg-red-50.text-red-700{
+ color:var(--stage-danger-fg)!important;background:var(--stage-danger-bg)!important;
+ border:1px solid var(--stage-danger-border)!important;
+}
