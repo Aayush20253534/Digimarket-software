@@ -521,11 +521,15 @@ export class FinanceService {
     const clientSum=(status:"POSTED"|"PENDING")=>clientGroups
       .filter(g=>g.status===status)
       .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
+    // Client-funded Meta Ads are outside agency expenses, but posted spend
+    // reduces the net amount retained from received income. Pending, rejected
+    // and cancelled client spending must never reduce the posted net.
+    const postedClientAds=clientSum("POSTED");
     return {currency:"INR",postedIncome:income.toFixed(4),postedExpense:expense.toFixed(4),
-      postedNet:income.minus(expense).toFixed(4),
+      postedNet:income.minus(expense).minus(postedClientAds).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
       pendingExpense:sum("EXPENSE","PENDING").toFixed(4),groups:entries,
-      clientAdSpend:{posted:clientSum("POSTED").toFixed(4),pending:clientSum("PENDING").toFixed(4),
+      clientAdSpend:{posted:postedClientAds.toFixed(4),pending:clientSum("PENDING").toFixed(4),
         count:clientGroups.filter(g=>g.status!=="CANCELLED").reduce((n,g)=>n+g._count._all,0)},
        ...(view==="all"?{recurringIncome:await this.recurringIncome(actor)}:{})};
   }
