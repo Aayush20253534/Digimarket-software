@@ -537,7 +537,7 @@ export default function FinancePage(){
         <input type="search" aria-label="Search loaded financial entries" value={entrySearch}
          placeholder="Search category, payee or member" onChange={e=>setEntrySearch(e.target.value)}/>
        </label>
-       <select className="field" aria-label="Filter financial entry type" value={entryKindFilter}
+       <select className="field" aria-label="Filter ledger by kind" value={entryKindFilter}
         onChange={e=>setEntryKindFilter(e.target.value as "ALL"|Kind)}>
         <option value="ALL">All types</option><option value="INCOME">Income</option><option value="EXPENSE">Expense</option>
        </select>
