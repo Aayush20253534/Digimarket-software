@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useRef,useState} from "react";
+import {useEffect,useState} from "react";
 import {useParams} from "next/navigation";
 import {ArrowUpRight,Check,Copy,MapPin,MessageSquareText,ShieldCheck,Star} from "lucide-react";
 import {apiRequest} from "@/lib/api";
@@ -8,7 +8,6 @@ type Draft={text:string;source:"ai"|"template"};
 function readable(e:unknown){return e instanceof Error?e.message:"Unable to load review card";}
 export default function PublicReviewPage(){
  const {slug}=useParams<{slug:string}>();
- const started=useRef(false);
  const [business,setBusiness]=useState<Business|null>(null);
  const [draft,setDraft]=useState("");
  const [source,setSource]=useState<Draft["source"]>("template");
@@ -16,8 +15,7 @@ export default function PublicReviewPage(){
  const [error,setError]=useState("");
  const [copied,setCopied]=useState(false);
  useEffect(()=>{
-  if(!slug||started.current)return;
-  started.current=true;
+  if(!slug)return;
   let mounted=true;
   (async()=>{
    try{
