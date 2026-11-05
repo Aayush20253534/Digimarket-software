@@ -83,6 +83,7 @@ export class FinanceService {
   async addCategory(actor:Principal,input:FinanceCategoryInput){
     need(actor,"finance.category.manage");
     const normalizedName=normalize(input.name);
+    if(input.kind==="EXPENSE"&&normalizedName==="salary")throw invalid("Salary is system-linked; record salary payments in the Salary module");
     try {
       return await this.db.$transaction(async tx=>{
         const category=await tx.financialCategory.create({data:{
@@ -120,6 +121,7 @@ export class FinanceService {
   async renameCategory(actor:Principal,id:string,name:string){
     this.administrator(actor);
     const normalizedName=normalize(name);
+    if(normalizedName==="salary")throw invalid("Salary is a reserved payroll category");
     try{
       return await this.db.$transaction(async tx=>{
         const updated=await tx.financialCategory.updateMany({
@@ -196,6 +198,7 @@ export class FinanceService {
           ...(input.categoryId===entry.categoryId?{}:{active:true})},
       });
       if(!category)throw invalid("Choose a valid "+entry.kind.toLowerCase()+" category in this organization");
+      if(entry.kind==="EXPENSE"&&normalize(category.name)==="salary")throw invalid("Salary entries are managed through Salary");
       const requestedClientId=input.clientId===undefined?entry.clientId:input.clientId;
       if(requestedClientId&&!isMetaAds(category.name))
         throw invalid("A client can only be linked to a Meta Ads expense");
@@ -297,6 +300,7 @@ export class FinanceService {
       this.db.user.findFirst({where:{id:enteredById,organizationId:actor.organizationId,status:"ACTIVE"},select:{id:true}}),
     ]);
     if(!category)throw invalid("Select an active category belonging to this workspace and type");
+    if(input.kind==="EXPENSE"&&normalize(category.name)==="salary")throw invalid("Record salary payments through Salary to avoid duplicate expense accounting");
     if(input.clientId){
       if(input.kind!=="EXPENSE"||!isMetaAds(category.name))
         throw invalid("A client can only be linked to a Meta Ads expense");
