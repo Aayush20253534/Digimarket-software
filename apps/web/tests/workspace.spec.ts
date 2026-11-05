@@ -421,7 +421,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Attach file").setInputFiles({
    name:"phase7-private.txt",mimeType:"text/plain",buffer:Buffer.from("CI attachment; never send")
   });
-  await page.locator(".aw-chat-back").evaluate((button:HTMLElement)=>button.click());
+  await page.locator(".aw-chat-back").evaluate(button=>(button as HTMLButtonElement).click());
   await contacts.first().click();
   await expect(page.locator(".aw-chat-upload-preview")).toHaveCount(0);
   await page.waitForTimeout(240);
