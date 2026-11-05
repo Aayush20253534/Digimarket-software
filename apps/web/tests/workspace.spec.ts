@@ -120,8 +120,14 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Start a new note"})).toBeVisible();
   await visitWorkspace(page,"/app/tasks");
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Operations workspace sections"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Task status counts on this page"})).toBeVisible();
+  await expect(page.getByLabel("Filter visible tasks by priority")).toHaveValue("");
   await visitWorkspace(page,"/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval workflows"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Approval counts in current view"})).toBeVisible();
+  await expect(page.getByLabel("Search approvals in this view")).toBeVisible();
+  await expect(page.getByLabel("Filter approval category")).toHaveValue("");
   // Reporting must fit the document viewport. Overflow belongs to inner tables only.
   for(const width of [1440,1024,768,390]){
     await page.setViewportSize({width,height:800});
@@ -313,6 +319,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("navigation",{name:"Task sections"})
     .getByRole("link",{name:"History"})).toBeVisible();
   await page.getByLabel("Task history scope").selectOption("team");
+  await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toBeVisible();
+  await expect(page.getByRole("region",{name:"History counts on this page"})).toBeVisible();
+  await page.getByLabel("History priority filter").selectOption("LOW");
+  await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toHaveCount(0);
+  await page.getByLabel("History priority filter").selectOption("");
   await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toBeVisible();
   await expect(page.getByText(/Completed:/)).toBeVisible();
   await page.getByRole("link",{name:"Open completed task CI Updated Task"}).click();
@@ -819,6 +830,17 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await firstShoot.check();
   await expect(firstShoot).toBeChecked();
   await expect(workspace.getByText("1/5 completed")).toBeVisible();
+  await expect(workspace.getByRole("region",{name:"Delivery counts in loaded schedules"})).toBeVisible();
+  await expect(workspace.getByRole("progressbar",{name:"CI Thursday shoot completion"})).toHaveAttribute("aria-valuenow","1");
+  const deliveryFilters=workspace.getByRole("group",{name:"Delivery schedule filters"});
+  await deliveryFilters.getByRole("button",{name:"Completed",exact:true}).click();
+  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toHaveCount(0);
+  await deliveryFilters.getByRole("button",{name:"All",exact:true}).click();
+  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toBeVisible();
+  await workspace.getByLabel("Search loaded delivery schedules").fill("does not match");
+  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toHaveCount(0);
+  await workspace.getByLabel("Search loaded delivery schedules").fill("");
+  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toBeVisible();
   await expect(workspace.getByRole("button",{name:"Previous week for CI Thursday shoot"})).toBeDisabled();
   await expect(workspace.getByRole("button",{name:"Edit schedule / reassign"})).toBeVisible();
   await createDelivery.click();
