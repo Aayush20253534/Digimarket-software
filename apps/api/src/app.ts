@@ -22,6 +22,7 @@ import { registerLeadRoutes } from "./leads/routes";
 import { registerWhatsAppWebhook } from "./whatsapp/webhook";
 import { registerVGrapleWebhook } from "./vgraple/webhook";
 import { registerFinanceRoutes } from "./finance/routes";
+import { registerSalaryRoutes } from "./salary/routes";
 import { registerApprovalRoutes } from "./approvals/routes";
 import { registerAuthRoutes } from "./auth/routes";
 import type { AuthService } from "./auth/service";
@@ -153,6 +154,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     registerReviewCardRoutes(app, authService);
     registerAssetRoutes(app, authService);
     registerFinanceRoutes(app, authService);
+    registerSalaryRoutes(app, authService);
     registerApprovalRoutes(app, authService);
     registerAuthRoutes(app, authService, allowedOrigins);
   }
