@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@digimarket/db";
+import { Prisma, type PrismaClient } from "@digimarket/db";
 import type { Principal } from "../auth/service";
 import { FinanceService } from "./service";
 
@@ -78,6 +78,51 @@ describe("Meta Ads register scopes", () => {
       clientId: { not: null },
       categoryId: { in: [categoryId.meta, categoryId.ads] },
     });
+  });
+
+  it("subtracts only posted client Meta Ads from net without double-counting agency expenses", async () => {
+    const { service, groupTransactions, categoryId } = fixture();
+    groupTransactions.mockImplementation(async ({ where }: { where: { clientId: unknown } }) =>
+      where.clientId === null
+        ? [
+            { kind: "INCOME", status: "POSTED", _sum: { amount: new Prisma.Decimal("50000.1234") }, _count: { _all: 1 } },
+            { kind: "EXPENSE", status: "POSTED", _sum: { amount: new Prisma.Decimal("10000.0234") }, _count: { _all: 1 } },
+            { kind: "INCOME", status: "PENDING", _sum: { amount: new Prisma.Decimal("700.0000") }, _count: { _all: 1 } },
+            { kind: "EXPENSE", status: "PENDING", _sum: { amount: new Prisma.Decimal("300.0000") }, _count: { _all: 1 } },
+          ]
+        : [
+            { status: "POSTED", _sum: { amount: new Prisma.Decimal("15000.1000") }, _count: { _all: 2 } },
+            { status: "PENDING", _sum: { amount: new Prisma.Decimal("2000.0000") }, _count: { _all: 1 } },
+            { status: "REJECTED", _sum: { amount: new Prisma.Decimal("1000.0000") }, _count: { _all: 1 } },
+            { status: "CANCELLED", _sum: { amount: new Prisma.Decimal("500.0000") }, _count: { _all: 1 } },
+          ]);
+    const totals = await service.totals(actor, "mine");
+    expect(totals.postedIncome).toBe("50000.1234");
+    expect(totals.postedExpense).toBe("10000.0234");
+    expect(totals.clientAdSpend).toEqual({ posted: "15000.1000", pending: "2000.0000", count: 4 });
+    expect(totals.pendingIncome).toBe("700.0000");
+    expect(totals.pendingExpense).toBe("300.0000");
+    expect(totals.postedNet).toBe("25000.0000");
+    expect(groupTransactions.mock.calls[0][0].where).toMatchObject({
+      organizationId: actor.organizationId, enteredById: actor.userId, clientId: null,
+    });
+    expect(groupTransactions.mock.calls[1][0].where).toMatchObject({
+      organizationId: actor.organizationId, enteredById: actor.userId,
+      kind: "EXPENSE", clientId: { not: null },
+      categoryId: { in: [categoryId.meta, categoryId.ads] },
+    });
+  });
+
+  it("allows a negative net if posted client ad spend exceeds posted income", async () => {
+    const { service, groupTransactions } = fixture();
+    groupTransactions.mockImplementation(async ({ where }: { where: { clientId: unknown } }) =>
+      where.clientId === null
+        ? [{ kind: "INCOME", status: "POSTED", _sum: { amount: new Prisma.Decimal("100.0000") }, _count: { _all: 1 } }]
+        : [{ status: "POSTED", _sum: { amount: new Prisma.Decimal("150.5000") }, _count: { _all: 1 } }]);
+    const totals = await service.totals(actor, "mine");
+    expect(totals.postedExpense).toBe("0.0000");
+    expect(totals.clientAdSpend.posted).toBe("150.5000");
+    expect(totals.postedNet).toBe("-50.5000");
   });
 
   it("exports only Meta Ads rows for the combined scope", async () => {
