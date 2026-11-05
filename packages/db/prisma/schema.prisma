@@ -217,6 +217,9 @@ model Organization {
   roles           Role[]
   teams           Team[]
   founderProfiles FounderProfile[]
+  salaryFundingAccounts SalaryFundingAccount[]
+  salaryPayments SalaryPayment[]
+  salaryFundingCredits SalaryFundingCredit[]
   auditLogs       AuditLog[]
   outboxEvents    OutboxEvent[]
   notifications Notification[]
@@ -271,6 +274,12 @@ model User {
   avatarData String? @db.Text
   teamMemberships    TeamMember[]
   founderProfile     FounderProfile?
+  ownedSalaryAccounts SalaryFundingAccount[] @relation("SalaryAccountFounder")
+  createdSalaryAccounts SalaryFundingAccount[] @relation("SalaryAccountCreator")
+  recordedSalaryCredits SalaryFundingCredit[] @relation("SalaryCreditRecorder")
+  receivedSalaryPayments SalaryPayment[] @relation("SalaryPaymentRecipient")
+  recordedSalaryPayments SalaryPayment[] @relation("SalaryPaymentRecorder")
+  voidedSalaryPayments SalaryPayment[] @relation("SalaryPaymentVoider")
   auditActions       AuditLog[]      @relation("AuditActor")
   approvalSubmissions ApprovalRequest[] @relation("ApprovalRequester")
   approvalActions ApprovalDecision[] @relation("ApprovalActor")
@@ -1443,4 +1452,87 @@ model ReviewCardEvent {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   card ReviewCard @relation(fields:[cardId],references:[id],onDelete:Cascade)
   @@index([cardId,kind,createdAt])
+}
+
+// Salary funding is tracked separately from standard finance income/expenses.
+// A founder-paid salary is one company cost, even if multiple founders fund it.
+// Founder salary receipts are never FinancialTransaction income records.
+enum SalaryPaymentStatus {
+  PAID
+  VOID
+}
+
+model SalaryFundingAccount {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  founderUserId String @db.Uuid
+  createdById String @db.Uuid
+  name String @db.VarChar(100)
+  normalizedName String @db.VarChar(100)
+  openingBalance Decimal @default(0) @db.Decimal(19,2)
+  availableBalance Decimal @default(0) @db.Decimal(19,2)
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  founder User @relation("SalaryAccountFounder",fields:[founderUserId],references:[id],onDelete:Restrict)
+  creator User @relation("SalaryAccountCreator",fields:[createdById],references:[id],onDelete:Restrict)
+  credits SalaryFundingCredit[]
+  allocations SalaryFundingAllocation[]
+  @@unique([organizationId,founderUserId,normalizedName])
+  @@index([organizationId,founderUserId])
+}
+
+model SalaryFundingCredit {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  accountId String @db.Uuid
+  recordedById String @db.Uuid
+  amount Decimal @db.Decimal(19,2)
+  recordedOn DateTime @db.Date
+  description String? @db.VarChar(250)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  account SalaryFundingAccount @relation(fields:[accountId],references:[id],onDelete:Restrict)
+  recorder User @relation("SalaryCreditRecorder",fields:[recordedById],references:[id],onDelete:Restrict)
+  @@index([organizationId,recordedOn])
+  @@index([accountId,createdAt])
+}
+
+model SalaryPayment {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  recipientUserId String @db.Uuid
+  createdById String @db.Uuid
+  idempotencyKey String @db.Uuid
+  amount Decimal @db.Decimal(19,2)
+  salaryMonth String @db.VarChar(7)
+  paidOn DateTime @db.Date
+  method FinanceMethod
+  reference String? @db.VarChar(160)
+  note String? @db.VarChar(500)
+  status SalaryPaymentStatus @default(PAID)
+  voidedAt DateTime? @db.Timestamptz(6)
+  voidedById String? @db.Uuid
+  voidReason String? @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  recipient User @relation("SalaryPaymentRecipient",fields:[recipientUserId],references:[id],onDelete:Restrict)
+  recorder User @relation("SalaryPaymentRecorder",fields:[createdById],references:[id],onDelete:Restrict)
+  voider User? @relation("SalaryPaymentVoider",fields:[voidedById],references:[id],onDelete:Restrict)
+  allocations SalaryFundingAllocation[]
+  @@unique([organizationId,idempotencyKey])
+  @@index([organizationId,status,paidOn])
+  @@index([organizationId,recipientUserId,paidOn])
+}
+
+model SalaryFundingAllocation {
+  id String @id @default(uuid()) @db.Uuid
+  paymentId String @db.Uuid
+  accountId String @db.Uuid
+  amount Decimal @db.Decimal(19,2)
+  payment SalaryPayment @relation(fields:[paymentId],references:[id],onDelete:Restrict)
+  account SalaryFundingAccount @relation(fields:[accountId],references:[id],onDelete:Restrict)
+  @@unique([paymentId,accountId])
+  @@index([accountId])
 }
