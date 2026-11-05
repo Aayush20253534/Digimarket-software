@@ -168,7 +168,13 @@ export function registerReviewCardRoutes(app:Express,auth:AuthService){
   const updated=await db.reviewCard.update({where:{id:card.id},data:{generationCount:{increment:1}},
    select:{generationCount:true}});
   await db.reviewCardEvent.create({data:{cardId:card.id,kind:"SCAN"}});
-  const draft=await aiDraft({...card,generationCount:updated.generationCount});
+  // Bound public AI spend even when abuse is distributed across many IP addresses.
+  // Count retained events, not customer identifiers; over cap uses the free starter draft.
+  const generatedToday=await db.reviewCardEvent.count({where:{cardId:card.id,kind:"GENERATED",
+   createdAt:{gte:new Date(Date.now()-24*60*60*1000)}}});
+  const draft=generatedToday>=250
+   ? {text:fallbackDraft(card.businessName,card.businessDetails,card.language,updated.generationCount),source:"template" as const}
+   : await aiDraft({...card,generationCount:updated.generationCount});
   await db.reviewCardEvent.create({data:{cardId:card.id,kind:"GENERATED"}});
   res.set("Cache-Control","no-store");
   res.json({data:draft});
