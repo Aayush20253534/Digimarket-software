@@ -7,6 +7,7 @@ import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { ClientsService } from "./service";
 import { ServiceDeliveryService } from "./delivery-service";
+import { ClientVideoReadinessService } from "./video-readiness-service";
 const id=z.uuid();
 function parse<T>(schema:z.ZodType<T>,value:unknown):T {
  const result=schema.safeParse(value);
@@ -16,6 +17,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T {
 export function registerClientRoutes(app:Express,auth:AuthService) {
  const svc=new ClientsService(auth.database);
  const deliveries=new ServiceDeliveryService(auth.database);
+ const videos=new ClientVideoReadinessService(auth.database);
  const authenticated=async(req:Request,res:Response,next:NextFunction)=>{
    try{
      const token=req.get("authorization");
@@ -37,6 +39,21 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  app.get(root+"/deliveries",authenticated,async(_req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.deliverySummary(actor(res))});
+ });
+ // Month buckets: week 1 = days 1–7, week 2 = 8–14, ... week 5 = 29–end.
+ const month=z.string().regex(/^\\d{4}-(0[1-9]|1[0-2])$/);
+ const weekNumber=z.coerce.number().int().min(1).max(5);
+ const videoWeekInput=z.strictObject({month,readyAdded:z.number().int().min(0).max(10000),
+  delivered:z.number().int().min(0).max(10000),
+  note:z.string().trim().max(500).optional(),version:z.number().int().min(0)});
+ app.get(root+"/:id/video-readiness",authenticated,async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json({data:await videos.monthly(actor(res),parse(id,req.params.id),parse(month,req.query.month))});
+ });
+ app.put(root+"/:id/video-readiness/:week",authenticated,async(req,res)=>{
+  const body=parse(videoWeekInput,req.body);
+  res.json({data:await videos.saveWeek(actor(res),parse(id,req.params.id),body.month,
+   parse(weekNumber,req.params.week),body)});
  });
  app.get(root+"/:id",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
