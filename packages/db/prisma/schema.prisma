@@ -235,6 +235,7 @@ model Organization {
   leads Lead[]
   leadDuplicateCandidates LeadDuplicateCandidate[]
   clients Client[]
+  reviewCards ReviewCard[]
   assets Asset[]
   assetFolders AssetFolder[]
   assetUploadIntents AssetUploadIntent[]
@@ -289,6 +290,7 @@ model User {
   leadActivities LeadActivity[] @relation("LeadActivityActor")
   reviewedLeadDuplicates LeadDuplicateCandidate[] @relation("LeadDuplicateReviewer")
   clientsCreated Client[] @relation("ClientCreator")
+  reviewCardsCreated ReviewCard[] @relation("ReviewCardCreator")
   assetsCreated Asset[] @relation("AssetCreator")
   assetIntentsCreated AssetUploadIntent[] @relation("AssetIntentCreator")
   projectsCreated Project[] @relation("ProjectCreator")
@@ -655,6 +657,7 @@ model Client {
   billingSchedules BillingSchedule[]
   costAllocations CostAllocation[]
   metaAdSpend FinancialTransaction[] @relation("ClientMetaAdSpend")
+  reviewCards ReviewCard[]
   revenueRecognitions RevenueRecognition[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
@@ -1405,4 +1408,39 @@ model Agreement {
 
   @@unique([organizationId, agreementNumber])
   @@index([organizationId, createdAt])
+}
+
+
+// One branded, durable review card per DigiMarket client. Public URLs use random slugs.
+model ReviewCard {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @unique @db.Uuid
+  createdById String @db.Uuid
+  slug String @unique @db.VarChar(48)
+  businessName String @db.VarChar(180)
+  googleReviewUrl String @db.VarChar(1000)
+  businessDetails String @default("") @db.VarChar(1200)
+  logoUrl String? @db.VarChar(1000)
+  accentColor String @default("#A855F7") @db.VarChar(7)
+  language String @default("English") @db.VarChar(12)
+  enabled Boolean @default(true)
+  generationCount Int @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  creator User @relation("ReviewCardCreator",fields:[createdById],references:[id],onDelete:Restrict)
+  events ReviewCardEvent[]
+  @@index([organizationId,createdAt])
+}
+
+// Scan and click counts only: no customer identities or submitted review contents.
+model ReviewCardEvent {
+  id String @id @default(uuid()) @db.Uuid
+  cardId String @db.Uuid
+  kind String @db.VarChar(16)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  card ReviewCard @relation(fields:[cardId],references:[id],onDelete:Cascade)
+  @@index([cardId,kind,createdAt])
 }

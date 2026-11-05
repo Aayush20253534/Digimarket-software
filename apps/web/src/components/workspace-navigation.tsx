@@ -5,7 +5,7 @@ import type {LucideIcon} from "lucide-react";
 import {
  BriefcaseBusiness,CalendarDays,CalendarClock,ChartNoAxesCombined,ChevronDown,
  CheckSquare2,FileStack,FolderKanban,LayoutDashboard,MessageCircle,
- Settings2,Users,Wallet
+ Settings2,Users,Wallet,QrCode
 } from "lucide-react";
 
 export type NavItem={label:string;href:string;icon:LucideIcon;permits?:readonly string[];roles?:readonly string[]};
@@ -18,7 +18,8 @@ const sections:readonly NavGroup[]=[
   {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
   {label:"Follow-ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
   {label:"Meetings",href:"/app/meetings",icon:CalendarDays,permits:["leads.read"]},
-  {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]}
+  {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]},
+  {label:"AI Review Cards",href:"/app/ai-review-cards",icon:QrCode,permits:["clients.read"]}
  ]},
  {title:"Operations",items:[
   {label:"Client Deliveries",href:"/app/deliveries",icon:FolderKanban,permits:["clients.read"]},
