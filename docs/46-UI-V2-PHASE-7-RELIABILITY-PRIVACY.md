@@ -31,7 +31,7 @@ No migration, endpoint or permission changes. No accounting, documents/PDF, lead
 
 The authenticated browser suite now includes:
 1. An employee-scoped personal Search test where an old API response is deliberately delayed until after a new response. The new result must remain visible.
-2. A founder-scoped messaging test with a delayed FileReader. Switching recipients must remove the pending attachment and leave Send disabled.
+2. A founder-scoped messaging test with a delayed FileReader. Leaving and reopening the conversation must remove the pending attachment and leave Send disabled; the same guard also protects switching to another recipient.
 3. Existing full regression coverage of Finance, Reports, Quotations/Agreements, Leads, Client Deliveries, Tasks, Approvals, Settings, Messages and responsive dark/light UI.
 
 The Phase 7 stylesheet `aw-phase7-reliability.css` uses the inherited monochrome tokens and reduced-motion rules for search and attachment progress.
