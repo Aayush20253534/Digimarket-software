@@ -17,7 +17,7 @@ CREATE TABLE "SalaryFundingAccount" (
   CONSTRAINT "SalaryFundingAccount_opening_nonnegative" CHECK ("openingBalance">=0),
   CONSTRAINT "SalaryFundingAccount_available_nonnegative" CHECK ("availableBalance">=0)
 );
-CREATE UNIQUE INDEX "SalaryFundingAccount_organizationId_founderUserId_normalizedName_key"
+CREATE UNIQUE INDEX "SalaryFundingAccount_organizationId_founderUserId_normalize_key"
   ON "SalaryFundingAccount" ("organizationId","founderUserId","normalizedName");
 CREATE INDEX "SalaryFundingAccount_organizationId_founderUserId_idx"
   ON "SalaryFundingAccount" ("organizationId","founderUserId");
