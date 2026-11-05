@@ -220,6 +220,7 @@ model Organization {
   salaryFundingAccounts SalaryFundingAccount[]
   salaryPayments SalaryPayment[]
   salaryFundingCredits SalaryFundingCredit[]
+  clientVideoWeeks ClientVideoWeek[]
   auditLogs       AuditLog[]
   outboxEvents    OutboxEvent[]
   notifications Notification[]
@@ -299,6 +300,7 @@ model User {
   leadActivities LeadActivity[] @relation("LeadActivityActor")
   reviewedLeadDuplicates LeadDuplicateCandidate[] @relation("LeadDuplicateReviewer")
   clientsCreated Client[] @relation("ClientCreator")
+  videoWeeksUpdated ClientVideoWeek[] @relation("ClientVideoWeekUpdater")
   reviewCardsCreated ReviewCard[] @relation("ReviewCardCreator")
   assetsCreated Asset[] @relation("AssetCreator")
   assetIntentsCreated AssetUploadIntent[] @relation("AssetIntentCreator")
@@ -667,6 +669,7 @@ model Client {
   costAllocations CostAllocation[]
   metaAdSpend FinancialTransaction[] @relation("ClientMetaAdSpend")
   reviewCards ReviewCard[]
+  videoWeeks ClientVideoWeek[]
   revenueRecognitions RevenueRecognition[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
@@ -1535,4 +1538,28 @@ model SalaryFundingAllocation {
   account SalaryFundingAccount @relation(fields:[accountId],references:[id],onDelete:Restrict)
   @@unique([paymentId,accountId])
   @@index([accountId])
+}
+
+ 
+// Inventory of finished videos per client, month and seven-day month bucket.
+// readyAdded and delivered are weekly movements, not repeated stock snapshots.
+model ClientVideoWeek {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  month String @db.VarChar(7)
+  week Int
+  readyAdded Int @default(0)
+  delivered Int @default(0)
+  note String? @db.VarChar(500)
+  version Int @default(1)
+  updatedById String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  updatedBy User @relation("ClientVideoWeekUpdater",fields:[updatedById],references:[id],onDelete:Restrict)
+  @@unique([clientId,month,week])
+  @@index([organizationId,month])
+  @@index([clientId,month])
 }
