@@ -4,14 +4,16 @@ import {z} from "zod";
 import type {AuthService,Principal} from "../auth/service";
 import {AuthError,unauthorized,forbidden} from "../auth/errors";
 import {paise,exactSplit,rupeePattern} from "./math";
+import {founderLedgerBalances} from "../finance/founder-balance";
 
 const amount=z.string().regex(rupeePattern).refine(v=>paise(v)>0n,"Amount must be positive");
-const nonnegative=z.string().regex(rupeePattern);
+// Finance is authoritative: do not independently seed salary wallets.
+const zeroOpening=z.enum(["0","0.00"]).optional();
 const isoDay=z.iso.date();
 const month=z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 const accountInput=z.strictObject({
  founderUserId:z.uuid(),name:z.string().trim().min(2).max(100),
- openingBalance:nonnegative.default("0.00")
+ openingBalance:zeroOpening
 });
 const creditInput=z.strictObject({amount,recordedOn:isoDay,description:z.string().trim().max(250).optional()});
 const paymentInput=z.strictObject({
@@ -71,12 +73,16 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
   const a=own(res);needFounder(a);
   const accounts=await db.salaryFundingAccount.findMany({where:{organizationId:a.organizationId},
    include:{founder:{select:{id:true,displayName:true}}},orderBy:[{createdAt:"asc"},{id:"asc"}]});
-  res.set("Cache-Control","no-store").json({data:accounts.map(row=>({
-   id:row.id,founderUserId:row.founderUserId,founderName:row.founder.displayName,
-   name:row.name,openingBalance:row.openingBalance.toFixed(2),
-   availableBalance:row.availableBalance.toFixed(2),active:row.active,
-   createdAt:row.createdAt
-  }))});
+  const linked=await founderLedgerBalances(db,a.organizationId,accounts.map(x=>x.founderUserId));
+  res.set("Cache-Control","no-store").json({data:accounts.map(row=>{
+   const balance=linked.get(row.founderUserId);
+   return {id:row.id,founderUserId:row.founderUserId,founderName:row.founder.displayName,
+    name:row.name,openingBalance:"0.00",
+    availableBalance:balance?.remaining.toFixed(4)??"0.0000",
+    financeNetBeforeSalary:balance?.financeNetBeforeSalary.toFixed(4)??"0.0000",
+    founderSalaryFunded:balance?.salaryFunded.toFixed(4)??"0.0000",
+    sharedFinancePool:true,active:row.active,createdAt:row.createdAt};
+  })});
  });
 
  app.post(root+"/accounts",authenticate,async(req,res)=>{
@@ -92,7 +98,7 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
     const row=await tx.salaryFundingAccount.create({data:{
      organizationId:a.organizationId,founderUserId:input.founderUserId,createdById:a.userId,
      name:input.name,normalizedName:input.name.trim().replace(/\s+/g," ").toLowerCase(),
-     openingBalance:dec(input.openingBalance),availableBalance:dec(input.openingBalance)
+     openingBalance:dec("0"),availableBalance:dec("0")
     }});
     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
      action:"salary.account_created",entityType:"SalaryFundingAccount",entityId:row.id,
@@ -114,24 +120,10 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
   res.json({data:{id,active}});
  });
 
+ // Historical manual credits remain auditable, but no longer create salary funds.
  app.post(root+"/accounts/:id/credits",authenticate,async(req,res)=>{
-  const a=own(res);needFounder(a);const id=parsed(z.uuid(),req.params.id);
-  const input=parsed(creditInput,req.body);
-  const result=await db.$transaction(async tx=>{
-   const account=await tx.salaryFundingAccount.findFirst({where:{id,organizationId:a.organizationId,active:true},
-    select:{id:true}});
-   if(!account)throw noFound();
-   const credit=await tx.salaryFundingCredit.create({data:{
-    organizationId:a.organizationId,accountId:id,recordedById:a.userId,
-    amount:dec(input.amount),recordedOn:date(input.recordedOn),description:input.description||null
-   }});
-   await tx.salaryFundingAccount.update({where:{id},data:{availableBalance:{increment:dec(input.amount)}}});
-   await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-    action:"salary.account_credit",entityType:"SalaryFundingCredit",entityId:credit.id,
-    afterRedacted:{accountId:id,amount:input.amount}}});
-   return credit;
-  });
-  res.status(201).json({data:{id:result.id,amount:result.amount.toFixed(2)}});
+  const a=own(res);needFounder(a);parsed(z.uuid(),req.params.id);
+  throw new AuthError(409,"FINANCE_LINKED","Salary funds now come from Finance. Add posted income to the founder's Finance entries.");
  });
 
  app.get(root+"/credits",authenticate,async(_req,res)=>{
@@ -186,16 +178,25 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
     const existing=await tx.salaryPayment.findUnique({where:{organizationId_idempotencyKey:{
      organizationId:a.organizationId,idempotencyKey:input.idempotencyKey}}});
     if(existing)throw new AuthError(409,"DUPLICATE_PAYMENT","Salary already recorded with this request identifier");
+    const accountRows=await tx.salaryFundingAccount.findMany({where:{
+     id:{in:input.allocations.map(x=>x.accountId)},organizationId:a.organizationId,active:true
+    },select:{id:true,founderUserId:true}});
+    if(accountRows.length!==input.allocations.length)
+     throw new AuthError(422,"INVALID_FUNDING_SOURCE","Funding accounts must be active and belong to this organization");
+    const accountFounder=new Map(accountRows.map(x=>[x.id,x.founderUserId]));
+    const requestedByFounder=new Map<string,Prisma.Decimal>();
     for(const share of input.allocations){
-     // CAS debit ensures two concurrent salary payments cannot overspend
-     // a personal funding account, even across Render instances.
-     const changed=await tx.salaryFundingAccount.updateMany({
-      where:{id:share.accountId,organizationId:a.organizationId,active:true,
-       availableBalance:{gte:dec(share.amount)}},
-      data:{availableBalance:{decrement:dec(share.amount)}}
-     });
-     if(changed.count!==1)throw new AuthError(422,"INSUFFICIENT_FUNDING",
-      "A founder account is missing, paused or has insufficient recorded funds");
+     const founderId=accountFounder.get(share.accountId);
+     if(!founderId)throw new AuthError(422,"INVALID_FUNDING_SOURCE","Funding source not found");
+     requestedByFounder.set(founderId,(requestedByFounder.get(founderId)??dec("0")).plus(share.amount));
+    }
+    // All accounts belonging to a founder share their Finance Net posted pool.
+    // Serializable isolation prevents concurrent salaries from spending it twice.
+    const founderBalances=await founderLedgerBalances(tx,a.organizationId,[...requestedByFounder.keys()]);
+    for(const [founderId,requested] of requestedByFounder){
+     const remaining=founderBalances.get(founderId)?.remaining??dec("0");
+     if(remaining.lessThan(requested))throw new AuthError(422,"INSUFFICIENT_FINANCE_BALANCE",
+      "Founder's remaining Finance Net posted is insufficient for this salary allocation");
     }
     const payment=await tx.salaryPayment.create({data:{
      organizationId:a.organizationId,recipientUserId:input.recipientUserId,createdById:a.userId,
@@ -235,9 +236,7 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
    const changed=await tx.salaryPayment.updateMany({where:{id,organizationId:a.organizationId,status:"PAID"},
     data:{status:"VOID",voidedAt:new Date(),voidedById:a.userId,voidReason:input.reason}});
    if(changed.count!==1)throw new AuthError(409,"ALREADY_VOID","Payment was already voided");
-   for(const share of payment.allocations)
-    await tx.salaryFundingAccount.update({where:{id:share.accountId},
-     data:{availableBalance:{increment:share.amount}}});
+   // Voided allocations stop reducing the derived Finance balance automatically.
    await tx.notification.create({data:{
     organizationId:a.organizationId,recipientId:payment.recipientUserId,
     dedupeKey:"salary.void."+id,kind:"SALARY_PAYMENT",
@@ -258,7 +257,7 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
   const period=parsed(periodSchema,req.query),paidOn=days(period);
   const filter={organizationId:a.organizationId,status:"PAID" as const,
    ...(paidOn?{paidOn}:{})};
-  const [totals,recipientGroups,allocationGroups,accounts,monthly]=await Promise.all([
+  const [totals,recipientGroups,allocationGroups,accounts,monthly,founders]=await Promise.all([
    db.salaryPayment.aggregate({where:filter,_sum:{amount:true},_count:{_all:true}}),
    db.salaryPayment.groupBy({by:["recipientUserId"],where:filter,_sum:{amount:true},_count:{_all:true}}),
    db.salaryFundingAllocation.groupBy({by:["accountId"],
@@ -268,7 +267,10 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
      openingBalance:true,availableBalance:true,active:true},
     orderBy:{createdAt:"asc"}}),
    db.salaryPayment.groupBy({by:["paidOn"],where:filter,_sum:{amount:true},_count:{_all:true},
-    orderBy:{paidOn:"asc"}})
+    orderBy:{paidOn:"asc"}}),
+   db.user.findMany({where:{organizationId:a.organizationId,status:"ACTIVE",
+    roles:{some:{role:{key:"FOUNDER",organizationId:a.organizationId}}}},
+    select:{id:true,displayName:true}})
   ]);
   const names=recipientGroups.length?await db.user.findMany({where:{
    organizationId:a.organizationId,id:{in:recipientGroups.map(x=>x.recipientUserId)}},
@@ -290,7 +292,16 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
    const month=group.paidOn.toISOString().slice(0,7),current=monthMap.get(month)??{amount:zero,count:0};
    monthMap.set(month,{amount:current.amount.plus(group._sum.amount??0),count:current.count+group._count._all});
   }
+  const linked=await founderLedgerBalances(db,a.organizationId,
+   [...founders.map(x=>x.id),...accounts.map(x=>x.founderUserId)]);
   const summary={
+   founderBalances:founders.map(x=>{
+    const balance=linked.get(x.id);
+    return {founderUserId:x.id,name:x.displayName,
+     financeNetBeforeSalary:balance?.financeNetBeforeSalary.toFixed(4)??"0.0000",
+     salaryFunded:balance?.salaryFunded.toFixed(4)??"0.0000",
+     remaining:balance?.remaining.toFixed(4)??"0.0000"};
+   }),
    currency:"INR",totalPaid:(totals._sum.amount??zero).toFixed(2),paymentCount:totals._count._all,
    founderFunding:Array.from(founderMap.values()).map(x=>({
     founderUserId:x.founderUserId,name:x.name,amount:x.amount.toFixed(2),count:x.count
@@ -302,8 +313,9 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
    monthly:Array.from(monthMap).map(([month,x])=>({month,amount:x.amount.toFixed(2),count:x.count})),
    accounts:accounts.map(x=>({
     id:x.id,founderUserId:x.founderUserId,founderName:x.founder.displayName,
-    name:x.name,openingBalance:x.openingBalance.toFixed(2),
-    availableBalance:x.availableBalance.toFixed(2),active:x.active
+    name:x.name,openingBalance:"0.00",
+    availableBalance:linked.get(x.founderUserId)?.remaining.toFixed(4)??"0.0000",
+    sharedFinancePool:true,active:x.active
    }))
   };
   res.set("Cache-Control","no-store").json({data:summary});
