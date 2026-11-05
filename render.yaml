@@ -44,6 +44,10 @@ services:
         sync: false
       - key: OPS_MONITOR_TOKEN
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_REVIEW_MODEL
+        value: gpt-4.1-mini
       - key: CHATGPT_API_ORIGIN
         sync: false
       - key: CHATGPT_WEB_ORIGIN
