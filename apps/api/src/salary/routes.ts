@@ -154,9 +154,9 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
    ...(days(period)?{paidOn:days(period)}:{})
   },orderBy:[{paidOn:"desc"},{createdAt:"desc"},{id:"desc"}],take:400,
    include:{recipient:{select:{displayName:true,loginId:true}},
-    recorder:{select:{displayName:true}},allocations:founder?{
+    recorder:{select:{displayName:true}},allocations:{
      include:{account:{select:{name:true,founder:{select:{displayName:true}}}}}
-    }:false}});
+    }}});
   res.set("Cache-Control","no-store").json({data:rows.map(payment=>({
    id:payment.id,recipientUserId:payment.recipientUserId,
    recipientName:payment.recipient.displayName,
