@@ -567,7 +567,7 @@ export default function FinancePage(){
           <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
           <td>{row.enteredBy.displayName}</td><td>{row.description||"—"}</td>
           <td>{row.receiptAssetId?<button type="button" disabled={busy} className="btn-secondary text-xs" onClick={()=>void showReceipt(row.id)}>Proof</button>:"—"}</td>
-          <td><Link className="underline" href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)}>View approval</Link></td>
+          <td>{row.approvalRequestId?<Link className="underline" href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)}>View approval</Link>:"—"}</td>
         </tr>)}</tbody></table>
       </div>}
       {metaAdEntries.length>0&&!filteredMetaAdEntries.length&&<div className="aw-v5-no-matches" role="status">
