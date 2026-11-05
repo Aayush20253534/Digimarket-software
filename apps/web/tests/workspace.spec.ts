@@ -395,6 +395,44 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // Old bookmarks still load the same original workflows, not a deleted page.
   await visitWorkspace(page,"/app/quotations");
   await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
+  // Phase 6: communication, Settings hub and account accessibility.
+  await visitWorkspace(page,"/app/messages");
+  await expect(page.getByTestId("workspace-messages")).toBeVisible();
+  const conversations=page.getByRole("group",{name:"Conversation filters"});
+  await expect(conversations.getByRole("button",{name:/Unread/})).toBeVisible();
+  await conversations.getByRole("button",{name:/Unread/}).click();
+  await expect(conversations.getByRole("button",{name:/Unread/})).toHaveAttribute("aria-pressed","true");
+  await conversations.getByRole("button",{name:"All members"}).click();
+  await expect(conversations.getByRole("button",{name:"All members"})).toHaveAttribute("aria-pressed","true");
+  await expect(page.getByRole("link",{name:"Open Notes Studio"})).toHaveCount(0);
+  // Theme tokens must reach internal chat scroll containers, not only the app shell.
+  if(await page.getByRole("button",{name:"Switch to dark theme"}).count()){
+   await page.getByRole("button",{name:"Switch to dark theme"}).click();
+  }
+  await expect(page.locator(".aw-chat-directory")).toHaveCSS("background-color","rgb(23, 23, 25)");
+  await page.getByRole("button",{name:"Switch to light theme"}).click();
+  await expect(page.locator(".aw-chat-directory")).toHaveCSS("background-color","rgb(255, 255, 255)");
+  await page.getByRole("button",{name:"Switch to dark theme"}).click();
+  for(const width of [390,768,1366]){
+   await page.setViewportSize({width,height:800});
+   await visitWorkspace(page,"/app/messages");
+   const measured=await page.evaluate(()=>({
+    page:document.documentElement.scrollWidth,
+    viewport:document.documentElement.clientWidth,
+   }));
+   expect(measured.page,"Messages must not cause horizontal overflow at "+width+"px")
+    .toBeLessThanOrEqual(measured.viewport+1);
+  }
+  await page.setViewportSize({width:1366,height:768});
+  await visitWorkspace(page,"/app/settings");
+  await expect(page.getByRole("heading",{name:"Settings",exact:true})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Settings sections"})).toBeVisible();
+  if(await page.locator(".aw-v6-settings-summary").count()){
+   await expect(page.getByRole("region",{name:"Configuration summary"})).toBeVisible();
+  }
+  await visitWorkspace(page,"/app/profile");
+  await expect(page.getByRole("heading",{name:"My profile"})).toBeVisible();
+  await expect(page.locator('input[aria-label="Upload profile photo"]')).toHaveAttribute("type","file");
   await visitWorkspace(page,"/app/dashboard");
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
   await visitWorkspace(page,"/app/notes");

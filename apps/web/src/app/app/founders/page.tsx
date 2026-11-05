@@ -51,7 +51,7 @@ export default function FoundersPage(){
  };
  if(!session)return <Spinner label="Checking founder access…"/>;
  if(!canRead)return <><PageHeader title="Founder directory"/><Notice kind="error">Founder directory access required.</Notice></>;
- return <div className="space-y-6">
+ return <div className="aw-v6-founders-page space-y-6" data-aw-module="founders">
   <PageHeader eyebrow="People & leadership" title="Founders & responsibilities"
    description="Define who owns marketing, delivery and business operations. These descriptions are separate from account roles and access permissions."/>
   {error&&<Notice kind="error">{error}</Notice>}

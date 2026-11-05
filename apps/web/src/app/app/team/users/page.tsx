@@ -106,7 +106,7 @@ export default function TeamAccounts() {
   if (!session) return <Spinner label="Loading access permissions…" />;
   if (!allowed) return <div className="space-y-6"><PageHeader eyebrow="Team" title="Access denied" description="Your account does not have permission to view employee records." /><Notice kind="error">Staff information is restricted to authorized administrators.</Notice></div>;
 
-  return <div className="space-y-7">
+  return <div className="aw-v6-team-page space-y-7" data-aw-module="team-users">
     <PageHeader eyebrow="Team management" title="People & accounts" description="Provision internal logins, manage permissions and revoke access. All operations are validated by the API."
       actions={canCreate && <button type="button" className="btn-primary" onClick={() => {
         setShowForm((current) => !current); setPassword(makeTemporaryPassword()); setError(""); setSuccess("");

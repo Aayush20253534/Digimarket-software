@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
 import {useAuth} from "@/components/auth-provider";
-import {MessageCircle,Paperclip,Send,FileText,Download,Search,Users,CheckCheck,ArrowLeft,X} from "lucide-react";
+import {MessageCircle,Paperclip,Send,FileText,Download,Search,Users,CheckCheck,ArrowLeft,X,RefreshCw} from "lucide-react";
 
 type Person={id:string;displayName:string;loginId:string;avatarData:string|null;unreadCount:number};
 type Attachment={name:string;mime:string;data:string};
@@ -20,6 +20,7 @@ export default function MessagesPage(){
  const [people,setPeople]=useState<Person[]>([]);
  const [peer,setPeer]=useState("");
  const [memberQuery,setMemberQuery]=useState("");
+ const [memberFilter,setMemberFilter]=useState<"all"|"unread">("all");
  const [items,setItems]=useState<Message[]>([]);
  const [draft,setDraft]=useState("");
  const [attachment,setAttachment]=useState<Attachment|null>(null);
@@ -101,24 +102,34 @@ export default function MessagesPage(){
   reader.readAsDataURL(file);
  };
  const current=people.find(p=>p.id===peer);
- const filtered=people.filter(p=>(p.displayName+" "+p.loginId).toLowerCase().includes(memberQuery.trim().toLowerCase()));
- return <div className="aw-messages-page" data-testid="workspace-messages">
+ const filtered=people.filter(p=>(memberFilter==="all"||p.unreadCount>0)&&
+  (p.displayName+" "+p.loginId).toLowerCase().includes(memberQuery.trim().toLowerCase()));
+ const unreadTotal=people.reduce((sum,p)=>sum+p.unreadCount,0);
+ return <div className="aw-messages-page aw-v6-messages" data-testid="workspace-messages">
   <aside className="aw-chat-directory" aria-label="Workspace conversations">
    <div className="aw-chat-directory-header">
     <div><span className="aw-chat-eyebrow">TEAM WORKSPACE</span><h1>Messages</h1></div>
-    <span className="aw-chat-contact-count">{people.length}</span>
+    <span className="aw-chat-contact-count" aria-label={people.length+" available members"}>{people.length}</span>
    </div>
    <label className="aw-chat-search"><Search size={17}/><input aria-label="Search available members" placeholder="Search members..." value={memberQuery} onChange={e=>setMemberQuery(e.target.value)}/></label>
+   <div className="aw-v6-chat-tools" role="group" aria-label="Conversation filters">
+    <button type="button" aria-pressed={memberFilter==="all"} onClick={()=>setMemberFilter("all")}>All members</button>
+    <button type="button" aria-pressed={memberFilter==="unread"} onClick={()=>setMemberFilter("unread")}>Unread <span aria-label={unreadTotal+" unread messages"}>{unreadTotal}</span></button>
+    <button type="button" title="Refresh member list" aria-label="Refresh conversations"
+      disabled={loadingMembers} onClick={()=>void reloadMembers()}><RefreshCw size={15} aria-hidden="true"/></button>
+   </div>
    <div className="aw-chat-directory-caption">DIRECT MESSAGES</div>
    <div className="aw-chat-contacts">
     {filtered.map(person=><button type="button" className="aw-chat-contact" key={person.id}
-      aria-current={peer===person.id?"true":undefined} onClick={()=>choose(person.id)}>
+      aria-current={peer===person.id?"true":undefined} aria-label={person.displayName+(person.unreadCount?" ("+person.unreadCount+" unread)":"")} onClick={()=>choose(person.id)}>
       <MemberAvatar person={person}/>
       <span className="aw-chat-contact-details"><strong>{person.displayName}</strong><small>@{person.loginId}</small></span>
       {person.unreadCount>0&&<span aria-label={person.unreadCount+" unread messages"} className="aw-chat-unread">+{person.unreadCount>99?"99":person.unreadCount}</span>}
     </button>)}
     {loadingMembers&&<p className="aw-chat-empty-list">Loading members…</p>}
-    {!loadingMembers&&!filtered.length&&<p className="aw-chat-empty-list">{memberQuery?"No matching members.":"No other active team members."}</p>}
+    {!loadingMembers&&!filtered.length&&<p className="aw-chat-empty-list" role="status">
+       {memberFilter==="unread"?"No unread conversations.":memberQuery?"No matching members.":"No other active team members."}
+     </p>}
    </div>
   </aside>
   <section className="aw-chat-conversation" aria-label="Direct message conversation">
@@ -128,7 +139,7 @@ export default function MessagesPage(){
      <div className="aw-chat-peer-label"><h2>{current.displayName}</h2><p>@{current.loginId} · Private conversation</p></div>
      <span className="aw-chat-header-status"><CheckCheck size={16}/> Team member</span>
     </header>
-    <div className="aw-chat-thread" ref={threadRef} role="log" aria-label={"Messages with "+current.displayName}>
+    <div className="aw-chat-thread" ref={threadRef} role="log" aria-relevant="additions" aria-label={"Messages with "+current.displayName}>
      {loadingChat&&!items.length&&<div className="aw-chat-placeholder">Loading conversation…</div>}
      {!loadingChat&&!items.length&&<div className="aw-chat-placeholder"><MessageCircle size={39}/><strong>Start a conversation</strong><span>Messages and files shared here are only visible to participants.</span></div>}
      {items.map(m=><div key={m.id} className={"aw-chat-message "+(m.senderId===userId?"aw-chat-message-own":"aw-chat-message-other")}>
@@ -153,13 +164,14 @@ export default function MessagesPage(){
       <label className="aw-chat-attach" title="Attach a file up to 1 MB"><Paperclip size={21}/>
        <input aria-label="Attach file" type="file" onChange={e=>{addFile(e.target.files?.[0]);e.target.value="";}}/>
       </label>
-      <input className="aw-chat-input" aria-label="Message" placeholder={"Message "+current.displayName+"..."} value={draft} onChange={e=>setDraft(e.target.value)}/>
+      <input className="aw-chat-input" aria-label="Message" placeholder={"Message "+current.displayName+"..."} value={draft} maxLength={5000}
+        onChange={e=>setDraft(e.target.value)}/>
       <button type="submit" className="aw-chat-send" disabled={busy||(!draft.trim()&&!attachment)} aria-label="Send message"><Send size={19}/></button>
      </form>
     </div>
    </>:<div className="aw-chat-blank"><span className="aw-chat-blank-icon"><Users size={40}/></span>
      <h2>Your team conversations</h2><p>Choose someone from the member list to send a message, a file, or a shared note.</p>
-     <Link href="/app/notes">Open Notes Studio</Link></div>}
+</div>}
    {error&&<p role="alert" className="aw-chat-error">{error}</p>}
   </section>
  </div>;
