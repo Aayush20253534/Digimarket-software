@@ -4,7 +4,8 @@ import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
 import { TeamMultiSelect } from "@/components/team-multi-select";
 import {TaskSectionTabs} from "@/components/task-section-tabs";
-import { Pencil, Trash2 } from "lucide-react";
+import {OperationsWorkspaceNav} from "@/components/operations-workspace-nav";
+import { Pencil, Trash2, Search, RefreshCw, Clock3 } from "lucide-react";
 import { Card,PageHeader,Notice,Spinner,StatusBadge,EmptyState } from "@/components/ui";
 
 type Status="TODO"|"IN_PROGRESS"|"BLOCKED"|"IN_REVIEW"|"DONE"|"CANCELLED";
@@ -66,6 +67,7 @@ export default function TasksPage(){
  const [schedule,setSchedule]=useState(initialSchedule);
  const [search,setSearch]=useState("");
  const [statusFilter,setStatusFilter]=useState("");
+ const [priorityFilter,setPriorityFilter]=useState<""|Priority>("");
  const [cursor,setCursor]=useState<string|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [comment,setComment]=useState("");
@@ -195,35 +197,76 @@ export default function TasksPage(){
    setSchedule(initialSchedule);
   },"Recurring schedule created.",false);
  }
- if(!session)return <Spinner label="Checking task permissions…"/>;
+ // Counts describe the exact currently loaded, permission-scoped API page.
+ const taskSummary=useMemo(()=>{
+  const result={total:tasks.length,pending:0,inProgress:0,completed:0,expired:0,other:0};
+  for(const task of tasks){
+   if(expired(task)){result.expired++;continue;}
+   if(task.status==="TODO")result.pending++;
+   else if(task.status==="IN_PROGRESS")result.inProgress++;
+   else if(task.status==="DONE")result.completed++;
+   else result.other++;
+  }
+  return result;
+ },[tasks]);
+ const shownTasks=useMemo(()=>
+  priorityFilter?tasks.filter(t=>t.priority===priorityFilter):tasks,
+ [tasks,priorityFilter]);
+  if(!session)return <Spinner label="Checking task permissions…"/>;
  if(!canRead)return <><PageHeader title="Task access denied"/><Notice kind="error">Task read permission required.</Notice></>;
  return <div data-aw-module="tasks" className="aw-module-root space-y-6">
+  <OperationsWorkspaceNav/>
   <TaskSectionTabs/>
   <PageHeader eyebrow="Delivery operations" title="Tasks & recurring work"
    description="Assign team work, track progress through comments and schedule automatic occurrences."/>
+  <section className="aw-v4-task-summary" aria-label="Task status counts on this page">
+   {([["On this page",taskSummary.total],["Pending",taskSummary.pending],
+     ["In process",taskSummary.inProgress],["Completed",taskSummary.completed],
+     ["Expired",taskSummary.expired]] as const).map(([label,count])=>
+      <div key={label} className="aw-v4-summary-stat"><span>{label}</span><strong>{loading?"…":count}</strong></div>)}
+  </section>
+  {!loading&&<section className="aw-v4-task-progress" aria-label="Task status distribution on this page">
+   <div><strong>Task distribution</strong><span>Loaded records only · {taskSummary.other} other states</span></div>
+   <div className="aw-v4-task-progress-track" role="img"
+    aria-label={`${taskSummary.pending} pending, ${taskSummary.inProgress} in process, ${taskSummary.completed} completed, ${taskSummary.expired} expired and ${taskSummary.other} other tasks`}>
+    {([["pending",taskSummary.pending],["progress",taskSummary.inProgress],
+      ["completed",taskSummary.completed],["expired",taskSummary.expired],
+      ["other",taskSummary.other]] as const).map(([key,count])=>
+      <span key={key} className={"aw-v4-segment-"+key} style={{width:(taskSummary.total?count/taskSummary.total*100:0)+"%"}}/>)}
+   </div>
+  </section>}
   {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Task management</span><span className="aw-module-count">{tasks.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{view==="mine"?"My tasks":"Team tasks"}</span></div>}
   {error&&<Notice kind="error">{error}</Notice>}
   {message&&<Notice kind="success">{message}</Notice>}
   <Card title="Task register" description="Your tasks are private to participants. Team-wide access requires management permissions.">
-   <div className="mb-4 flex flex-wrap gap-2">
+   <div className="aw-v4-task-toolbar">
     {canManage&&<select className="field" aria-label="Task view" value={view} onChange={e=>{setView(e.target.value as "mine"|"team");setCursor(null);}}>
       <option value="mine">My tasks</option><option value="team">Team tasks</option></select>}
-    <input className="field min-w-[175px] flex-1" aria-label="Search tasks" placeholder="Search title" value={search}
-      onChange={e=>{setSearch(e.target.value);setCursor(null);}}/>
+    <label className="aw-v4-task-search"><Search size={16} aria-hidden="true"/><span className="sr-only">Search tasks</span><input className="field min-w-[175px] flex-1" aria-label="Search tasks" placeholder="Search title" value={search}
+      onChange={e=>{setSearch(e.target.value);setCursor(null);}}/></label>
     <select className="field" aria-label="Task status filter" value={statusFilter}
       onChange={e=>{setStatusFilter(e.target.value);setCursor(null);}}>
      <option value="">All statuses</option>{visibleStatuses.map(v=><option key={v.value} value={v.value}>{v.label}</option>)}
     </select>
+    <select className="field" aria-label="Filter visible tasks by priority" value={priorityFilter}
+      onChange={e=>setPriorityFilter(e.target.value as ""|Priority)}>
+     <option value="">All priorities</option>{priorities.map(priority=>
+      <option value={priority} key={priority}>{priority}</option>)}
+    </select>
+    <button className="btn-secondary" type="button" aria-label="Refresh task register"
+     disabled={loading||busy} onClick={()=>void load()}><RefreshCw size={15} aria-hidden="true"/>Refresh</button>
    </div>
-   {loading?<Spinner label="Loading tasks…"/>:tasks.length? <div className="space-y-2" data-testid="task-register-list">
-     {tasks.map(task=><button type="button" key={task.id} onClick={()=>void open(task.id)}
-       className={"flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:border-indigo-400"+(!isAdmin&&taskCardTone(task)?" aw-assignee-task-card aw-assignee-task-"+taskCardTone(task):"")}>
-       <div><p className="text-sm font-semibold">{task.title}</p>
+   {loading?<Spinner label="Loading tasks…"/>:shownTasks.length? <div className="aw-v4-task-list" data-testid="task-register-list">
+     {shownTasks.map(task=><button type="button" key={task.id} onClick={()=>void open(task.id)}
+       className={"aw-v4-task-row flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border p-3 text-left"+(!isAdmin&&taskCardTone(task)?" aw-assignee-task-card aw-assignee-task-"+taskCardTone(task):"")}>
+       <div className="aw-v4-task-row-main"><p className="text-sm font-semibold">{task.title}</p>
          <p className="mt-1 text-xs text-slate-500">{task.service?task.service.client.businessName+" / "+task.service.name:task.project?.name||"General"} · {task.priority}
-           {task.dueAt?" · Due "+new Date(task.dueAt).toLocaleString():""}</p></div>
+           {task.dueAt?" · Due "+new Date(task.dueAt).toLocaleString():""}</p>
+         <span className="aw-v4-task-assignee"><Clock3 size={13} aria-hidden="true"/>{task.assignees.length} assigned</span></div>
        <span className={"aw-task-state"+(expired(task)?" aw-task-expired":"")}>{displayStatus(task)}</span>
      </button>)}
-   </div>:<EmptyState title="No tasks found" description="Tasks assigned to you will appear here."/>}
+   </div>:<EmptyState title={priorityFilter?"No tasks match that priority":"No tasks found"}
+    description={priorityFilter?"Choose All priorities to show the loaded page again.":"Tasks assigned to you will appear here."}/>}
    <div className="mt-4 flex justify-between">
     <button type="button" className="btn-secondary" disabled={!cursor||busy} onClick={()=>setCursor(null)}>First page</button>
     <button type="button" className="btn-secondary" disabled={!nextCursor||busy} onClick={()=>setCursor(nextCursor)}>Next page</button>

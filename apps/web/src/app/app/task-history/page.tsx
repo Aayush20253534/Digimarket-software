@@ -5,6 +5,7 @@ import {ArrowLeft,ArrowRight,CheckCheck,Clock3,History,RefreshCw,Search} from "l
 import {useAuth} from "@/components/auth-provider";
 import {AWNotice,AWStatusBadge} from "@/components/aw-ui";
 import {TaskSectionTabs} from "@/components/task-section-tabs";
+import {OperationsWorkspaceNav} from "@/components/operations-workspace-nav";
 
 type HistoryTask={
  id:string;title:string;description:string|null;status:string;priority:string;
@@ -24,6 +25,7 @@ export default function TaskHistoryPage(){
    !!session?.identity.permissions.includes("tasks.manage");
  const [view,setView]=useState<View>("mine");
  const [search,setSearch]=useState("");
+ const [priorityFilter,setPriorityFilter]=useState("");
  const [cursor,setCursor]=useState<string|null>(null);
  const [previous,setPrevious]=useState<(string|null)[]>([]);
  const [items,setItems]=useState<HistoryTask[]>([]);
@@ -53,7 +55,12 @@ export default function TaskHistoryPage(){
  const next=()=>{if(!nextCursor||loading)return;setPrevious(x=>[...x,cursor]);setCursor(nextCursor);};
  const back=()=>{if(!previous.length||loading)return;setCursor(previous[previous.length-1]);setPrevious(x=>x.slice(0,-1));};
  const recent=items.filter(t=>t.completedAt&&Date.parse(t.completedAt)>Date.now()-86400000).length;
+ const dated=items.filter(t=>t.completedAt&&t.dueAt);
+ const onTime=dated.filter(t=>Date.parse(t.completedAt!)<=Date.parse(t.dueAt!)).length;
+ const late=dated.length-onTime;
+ const visibleItems=priorityFilter?items.filter(t=>t.priority===priorityFilter):items;
  return <div className="aw-module-root min-w-0 space-y-6" data-aw-module="task-history" data-testid="task-history-page">
+  <OperationsWorkspaceNav/>
   <TaskSectionTabs/>
   <header className="flex flex-wrap items-end justify-between gap-4">
    <div>
@@ -67,6 +74,11 @@ export default function TaskHistoryPage(){
      <RefreshCw size={16} aria-hidden="true"/>Refresh history</button>
    </div>
   </header>
+  {canRead&&<section className="aw-v4-history-summary" aria-label="History counts on this page">
+    {([["Completed records",items.length],["Last 24 hours",recent],
+     ["On time (dated)",onTime],["Late (dated)",late]] as const).map(([label,count])=>
+     <div className="aw-v4-summary-stat" key={label}><span>{label}</span><strong>{loading?"…":count}</strong></div>)}
+   </section>}
   {!canRead&&<AWNotice tone="info">Your account does not have permission to view tasks.</AWNotice>}
   {error&&<AWNotice tone="error">{error}</AWNotice>}
   {canRead&&<section className="aw-personal-task-section space-y-4" aria-label="Completed task history">
@@ -76,13 +88,20 @@ export default function TaskHistoryPage(){
     <span className="text-xs text-[#d6c3e6]" aria-live="polite">Page {previous.length+1} · {items.length} record{items.length===1?"":"s"} · {recent} in the past 24h on this page</span>
    </div>
    <div className="flex flex-wrap items-end gap-3">
-    <label className="min-w-[190px] flex-1 text-xs font-semibold text-[#ddc9f0]">
+    <label className="aw-v4-history-search min-w-[190px] flex-1 text-xs font-semibold">
      Search completed tasks
      <span className="mt-2 flex items-center gap-2 rounded border border-[#76508b] bg-[#180e24] px-3">
       <Search size={15} aria-hidden="true"/><input className="w-full min-w-0 bg-transparent py-3 text-sm text-white outline-none" type="search"
        value={search} maxLength={100} onChange={e=>updateSearch(e.target.value)}
        placeholder="Search by task title" aria-label="Search completed tasks"/>
      </span>
+    </label>
+    <label className="aw-v4-history-filter text-xs font-semibold">Priority
+     <select className="field mt-2 w-full sm:w-auto" aria-label="History priority filter"
+      value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)}>
+      <option value="">All priorities</option>
+      {["LOW","MEDIUM","HIGH","URGENT"].map(p=><option value={p} key={p}>{p}</option>)}
+     </select>
     </label>
     {canManage&&<label className="text-xs font-semibold text-[#ddc9f0]">History scope
      <select className="field mt-2 w-full sm:w-auto" aria-label="Task history scope" value={view}
@@ -96,8 +115,12 @@ export default function TaskHistoryPage(){
     <div className="rounded border border-dashed border-[#634279] p-8 text-center text-sm text-[#d6c3e6]">
      No completed tasks found for this view.
     </div>}
-   <ol className="grid gap-3" aria-label="Completed task records" aria-busy={loading}>
-    {items.map(t=><li key={t.id} className="min-w-0 rounded border border-[#654677] bg-[#1b1128] p-4">
+   {!loading&&!error&&items.length>0&&!visibleItems.length&&
+    <div className="aw-v4-empty">No completed tasks match the priority filter.
+     <button type="button" onClick={()=>setPriorityFilter("")}>Show all priorities</button>
+    </div>}
+   <ol className="aw-v4-history-list grid gap-3" aria-label="Completed task records" aria-busy={loading}>
+    {visibleItems.map(t=><li key={t.id} className="aw-v4-history-row min-w-0 rounded border p-4">
      <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1 space-y-2">
        <div className="flex flex-wrap items-center gap-2">
