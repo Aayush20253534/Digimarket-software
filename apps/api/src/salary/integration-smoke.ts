@@ -20,6 +20,7 @@ const fakeAuth={database:db,authenticate:async(token:string)=>{
 }} as unknown as AuthService;
 registerSalaryRoutes(api,fakeAuth);
 const onError:ErrorRequestHandler=(error:unknown,_req,res,_next)=>{
+ void _next;
  const e=error as {status?:number;code?:string;message?:string};
  res.status(e.status||500).json({error:{code:e.code||"SERVER_ERROR",message:e.message||"Error"}});
 };
