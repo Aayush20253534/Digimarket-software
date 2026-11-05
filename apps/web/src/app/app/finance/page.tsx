@@ -374,7 +374,7 @@ export default function FinancePage(){
       ] as const).map(([label,value])=><Card key={label}>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
         <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(value)}</p>
-        <p className="mt-2 text-xs text-slate-500">{view==="all"?"Organization":"Your entries"} · {totals.currency}</p>
+        <p className="mt-2 text-xs text-slate-500">{label==="Net posted"?"Income − agency expenses − posted client Meta Ads":(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
       </Card>)}
       <Card>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Client Meta Ads spend</p>
@@ -384,8 +384,8 @@ export default function FinancePage(){
     </div>
     <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
       <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
-        <h2>Posted agency cashflow</h2>
-        <p>Only posted agency income and expenses. Client-funded Meta Ads are excluded.</p>
+        <h2>Posted agency income and expenses</h2>
+        <p>These bars show agency income and expenses. Posted client Meta Ads spend is deducted separately in Net posted.</p>
        </div><Scale size={20} aria-hidden="true"/></header>
       <div className="aw-v5-finance-compare">
        {([["Income",totals.postedIncome,postedIncomeValue],
@@ -439,7 +439,7 @@ export default function FinancePage(){
               {metaAdClientsError&&<p className="mt-2 text-sm text-red-400" role="alert">{metaAdClientsError}</p>}
               {!metaAdClientsError&&!metaAdClients.length&&<p className="mt-2 text-xs text-slate-400">No active clients available in this workspace.</p>}
             </FormField>}
-            <p className="sm:col-span-2 text-xs text-slate-500">Client-funded Meta Ads are tracked separately and do not affect agency expenses or net income.</p>
+            <p className="sm:col-span-2 text-xs text-slate-500">Client Meta Ads spend stays separate from agency expenses. Once posted, it reduces Net posted.</p>
           </>}
           <FormField id="finance-amount" label="Amount (INR)"><input id="finance-amount" className="field" inputMode="decimal" required
             pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" placeholder="1250.00"
@@ -483,7 +483,7 @@ export default function FinancePage(){
       </Card>
     </div>
     <div id="finance-meta-ads" className="aw-v5-finance-anchor"/>
-    <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Client-funded spending does not affect agency expense or net totals. Latest 200 entries shown.">
+    <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Posted client spending reduces Net posted without increasing agency expenses. Latest 200 entries shown.">
       <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("meta_ads")}>
         <Download className="h-4 w-4"/> Export Meta Ads CSV
       </button>
