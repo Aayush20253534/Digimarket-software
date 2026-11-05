@@ -122,19 +122,15 @@ export default function SalaryPage(){
    <div className="grid gap-5 lg:grid-cols-2">
     <section className="rounded-xl border border-white/10 p-5 space-y-4">
      <h2 className="font-semibold text-lg flex gap-2 items-center"><Wallet size={19}/>Founder funding accounts</h2>
-     <p className="text-sm opacity-70">Create a tracked balance for each founder's cash, UPI or bank funding source. Values are manual records, not bank-connected balances.</p>
+     <p className="text-sm opacity-70">Create source labels (UPI, bank, cash). All sources owned by the same founder share that founder's posted Finance remaining balance.</p>
      <label className="block text-sm space-y-1">Founder<select className="field w-full" value={accountFounder} onChange={e=>setAccountFounder(e.target.value)}>
       <option value="">Select founder</option>{founders.map(x=><option key={x.id} value={x.id}>{x.displayName}</option>)}
      </select></label>
-     <div className="grid grid-cols-2 gap-3">
-      <label className="text-sm space-y-1">Account label<input className="field w-full" value={accountName} maxLength={100}
-       placeholder="UPI / Cash / Bank" onChange={e=>setAccountName(e.target.value)}/></label>
-      <label className="text-sm space-y-1">Opening recorded funds (₹)<input className="field w-full" type="number" min="0" step="0.01"
-       value={openingBalance} onChange={e=>setOpeningBalance(e.target.value)}/></label>
-     </div>
+     <label className="block text-sm space-y-1">Payment source label<input className="field w-full" value={accountName} maxLength={100}
+      placeholder="UPI / Cash / Bank" onChange={e=>setAccountName(e.target.value)}/></label>
      <button className="btn-secondary" disabled={busy||!accountFounder||!accountName.trim()} onClick={()=>void action(async()=>{
-      await request("/salary/accounts",{method:"POST",body:{founderUserId:accountFounder,name:accountName,openingBalance}});
-      setAccountName("");setOpeningBalance("0");
+      await request("/salary/accounts",{method:"POST",body:{founderUserId:accountFounder,name:accountName}});
+      setAccountName("");
      },"Funding account created.")}><Plus size={16}/>Add account</button>
      {accounts.length===0?<p className="text-sm opacity-60">No founder salary funding accounts recorded.</p>:
       <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left opacity-60">
@@ -147,31 +143,21 @@ export default function SalaryPage(){
          {a.active?"Active":"Paused"}</button></td>
        </tr>)}</tbody></table></div>}
     </section>
-    <section className="rounded-xl border border-white/10 p-5 space-y-4">
-     <h2 className="font-semibold text-lg flex gap-2 items-center"><Plus size={19}/>Record founder funds</h2>
-     <p className="text-sm opacity-70">Add manually available funds without registering this contribution as agency income.</p>
-     <label className="block text-sm space-y-1">Funding account<select className="field w-full" value={creditAccount} onChange={e=>setCreditAccount(e.target.value)}>
-      <option value="">Choose an account</option>{activeAccounts.map(a=><option key={a.id} value={a.id}>
-       {a.founderName} · {a.name} ({rupees(a.availableBalance)})</option>)}
-     </select></label>
-     <div className="grid grid-cols-2 gap-3">
-      <label className="text-sm space-y-1">Amount (₹)<input className="field w-full" type="number" min="0.01" step="0.01"
-       value={creditAmount} onChange={e=>setCreditAmount(e.target.value)}/></label>
-      <label className="text-sm space-y-1">Date<input className="field w-full" type="date" value={creditDate}
-       onChange={e=>setCreditDate(e.target.value)}/></label>
-     </div>
-     <label className="block text-sm space-y-1">Note (optional)<input className="field w-full" maxLength={250}
-      value={creditNote} onChange={e=>setCreditNote(e.target.value)} placeholder="Funds set aside for payroll"/></label>
-     <button className="btn-secondary" disabled={busy||!creditAccount||Number(creditAmount)<=0} onClick={()=>void action(async()=>{
-      await request("/salary/accounts/"+creditAccount+"/credits",{method:"POST",body:{
-       amount:creditAmount,recordedOn:creditDate,description:creditNote}});
-      setCreditAmount("");setCreditNote("");
-     },"Founder funding balance updated.")}><Plus size={16}/>Record funding credit</button>
-     <div className="space-y-2"><h3 className="font-semibold text-sm">Recent funding credits</h3>
-      {credits.slice(0,8).map(c=><div key={c.id} className="flex justify-between gap-3 border-t border-white/10 py-2 text-sm">
-       <span>{c.founderName} · {c.accountName}<small className="block opacity-60">{c.date} · {c.recordedBy}</small></span>
-       <strong>{rupees(c.amount)}</strong>
-      </div>)}{credits.length===0&&<p className="text-sm opacity-60">No additional funding recorded.</p>}</div>
+    <section className="rounded-xl border border-white/10 p-5 space-y-4" aria-label="Finance-linked founder balances">
+     <div className="flex items-center justify-between gap-2"><h2 className="font-semibold text-lg flex gap-2 items-center"><Wallet size={19}/>Live Finance balance</h2>
+      <Link href="/app/finance" className="underline text-sm">Open Finance</Link></div>
+     <p className="text-sm opacity-70">Posted founder income minus agency expenses, client-funded Meta Ads and salary allocations. Finance ledger balances, not verified bank balances.</p>
+     {(overview?.founderBalances||[]).map(x=><div className="rounded-lg border border-white/10 p-3 space-y-2" key={x.founderUserId}>
+      <h3 className="font-semibold">{x.name}</h3>
+      <div className="flex justify-between text-sm"><span>Net before salary</span><strong>{rupees(x.financeNetBeforeSalary)}</strong></div>
+      <div className="flex justify-between text-sm"><span>Salary funded (all time)</span><strong>{rupees(x.salaryFunded)}</strong></div>
+      <div className="flex justify-between text-sm font-semibold border-t border-white/10 pt-2"><span>Net posted remaining</span><strong>{rupees(x.remaining)}</strong></div>
+     </div>)}
+     {!(overview?.founderBalances||[]).length&&<p className="text-sm opacity-60">No founder Finance balances available.</p>}
+     {credits.length>0&&<details className="text-sm opacity-70"><summary>Historical manual salary credits ({credits.length})</summary>
+      <p className="py-2">Legacy credits remain auditable but do not increase Finance-linked salary funds.</p>
+      {credits.slice(0,10).map(c=><div className="py-1" key={c.id}>{c.date}: {c.founderName} · {c.accountName}, {rupees(c.amount)}</div>)}
+     </details>}
     </section>
    </div>
    <section className="rounded-xl border border-white/10 p-5 space-y-4">
