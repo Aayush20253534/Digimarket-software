@@ -157,11 +157,11 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
    {manager&&clientId&&<button type="button" className="aw-client-primary" aria-label="Schedule service delivery" onClick={()=>{if(expanded)reset();else{reset();setExpanded(true);}}}><Plus size={16}/>{expanded?"Close form":"Schedule service"}</button>}
   </div></div>
   {loaded&&<div className="aw-v4-delivery-tools">
-    <div className="aw-v4-delivery-stats" aria-label="Delivery counts in loaded schedules">
+    <section className="aw-v4-delivery-stats" aria-label="Delivery counts in loaded schedules">
      {([["Schedules",summary.schedules],["Overdue",summary.overdue],["Due today",summary.dueToday],
        ["Upcoming",summary.upcoming],["Completed dates",summary.completed]] as const).map(([label,count])=>
        <div className="aw-v4-summary-stat" key={label}><span>{label}</span><strong>{count}</strong></div>)}
-    </div>
+    </section>
     <div className="aw-v4-delivery-filters">
      <label className="aw-v4-search"><Search size={16} aria-hidden="true"/>
       <span className="sr-only">Search loaded delivery schedules</span>
