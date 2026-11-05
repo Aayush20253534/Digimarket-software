@@ -21,7 +21,7 @@ type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED"
   category:{id:string;name:string;active:boolean};
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
 type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
-  postedNetBeforeSalary?:string;postedSalaryExpense?:string;
+  postedNetBeforeSalary?:string;postedSalaryExpense?:string;postedExpenseIncludingSalary?:string;
   pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];
   clientAdSpend?:{posted:string;pending:string;count:number};recurringIncome?:RecurringIncome};
 type FinancePolicy={category:string;active:boolean};
@@ -393,6 +393,7 @@ export default function FinancePage(){
       {([
         ["Posted income",totals.postedIncome],
         ["Posted expenses",totals.postedExpense],
+        ["Expenses incl. salary",totals.postedExpenseIncludingSalary??totals.postedExpense],
         ["Net posted",totals.postedNet],
         ["Pending income",totals.pendingIncome],
         ["Pending expenses",totals.pendingExpense],
