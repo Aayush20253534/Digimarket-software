@@ -19,7 +19,7 @@ export default function SearchPage(){
  useEffect(()=>{setResults([]);setSubmitted("");},[session?.identity.userId]);
  if(!session)return <Spinner label="Checking search access…"/>;
  if(!can)return <Notice kind="error">Personal search permission required.</Notice>;
- return <div className="space-y-6">
+ return <div className="aw-v6-search-page space-y-6" data-aw-module="search">
   <PageHeader eyebrow="Private workspace index" title="My workspace search"
    description="Find your own or assigned leads, clients, projects, tasks, content, files, notes, income, expenses and approvals. Results are scoped to the signed-in user."/>
   <Card title="Find one of your records">
@@ -34,7 +34,7 @@ export default function SearchPage(){
   {submitted&&<Card title={"Results for "+submitted} description="The backend enforces user ownership, assignment and module permissions.">
    {!results.length?<EmptyState title="No matching records" description="Try another title or business name."/>:
     <div className="space-y-2">{results.map(x=><Link key={x.kind+x.id} href={x.href}
-     className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 hover:border-indigo-300">
+     className="aw-v6-search-result flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
      <div><b className="text-sm">{x.title}</b><p className="text-xs text-slate-500">{x.detail}</p></div>
      <span className="text-xs text-indigo-700">Open {x.kind} module →</span>
     </Link>)}</div>}
