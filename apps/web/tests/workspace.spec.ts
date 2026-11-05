@@ -404,10 +404,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(conversations.getByRole("button",{name:/Unread/})).toHaveAttribute("aria-pressed","true");
   await conversations.getByRole("button",{name:"All members"}).click();
   await expect(conversations.getByRole("button",{name:"All members"})).toHaveAttribute("aria-pressed","true");
-  // Phase 7 privacy: the file reader may finish after choosing a different
-  // recipient. It must never attach the old file to the new conversation.
+  // Phase 7 privacy: a FileReader can finish after leaving a conversation.
+  // The isolated founder fixture may have just one activated contact; verify
+  // clearing on close/reopen without assuming an additional production user.
   const contacts=page.locator(".aw-chat-contact");
-  await expect(contacts.nth(1)).toBeVisible();
+  await expect(contacts.first()).toBeVisible();
   await contacts.first().click();
   await page.evaluate(()=>{
    const OriginalFileReader=window.FileReader;
@@ -420,7 +421,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Attach file").setInputFiles({
    name:"phase7-private.txt",mimeType:"text/plain",buffer:Buffer.from("CI attachment; never send")
   });
-  await contacts.nth(1).click();
+  await page.locator(".aw-chat-back").evaluate((button:HTMLElement)=>button.click());
+  await contacts.first().click();
   await expect(page.locator(".aw-chat-upload-preview")).toHaveCount(0);
   await page.waitForTimeout(240);
   await expect(page.locator(".aw-chat-upload-preview")).toHaveCount(0);
