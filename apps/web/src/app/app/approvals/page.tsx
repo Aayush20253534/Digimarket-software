@@ -5,6 +5,7 @@ import { Check, Clock3, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner } from "@/components/ui";
 import { ApiError } from "@/lib/api";
+import {OperationsWorkspaceNav} from "@/components/operations-workspace-nav";
 
 type Category = "GENERAL" | "FINANCE" | "CONTENT" | "DELIVERABLE";
 type Outcome = "APPROVED" | "REJECTED" | "CANCELLED";
@@ -116,6 +117,7 @@ export default function ApprovalsPage() {
   if(!canRead)return <div className="space-y-4"><PageHeader title="Access denied" description="Approval requests are restricted."/><Notice kind="error">Your role cannot view approvals.</Notice></div>;
   const activePolicies=policies.filter(p=>p.active);
   return <div data-aw-module="approvals" className="aw-module-root space-y-7">
+    <OperationsWorkspaceNav/>
     <PageHeader eyebrow="Operations" title="Approval workflows"
       description="Submit requests, review pending decisions and inspect recorded outcomes. Approving a finance request posts its associated financial entry."
       actions={<button className="btn-secondary" onClick={()=>void reload()} disabled={loading||busy}><RefreshCw className="h-4 w-4"/>Refresh</button>}/>
