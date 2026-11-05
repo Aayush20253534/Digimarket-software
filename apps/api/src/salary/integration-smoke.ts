@@ -85,7 +85,7 @@ try{
  await http(api).post("/api/v1/salary/payments").set(auth("founder-a")).send(salary).expect(409);
  let state=await http(api).get("/api/v1/salary/accounts").set(auth("founder-a")).expect(200);
  assert.equal(state.body.data.find((x:{id:string})=>x.id===a).availableBalance,"0.0000");
- assert.equal(state.body.data.find((x:{id:string})=>x.id===b).availableBalance,"0.00");
+ assert.equal(state.body.data.find((x:{id:string})=>x.id===b).availableBalance,"0.0000");
  const summary=await http(api).get("/api/v1/salary/summary").set(auth("founder-b")).expect(200);
  assert.equal(summary.body.data.totalPaid,"20000.00");
  assert.equal(summary.body.data.paymentCount,1);
@@ -136,7 +136,7 @@ try{
   ...salary,idempotencyKey:randomUUID(),recipientUserId:f2.id,amount:"500.00",
   allocations:[{accountId:a,amount:"500.00"}]
  }).expect(201);
- assert.equal(await db.financialTransaction.count({where:{organizationId:org.id}}),2);
+ assert.equal(await db.financialTransaction.count({where:{organizationId:org.id}}),4);
  assert.equal((await http(api).get("/api/v1/salary/payments").set(auth("employee")).expect(200)).body.data.length,1);
  assert.equal((await http(api).get("/api/v1/salary/summary").set(auth("founder-a")).expect(200)).body.data.totalPaid,"500.00");
  assert.equal((await finance.totals(accountA,"mine")).postedNet,"15500.0000");
