@@ -24,16 +24,17 @@ function fixture() {
   const findTransactions = vi.fn().mockResolvedValue([]);
   const groupTransactions = vi.fn().mockResolvedValue([]);
   const salaryFundingAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
+  const salaryFundingFindMany=vi.fn().mockResolvedValue([]);
   const salaryPaymentAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const db = {
     financialCategory: { findMany: findCategories },
     financialTransaction: { findMany: findTransactions, groupBy: groupTransactions },
-    salaryFundingAllocation:{aggregate:salaryFundingAggregate},
+    salaryFundingAllocation:{aggregate:salaryFundingAggregate,findMany:salaryFundingFindMany},
     salaryPayment:{aggregate:salaryPaymentAggregate},
   } as unknown as PrismaClient;
   return {
     service: new FinanceService(db),
-    findCategories, findTransactions, groupTransactions, salaryFundingAggregate,
+    findCategories, findTransactions, groupTransactions, salaryFundingAggregate, salaryFundingFindMany,
     salaryPaymentAggregate, categoryId,
   };
 }
@@ -152,4 +153,52 @@ describe("Meta Ads register scopes", () => {
       categoryId: { in: [categoryId.meta, categoryId.ads] },
     });
   });
+
+  it("shows salary shares per funding founder and both shares in Agency, without duplicating ledger expenses",async()=>{
+    const {service,salaryFundingFindMany,findTransactions}=fixture();
+    const founderA=actor.userId;
+    const founderB="00000000-0000-4000-8000-000000000009";
+    const pay={id:"00000000-0000-4000-8000-000000000020",
+      paidOn:new Date("2026-11-05T00:00:00.000Z"),
+      createdAt:new Date("2026-11-05T11:00:00.000Z"),
+      method:"UPI",status:"PAID",salaryMonth:"2026-11",
+      reference:null,note:"November payroll",
+      recipient:{displayName:"Employee C"},recorder:{displayName:"Founder A"}};
+    const shares=[
+      {id:"00000000-0000-4000-8000-000000000021",
+        amount:new Prisma.Decimal("2000.00"),payment:pay,
+        account:{name:"UPI A",founderUserId:founderA,
+          founder:{displayName:"Founder A",loginId:"fa"}}},
+      {id:"00000000-0000-4000-8000-000000000022",
+        amount:new Prisma.Decimal("3000.00"),payment:pay,
+        account:{name:"Bank B",founderUserId:founderB,
+          founder:{displayName:"Founder B",loginId:"fb"}}},
+    ];
+    salaryFundingFindMany.mockImplementation(async ({where}:{
+      where:{account:{founderUserId?:string}}
+    })=>where.account.founderUserId
+      ?shares.filter(share=>share.account.founderUserId===where.account.founderUserId)
+      :shares);
+    const aEntries=await service.entries(actor,"mine");
+    expect(aEntries.filter(x=>x.sourceType==="SALARY").map(x=>x.amount)).toEqual(["2000.0000"]);
+    const second={...actor,userId:founderB};
+    const bEntries=await service.entries(second,"mine");
+    expect(bEntries.filter(x=>x.sourceType==="SALARY").map(x=>x.amount)).toEqual(["3000.0000"]);
+    const admin={...actor,permissions:new Set(["finance.read.all","finance.entry.read.own"])};
+    const all=await service.entries(admin,"all");
+    expect(all.filter(x=>x.sourceType==="SALARY")).toHaveLength(2);
+    expect(all.filter(x=>x.sourceType==="SALARY").map(x=>x.category.name)).toEqual(["Salary","Salary"]);
+    expect(all.filter(x=>x.sourceType==="SALARY").reduce((n,x)=>n.plus(x.amount),new Prisma.Decimal(0)).toFixed(2))
+      .toBe("5000.00");
+    expect(all.filter(x=>x.sourceType==="SALARY").map(x=>x.enteredById).sort()).toEqual([founderA,founderB].sort());
+    expect(findTransactions).not.toHaveBeenCalled();
+    const csv=await service.exportCsv(admin,"all");
+    expect(csv.csv).toContain("salary:00000000-0000-4000-8000-000000000021");
+    expect(csv.csv).toContain("salary:00000000-0000-4000-8000-000000000022");
+    pay.status="VOID";
+    const voided=await service.entries(actor,"mine");
+    expect(voided.find(x=>x.sourceType==="SALARY")?.status).toBe("CANCELLED");
+  });
+
+
 });
