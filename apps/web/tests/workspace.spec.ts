@@ -133,6 +133,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     await page.setViewportSize({width,height:800});
     await visitWorkspace(page,"/app/reports");
     await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
+    await expect(page.getByRole("navigation",{name:"Business workspace sections"})).toBeVisible();
+    await expect(page.getByRole("navigation",{name:"Reporting breakdowns"})).toBeVisible();
+    await expect(page.getByRole("group",{name:"Quick report periods"})).toBeVisible();
     await expect(page.getByRole("article",{name:"Lead conversion rate"})).toBeVisible();
     const bounds=await page.evaluate(()=>({
       documentWidth:document.documentElement.scrollWidth,
@@ -380,9 +383,15 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await visitWorkspace(page,"/app/documents/quotations");
   await expect(page.getByRole("navigation",{name:"Documents sections"})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Business workspace sections"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Quotation sections"})).toBeVisible();
+  await expect(page.getByLabel("Reels per month")).toHaveValue("8");
+  await expect(page.getByLabel("Posts per month")).toHaveValue("8");
   await page.getByRole("navigation",{name:"Documents sections"}).getByRole("link",{name:"Agreements"}).click();
   await expect(page).toHaveURL(/\/app\/documents\/agreements$/);
   await expect(page.getByRole("heading",{name:"Agreements",exact:true})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Agreement sections"})).toBeVisible();
+  await expect(page.locator("#agreement-summary")).toBeVisible();
   // Old bookmarks still load the same original workflows, not a deleted page.
   await visitWorkspace(page,"/app/quotations");
   await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
@@ -965,6 +974,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
   await visitWorkspace(page,"/app/finance");
   await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Finance page sections"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Posted income and expense comparison"})).toBeVisible();
+  await expect(page.getByRole("group",{name:"Meta Ads funding filter"})).toBeVisible();
+  await expect(page.getByLabel("Search loaded financial entries")).toBeVisible();
+  await expect(page.getByLabel("Filter financial entry type")).toHaveValue("ALL");
   const financeCategory=page.getByLabel("Category",{exact:true});
   // No Person field on new transactions; the server records the submitting user.
   await expect(financeCategory).toHaveValue("");
@@ -980,6 +994,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Amount (INR)").fill("55.50");
   await page.getByRole("button",{name:"Submit for approval"}).click();
   await expect(page.getByText("Entry submitted for finance approval. Pending amounts are not included in posted totals.")).toBeVisible();
+  await page.getByLabel("Filter financial entry type").selectOption("INCOME");
+  const financeRegister=page.getByRole("region",{name:"Financial register"});
+  await expect(financeRegister.getByText("CI Revenue Category")).toBeVisible();
+  await expect(financeRegister.getByText("CI Admin Category Updated")).toHaveCount(0);
+  await page.getByLabel("Filter financial entry type").selectOption("ALL");
+  await expect(financeRegister.getByText("CI Admin Category Updated")).toBeVisible();
   await expect(page.getByRole("button",{name:"Agency totals"})).toHaveCount(0);
   for(const width of [320,360,375,390,430,768,1024,1366,1440]){
     await page.setViewportSize({width,height:812});
