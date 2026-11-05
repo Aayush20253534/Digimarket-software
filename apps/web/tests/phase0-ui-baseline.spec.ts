@@ -36,8 +36,21 @@ type Captured={role:"admin";route:string;theme:Palette;viewport:{width:number;he
 async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
   viewport:{width:number;height:number},captures:Captured[]){
  await page.setViewportSize(viewport);
- await page.goto(entry.href);
  const workspace=page.locator(".aw-workspace");
+ // A full navigation remounts auth and rotates its HttpOnly refresh cookie.
+ // Use the app's own client-side sidebar route when possible. For a capture
+ // on the same URL, do not navigate at all. Repeated theme/viewport captures
+ // should not generate new authentication sessions.
+ if(new URL(page.url()).pathname!==entry.href){
+  const sidebar=page.getByRole("navigation",{name:"Workspace navigation"});
+  const target=sidebar.locator('a[href="'+entry.href+'"]');
+  if(await workspace.isVisible()&&await target.count()&&await target.first().isVisible()){
+   await target.first().click();
+   await page.waitForURL(url=>url.pathname===entry.href,{timeout:15000});
+  }else{
+   await page.goto(entry.href);
+  }
+ }
  // Capturing dozens of full document navigations can expire isolated E2E
  // sessions. Recover a login redirect once; do not ignore real route errors.
  try{
@@ -59,6 +72,11 @@ async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
  }
  await expect(workspace,"Protected workspace on "+entry.href+" (actual: "+page.url()+")")
   .toBeVisible({timeout:20000});
+ // Client-side theme changes require the real theme button. Setting only
+ // localStorage cannot update an already mounted React workspace.
+ if(await workspace.getAttribute("data-theme")!==theme){
+  await page.getByRole("button",{name:theme==="dark"?"Switch to dark theme":"Switch to light theme"}).click();
+ }
  await expect(workspace).toHaveAttribute("data-theme",theme,{timeout:15000});
  // Font readiness and transitions matter for stable screenshot review. No
  // networkidle wait: the workspace may keep notification connections alive.
