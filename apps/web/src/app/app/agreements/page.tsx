@@ -76,7 +76,7 @@ export default function AgreementsPage(){
  }
  if(!session)return <Spinner label="Checking agreement access…"/>;
  if(!permitted)return <section className="p-6"><h1>Agreements</h1><p>Only founders and administrators can access agreements.</p></section>;
- return <div className="aw-quote-page space-y-5" data-aw-module="agreements">
+ return <div className="aw-quote-page aw-v5-document-page space-y-5" data-aw-module="agreements">
   <header className="flex flex-wrap items-start justify-between gap-4">
    <div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#D65DEC]">AMPLIFYWORLD / SALES</p>
     <h1 className="mt-2 text-3xl font-extrabold text-[#FBF4FF]">Agreements</h1>
@@ -93,9 +93,16 @@ export default function AgreementsPage(){
     <span className="mt-1 block text-xs">{option==="default"?"Standard digital marketing services and clauses.":"Customize services, content targets and special terms."}</span>
    </button>)}
   </div>
+  <nav className="aw-v5-document-steps" aria-label="Agreement sections">
+    {([["01","Client","#agreement-client"],["02","Dates","#agreement-dates"],
+      ["03","Services","#agreement-services"],["04","Charges","#agreement-charges"],
+      ["05","Terms","#agreement-terms"],["06","Review","#agreement-summary"],
+      ["07","History","#agreement-history"]] as const).map(([n,title,href])=>
+       <a key={href} href={href}><span>{n}</span>{title}</a>)}
+   </nav>
   <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(285px,.7fr)]" onSubmit={e=>void create(e)}>
    <div className="space-y-5">
-    <section className={panel}>
+    <section id="agreement-client" className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">1. Client and representatives</h2>
      <div className={row}>
       <div className="sm:col-span-2"><label className={label} htmlFor="ag-client">Client / legal business name *</label>
@@ -114,7 +121,7 @@ export default function AgreementsPage(){
        <input className={input} id="ag-email" type="email" maxLength={200} value={form.clientEmail} onChange={e=>patch("clientEmail",e.target.value)}/></div>
      </div>
     </section>
-    <section className={panel}>
+    <section id="agreement-dates" className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">2. Agreement dates and term</h2>
      <div className="grid gap-4 sm:grid-cols-3">
       <div><label className={label} htmlFor="ag-date">Agreement date *</label><input className={input} id="ag-date" type="date" required value={form.agreementDate} onChange={e=>patch("agreementDate",e.target.value)}/></div>
@@ -122,7 +129,7 @@ export default function AgreementsPage(){
       <div><label className={label} htmlFor="ag-end">End date *</label><input className={input} id="ag-end" type="date" min={form.startDate} required value={form.endDate} onChange={e=>patch("endDate",e.target.value)}/></div>
      </div>
     </section>
-    <section className={panel}>
+    <section id="agreement-services" className={panel}>
      <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-bold text-[#F5E7FF]">3. Services and deliverables</h2>
       {mode==="custom"&&<button type="button" className="btn-secondary" disabled={form.services.length>=12} onClick={()=>patch("services",[...form.services,{name:"",description:""}])}><Plus size={16}/>Add service</button>}
      </div>
@@ -148,7 +155,7 @@ export default function AgreementsPage(){
       <div><label className={label} htmlFor="ag-posts">Posts per month</label><input className={input} id="ag-posts" type="number" min={0} max={999} disabled={mode==="default"} value={form.posts} onChange={e=>patch("posts",Number(e.target.value))}/></div>
      </div>
     </section>
-    <section className={panel}>
+    <section id="agreement-charges" className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">4. Charges and payment schedule</h2>
      <div className={row}>
       <div><label className={label} htmlFor="ag-fee">Agency service fee (₹) *</label><input className={input} id="ag-fee" required type="number" min={0} max={999999999} step=".01" value={form.serviceFee} onChange={e=>patch("serviceFee",e.target.value)}/></div>
@@ -164,7 +171,7 @@ export default function AgreementsPage(){
       {form.taxMode==="extra"&&<div><label className={label} htmlFor="ag-gst">GST rate (%)</label><input className={input} type="number" id="ag-gst" min={0} max={28} step=".01" value={form.gstRate} onChange={e=>patch("gstRate",Number(e.target.value))}/></div>}
      </div>
     </section>
-    <section className={panel}>
+    <section id="agreement-terms" className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">5. Termination and additional conditions</h2>
      <div className={row}>
       <div><label className={label} htmlFor="ag-notice">Termination notice (days)</label><input className={input} id="ag-notice" type="number" min={0} max={90} value={form.noticeDays} onChange={e=>patch("noticeDays",Number(e.target.value))}/></div>
@@ -174,7 +181,7 @@ export default function AgreementsPage(){
      <p className="mt-4 text-xs leading-5 text-[#C4ACD4]">The PDF includes responsibilities, confidentiality, third-party costs, liability, termination and governing law. Typed names do not constitute electronic signatures.</p>
     </section>
    </div>
-   <aside className="space-y-4 xl:sticky xl:top-6"><section className={panel}>
+   <aside className="space-y-4 xl:sticky xl:top-6"><section id="agreement-summary" className={panel}>
     <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">Agreement summary</h2>
     <div className="space-y-3 text-sm">
      <div className="flex justify-between gap-3"><span>Agency fee</span><strong>{currency(form.serviceFee)}</strong></div>
@@ -186,9 +193,10 @@ export default function AgreementsPage(){
     <button type="button" className="btn-secondary mt-3 w-full" disabled={saving} onClick={()=>{setForm(initial(mode));setError("");setNotice("");}}>Clear form</button>
    </section></aside>
   </form>
-  <section className={panel}>
+  <section id="agreement-history" className={panel}>
    <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold text-[#F5E7FF]">Agreement history</h2>
     <input className={input} aria-label="Search agreements" placeholder="Search client or agreement number" value={search} onChange={e=>setSearch(e.target.value)}/></div>
+   <p className="aw-v5-document-history-count" aria-live="polite">{filtered.length} of {history.length} saved agreements shown</p>
    {loading?<Spinner label="Loading agreements…"/>:filtered.length===0?<p className="text-sm text-[#C4ACD4]">No saved agreements match.</p>:
     <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm">
      <thead><tr className="border-b border-[#553363]"><th className="py-3">Agreement</th><th>Client</th><th>Term</th><th>Service fee</th><th>PDF</th></tr></thead>

@@ -4,6 +4,7 @@ import {usePathname} from "next/navigation";
 import {FileSignature,FileText} from "lucide-react";
 import type {ReactNode} from "react";
 import {useAuth} from "@/components/auth-provider";
+import {BusinessWorkspaceNav} from "@/components/business-workspace-nav";
 
 /* Shared navigation wrapper; each underlying form/history remains untouched. */
 export default function DocumentsLayout({children}:{children:ReactNode}){
@@ -15,7 +16,9 @@ export default function DocumentsLayout({children}:{children:ReactNode}){
   {label:"Quotations",href:"/app/documents/quotations",icon:FileText},
   {label:"Agreements",href:"/app/documents/agreements",icon:FileSignature},
  ];
- return <div className="aw-v2-subpage">
+ return <div className="aw-v2-subpage aw-v5-documents-shell">
+  <BusinessWorkspaceNav/>
+  <div className="aw-v5-documents-intro"><span>COMMERCIAL DOCUMENTS</span><p>Prepare, save and retrieve quotations and service agreements. PDFs are generated from saved document snapshots.</p></div>
   <nav aria-label="Documents sections" className="aw-v2-tabs" data-testid="documents-tabs">
    {tabs.map(({label,href,icon:Icon})=><Link key={href} href={href}
     aria-current={pathname===href?"page":undefined}

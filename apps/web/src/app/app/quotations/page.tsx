@@ -95,7 +95,7 @@ export default function QuotationsPage(){
  }
  if(!session)return <Spinner label="Checking quotation access…"/>;
  if(!permitted)return <div className="p-6"><h1 className="text-xl font-bold">Quotations</h1><p>Only founder and administrator accounts can access quotations.</p></div>;
- return <div className="aw-quote-page space-y-5" data-aw-module="quotations">
+ return <div className="aw-quote-page aw-v5-document-page space-y-5" data-aw-module="quotations">
   <header className="flex flex-wrap items-start justify-between gap-4">
    <div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#D65DEC]">AMPLIFYWORLD / SALES</p>
     <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#FBF4FF]">Quotations</h1>
@@ -113,9 +113,19 @@ export default function QuotationsPage(){
     <span className="text-base font-bold">New quotation</span><span className="mt-1 block text-xs">Select, edit, remove or add services and commercial terms.</span>
    </button>
   </div>
+  <nav className="aw-v5-document-steps" aria-label="Quotation sections">
+    {(mode==="default"?[
+      ["01","Package","#quote-package"],["02","Review & export","#quote-summary"],["03","Saved history","#quote-history"]
+     ]:[
+      ["01","Client","#quote-client"],["02","Services","#quote-services"],
+      ["03","Charges","#quote-charges"],["04","Terms","#quote-terms"],
+      ["05","Review & export","#quote-summary"],["06","Saved history","#quote-history"]
+     ]).map(([n,title,href])=><a key={href} href={href}>
+       <span>{n}</span>{title}</a>)}
+   </nav>
   <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(285px,.7fr)]" onSubmit={e=>void create(e)}>
    <div className="space-y-5">
-    {mode==="default"?<section className={card}>
+    {mode==="default"?<section id="quote-package" className={card}>
      <div className="mb-5"><h2 className="text-xl font-bold text-[#F5E7FF]">Default marketing package</h2>
       <p className="mt-1 text-sm leading-6 text-[#C6ABD9]">Six included services and standard commercial terms. Monthly content starts at 8 reels and 8 posts, and both quantities are editable.</p></div>
      <div className="grid gap-4 sm:grid-cols-2">
@@ -143,7 +153,7 @@ export default function QuotationsPage(){
      </div>
      <p className="mt-5 text-xs leading-6 text-[#C4ACD4]">Monthly content: {form.reels} reels and {form.posts} posts. Commercial terms and the six service types remain fixed. The PDF date and quotation number are generated automatically.</p>
     </section>:<>
-    <section className={card}>
+    <section id="quote-client" className={card}>
      <h2 className="mb-4 text-lg font-bold text-[#F4DFFF]">1. Client & quotation</h2>
      <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><label className={label} htmlFor="quote-client">Client / business name *</label>
@@ -156,7 +166,7 @@ export default function QuotationsPage(){
       <div className="flex items-end pb-2 text-sm text-[#BDA7CD]">Quotation number is assigned when saved.</div>
      </div>
     </section>
-    <section className={card}>
+    <section id="quote-services" className={card}>
      <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-bold text-[#F4DFFF]">2. Included services *</h2>
       <button type="button" className={action} disabled={form.services.length>=6}
        onClick={()=>patch("services",[...form.services,{name:"",description:""}])}><Plus size={15}/> Add custom service</button></div>
@@ -193,7 +203,7 @@ export default function QuotationsPage(){
        <input id="quote-posts" type="number" min={0} max={999} className={field} value={form.posts} onChange={e=>patch("posts",Number(e.target.value))}/></div>
      </div>
     </section>
-    <section className={card}>
+    <section id="quote-charges" className={card}>
      <h2 className="mb-4 text-lg font-bold text-[#F4DFFF]">3. Fees, advertising & taxes</h2>
      <div className="grid gap-4 sm:grid-cols-2">
       <div><label className={label} htmlFor="quote-fee">Agency service fee (₹) *</label>
@@ -223,7 +233,7 @@ export default function QuotationsPage(){
      </div>
      <p className="mt-3 text-xs text-[#BDA7CD]">GST added separately is calculated on agency fees, not client-controlled advertising spend. Validate tax treatment before issuing a legal quotation.</p>
     </section>
-    <section className={card}>
+    <section id="quote-terms" className={card}>
      <h2 className="mb-4 text-lg font-bold text-[#F4DFFF]">4. Payment & commercial terms</h2>
      <div className="grid gap-4 sm:grid-cols-2">
       <div><label className={label} htmlFor="quote-service-payment">Service fee payable</label>
@@ -258,7 +268,7 @@ export default function QuotationsPage(){
     </>}
    </div>
    <aside className="space-y-5 xl:sticky xl:top-6">
-    <section className="aw-quote-panel overflow-hidden rounded-2xl border border-[#503063] bg-[#170C24] shadow-sm">
+    <section id="quote-summary" className="aw-quote-panel aw-v5-document-summary overflow-hidden rounded-2xl border border-[#503063] bg-[#170C24] shadow-sm">
      <div className="bg-[#51217B] px-5 py-4 text-white"><FileText className="mb-2" size={22}/><h2 className="text-lg font-bold">Quotation summary</h2>
       <p className="text-sm text-[#E8D6F5]">AmplifyWorld • A4 PDF • {mode==="default"?"Fixed package":"Custom package"}</p></div>
      <div className="space-y-3 p-5">
@@ -274,10 +284,11 @@ export default function QuotationsPage(){
     </section>
    </aside>
   </form>
-  <section className={card}>
+  <section id="quote-history" className={card}>
    <div className="mb-4 flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-lg font-bold text-[#F4DFFF]">Quotation history</h2>
     <p className="text-sm text-[#C4A7DA]">Saved quotations are immutable snapshots. Reuse as a new quotation to revise terms.</p></div>
     <input aria-label="Search quotation history" className={field+" max-w-sm"} placeholder="Search name or quotation number" value={search} onChange={e=>setSearch(e.target.value)}/></div>
+   <p className="aw-v5-document-history-count" aria-live="polite">{filtered.length} of {rows.length} saved quotations shown</p>
    {loading?<p role="status">Loading quotations…</p>:!filtered.length?<p className="py-8 text-center text-[#C4A7DA]">No quotations found.</p>:
     <div className="overflow-x-auto"><table className="w-full text-left text-sm" aria-label="Quotation history">
      <thead className="border-b bg-[#291639] text-[#F4DFFF]"><tr><th className="p-3">Quotation no.</th><th className="p-3">Client</th><th className="p-3">Date</th><th className="p-3">Total</th><th className="p-3">Actions</th></tr></thead>

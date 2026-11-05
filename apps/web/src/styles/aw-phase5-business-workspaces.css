@@ -1,0 +1,737 @@
+/*
+ * DigiMarket UI v2 — Phase 5: Finance, Documents and Reports
+ * Presentation-only. Accounting, PDF exports, data scopes, RBAC and APIs
+ * remain exclusively owned by the existing pages and server.
+ */
+
+/* Shared Business navigation */
+.aw-workspace .aw-v5-business-nav {
+ display:flex;align-items:center;gap:6px;width:100%;min-width:0;
+ padding:0 0 12px;margin-bottom:18px;border-bottom:1px solid var(--ui-border);
+ overflow-x:auto;scrollbar-width:thin;
+}
+.aw-workspace .aw-v5-business-link {
+ display:inline-flex;align-items:center;gap:9px;flex:none;
+ min-height:40px;padding:9px 14px;border-radius:9px;
+ border:1px solid transparent;background:transparent;
+ color:var(--ui-muted)!important;text-decoration:none!important;
+ font-size:13px;font-weight:640;white-space:nowrap;
+}
+.aw-workspace .aw-v5-business-link:hover{
+ background:var(--ui-hover);color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-business-link.is-active{
+ background:var(--ui-raised);border-color:var(--ui-border);
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-business-link.is-active::after {
+ content:"";height:5px;width:5px;border-radius:50%;background:var(--ui-strong);
+}
+.aw-workspace :is(.aw-v5-business-link,.aw-v5-finance-jump a,.aw-v5-document-steps a,
+ .aw-v5-filter-pills button,.aw-v5-date-presets button):focus-visible{
+ outline:2px solid var(--ui-focus)!important;outline-offset:2px;
+}
+.aw-workspace .aw-v5-eyebrow{
+ color:var(--ui-subtle);font-size:10px;font-weight:760;
+ letter-spacing:.12em;text-transform:uppercase;
+}
+
+/* Finance: a readable ledger, exactly-scoped totals, restrained navigation. */
+.aw-workspace .aw-v5-finance-page{min-width:0;color:var(--ui-strong);}
+.aw-workspace .aw-v5-finance-jump,
+.aw-workspace .aw-v5-report-jump{
+ display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;
+}
+.aw-workspace .aw-v5-finance-jump a,
+.aw-workspace .aw-v5-report-jump a{
+ display:inline-flex;align-items:center;gap:8px;min-height:38px;
+ padding:8px 12px;border:1px solid var(--ui-border);border-radius:9px;
+ background:var(--ui-raised);color:var(--ui-strong)!important;
+ font-size:12px;font-weight:665;text-decoration:none!important;
+}
+.aw-workspace .aw-v5-finance-jump a:hover,
+.aw-workspace .aw-v5-report-jump a:hover{background:var(--ui-hover);}
+.aw-workspace .aw-v5-finance-visibility{
+ width:max-content;max-width:100%;padding:5px;border:1px solid var(--ui-border);
+ background:var(--ui-surface);border-radius:10px;flex-wrap:wrap;
+}
+.aw-workspace .aw-v5-finance-visibility button{
+ min-height:38px;padding:9px 13px;border-radius:8px!important;
+ font-size:12px;font-weight:675;
+}
+.aw-workspace .aw-v5-finance-visibility .btn-primary{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-finance-visibility .btn-secondary{
+ background:transparent!important;border-color:transparent!important;
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-summary-grid{
+ grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-summary-grid > *{
+ padding:19px!important;min-height:126px;
+ background:var(--ui-surface)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;border-radius:12px!important;
+ box-shadow:var(--ui-shadow)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-summary-grid p:first-child{
+ font-size:11px;font-weight:680;letter-spacing:.04em;color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-summary-grid p:nth-child(2){
+ font-size:clamp(1.3rem,2vw,1.85rem);line-height:1.18;
+ letter-spacing:-.035em;font-weight:740;color:var(--ui-strong)!important;
+ font-variant-numeric:tabular-nums;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-summary-grid p:last-child{
+ font-size:11px;color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-finance-visuals{
+ display:grid;gap:17px;min-width:0;padding:22px;
+ background:var(--ui-surface);border:1px solid var(--ui-border);
+ border-radius:12px;box-shadow:var(--ui-shadow);
+}
+.aw-workspace .aw-v5-finance-visuals header{
+ display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+}
+.aw-workspace .aw-v5-finance-visuals header>svg{color:var(--ui-subtle);flex:none;}
+.aw-workspace .aw-v5-finance-visuals h2{
+ font-size:16px;font-weight:730;letter-spacing:-.01em;color:var(--ui-strong)!important;
+ margin:4px 0 7px;
+}
+.aw-workspace .aw-v5-finance-visuals header p{
+ color:var(--ui-muted)!important;font-size:12px;line-height:1.55;
+}
+.aw-workspace .aw-v5-finance-compare{display:grid;gap:17px;}
+.aw-workspace .aw-v5-finance-comparison-row{display:grid;gap:9px;min-width:0;}
+.aw-workspace .aw-v5-finance-comparison-row>div:first-child{
+ display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+}
+.aw-workspace .aw-v5-finance-comparison-row span{
+ font-size:12px;color:var(--ui-muted);font-weight:650;
+}
+.aw-workspace .aw-v5-finance-comparison-row strong{
+ font-size:14px;font-weight:745;color:var(--ui-strong);
+ font-variant-numeric:tabular-nums;overflow-wrap:anywhere;
+}
+.aw-workspace .aw-v5-finance-track{
+ display:block;height:11px;width:100%;overflow:hidden;
+ border-radius:99px;background:var(--ui-track);
+}
+.aw-workspace .aw-v5-finance-track>span{
+ display:block;height:100%;border-radius:inherit;background:var(--aw-chart-2);
+}
+.aw-workspace .aw-v5-finance-comparison-row:nth-child(2) .aw-v5-finance-track>span{
+ background:var(--aw-chart-5);
+}
+.aw-workspace .aw-v5-finance-notice{
+ border-top:1px solid var(--ui-border);padding-top:13px;
+ color:var(--ui-muted)!important;font-size:11px;
+}
+.aw-workspace .aw-v5-finance-anchor,
+.aw-workspace .aw-v5-finance-page [id^="finance-"]{scroll-margin-top:90px;}
+.aw-workspace .aw-v5-finance-page .aw-finance-panels{
+ gap:15px;align-items:start;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-panels > *{
+ min-width:0;
+}
+.aw-workspace .aw-v5-finance-page :is(.aw-finance-category-list,.aw-finance-admin-modal){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-category-list > div{
+ border:1px solid var(--ui-border)!important;background:var(--ui-raised);
+ border-radius:9px;min-height:52px;
+}
+.aw-workspace .aw-v5-finance-page :is(.aw-finance-register-scroll,.overflow-x-auto){
+ scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-register-scroll{
+ border:1px solid var(--ui-border)!important;border-radius:10px!important;
+ background:var(--ui-surface)!important;overflow-x:auto;
+ max-width:100%;scrollbar-width:thin;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-register{
+ border-collapse:separate;border-spacing:0;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-register th{
+ padding:13px 15px!important;background:var(--ui-raised)!important;
+ color:var(--ui-muted)!important;border-bottom:1px solid var(--ui-border)!important;
+ font-size:11px!important;font-weight:710;letter-spacing:.05em;text-transform:uppercase;
+ white-space:nowrap;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-register td{
+ padding:14px 15px!important;color:var(--ui-strong)!important;
+ border-bottom:1px solid var(--ui-border)!important;
+ vertical-align:middle;font-size:12px;white-space:nowrap;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-register tbody tr:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-register .aw-finance-amount{
+ font-weight:735;font-variant-numeric:tabular-nums;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-original-submitter{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-admin-modal{
+ border:1px solid var(--ui-border)!important;
+ background:var(--ui-surface)!important;border-radius:12px!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-admin-modal :is(h2,label,strong){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-finance-page .aw-finance-admin-modal p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-finance-page :is(.field,input.field,select.field,textarea.field){
+ background:var(--ui-input)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;color-scheme:inherit!important;
+ border-radius:9px!important;
+}
+.aw-workspace .aw-v5-finance-page :is(.field,input.field,select.field,textarea.field)::placeholder{
+ color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-v5-register-filters{
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:11px;padding:12px 14px;margin-bottom:15px;
+ border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-raised);
+}
+.aw-workspace .aw-v5-register-search{
+ display:flex;align-items:center;gap:9px;min-height:42px;
+ flex:1 1 230px;max-width:460px;padding:0 12px;
+ border:1px solid var(--ui-border);border-radius:9px;
+ background:var(--ui-input);color:var(--ui-muted);
+}
+.aw-workspace .aw-v5-register-search:focus-within{
+ outline:2px solid var(--ui-focus);outline-offset:1px;
+}
+.aw-workspace .aw-v5-register-search input{
+ width:100%;min-width:0;min-height:40px;border:0;outline:0;
+ background:transparent!important;color:var(--ui-strong)!important;font-size:12px;
+}
+.aw-workspace .aw-v5-register-search input::placeholder{color:var(--ui-subtle)!important;}
+.aw-workspace .aw-v5-register-filters select{
+ min-width:125px;min-height:42px;font-size:12px!important;
+}
+.aw-workspace .aw-v5-filter-pills{display:flex;align-items:center;gap:5px;}
+.aw-workspace .aw-v5-filter-pills button{
+ min-height:36px;padding:8px 12px;border-radius:8px;
+ font-size:12px;font-weight:660;color:var(--ui-muted);
+ border:1px solid transparent;background:transparent;
+}
+.aw-workspace .aw-v5-filter-pills button:hover{
+ color:var(--ui-strong);background:var(--ui-hover);
+}
+.aw-workspace .aw-v5-filter-pills button[aria-pressed="true"]{
+ background:var(--ui-surface);border-color:var(--ui-border);
+ color:var(--ui-strong);
+}
+.aw-workspace .aw-v5-register-count{
+ font-size:11px;color:var(--ui-muted);white-space:nowrap;
+}
+.aw-workspace .aw-v5-no-matches{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:12px;padding:14px;
+ background:var(--ui-raised);border:1px dashed var(--ui-border);
+ border-radius:9px;color:var(--ui-muted);font-size:12px;
+}
+.aw-workspace .aw-v5-no-matches button{
+ min-height:34px;padding:7px 11px;border-radius:7px;
+ background:var(--ui-surface);border:1px solid var(--ui-border);
+ color:var(--ui-strong);font-weight:650;
+}
+
+/* Documents: clean white/graphite editor. PDF branding remains unchanged. */
+.aw-workspace:has(.aw-v5-document-page) .aw-work-content{
+ background:var(--ui-canvas)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-documents-shell{
+ display:grid;gap:0;min-width:0;
+}
+.aw-workspace .aw-v5-documents-intro{
+ display:grid;gap:7px;margin:0 0 15px;padding:15px 18px;
+ border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface);
+}
+.aw-workspace .aw-v5-documents-intro>span{
+ font-size:10px;font-weight:760;letter-spacing:.13em;
+ color:var(--ui-muted);
+}
+.aw-workspace .aw-v5-documents-intro p{
+ font-size:12px;line-height:1.6;color:var(--ui-muted);
+}
+.aw-workspace .aw-v5-documents-shell>.aw-v2-tabs{
+ margin-bottom:16px;
+}
+.aw-workspace .aw-v5-document-page{
+ padding:clamp(14px,2.1vw,25px)!important;
+ border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;background:var(--ui-surface)!important;
+ background-image:none!important;color:var(--ui-strong)!important;
+ color-scheme:inherit!important;min-width:0;
+}
+.aw-workspace .aw-v5-document-page header{
+ gap:16px;
+}
+.aw-workspace .aw-v5-document-page header :is(h1,h2){
+ color:var(--ui-strong)!important;
+ font-size:clamp(1.45rem,2.6vw,2.1rem);
+ font-weight:750;letter-spacing:-.038em;
+}
+.aw-workspace .aw-v5-document-page header p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-document-steps{
+ display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+ padding:11px 12px;border:1px solid var(--ui-border);
+ border-radius:10px;background:var(--ui-raised);
+}
+.aw-workspace .aw-v5-document-steps a{
+ display:inline-flex;align-items:center;gap:8px;min-height:37px;
+ padding:8px 11px;border:1px solid var(--ui-border);border-radius:8px;
+ background:var(--ui-surface);color:var(--ui-strong)!important;
+ text-decoration:none!important;font-size:12px;font-weight:640;
+}
+.aw-workspace .aw-v5-document-steps a:hover{
+ background:var(--ui-hover);border-color:var(--ui-subtle);
+}
+.aw-workspace .aw-v5-document-steps a span{
+ display:grid;place-items:center;width:23px;height:23px;flex:none;
+ background:var(--ui-raised);border-radius:6px;
+ color:var(--ui-muted);font-size:10px;font-weight:760;
+}
+.aw-workspace .aw-v5-document-page :is(
+ .aw-quote-panel,section.rounded-2xl.border
+){
+ background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;box-shadow:none!important;
+}
+.aw-workspace .aw-v5-document-page :is(h2,h3,h4,strong,legend){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-document-page :is(p,label,section>span){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-document-page label{
+ color:var(--ui-muted)!important;font-size:11px;
+}
+.aw-workspace .aw-v5-document-page :is(.field,input,select,textarea):not([type="checkbox"]){
+ background:var(--ui-input)!important;
+ background-image:none!important;
+ color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;
+ border-radius:9px!important;color-scheme:inherit!important;
+}
+.aw-workspace .aw-v5-document-page :is(.field,input,textarea)::placeholder{
+ color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-v5-document-page :is(.field,input,textarea,select):focus-visible{
+ outline:2px solid var(--ui-focus)!important;outline-offset:1px;
+ box-shadow:none!important;
+}
+.aw-workspace .aw-v5-document-page select option{
+ background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-document-page :is(.btn-secondary,.aw-quote-catalog-button){
+ background:var(--ui-raised)!important;background-image:none!important;
+ color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;box-shadow:none!important;
+ border-radius:9px!important;
+}
+.aw-workspace .aw-v5-document-page :is(.btn-secondary,.aw-quote-catalog-button):hover:not(:disabled){
+ background:var(--ui-hover)!important;border-color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-v5-document-page .btn-primary{
+ color:var(--ui-action-text)!important;background:var(--ui-primary)!important;
+ background-image:none!important;border:1px solid var(--ui-primary)!important;
+ box-shadow:none!important;border-radius:9px!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-mode{
+ min-height:100px;display:grid;align-content:center;gap:6px;
+ border:1px solid var(--ui-border)!important;
+ background:var(--ui-raised)!important;color:var(--ui-muted)!important;
+ box-shadow:none!important;border-radius:11px!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-mode:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-mode[aria-pressed="true"]{
+ background:var(--ui-surface)!important;
+ border:1px solid var(--ui-subtle)!important;
+ box-shadow:inset 3px 0 0 var(--ui-primary)!important;
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-mode strong,
+.aw-workspace .aw-v5-document-page .aw-quote-mode span:first-child{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-mode span:last-child{
+ color:var(--ui-muted)!important;font-size:12px;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-fixed-service{
+ min-height:82px;padding:14px;background:var(--ui-raised)!important;
+ border:1px solid var(--ui-border)!important;border-radius:9px!important;
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-fixed-service>span{
+ color:var(--ui-muted)!important;font-weight:730;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-fixed-service :is(strong,p:first-child){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-fixed-service p:last-child{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-catalog-button{
+ min-height:86px;text-align:left;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-catalog-button span span{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-quote-catalog-button:disabled{
+ opacity:.55;
+}
+.aw-workspace .aw-v5-document-page .aw-v5-document-summary{
+ overflow:hidden;
+}
+.aw-workspace .aw-v5-document-page .aw-v5-document-summary>div:first-child{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ padding:17px 20px!important;border-bottom:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-v5-document-summary>div:first-child :is(h2,p,svg){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-v5-document-summary>div:first-child p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-document-page .aw-v5-document-summary>div:last-child{
+ padding:20px!important;
+}
+.aw-workspace .aw-v5-document-page :is(.border-t,.border-b,.border){
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-document-page div[class*="bg-[#"]{
+ background:var(--ui-raised)!important;
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-document-page :is(
+ .aw-quote-fixed-service,.aw-quote-catalog-button
+) :is(h2,h3,p,strong,span){overflow-wrap:anywhere;}
+.aw-workspace .aw-v5-document-page :is(table,.overflow-x-auto){
+ color:var(--ui-strong)!important;
+ scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+.aw-workspace .aw-v5-document-page table{
+ width:100%;min-width:620px;border-collapse:separate;border-spacing:0;
+}
+.aw-workspace .aw-v5-document-page table thead,
+.aw-workspace .aw-v5-document-page table th{
+ background:var(--ui-raised)!important;
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-document-page table th{
+ font-size:11px;font-weight:730;letter-spacing:.04em;
+ text-transform:uppercase;padding:13px!important;
+ border-bottom:1px solid var(--ui-border)!important;white-space:nowrap;
+}
+.aw-workspace .aw-v5-document-page table td{
+ color:var(--ui-strong)!important;
+ font-size:12px;padding:13px!important;vertical-align:middle;
+ border-bottom:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-document-page table tbody tr:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-v5-document-history-count{
+ color:var(--ui-muted)!important;font-size:11px;margin:0 0 12px;
+}
+.aw-workspace .aw-v5-document-page :is(
+ [id^="quote-"],[id^="agreement-"]
+){scroll-margin-top:92px;}
+
+/* Reporting, definitions and financial drilldowns. */
+.aw-workspace .aw-v5-report-shell{min-width:0;}
+.aw-workspace .aw-v5-reports-page{min-width:0;}
+.aw-workspace .aw-v5-reports-page .aw-report-toolbar{
+ background:var(--ui-surface)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;border-radius:12px!important;
+ padding:20px!important;box-shadow:var(--ui-shadow)!important;
+ display:grid;gap:16px;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-toolbar-title{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-toolbar-title :is(strong,svg){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-toolbar-title p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-date-presets{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.aw-workspace .aw-v5-date-presets button{
+ min-height:36px;padding:8px 12px;border-radius:8px;
+ border:1px solid var(--ui-border);background:var(--ui-raised);
+ color:var(--ui-strong);font-size:12px;font-weight:660;
+}
+.aw-workspace .aw-v5-date-presets button:hover{
+ background:var(--ui-hover);
+}
+.aw-workspace .aw-v5-date-presets button[aria-pressed="true"]{
+ border-color:var(--ui-subtle)!important;
+ box-shadow:inset 3px 0 0 var(--ui-primary);
+}
+.aw-workspace .aw-v5-reports-page .aw-report-dates{
+ gap:11px;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-dates label{
+ color:var(--ui-muted)!important;font-size:11px!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-dates input{
+ background:var(--ui-input)!important;border-color:var(--ui-border)!important;
+ color:var(--ui-strong)!important;color-scheme:inherit!important;
+ border-radius:9px!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-refresh{
+ background:var(--ui-primary)!important;color:var(--ui-action-text)!important;
+ border:1px solid var(--ui-primary)!important;border-radius:9px!important;
+}
+.aw-workspace .aw-v5-report-period-note{
+ display:flex;align-items:center;gap:9px 14px;flex-wrap:wrap;
+ background:var(--ui-raised);border:1px solid var(--ui-border);
+ border-radius:9px;padding:12px 15px;font-size:11px;
+ color:var(--ui-muted);
+}
+.aw-workspace .aw-v5-report-period-note strong{
+ font-size:12px;color:var(--ui-strong);font-weight:720;
+}
+.aw-workspace .aw-v5-report-period-note small{
+ margin-left:auto;color:var(--ui-subtle);font-size:11px;
+}
+.aw-workspace .aw-v5-reports-page :is(.aw-report-sectionhead,.aw-insights-head){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-sectionhead h2{
+ color:var(--ui-strong)!important;font-size:18px;font-weight:740;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-sectionhead p,
+.aw-workspace .aw-v5-reports-page .aw-report-sectionhead>span{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-visuals{
+ grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;
+}
+.aw-workspace .aw-v5-reports-page .aw-insights-card{
+ padding:20px!important;border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;background:var(--ui-surface)!important;
+ background-image:none!important;box-shadow:var(--ui-shadow)!important;
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-insights-head :is(h3,svg){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-reports-page :is(.aw-insights-hint,.aw-insights-chart-note){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-insights-label{
+ color:var(--ui-muted)!important;font-size:12px;
+}
+.aw-workspace .aw-v5-reports-page .aw-insights-label strong{
+ color:var(--ui-strong)!important;font-variant-numeric:tabular-nums;
+}
+.aw-workspace .aw-v5-reports-page .aw-insights-track{
+ height:9px!important;background:var(--ui-track)!important;border-radius:99px!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-insights-fill{
+ background:var(--aw-chart-2)!important;border-radius:inherit!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-grid{
+ gap:14px;grid-template-columns:repeat(3,minmax(0,1fr));
+}
+.aw-workspace .aw-v5-reports-page .aw-report-card{
+ min-width:0;border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;background:var(--ui-surface)!important;
+ background-image:none!important;box-shadow:var(--ui-shadow)!important;
+ padding:20px!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-card :is(
+ .aw-report-card-label,.aw-report-hero-label,.aw-report-details dt
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-v5-reports-page .aw-report-card :is(
+ .aw-report-hero-value,.aw-report-details dd,.aw-cash-ledger-line strong
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-v5-reports-page .aw-report-card .aw-report-icon{
+ color:var(--ui-strong)!important;background:var(--ui-raised)!important;
+ border:1px solid var(--ui-border);border-radius:9px!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-card-top>svg{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-hero-value{
+ font-size:clamp(1.55rem,2.2vw,2.1rem)!important;letter-spacing:-.04em;
+ font-variant-numeric:tabular-nums;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-details>div{
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-cash-ledger-line{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:8px!important;
+ padding:11px 12px!important;text-decoration:none!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-cash-ledger-line:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-cash-ledger-currency{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-footnote{
+ background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;box-shadow:none!important;padding:20px!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-footnote :is(h2,svg){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-reports-page .aw-report-footnote :is(p,dt,dd){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v5-reports-page [id^="report-"]{scroll-margin-top:100px;}
+
+/* Finance and Leads reporting detail screens share the exact same theme. */
+.aw-workspace .aw-v5-report-shell :is(.aw-finance-breakdown,.aw-lead-breakdown){
+ color:var(--ui-strong)!important;min-width:0;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown :is(
+ .aw-report-breakdown-filter,.aw-finance-panel,.aw-finance-stat,.aw-finance-drill-panels,
+ .aw-finance-day,.aw-finance-person
+){
+ background:var(--ui-surface)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;
+ color:var(--ui-strong)!important;box-shadow:none!important;
+ border-radius:11px!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown :is(
+ .aw-finance-panel h2,.aw-finance-stat strong,.aw-finance-panel-heading,
+ .aw-finance-day strong,.aw-finance-person strong
+){color:var(--ui-strong)!important;}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown :is(
+ .aw-finance-stat p,.aw-finance-panel-caption,.aw-finance-stat span,
+ .aw-finance-trend-item,.aw-finance-days,.aw-finance-person-title
+){color:var(--ui-muted)!important;}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown :is(
+ .aw-report-back,.aw-report-preset-row button,.aw-finance-pagination button,
+ .aw-finance-clear,.aw-report-primary
+){
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:8px!important;
+ box-shadow:none!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown .aw-report-primary{
+ background:var(--ui-primary)!important;color:var(--ui-action-text)!important;
+ border-color:var(--ui-primary)!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown :is(input,select,textarea){
+ background:var(--ui-input)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;color-scheme:inherit!important;
+ border-radius:8px!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown .aw-finance-table-scroller{
+ border:1px solid var(--ui-border)!important;border-radius:10px!important;
+ scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+ background:var(--ui-surface)!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown .aw-finance-table{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown .aw-finance-table th{
+ background:var(--ui-raised)!important;color:var(--ui-muted)!important;
+ border-bottom:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown .aw-finance-table td{
+ color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown :is(
+ .aw-finance-trend-column,.aw-finance-category-track,.aw-finance-day-track
+){background:var(--ui-track)!important;}
+.aw-workspace .aw-v5-report-shell .aw-finance-breakdown :is(
+ .aw-finance-trend-bar,.aw-finance-category-track>span,.aw-finance-day-track>span
+){background:var(--aw-chart-2)!important;}
+.aw-workspace .aw-v5-report-shell .aw-lead-breakdown :is(
+ .aw-lead-card,.aw-lead-panel,.aw-lead-filter,.aw-lead-stat
+){
+ background:var(--ui-surface)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;
+ box-shadow:none!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v5-report-shell .aw-lead-breakdown :is(
+ .aw-lead-track,.aw-lead-trend-track
+){background:var(--ui-track)!important;}
+.aw-workspace .aw-v5-report-shell .aw-lead-breakdown :is(
+ .aw-lead-filter input,.aw-lead-filter select
+){
+ background:var(--ui-input)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;color-scheme:inherit!important;
+}
+
+/* Responsive layouts without whole-document horizontal overflow. */
+@media(max-width:1160px){
+ .aw-workspace .aw-v5-finance-page .aw-finance-summary-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+ .aw-workspace .aw-v5-reports-page .aw-report-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+ .aw-workspace .aw-v5-reports-page .aw-report-visuals{
+  grid-template-columns:1fr;
+ }
+}
+@media(max-width:760px){
+ .aw-workspace .aw-v5-finance-page .aw-finance-summary-grid{gap:9px;}
+ .aw-workspace .aw-v5-finance-page .aw-finance-summary-grid > *{
+  min-height:108px;padding:13px!important;
+ }
+ .aw-workspace .aw-v5-finance-visuals{padding:17px;}
+ .aw-workspace .aw-v5-reports-page .aw-report-grid{
+  grid-template-columns:1fr;
+ }
+ .aw-workspace .aw-v5-document-steps{gap:5px;padding:9px;}
+ .aw-workspace .aw-v5-document-steps a{padding:7px 9px;font-size:11px;}
+ .aw-workspace .aw-v5-document-page{
+  padding:14px!important;
+ }
+ .aw-workspace .aw-v5-finance-visibility{width:100%;}
+ .aw-workspace .aw-v5-register-search{max-width:none;flex-basis:100%;}
+}
+@media(max-width:500px){
+ .aw-workspace .aw-v5-business-link{padding:8px 11px;font-size:12px;}
+ .aw-workspace .aw-v5-finance-jump a,
+ .aw-workspace .aw-v5-report-jump a{padding:7px 9px;font-size:11px;}
+ .aw-workspace .aw-v5-finance-page .aw-finance-summary-grid p:nth-child(2){
+  font-size:1.1rem;
+ }
+ .aw-workspace .aw-v5-finance-page .aw-finance-summary-grid p:first-child{
+  font-size:10px;
+ }
+ .aw-workspace .aw-v5-finance-comparison-row>div:first-child{
+  align-items:flex-start;flex-wrap:wrap;
+ }
+ .aw-workspace .aw-v5-finance-page .aw-finance-register td{
+  padding:12px!important;
+ }
+ .aw-workspace .aw-v5-document-page .aw-quote-mode{
+  min-height:92px;padding:13px!important;
+ }
+ .aw-workspace .aw-v5-document-page .aw-quote-mode span:first-child{
+  font-size:13px!important;
+ }
+ .aw-workspace .aw-v5-document-steps a span{width:20px;height:20px;}
+ .aw-workspace .aw-v5-report-period-note small{margin-left:0;}
+}
+@media(prefers-reduced-motion:reduce){
+ .aw-workspace :is(
+ .aw-v5-business-link,.aw-v5-document-steps a,.aw-v5-filter-pills button
+ ){transition:none!important;}
+}

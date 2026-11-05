@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Download, FileImage, Plus, RefreshCw, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Download, FileImage, Plus, RefreshCw, Wallet, Search, Scale } from "lucide-react";
+import {BusinessWorkspaceNav} from "@/components/business-workspace-nav";
 import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, FormField, Notice, PageHeader, Spinner } from "@/components/ui";
 import { ApiError } from "@/lib/api";
@@ -57,6 +58,11 @@ export default function FinancePage(){
   const [categories,setCategories]=useState<Category[]>([]);
   const [entries,setEntries]=useState<Entry[]>([]);
   const [metaAdEntries,setMetaAdEntries]=useState<Entry[]>([]);
+  const [metaSearch,setMetaSearch]=useState("");
+  const [metaFundingFilter,setMetaFundingFilter]=useState<"ALL"|"SELF"|"CLIENT">("ALL");
+  const [entrySearch,setEntrySearch]=useState("");
+  const [entryKindFilter,setEntryKindFilter]=useState<"ALL"|Kind>("ALL");
+  const [entryStatusFilter,setEntryStatusFilter]=useState<"ALL"|Entry["status"]>("ALL");
   const [metaAdClients,setMetaAdClients]=useState<MetaAdClient[]>([]);
   const [metaAdClientsError,setMetaAdClientsError]=useState("");
   const [totals,setTotals]=useState<Totals>(zero);
@@ -83,6 +89,25 @@ export default function FinancePage(){
   const [categoryName,setCategoryName]=useState("");
   const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind),[categories,kind]);
   const metaAdsSelected=kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===categoryId)?.name??"");
+  const filteredMetaAdEntries=useMemo(()=>metaAdEntries.filter(row=>
+   (metaFundingFilter==="ALL"||(metaFundingFilter==="CLIENT"?Boolean(row.clientId):!row.clientId))&&
+   (!metaSearch.trim()||[row.client?.businessName??"",row.description??"",
+      row.merchantOrSource??"",row.enteredBy.displayName]
+     .some(value=>value.toLocaleLowerCase().includes(metaSearch.trim().toLocaleLowerCase())))),
+   [metaAdEntries,metaFundingFilter,metaSearch]);
+  const filteredEntries=useMemo(()=>entries.filter(row=>
+   (entryKindFilter==="ALL"||row.kind===entryKindFilter)&&
+   (entryStatusFilter==="ALL"||row.status===entryStatusFilter)&&
+   (!entrySearch.trim()||[row.category.name,row.description??"",
+     row.merchantOrSource??"",row.enteredBy.displayName]
+    .some(value=>value.toLocaleLowerCase().includes(entrySearch.trim().toLocaleLowerCase())))),
+   [entries,entryKindFilter,entryStatusFilter,entrySearch]);
+  // Bar widths are visual comparisons only; displayed money uses the existing
+  // exact decimal-string formatter and server-owned summary calculations.
+  const postedIncomeValue=Number(totals.postedIncome);
+  const postedExpenseValue=Number(totals.postedExpense);
+  const postedMax=Math.max(1,Number.isFinite(postedIncomeValue)?Math.max(0,postedIncomeValue):0,
+    Number.isFinite(postedExpenseValue)?Math.max(0,postedExpenseValue):0);
   // An entry must start without a selected category.
   useEffect(()=>{if(categoryId&&!selected.some(c=>c.id===categoryId))setCategoryId("");},[selected,categoryId]);
 
@@ -319,7 +344,8 @@ export default function FinancePage(){
   }
   if(!session)return <Spinner label="Checking finance access…"/>;
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
-  return <div className="aw-finance-page space-y-7">
+  return <div className="aw-finance-page aw-v5-finance-page space-y-7" data-aw-module="finance">
+    <BusinessWorkspaceNav/>
     <PageHeader eyebrow="Financial operations" title="Income & expenses"
       description={isFounder?"Your income and expenses post immediately without approval.":"Entries are submitted for approval. Only posted entries count towards net income."}
       actions={<div className="flex flex-wrap gap-2">
@@ -327,11 +353,18 @@ export default function FinancePage(){
         <button className="btn-secondary" type="button" disabled={loading} onClick={()=>void reload()}><RefreshCw className="h-4 w-4"/>Refresh</button>
       </div>}/>
     {error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}
-    <div className="flex gap-2" role="group" aria-label="Finance visibility">
+    <nav className="aw-v5-finance-jump" aria-label="Finance page sections">
+      <a href="#finance-summary">Overview</a>
+      {canAll&&<a href="#finance-recurring">Recurring agreements</a>}
+      {canCreate&&<a href="#finance-entry">New entry</a>}
+      <a href="#finance-meta-ads">Meta Ads spend</a>
+      <a href="#finance-register">Financial register</a>
+    </nav>
+    <div className="aw-v5-finance-visibility flex gap-2" role="group" aria-label="Finance visibility">
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
     </div>
-    <div className="aw-finance-summary-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="Financial totals">
+    <div id="finance-summary" className="aw-finance-summary-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="Financial totals">
       {([
         ["Posted income",totals.postedIncome],
         ["Posted expenses",totals.postedExpense],
@@ -349,10 +382,28 @@ export default function FinancePage(){
         <p className="mt-2 text-xs text-slate-500">Posted · Pending: {money(totals.clientAdSpend?.pending??"0.0000")}</p>
       </Card>
     </div>
+    <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
+      <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
+        <h2>Posted agency cashflow</h2>
+        <p>Only posted agency income and expenses. Client-funded Meta Ads are excluded.</p>
+       </div><Scale size={20} aria-hidden="true"/></header>
+      <div className="aw-v5-finance-compare">
+       {([["Income",totals.postedIncome,postedIncomeValue],
+          ["Expenses",totals.postedExpense,postedExpenseValue]] as const).map(([label,value,number])=>
+         <div className="aw-v5-finance-comparison-row" key={label}>
+          <div><span>{label}</span><strong>{loading?"…":money(value)}</strong></div>
+          <div className="aw-v5-finance-track" role="img"
+            aria-label={label+": "+(loading?"loading":money(value))}>
+           <span style={{width:(Number.isFinite(number)?Math.max(0,number)/postedMax*100:0)+"%"}}/>
+          </div>
+         </div>)}
+      </div>
+      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included in posted totals.</p>
+    </section>
     {!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}
-    {canAll&&<Card title="Recurring income from client agreements" description="Current-month contract projection, not received payments. Ad budgets are separate from agency service revenue.">
+    {canAll&&<div id="finance-recurring" className="aw-v5-finance-anchor"><Card title="Recurring income from client agreements" description="Current-month contract projection, not received payments. Ad budgets are separate from agency service revenue.">
       {recurring?<div className="space-y-4">
         <p className="text-sm text-slate-500">Period: {recurring.month} · Active client agreements</p>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -364,8 +415,8 @@ export default function FinancePage(){
           <tbody>{recurring.items.map(c=><tr key={c.id}><td><Link href={"/app/clients/"+c.id} className="underline">{c.businessName}</Link></td><td>{money(c.monthlyServiceCharge)}</td><td>{money(c.monthlyAdBudget)}</td><td>{money(c.monthlyCombined)}</td><td>{c.contractEndOn??"Open-ended"}</td></tr>)}</tbody></table></div>
         {!recurring.items.length&&<p className="text-sm">No active client agreements with monthly charges recorded for this month.</p>}
       </div>:<p className="text-sm">Recurring agreement projection is unavailable.</p>}
-    </Card>}
-    <div className="aw-finance-panels grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+    </Card></div>}
+    <div id="finance-entry" className="aw-finance-panels grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
       {canCreate&&<Card title="New income or expense" description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
         <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
           <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" value={kind} onChange={e=>{setKind(e.target.value as Kind);setCategoryId("");}}>
@@ -431,16 +482,30 @@ export default function FinancePage(){
         </div>):<EmptyState title="No categories yet" description="An administrator can add expense and income categories." icon={Wallet}/>}</div>
       </Card>
     </div>
+    <div id="finance-meta-ads" className="aw-v5-finance-anchor"/>
     <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Client-funded spending does not affect agency expense or net totals. Latest 200 entries shown.">
       <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("meta_ads")}>
         <Download className="h-4 w-4"/> Export Meta Ads CSV
       </button>
+      <div className="aw-v5-register-filters" aria-label="Meta Ads register filters">
+       <label className="aw-v5-register-search"><Search size={16} aria-hidden="true"/>
+        <span className="sr-only">Search loaded Meta Ads spend</span>
+        <input type="search" aria-label="Search loaded Meta Ads spend" value={metaSearch}
+          placeholder="Search client, note or payer" onChange={e=>setMetaSearch(e.target.value)}/>
+       </label>
+       <div className="aw-v5-filter-pills" role="group" aria-label="Meta Ads funding filter">
+        {([["ALL","All"],["SELF","Agency"],["CLIENT","Client"]] as const).map(([value,label])=>
+          <button key={value} type="button" aria-pressed={metaFundingFilter===value}
+            onClick={()=>setMetaFundingFilter(value)}>{label}</button>)}
+       </div>
+       <span className="aw-v5-register-count">{filteredMetaAdEntries.length} of {metaAdEntries.length} loaded</span>
+      </div>
       {!metaAdEntries.length?<EmptyState title="No Meta Ads expenses recorded" description="Expenses categorized as Meta Ads appear here, whether paid by Self or a client."/>:
       <div className="aw-finance-register-scroll" role="region" aria-label="All Meta Ads register" tabIndex={0}>
         <table className="aw-finance-register"><thead><tr>
           {adminFinance&&<th>Actions</th>}
           {["Date","Paid by","Client","Amount","Payment method","Status","Recorded by","Notes","Receipt","Approval"].map(label=><th key={label}>{label}</th>)}
-        </tr></thead><tbody>{metaAdEntries.map(row=><tr key={row.id} id={"finance-meta-"+row.id}>
+        </tr></thead><tbody>{filteredMetaAdEntries.map(row=><tr key={row.id} id={"finance-meta-"+row.id}>
           {adminFinance&&<td><div className="flex gap-2">
             {row.status!=="CANCELLED"&&<>
               <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>beginEntryEdit(row)}>Edit</button>
@@ -459,8 +524,30 @@ export default function FinancePage(){
           <td><Link className="underline" href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)}>View approval</Link></td>
         </tr>)}</tbody></table>
       </div>}
+      {metaAdEntries.length>0&&!filteredMetaAdEntries.length&&<p className="aw-v5-no-matches" role="status">
+       No Meta Ads records match these filters.
+       <button type="button" onClick={()=>{setMetaSearch("");setMetaFundingFilter("ALL");}}>Clear filters</button>
+      </p>}
     </Card>
+    <div id="finance-register" className="aw-v5-finance-anchor"/>
     <Card title={view==="all"?"Agency financial register":"My financial register"} description="Saved records, including pending, posted, rejected and cancelled entries. Latest 200 shown; CSV export includes up to 5,000.">
+      <div className="aw-v5-register-filters" aria-label="Financial register filters">
+       <label className="aw-v5-register-search"><Search size={16} aria-hidden="true"/>
+        <span className="sr-only">Search loaded financial entries</span>
+        <input type="search" aria-label="Search loaded financial entries" value={entrySearch}
+         placeholder="Search category, payee or member" onChange={e=>setEntrySearch(e.target.value)}/>
+       </label>
+       <select className="field" aria-label="Filter ledger by kind" value={entryKindFilter}
+        onChange={e=>setEntryKindFilter(e.target.value as "ALL"|Kind)}>
+        <option value="ALL">All types</option><option value="INCOME">Income</option><option value="EXPENSE">Expense</option>
+       </select>
+       <select className="field" aria-label="Filter financial entry status" value={entryStatusFilter}
+        onChange={e=>setEntryStatusFilter(e.target.value as "ALL"|Entry["status"])}>
+        <option value="ALL">All statuses</option>{(["POSTED","PENDING","REJECTED","CANCELLED"] as const).map(value=>
+         <option key={value} value={value}>{value}</option>)}
+       </select>
+       <span className="aw-v5-register-count">{filteredEntries.length} of {entries.length} loaded</span>
+      </div>
       {loading&&!hasLoadedEntries?<Spinner label="Loading financial entries…"/>:
         !entries.length&&!error?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
         !entries.length?<Notice kind="error">The financial register could not be loaded. Saved entries have not been deleted. Retry Refresh.</Notice>:
@@ -468,7 +555,7 @@ export default function FinancePage(){
           <thead><tr className="border-b text-xs uppercase text-slate-500">
             {adminFinance&&<th className="pb-3 pr-4">Actions</th>}
             {["Date","Type","Category","Source","Notes","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
-          </tr></thead><tbody>{entries.map(row=><tr key={row.id} id={"finance-"+row.id}>
+          </tr></thead><tbody>{filteredEntries.map(row=><tr key={row.id} id={"finance-"+row.id}>
             {adminFinance&&<td className="py-3 pr-4">
               {row.status!=="CANCELLED"&&<div className="flex items-center gap-2">
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
@@ -495,6 +582,10 @@ export default function FinancePage(){
 
             </div></td>
           </tr>)}</tbody></table></div>}
+      {entries.length>0&&!filteredEntries.length&&<p className="aw-v5-no-matches" role="status">
+       No transactions match these filters.
+       <button type="button" onClick={()=>{setEntrySearch("");setEntryKindFilter("ALL");setEntryStatusFilter("ALL");}}>Clear filters</button>
+      </p>}
     </Card>
     {adminFinance&&editingCategory&&<div className="aw-finance-admin-overlay" role="presentation">
       <div className="aw-finance-admin-modal" role="dialog" aria-modal="true" aria-label="Edit finance category">
