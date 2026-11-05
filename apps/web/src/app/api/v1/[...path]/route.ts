@@ -36,6 +36,11 @@ const endpoints: Record<string, string[]> = {
   "approval-policies": ["GET"],
   "approvals": ["GET", "POST"],
   "finance/categories": ["GET", "POST"],
+  "salary/people": ["GET"],
+  "salary/accounts": ["GET","POST"],
+  "salary/credits": ["GET"],
+  "salary/payments": ["GET","POST"],
+  "salary/summary": ["GET"],
   "finance/entries": ["GET", "POST"],
   "finance/assignees": ["GET"],
   "finance/meta-ad-clients": ["GET"],
@@ -137,6 +142,12 @@ const leadDuplicateReviewPattern = /^leads\/duplicates\/[0-9a-fA-F-]{36}\/review
 const userActionPattern = /^users\/[0-9a-fA-F-]{36}\/(reset-password|disable|role)$/;
 
 function permitted(path: string, method: string): boolean {
+  const salaryBits=path.split("/");
+  if(salaryBits.length===4&&salaryBits[0]==="salary"&&salaryBits[1]==="accounts"&&/^[0-9a-fA-F-]{36}$/.test(salaryBits[2])){
+    if(salaryBits[3]==="credits")return method==="POST";
+    if(salaryBits[3]==="status")return method==="PUT";
+  }
+  if(salaryBits.length===4&&salaryBits[0]==="salary"&&salaryBits[1]==="payments"&&/^[0-9a-fA-F-]{36}$/.test(salaryBits[2])&&salaryBits[3]==="void")return method==="POST";
   if(path.startsWith("review-cards/public/")){
     const parts=path.split("/");
     if(parts.length===3 && /^[a-f0-9]{32}$/.test(parts[2]))return method==="GET";
@@ -355,6 +366,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
+  }
+  if (path === "salary/payments" || path === "salary/summary") {
+    for(const key of ["from","to"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
   if (path === "clients") {
     for (const key of ["status","q","cursor","limit"]) {
