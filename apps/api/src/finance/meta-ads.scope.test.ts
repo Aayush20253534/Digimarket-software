@@ -130,7 +130,7 @@ describe("Meta Ads register scopes", () => {
     expect(totals.postedNet).toBe("-50.5000");
   });
 
-  it("deducts only the funding founder\'s salary from personal Net posted", async () => {
+  it("deducts only the funding founder's salary from personal Net posted", async () => {
     const {service,groupTransactions,salaryFundingAggregate}=fixture();
     groupTransactions.mockImplementation(async ({where}:{where:{clientId:unknown}})=>
       where.clientId===null?
