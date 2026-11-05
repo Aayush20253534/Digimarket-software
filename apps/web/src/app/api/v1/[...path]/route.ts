@@ -142,7 +142,7 @@ function permitted(path: string, method: string): boolean {
     if(parts.length===3 && /^[a-f0-9]{32}$/.test(parts[2]))return method==="GET";
     return parts.length===4 && /^[a-f0-9]{32}$/.test(parts[2]) && ["draft","click"].includes(parts[3]) && method==="POST";
   }
-  if(/^review-cards\\/[0-9a-fA-F-]{36}$/.test(path))return method==="PUT";
+  if(path.startsWith("review-cards/") && path.split("/").length===2 && /^[0-9a-fA-F-]{36}$/.test(path.split("/")[1]))return method==="PUT";
   if(messageReadPattern.test(path))return method==="POST";
   if(messageNotePattern.test(path))return method==="GET";
   if(messageSavePattern.test(path))return method==="POST";
