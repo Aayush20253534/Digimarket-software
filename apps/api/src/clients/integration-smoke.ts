@@ -4,11 +4,12 @@ import { createDatabaseClient } from "@digimarket/db";
 import type { Principal } from "../auth/service";
 import { ClientsService } from "./service";
 import { ServiceDeliveryService,datesInRange } from "./delivery-service";
+import { ClientVideoReadinessService,monthWeeks } from "./video-readiness-service";
 import { LeadsService } from "../leads/service";
 
 if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarket_ci"))
  throw new Error("Clients integration requires isolated digimarket_ci PostgreSQL");
-const db=createDatabaseClient(),clients=new ClientsService(db),leads=new LeadsService(db),deliveries=new ServiceDeliveryService(db);
+const db=createDatabaseClient(),clients=new ClientsService(db),leads=new LeadsService(db),deliveries=new ServiceDeliveryService(db),videos=new ClientVideoReadinessService(db);
 const actor=(id:string,org:string,grants:string[]):Principal=>({
  userId:id,organizationId:org,sessionId:"ci",roles:["FOUNDER"],permissions:new Set(grants),
 });
@@ -38,6 +39,54 @@ try{
  await assert.rejects(()=>clients.convert(manager,created.id,approved.version),fail(405));
  await assert.rejects(()=>clients.update(external,client.id,{version:1,businessName:"Wrong tenant"}),fail(404));
  await assert.rejects(()=>clients.detail(external,client.id),fail(404));
+ // Weekly client video readiness: ready stock is produced once and delivered
+ // once, with carry-over between months and no future negative stock.
+ assert.equal(monthWeeks("2026-02").length,4);
+ assert.equal(monthWeeks("2028-02").length,5);
+ const emptyVideos=await videos.monthly(manager,client.id,"2026-11");
+ assert.equal(emptyVideos.remainingStock,0);
+ assert.equal(emptyVideos.weeks.length,5);
+ const ready=await videos.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:6,delivered:0,note:"Six edited reels in stock",version:0});
+ assert.equal(ready.version,1);
+ await assert.rejects(()=>videos.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:7,delivered:0,version:0}),fail(409));
+ await videos.saveWeek(team,client.id,"2026-11",2,
+  {readyAdded:0,delivered:3,note:"Three client deliveries",version:0});
+ let stock=await videos.monthly(manager,client.id,"2026-11");
+ assert.equal(stock.readyThisMonth,6);
+ assert.equal(stock.deliveredThisMonth,3);
+ assert.equal(stock.remainingStock,3);
+ assert.equal(stock.weeks[0].remainingStock,6);
+ assert.equal(stock.weeks[1].availableBefore,6);
+ assert.equal(stock.weeks[1].remainingStock,3);
+ const dec=await videos.monthly(manager,client.id,"2026-12");
+ assert.equal(dec.openingStock,3);
+ assert.equal(dec.remainingStock,3);
+ await videos.saveWeek(team,client.id,"2026-12",1,
+  {readyAdded:2,delivered:4,note:"Four delivered in December",version:0});
+ stock=await videos.monthly(manager,client.id,"2026-12");
+ assert.equal(stock.openingStock,3);
+ assert.equal(stock.remainingStock,1);
+ await assert.rejects(()=>videos.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:4,delivered:0,note:"Backdated shortage",version:1}),fail(422));
+ await assert.rejects(()=>videos.saveWeek(manager,client.id,"2026-11",2,
+  {readyAdded:0,delivered:8,version:1}),fail(422));
+ await assert.rejects(()=>videos.saveWeek(manager,client.id,"2026-02",5,
+  {readyAdded:1,delivered:0,version:0}),fail(422));
+ const corrected=await videos.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:7,delivered:0,note:"Corrected stock",version:1});
+ assert.equal(corrected.version,2);
+ assert.equal((await videos.monthly(team,client.id,"2026-12")).remainingStock,2);
+ const viewer=actor(member.id,org.id,["clients.read"]);
+ await assert.rejects(()=>videos.saveWeek(viewer,client.id,"2026-11",3,
+  {readyAdded:1,delivered:0,version:0}),fail(403));
+ await assert.rejects(()=>videos.monthly(external,client.id,"2026-11"),fail(404));
+ await assert.rejects(()=>videos.saveWeek(external,client.id,"2026-11",3,
+  {readyAdded:10,delivered:0,version:0}),fail(404));
+ assert.ok((await db.auditLog.count({where:{organizationId:org.id,
+  action:"clients.video_readiness_saved",entityId:client.id}}))>=4);
+
  const updated=await clients.update(team,client.id,{version:1,businessName:"Agency Cafe Updated",businessType:"Hospitality"});
  assert.equal(updated.version,2);
  assert.equal(updated.businessType,"Hospitality");
