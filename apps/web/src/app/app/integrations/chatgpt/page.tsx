@@ -41,7 +41,7 @@ export default function ChatGptIntegrationPage() {
     } catch (e) { setError(errorText(e)); }
     finally { setBusy(""); }
   }
-  return <div className="space-y-6">
+  return <div className="aw-v6-integrations-page space-y-6" data-aw-module="integrations">
     <PageHeader eyebrow="Settings / Integrations" title="ChatGPT CRM"
       description="Review per-founder access, permissions, last use and connection revocation." />
     {!authorized && <Notice kind="error">This page is restricted to founders and administrators.</Notice>}
