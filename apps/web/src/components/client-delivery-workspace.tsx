@@ -1,7 +1,7 @@
 "use client";
 import {FormEvent,useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
-import {CalendarDays,Check,Plus,RefreshCw,Trash2,UserRound} from "lucide-react";
+import {CalendarDays,Check,Plus,RefreshCw,Trash2,UserRound,Search} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 
 type Person={id:string;displayName:string};
@@ -53,6 +53,8 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
  const [editing,setEditing]=useState<string|null>(null),[expanded,setExpanded]=useState(false);
  const [weekBySchedule,setWeekBySchedule]=useState<Record<string,string>>({});
  const [busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
+ const [search,setSearch]=useState("");
+ const [deliveryFilter,setDeliveryFilter]=useState<"all"|"overdue"|"today"|"upcoming"|"completed">("all");
  const load=useCallback(async()=>{
   try{
    const params=new URLSearchParams();if(clientId)params.set("clientId",clientId);else params.set("mine","true");
@@ -64,6 +66,32 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!manager||!clientId)return;void request<Person[]>("/projects/assignees").then(setStaff).catch(e=>setError(e instanceof Error?e.message:"Could not load employees"));},[manager,clientId,request]);
  const validDates=useMemo(()=>scheduledDates(draft.startOn,draft.repeat?draft.endOn:draft.startOn,draft.repeat&&draft.repeatMode==="weekdays"?draft.weekdays:[],draft.repeat&&draft.repeatMode==="interval"?draft.repeatEveryDays:null),[draft.startOn,draft.endOn,draft.weekdays,draft.repeat,draft.repeatMode,draft.repeatEveryDays]);
+ // All counters and filters below cover only schedules delivered by the
+ // existing permission-scoped API. They are not workspace-wide totals.
+ const summary=useMemo(()=>{
+  const current=today();
+  const counts={schedules:plans.length,completed:0,overdue:0,dueToday:0,upcoming:0};
+  for(const plan of plans)for(const occurrence of plan.occurrences){
+   if(occurrence.status==="COMPLETED"){counts.completed++;continue;}
+   const date=ymd(occurrence.scheduledOn);
+   if(date<current)counts.overdue++;
+   else if(date===current)counts.dueToday++;
+   else counts.upcoming++;
+  }
+  return counts;
+ },[plans]);
+ const visiblePlans=useMemo(()=>{
+  const current=today(),q=search.trim().toLocaleLowerCase();
+  return plans.filter(plan=>{
+   if(q&&![plan.title,plan.client.businessName,plan.assignee.displayName,plan.service?.name??""]
+    .some(text=>text.toLocaleLowerCase().includes(q)))return false;
+   if(deliveryFilter==="all")return true;
+   if(deliveryFilter==="completed")return plan.occurrences.length>0&&plan.occurrences.every(o=>o.status==="COMPLETED");
+   return plan.occurrences.some(o=>o.status==="PENDING"&&
+    (deliveryFilter==="overdue"?ymd(o.scheduledOn)<current:
+     deliveryFilter==="today"?ymd(o.scheduledOn)===current:ymd(o.scheduledOn)>current));
+  });
+ },[plans,search,deliveryFilter]);
  const reset=()=>{setDraft(defaultDraft(ymd(contractStartOn??""),ymd(contractEndOn??"")));setExpanded(false);setEditing(null);};
  const save=async(e:FormEvent)=>{
   e.preventDefault();if(!clientId||!manager||validDates.length===0||busy)return;
@@ -128,6 +156,25 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
   </div><div className="aw-client-actions"><button type="button" className="aw-client-btn" onClick={()=>void load()} disabled={busy}><RefreshCw size={15}/>Refresh</button>
    {manager&&clientId&&<button type="button" className="aw-client-primary" aria-label="Schedule service delivery" onClick={()=>{if(expanded)reset();else{reset();setExpanded(true);}}}><Plus size={16}/>{expanded?"Close form":"Schedule service"}</button>}
   </div></div>
+  {loaded&&<div className="aw-v4-delivery-tools">
+    <div className="aw-v4-delivery-stats" aria-label="Delivery counts in loaded schedules">
+     {([["Schedules",summary.schedules],["Overdue",summary.overdue],["Due today",summary.dueToday],
+       ["Upcoming",summary.upcoming],["Completed dates",summary.completed]] as const).map(([label,count])=>
+       <div className="aw-v4-summary-stat" key={label}><span>{label}</span><strong>{count}</strong></div>)}
+    </div>
+    <div className="aw-v4-delivery-filters">
+     <label className="aw-v4-search"><Search size={16} aria-hidden="true"/>
+      <span className="sr-only">Search loaded delivery schedules</span>
+      <input aria-label="Search loaded delivery schedules" type="search" value={search}
+       onChange={e=>setSearch(e.target.value)} placeholder="Search service, client or assignee"/></label>
+     <div className="aw-v4-filter-buttons" role="group" aria-label="Delivery schedule filters">
+      {([["all","All"],["overdue","Overdue"],["today","Today"],["upcoming","Upcoming"],["completed","Completed"]] as const).map(([value,label])=>
+       <button key={value} type="button" aria-pressed={deliveryFilter===value}
+        onClick={()=>setDeliveryFilter(value)}>{label}</button>)}
+     </div>
+    </div>
+    {(search||deliveryFilter!=="all")&&<p className="aw-v4-scope-note" aria-live="polite">{visiblePlans.length} of {plans.length} loaded schedules match. Filters do not change assigned dates.</p>}
+   </div>}
   {error&&<div role="alert" className="aw-client-alert">{error}</div>}
   {success&&<div role="status" className="aw-client-success">{success}</div>}
   {manager&&clientId&&expanded&&<form className="aw-client-form aw-client-subform" aria-label="Service delivery schedule form" onSubmit={e=>void save(e)}>
@@ -172,7 +219,11 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
   </form>}
   {!loaded&&<p role="status" className="aw-client-muted">Loading service deliveries…</p>}
   {loaded&&!plans.length&&<div className="aw-client-empty"><CalendarDays size={22}/><h3>No service deliveries scheduled</h3><p>{clientId?"Create a one-time delivery or recurring schedule above, and assign one responsible employee.":"No client delivery occurrences are currently assigned to you."}</p></div>}
-  <div className="aw-delivery-schedule-list">{plans.map(p=>{
+  {loaded&&plans.length>0&&!visiblePlans.length&&<div className="aw-v4-empty">
+   No delivery schedules match these filters.
+   <button type="button" onClick={()=>{setSearch("");setDeliveryFilter("all");}}>Clear filters</button>
+  </div>}
+  <div className="aw-delivery-schedule-list">{visiblePlans.map(p=>{
    const completed=p.occurrences.filter(x=>x.status==="COMPLETED").length;
    const overdue=p.occurrences.filter(x=>x.status==="PENDING"&&ymd(x.scheduledOn)<today()).length;
    const firstOccurrence=ymd(p.occurrences[0]?.scheduledOn??p.startOn);
@@ -194,6 +245,10 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
      {admin&&clientId&&<button type="button" className="aw-client-btn" disabled={busy} aria-label={"Delete delivery schedule "+p.title} onClick={()=>void remove(p)}><Trash2 size={15}/>Delete</button>}
     </div></div>
     <div className="aw-delivery-progress"><span>{completed}/{p.occurrences.length} completed</span><span>{overdue} overdue</span></div>
+    <div className="aw-v4-delivery-progress-track" role="progressbar" aria-label={p.title+" completion"}
+      aria-valuemin={0} aria-valuemax={Math.max(1,p.occurrences.length)} aria-valuenow={completed}>
+      <span style={{width:(p.occurrences.length?completed/p.occurrences.length*100:0)+"%"}}/>
+    </div>
     <div className="aw-delivery-week-toolbar" aria-label={"Week navigation for "+p.title}>
      <button className="aw-client-btn" type="button" aria-label={"Previous week for "+p.title} disabled={weekIndex<=0} onClick={()=>setWeekBySchedule(v=>({...v,[p.id]:weeks[weekIndex-1]}))}>Previous week</button>
      <strong>Week: {format(selectedWeek)} to {format(plusDays(selectedWeek,6))}</strong>
