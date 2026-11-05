@@ -597,6 +597,7 @@ export class FinanceService {
     const beforeSalary=income.minus(expense).minus(postedClientAds);
     return {currency:"INR",postedIncome:income.toFixed(4),postedExpense:expense.toFixed(4),
       postedSalaryExpense:postedSalaryExpense.toFixed(4),
+      postedExpenseIncludingSalary:expense.plus(postedSalaryExpense).toFixed(4),
       postedNetBeforeSalary:beforeSalary.toFixed(4),
       postedNet:beforeSalary.minus(postedSalaryExpense).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
