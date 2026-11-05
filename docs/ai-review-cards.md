@@ -11,8 +11,8 @@
 ## Backend and deployment
 1. Deploy the additive migration at `packages/db/prisma/migrations/20261105170000_ai_review_cards/migration.sql` with `pnpm --filter @digimarket/db db:migrate:deploy`.
 2. Build and deploy the backend and frontend at the same revision. Deploy backend first if independent.
-3. On the Render API service configure `OPENAI_API_KEY` (server-side only), with optional `OPENAI_REVIEW_MODEL` (default `gpt-4.1-mini`).
-4. Without an API key, API failures or a provider timeout, the system intentionally returns a labeled non-AI starter draft. Never disclose the API key to the browser.
+3. On the Render API service configure `GROQ_API_KEY` (server-side only) and optionally `GROQ_REVIEW_MODEL` (default `openai/gpt-oss-20b`). Obtain the key from https://console.groq.com/keys. The Groq API uses `https://api.groq.com/openai/v1/chat/completions`. If `GROQ_API_KEY` is absent, the previous `OPENAI_API_KEY` / `OPENAI_REVIEW_MODEL` integration remains available.
+4. Without a valid API key, on provider quota exhaustion (HTTP 429), provider failure or timeout, the system intentionally returns a labeled non-AI starter draft, rather than silently charging a secondary provider. Never disclose the API key to the browser.
 5. Test in `/app/ai-review-cards`, create a card, scan its QR with a mobile phone, verify a new draft appears automatically, edit the bracketed personal detail, and test the official Google link.
 
 ## Data, privacy, metrics

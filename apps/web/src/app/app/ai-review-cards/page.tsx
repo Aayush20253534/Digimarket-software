@@ -141,7 +141,7 @@ export default function AiReviewCards(){
     <p className="text-sm opacity-75">Scans, generated drafts and outbound clicks are recorded. Published Google reviews cannot be confirmed from a click.</p>
     <p className="text-sm">Cards: <strong>{cards.length}</strong> | Enabled: <strong>{cards.filter(c=>c.enabled).length}</strong></p>
     <button className="aw-client-btn" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh analytics</button>
-    <p className="text-xs opacity-70">AI integration uses the backend OPENAI_API_KEY. If it is not configured or the provider is unavailable, the page displays a clearly labeled editable starter draft.</p>
+    <p className="text-xs opacity-70">AI integration uses backend GROQ_API_KEY (preferred) or OPENAI_API_KEY. If it is not configured or the provider is unavailable, the page displays a clearly labeled editable starter draft.</p>
    </div>
   </section>
   <section className="space-y-3"><h2 className="text-xl font-bold">Client review cards</h2>

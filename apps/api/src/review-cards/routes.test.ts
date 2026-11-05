@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {fallbackDraft,isGoogleReviewUrl} from "./routes";
+import {fallbackDraft,isGoogleReviewUrl,reviewProviderConfiguration} from "./routes";
 
 describe("official Google review URL validation",()=>{
  it("accepts known review links",()=>{
@@ -26,5 +26,18 @@ describe("fallback draft generator",()=>{
  it("offers supported languages",()=>{
   expect(fallbackDraft("Demo","","Hindi",1)).toMatch(/\[/);
   expect(fallbackDraft("Demo","","Hinglish",1)).toContain("experience");
+ });
+});
+
+describe("AI provider selection",()=>{
+ it("prioritizes Groq over OpenAI",()=>{
+  const choice=reviewProviderConfiguration({GROQ_API_KEY:"gsk_sample",OPENAI_API_KEY:"sk_sample"});
+  expect(choice?.provider).toBe("groq");
+  expect(choice?.model).toBe("openai/gpt-oss-20b");
+  expect(choice?.endpoint).toBe("https://api.groq.com/openai/v1/chat/completions");
+ });
+ it("uses OpenAI only if Groq is not configured",()=>{
+  expect(reviewProviderConfiguration({OPENAI_API_KEY:"sk_sample"})?.provider).toBe("openai");
+  expect(reviewProviderConfiguration({}) ).toBeNull();
  });
 });

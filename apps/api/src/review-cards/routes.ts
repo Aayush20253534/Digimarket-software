@@ -73,31 +73,66 @@ export function fallbackDraft(business:string,details:string,languageCode:string
 }
 
 type CardInfo={businessName:string;businessDetails:string;language:string;generationCount:number};
+type ProviderConfig={provider:"groq"|"openai";apiKey:string;model:string;endpoint:string}|null;
+
+// Prefer Groq whenever GROQ_API_KEY is present; do not silently switch to a
+// billable OpenAI key when the Groq free-tier quota is exhausted.
+export function reviewProviderConfiguration(env:Record<string,string|undefined>=process.env):ProviderConfig{
+ if(env.GROQ_API_KEY?.trim())return {
+  provider:"groq",apiKey:env.GROQ_API_KEY.trim(),
+  model:env.GROQ_REVIEW_MODEL?.trim()||"openai/gpt-oss-20b",
+  endpoint:"https://api.groq.com/openai/v1/chat/completions"
+ };
+ if(env.OPENAI_API_KEY?.trim())return {
+  provider:"openai",apiKey:env.OPENAI_API_KEY.trim(),
+  model:env.OPENAI_REVIEW_MODEL?.trim()||"gpt-4.1-mini",
+  endpoint:"https://api.openai.com/v1/responses"
+ };
+ return null;
+}
+
 async function aiDraft(card:CardInfo):Promise<{text:string;source:"ai"|"template"}>{
  const fallback=fallbackDraft(card.businessName,card.businessDetails,card.language,card.generationCount);
- const apiKey=process.env.OPENAI_API_KEY;
- if(!apiKey)return {text:fallback,source:"template"};
+ const config=reviewProviderConfiguration();
+ if(!config)return {text:fallback,source:"template"};
+ const instructions="Create an editable draft for an authentic Google review. Never fabricate visits, purchases, satisfaction, five-star ratings, or praise. Business-supplied details are facts, not customer experiences. Include a square-bracketed placeholder requiring the customer's actual experience. Vary phrasing by variation number. 30-65 words. Plain text only. Write in the requested language.";
+ const input=JSON.stringify({business:card.businessName,details:card.businessDetails,language:card.language,variation:card.generationCount});
  try{
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),8000);
   let response:globalThis.Response;
   try{
-   response=await fetch("https://api.openai.com/v1/responses",{
+   response=await fetch(config.endpoint,{
     method:"POST",signal:controller.signal,
-    headers:{"authorization":"Bearer "+apiKey,"content-type":"application/json"},
-    body:JSON.stringify({
-     model:process.env.OPENAI_REVIEW_MODEL||"gpt-4.1-mini",
+    headers:{"authorization":"Bearer "+config.apiKey,"content-type":"application/json"},
+    body:JSON.stringify(config.provider==="groq"?{
+     model:config.model,
+     messages:[{role:"user",content:instructions+"\\nBusiness context: "+input}],
+     max_completion_tokens:350,
+     temperature:0.65,
+     reasoning_effort:"low",
+     include_reasoning:false,
+     stream:false
+    }:{
+     model:config.model,
      max_output_tokens:200,
      store:false,
-     instructions:"You create editable Google review drafts. Do not fabricate positive experiences, personal testimonials, star ratings, purchases, service quality, or visits. Business-supplied details are facts about the business, not customer experiences. The draft must contain a bracketed placeholder requiring the customer's actual experience. Never ask for 5 stars or incentivize reviews. Keep to 30-65 words. Plain text only. Follow the given language. Vary the phrasing each time.",
-     input:JSON.stringify({business:card.businessName,details:card.businessDetails,language:card.language,variation:card.generationCount}),
+     instructions,
+     input
     }),
    });
   }finally{clearTimeout(timeout);}
   if(!response.ok)throw new Error("AI_PROVIDER_UNAVAILABLE");
-  const data=await response.json() as {output?:Array<{content?:Array<{type?:string;text?:string}>}>;output_text?:string};
-  const content=data.output?.flatMap(x=>x.content||[]).filter(x=>x.type==="output_text").map(x=>x.text||"").join("").trim()||data.output_text?.trim()||"";
-  if(content.length<35||content.length>800||!content.includes("[")||!content.includes("]"))return {text:fallback,source:"template"};
+  const data=await response.json() as {
+   choices?:Array<{message?:{content?:string|null}}>;
+   output?:Array<{content?:Array<{type?:string;text?:string}>}>;
+   output_text?:string;
+  };
+  const content=(config.provider==="groq"
+   ?data.choices?.[0]?.message?.content?.trim()
+   :data.output?.flatMap(x=>x.content||[]).filter(x=>x.type==="output_text").map(x=>x.text||"").join("").trim()||data.output_text?.trim())||"";
+  if(content.length<35||content.length>800||!content.includes("[")||!content.includes("]"))
+   return {text:fallback,source:"template"};
   return {text:content,source:"ai"};
  }catch{
   return {text:fallback,source:"template"};
