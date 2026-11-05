@@ -502,7 +502,7 @@ export class FinanceService {
 
   async totals(actor:Principal,view:View){
     const clientAdWhere=await this.metaAdsWhere(actor,view,"client_ads");
-    const [grouped,clientGroups]=await Promise.all([
+    const [grouped,clientGroups,salaryExpense]=await Promise.all([
       this.db.financialTransaction.groupBy({
         by:["kind","status"],where:this.scope(actor,view),
         _sum:{amount:true},_count:{_all:true},
@@ -510,6 +510,12 @@ export class FinanceService {
       this.db.financialTransaction.groupBy({
         by:["status"],where:clientAdWhere,
         _sum:{amount:true},_count:{_all:true},
+      }),
+      view==="all"?this.db.salaryPayment.aggregate({
+        where:{organizationId:actor.organizationId,status:"PAID"},_sum:{amount:true}
+      }):this.db.salaryFundingAllocation.aggregate({
+        where:{payment:{organizationId:actor.organizationId,status:"PAID"},
+         account:{organizationId:actor.organizationId,founderUserId:actor.userId}},_sum:{amount:true}
       }),
     ]);
     const entries=grouped.map(g=>({kind:g.kind,status:g.status,
@@ -525,8 +531,15 @@ export class FinanceService {
     // reduces the net amount retained from received income. Pending, rejected
     // and cancelled client spending must never reduce the posted net.
     const postedClientAds=clientSum("POSTED");
+    // One salary payment is a single agency expense, regardless of how many
+    // founder accounts funded it. "Mine" charges the funding founder, not
+    // the person recording the payment or receiving their salary.
+    const postedSalaryExpense=salaryExpense._sum.amount??new Prisma.Decimal(0);
+    const beforeSalary=income.minus(expense).minus(postedClientAds);
     return {currency:"INR",postedIncome:income.toFixed(4),postedExpense:expense.toFixed(4),
-      postedNet:income.minus(expense).minus(postedClientAds).toFixed(4),
+      postedSalaryExpense:postedSalaryExpense.toFixed(4),
+      postedNetBeforeSalary:beforeSalary.toFixed(4),
+      postedNet:beforeSalary.minus(postedSalaryExpense).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
       pendingExpense:sum("EXPENSE","PENDING").toFixed(4),groups:entries,
       clientAdSpend:{posted:postedClientAds.toFixed(4),pending:clientSum("PENDING").toFixed(4),

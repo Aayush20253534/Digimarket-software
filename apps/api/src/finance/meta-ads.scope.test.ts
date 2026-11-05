@@ -23,13 +23,18 @@ function fixture() {
   ]);
   const findTransactions = vi.fn().mockResolvedValue([]);
   const groupTransactions = vi.fn().mockResolvedValue([]);
+  const salaryFundingAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
+  const salaryPaymentAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const db = {
     financialCategory: { findMany: findCategories },
     financialTransaction: { findMany: findTransactions, groupBy: groupTransactions },
+    salaryFundingAllocation:{aggregate:salaryFundingAggregate},
+    salaryPayment:{aggregate:salaryPaymentAggregate},
   } as unknown as PrismaClient;
   return {
     service: new FinanceService(db),
-    findCategories, findTransactions, groupTransactions, categoryId,
+    findCategories, findTransactions, groupTransactions, salaryFundingAggregate,
+    salaryPaymentAggregate, categoryId,
   };
 }
 
@@ -123,6 +128,19 @@ describe("Meta Ads register scopes", () => {
     expect(totals.postedExpense).toBe("0.0000");
     expect(totals.clientAdSpend.posted).toBe("150.5000");
     expect(totals.postedNet).toBe("-50.5000");
+  });
+
+  it("deducts only the funding founder's salary from personal Net posted", async () => {
+    const {service,groupTransactions,salaryFundingAggregate}=fixture();
+    groupTransactions.mockImplementation(async ({where}:{where:{clientId:unknown}})=>
+      where.clientId===null?
+       [{kind:"INCOME",status:"POSTED",_sum:{amount:new Prisma.Decimal("5000.0000")},_count:{_all:1}}]:[]);
+    salaryFundingAggregate.mockResolvedValue({_sum:{amount:new Prisma.Decimal("1200.0000")}});
+    const result=await service.totals(actor,"mine");
+    expect(result.postedNetBeforeSalary).toBe("5000.0000");
+    expect(result.postedSalaryExpense).toBe("1200.0000");
+    expect(result.postedNet).toBe("3800.0000");
+    expect(salaryFundingAggregate.mock.calls[0][0].where.account.founderUserId).toBe(actor.userId);
   });
 
   it("exports only Meta Ads rows for the combined scope", async () => {
