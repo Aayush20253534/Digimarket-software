@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
-import {ArrowRight,BriefcaseBusiness,RefreshCw,Users,Search,PauseCircle,Archive} from "lucide-react";
+import {ArrowRight,BriefcaseBusiness,RefreshCw,Users,Search,PauseCircle,Archive,Video} from "lucide-react";
 import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
@@ -47,6 +47,7 @@ export default function ClientsPage(){
   <PageHeader eyebrow="CLIENT RELATIONSHIPS" title="Clients & delivery"
     description="Manage each client's agreement, services, projects and delivery from one place."
     actions={<div className="flex gap-2 flex-wrap"><Link href="/app/leads" className="aw-client-btn">View leads</Link>
+    <Link href="/app/clients/video-readiness" className="aw-client-btn"><Video size={16}/>Video readiness</Link>
     {!session.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&session.identity.permissions.includes("assets.read")&&
      <Link href="/app/clients/assets" className="aw-client-btn">Files & Assets</Link>}
     <button className="aw-client-btn" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
@@ -82,7 +83,7 @@ export default function ClientsPage(){
    {loading?<p role="status" className="aw-client-muted">Loading clients…</p>:!rows.length?<p className="aw-client-empty">No clients match these filters. A lead becomes a client when its stage is Approved.</p>:null}
    <div className="aw-client-table-wrap">
     <table className="aw-client-table" aria-label="Clients directory">
-     <thead><tr><th>Business</th><th>Category</th><th>Phone</th><th>Location</th><th>Services</th><th>Status</th><th>Workspace</th></tr></thead>
+     <thead><tr><th>Business</th><th>Category</th><th>Phone</th><th>Location</th><th>Services</th><th>Status</th><th>Video readiness</th><th>Workspace</th></tr></thead>
      <tbody>{sorted.map(c=><tr key={c.id}>
        <td><div className="aw-v3-client-identity">
          <span aria-hidden="true" className="aw-v3-client-avatar">{c.businessName.trim().slice(0,2).toUpperCase()}</span>
@@ -90,6 +91,7 @@ export default function ClientsPage(){
         </div></td>
        <td>{c.businessType||"Not set"}</td><td>{c.phone||"—"}</td><td>{c.location||"—"}</td><td>{c._count?.services??0}</td>
        <td><span className={"aw-client-status aw-client-status-"+c.status.toLowerCase()}>{c.status}</span></td>
+       <td><Link className="aw-client-open" href={"/app/clients/video-readiness?clientId="+encodeURIComponent(c.id)}>Weekly videos</Link></td>
        <td><Link className="aw-client-open" href={"/app/clients/"+c.id}>Open workspace <ArrowRight size={15}/></Link></td>
       </tr>)}</tbody>
     </table>
