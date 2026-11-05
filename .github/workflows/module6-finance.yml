@@ -87,3 +87,6 @@ jobs:
         run: pnpm --filter @digimarket/api exec tsx src/approvals/integration-smoke.ts
       - name: Test finance state machine and reconciliation against PostgreSQL
         run: pnpm --filter @digimarket/api exec tsx src/finance/integration-smoke.ts
+
+      - name: Test salary funding and employee isolation against PostgreSQL
+        run: pnpm --filter @digimarket/api exec tsx src/salary/integration-smoke.ts

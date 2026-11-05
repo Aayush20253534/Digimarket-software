@@ -5,7 +5,7 @@ import type {LucideIcon} from "lucide-react";
 import {
  BriefcaseBusiness,CalendarDays,CalendarClock,ChartNoAxesCombined,ChevronDown,
  CheckSquare2,FileStack,FolderKanban,LayoutDashboard,MessageCircle,
- Settings2,Users,Wallet,QrCode
+ Settings2,Users,Wallet,QrCode,Banknote
 } from "lucide-react";
 
 export type NavItem={label:string;href:string;icon:LucideIcon;permits?:readonly string[];roles?:readonly string[]};
@@ -27,6 +27,7 @@ const sections:readonly NavGroup[]=[
  ]},
  {title:"Business",items:[
   {label:"Finance",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]},
+  {label:"Salary",href:"/app/salary",icon:Banknote},
   {label:"Documents",href:"/app/documents/quotations",icon:FileStack,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},

@@ -23,6 +23,7 @@ type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:
   pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];
   clientAdSpend?:{posted:string;pending:string;count:number};recurringIncome?:RecurringIncome};
 type FinancePolicy={category:string;active:boolean};
+type SalaryFinanceSummary={totalPaid:string;founderFunding:{founderUserId:string;name:string;amount:string}[]};
 type RecurringIncome={month:string;monthlyServiceTotal:string;monthlyAdBudgetTotal:string;monthlyCombinedTotal:string;items:{id:string;businessName:string;monthlyServiceCharge:string;monthlyAdBudget:string;monthlyCombined:string;contractEndOn:string|null}[]};
 const zero:Totals={currency:"INR",postedIncome:"0.0000",postedExpense:"0.0000",postedNet:"0.0000",
   pendingIncome:"0.0000",pendingExpense:"0.0000",groups:[]};
@@ -68,6 +69,8 @@ export default function FinancePage(){
   const [totals,setTotals]=useState<Totals>(zero);
   const [financeReady,setFinanceReady]=useState(false);
   const [recurring,setRecurring]=useState<RecurringIncome|null>(null);
+  const [salarySummary,setSalarySummary]=useState<SalaryFinanceSummary|null>(null);
+  const [salaryError,setSalaryError]=useState("");
   const [loading,setLoading]=useState(true);
   const reloadSequence=useRef(0);
   const [hasLoadedEntries,setHasLoadedEntries]=useState(false);
@@ -106,10 +109,14 @@ export default function FinancePage(){
    [entries,entryKindFilter,entryStatusFilter,entrySearch]);
   // Bar widths are visual comparisons only; displayed money uses the existing
   // exact decimal-string formatter and server-owned summary calculations.
+  const founderSalaryRows=salarySummary?.founderFunding.filter(x=>view==="all"||x.founderUserId===session?.identity.userId)??[];
+  const fundedSalaryExpense=founderSalaryRows.reduce((total,x)=>total+Number(x.amount),0);
+  const fundedSalaryText=fundedSalaryExpense.toFixed(2);
   const postedIncomeValue=Number(totals.postedIncome);
   const postedExpenseValue=Number(totals.postedExpense);
   const postedMax=Math.max(1,Number.isFinite(postedIncomeValue)?Math.max(0,postedIncomeValue):0,
-    Number.isFinite(postedExpenseValue)?Math.max(0,postedExpenseValue):0);
+    Number.isFinite(postedExpenseValue)?Math.max(0,postedExpenseValue):0,
+    Number.isFinite(fundedSalaryExpense)?Math.max(0,fundedSalaryExpense):0);
   // An entry must start without a selected category.
   useEffect(()=>{if(categoryId&&!selected.some(c=>c.id===categoryId))setCategoryId("");},[selected,categoryId]);
 
@@ -160,6 +167,14 @@ export default function FinancePage(){
     setError(problems.join(" "));
     setLoading(false);
   },[request,view,canReadOwn,canAll]);
+  useEffect(()=>{
+    if(!isFounder)return;
+    let active=true;
+    void request<SalaryFinanceSummary>("/salary/summary").then(summary=>{
+      if(active){setSalarySummary(summary);setSalaryError("");}
+    }).catch(e=>{if(active)setSalaryError(readable(e));});
+    return()=>{active=false;};
+  },[isFounder,request]);
   useEffect(()=>{
     void reload();
     return()=>{reloadSequence.current+=1;};
@@ -360,6 +375,7 @@ export default function FinancePage(){
       {canAll&&<a href="#finance-recurring">Recurring agreements</a>}
       {canCreate&&<a href="#finance-entry">New entry</a>}
       <a href="#finance-meta-ads">Meta Ads spend</a>
+      {isFounder&&<a href="#finance-salary">Founder-funded salary</a>}
       <a href="#finance-register">Financial register</a>
     </nav>
     <div className="aw-v5-finance-visibility flex gap-2" role="group" aria-label="Finance visibility">
@@ -387,11 +403,12 @@ export default function FinancePage(){
     <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
       <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
         <h2>Posted agency income and expenses</h2>
-        <p>These bars show agency income and expenses. Posted client Meta Ads spend is deducted separately in Net posted.</p>
+        <p>Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income.</p>
        </div><Scale size={20} aria-hidden="true"/></header>
       <div className="aw-v5-finance-compare">
        {([["Income",totals.postedIncome,postedIncomeValue],
-          ["Expenses",totals.postedExpense,postedExpenseValue]] as const).map(([label,value,number])=>
+          ["Expenses",totals.postedExpense,postedExpenseValue],
+           ...(isFounder?[["Founder-funded salaries",fundedSalaryText,fundedSalaryExpense] as const]:[])] as const).map(([label,value,number])=>
          <div className="aw-v5-finance-comparison-row" key={label}>
           <div><span>{label}</span><strong>{loading?"…":money(value)}</strong></div>
           <div className="aw-v5-finance-track" role="img"
@@ -402,6 +419,16 @@ export default function FinancePage(){
       </div>
       <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included in posted totals.</p>
     </section>
+    {isFounder&&<section id="finance-salary" className="rounded-xl border border-white/10 p-5 space-y-3" aria-label="Separate founder salary funding expenses">
+      <div className="flex flex-wrap justify-between gap-2"><div><h2 className="font-semibold text-lg">Founder-funded salary expenses</h2>
+        <p className="text-sm opacity-70">Tracked separately from posted agency income and expense entries. Funding is attributed to the founder whose account paid, not the recipient.</p></div>
+        <Link href="/app/salary" className="btn-secondary">Salary ledger</Link></div>
+      {salaryError&&<p className="text-sm text-amber-400">Salary ledger unavailable: {salaryError}</p>}
+      <div className="space-y-2">{founderSalaryRows.map(x=><div key={x.founderUserId} className="flex gap-2 justify-between border-b border-white/10 py-2 text-sm">
+        <span>{x.name}</span><strong>{money(x.amount)}</strong></div>)}</div>
+      <p className="font-semibold">Total founder-funded salary expense: {money(fundedSalaryText)}</p>
+      {view==="all"&&<p className="text-sm opacity-70">Operational net after salary: {money((Number(totals.postedNet)-Number(salarySummary?.totalPaid||"0")).toFixed(2))}. This adjusts company costs for external founder-paid salaries; it is not a bank balance.</p>}
+    </section>}
     {!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}

@@ -8,6 +8,7 @@ import {Notice,PageHeader,Spinner} from "@/components/ui";
 type MetricValue=number|string|{kind:string;amount:string}[];
 type Section=Record<string,MetricValue>;
 type Report={from:string;to:string;asOf:string;sections:Record<string,Section>;definitions:Record<string,string>};
+type SalaryReport={totalPaid:string;paymentCount:number;founderFunding:{founderUserId:string;name:string;amount:string}[]};
 const today=()=>new Date().toISOString().slice(0,10);
 const first=()=>today().slice(0,7)+"-01";
 const label=(s:string)=>s.replace(/([A-Z])/g," $1").replace(/_/g," ").replace(/^./,x=>x.toUpperCase());
@@ -19,6 +20,7 @@ const numeric=(v:MetricValue|undefined)=>typeof v==="number"?v:
 export default function ReportsPage(){
  const {session,request}=useAuth();
  const can=!!session?.identity.permissions.includes("reports.business.read");
+ const founder=!!session?.identity.roles.includes("FOUNDER");
  const [from,setFrom]=useState(()=>{
    if(typeof window==="undefined")return first();
    const candidate=new URLSearchParams(window.location.search).get("from");
@@ -29,6 +31,7 @@ export default function ReportsPage(){
    return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:today();
  }),[report,setReport]=useState<Report|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
+ const [salaryReport,setSalaryReport]=useState<SalaryReport|null>(null),[salaryWarning,setSalaryWarning]=useState("");
  const reportSequence=useRef(0);
  const applyPreset=(preset:"month"|"last30"|"year")=>{
   const end=today();
@@ -55,6 +58,14 @@ export default function ReportsPage(){
   finally{if(sequence===reportSequence.current)setBusy(false);}
  },[can,request,from,to]);
  useEffect(()=>{void load();return()=>{reportSequence.current+=1;};},[load]);
+ useEffect(()=>{
+  if(!founder||!can||from>to)return;
+  let active=true;
+  void request<SalaryReport>("/salary/summary?"+new URLSearchParams({from,to})).then(data=>{
+   if(active){setSalaryReport(data);setSalaryWarning("");}
+  }).catch(e=>{if(active){setSalaryReport(null);setSalaryWarning(e instanceof Error?e.message:"Salary data unavailable");}});
+  return()=>{active=false;};
+ },[founder,can,from,to,request]);
  if(!session)return <Spinner label="Checking reporting permissions…"/>;
  if(!can)return <Notice kind="error">Business reporting permission required.</Notice>;
  const cards=Object.entries(report?.sections??{}).filter(([key])=>key!=="invoices");
@@ -140,6 +151,18 @@ export default function ReportsPage(){
      </div>
      <p className="aw-insights-chart-note">Client-funded Meta Ads spending is excluded from agency expenses.</p>
     </div>}
+   </section>}
+   {founder&&<section className="aw-insights-card space-y-3" aria-label="Separate founder salary expenses">
+    <div className="aw-insights-head"><div><h3 className="aw-insights-title">Founder-paid salaries</h3>
+     <p className="aw-insights-hint">Paid salary expenses by founder funding source; excluded from ordinary ledger income and expenses.</p></div>
+     <Link href="/app/salary" className="underline text-sm">Open Salary</Link></div>
+    {salaryWarning&&<p role="status" className="text-sm text-amber-400">Salary reporting unavailable: {salaryWarning}</p>}
+    <p className="text-lg font-bold">Total paid: {new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(salaryReport?.totalPaid||0))}</p>
+    <div className="aw-insights-bar-list">{(salaryReport?.founderFunding||[]).map(x=><div key={x.founderUserId}>
+     <div className="aw-insights-label"><span>{x.name}</span><strong>{new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(x.amount))}</strong></div>
+     <div className="aw-insights-track"><div className="aw-insights-fill" style={{width:Number(x.amount)/Math.max(1,...(salaryReport?.founderFunding||[]).map(y=>Number(y.amount)))*100+"%"}}/></div>
+    </div>)}</div>
+    <p className="aw-insights-chart-note">Founder contributions and received salaries never appear as new agency income. The total cost is counted once per salary payment, regardless of how many founder accounts funded it.</p>
    </section>}
    <div className="aw-report-grid" id="report-breakdown-cards">
     {leadConversionValue!==null&&Number.isFinite(leadConversionValue)&&
