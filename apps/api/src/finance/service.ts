@@ -631,6 +631,6 @@ export class FinanceService {
       r.enteredBy.loginId,"",r.postedAt??"",""
     ].map(csvCell).join(","));
     return {filename:"digimarket-finance-"+scope+"-"+view+".csv",
-      csv:[header.map(csvCell).join(","),...records,...salaryRecords].join("\r\n")+"\r\n"};
+      csv:[header.join(","),...records,...salaryRecords].join("\r\n")+"\r\n"};
   }
 }
