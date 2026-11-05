@@ -120,7 +120,7 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
  });
 
  // Historical manual credits remain auditable, but no longer create salary funds.
- app.post(root+"/accounts/:id/credits",authenticate,async(req)=>{
+ app.post(root+"/accounts/:id/credits",authenticate,async(req,res)=>{
   const a=own(res);needFounder(a);parsed(z.uuid(),req.params.id);
   throw new AuthError(409,"FINANCE_LINKED","Salary funds now come from Finance. Add posted income to the founder's Finance entries.");
  });
