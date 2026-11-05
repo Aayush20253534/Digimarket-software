@@ -5,6 +5,7 @@ import {ArrowLeft,ArrowRight,CheckCheck,Clock3,History,RefreshCw,Search} from "l
 import {useAuth} from "@/components/auth-provider";
 import {AWNotice,AWStatusBadge} from "@/components/aw-ui";
 import {TaskSectionTabs} from "@/components/task-section-tabs";
+import {OperationsWorkspaceNav} from "@/components/operations-workspace-nav";
 
 type HistoryTask={
  id:string;title:string;description:string|null;status:string;priority:string;
@@ -54,6 +55,7 @@ export default function TaskHistoryPage(){
  const back=()=>{if(!previous.length||loading)return;setCursor(previous[previous.length-1]);setPrevious(x=>x.slice(0,-1));};
  const recent=items.filter(t=>t.completedAt&&Date.parse(t.completedAt)>Date.now()-86400000).length;
  return <div className="aw-module-root min-w-0 space-y-6" data-aw-module="task-history" data-testid="task-history-page">
+  <OperationsWorkspaceNav/>
   <TaskSectionTabs/>
   <header className="flex flex-wrap items-end justify-between gap-4">
    <div>
