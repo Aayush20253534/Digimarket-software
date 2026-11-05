@@ -51,8 +51,11 @@ async function capture(page:Page,entry:{slug:string;href:string},theme:Palette,
    await page.getByLabel("Password",{exact:true}).fill(pwd);
    await page.getByRole("button",{name:"Sign in",exact:true}).click();
   }
-  // One retry also handles a transient hydration/session refresh race.
-  await page.goto(entry.href);
+  // One reload additionally handles a transient hydration/session refresh
+  // race when the URL is already the correct route but the workspace shell
+  // has temporarily rendered its connection fallback rather than the app.
+  if(currentPath!=="/login")await page.reload({waitUntil:"domcontentloaded"});
+  await page.goto(entry.href,{waitUntil:"domcontentloaded"});
  }
  await expect(workspace,"Protected workspace on "+entry.href+" (actual: "+page.url()+")")
   .toBeVisible({timeout:20000});
@@ -136,31 +139,40 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  // browser session, retain evidence and record the exact incomplete route.
  // Alternate themes early so partial evidence includes BOTH appearances.
  const incomplete:{route:string;theme:Palette;viewport:string;reason:string}[]=[];
+ let consecutiveErrors=0;
  let stopped=false;
  async function attempt(entry:{slug:string;href:string},theme:Palette,viewport:{width:number;height:number}){
   try{
    await page.evaluate(next=>window.localStorage.setItem("aw-workspace-theme",next),theme);
    await capture(page,entry,theme,viewport,captures);
+   consecutiveErrors=0;
    return true;
   }catch(e){
+   consecutiveErrors++;
    incomplete.push({route:entry.href,theme,viewport:viewport.width+"x"+viewport.height,
     reason:e instanceof Error?e.message.slice(0,300):"Capture failed"});
    console.warn("UI screenshot capture incomplete:",entry.href,theme,viewport.width);
    return false;
   }
  }
- for(const entry of routes){
+ // Prioritise Messages and Settings for the final polish audit. Captures
+ // remain isolated CI-only and retain the original URL/filename mapping.
+ const priority=new Set(["overview","messages","settings","profile","finance","reports"]);
+ const captureRoutes=[...routes.filter(x=>priority.has(x.slug)),...routes.filter(x=>!priority.has(x.slug))];
+ captureLoop: for(const entry of captureRoutes){
   for(const theme of ["dark","light"] as const){
-   if(!await attempt(entry,theme,{width:1440,height:900})){stopped=true;break;}
+   await attempt(entry,theme,{width:1440,height:900});
+   if(consecutiveErrors>=3){stopped=true;break captureLoop;}
    if(responsive.has(entry.slug)){
-    if(!await attempt(entry,theme,{width:390,height:844})){stopped=true;break;}
+    await attempt(entry,theme,{width:390,height:844});
+    if(consecutiveErrors>=3){stopped=true;break captureLoop;}
    }
   }
-  if(stopped)break;
  }
  if(!stopped){
   for(const entry of routes.filter(x=>["overview","leads","finance","reports"].includes(x.slug))){
-   if(!await attempt(entry,"dark",{width:768,height:900}))break;
+   await attempt(entry,"dark",{width:768,height:900});
+   if(consecutiveErrors>=3)break;
   }
  }
  await mkdir(OUTPUT,{recursive:true});
@@ -171,4 +183,6 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  // The full workflow coverage is enforced by workspace.spec.ts. This test
  // enforces a usable cross-theme visual sample, not completion of all screenshots.
  expect(captures.length).toBeGreaterThanOrEqual(6);
+ expect(new Set(captures.map(x=>x.theme))).toEqual(new Set(["dark","light"]));
+ expect(captures.some(x=>x.viewport.width<=390)).toBe(true);
 });
