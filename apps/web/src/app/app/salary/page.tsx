@@ -1,12 +1,13 @@
 "use client";
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useMemo,useState} from "react";
+import Link from "next/link";
 import {Banknote,Check,Plus,RefreshCw,RotateCcw,ShieldCheck,Users,Wallet} from "lucide-react";
 import {BusinessWorkspaceNav} from "@/components/business-workspace-nav";
 import {useAuth} from "@/components/auth-provider";
 import {PageHeader,Spinner} from "@/components/ui";
 
 type Person={id:string;displayName:string;loginId:string;isFounder:boolean};
-type Account={id:string;name:string;founderUserId:string;founderName:string;openingBalance:string;availableBalance:string;active:boolean};
+type Account={id:string;name:string;founderUserId:string;founderName:string;openingBalance:string;availableBalance:string;financeNetBeforeSalary:string;founderSalaryFunded:string;sharedFinancePool:boolean;active:boolean};
 type Credit={id:string;amount:string;date:string;accountName:string;founderName:string;recordedBy:string;description:string|null};
 type Share={accountId:string;amount:string};
 type Salary={id:string;recipientUserId:string;recipientName:string;recordedBy:string;amount:string;salaryMonth:string;
@@ -15,7 +16,8 @@ type Salary={id:string;recipientUserId:string;recipientName:string;recordedBy:st
 type Overview={currency:string;totalPaid:string;paymentCount:number;
  founderFunding:{founderUserId:string;name:string;amount:string;count:number}[];
  recipients:{userId:string;name:string;amount:string;count:number}[];
- monthly:{month:string;amount:string;count:number}[];accounts:Account[]};
+ monthly:{month:string;amount:string;count:number}[];accounts:Account[];
+ founderBalances:{founderUserId:string;name:string;financeNetBeforeSalary:string;salaryFunded:string;remaining:string}[]};
 const today=()=>new Date().toISOString().slice(0,10);
 const rupees=(s:string|number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",
  minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(s)||0);
@@ -33,10 +35,7 @@ export default function SalaryPage(){
  const [error,setError]=useState(""),[success,setSuccess]=useState("");
  const [dateFrom,setDateFrom]=useState(today().slice(0,7)+"-01");
  const [dateTo,setDateTo]=useState(today());
- const [accountFounder,setAccountFounder]=useState(""),[accountName,setAccountName]=useState(""),
-  [openingBalance,setOpeningBalance]=useState("0");
- const [creditAccount,setCreditAccount]=useState(""),[creditAmount,setCreditAmount]=useState(""),
-  [creditDate,setCreditDate]=useState(today()),[creditNote,setCreditNote]=useState("");
+ const [accountFounder,setAccountFounder]=useState(""),[accountName,setAccountName]=useState("");
  const [recipient,setRecipient]=useState(""),[amount,setAmount]=useState(""),[salaryMonth,setSalaryMonth]=useState(today().slice(0,7)),
   [paidOn,setPaidOn]=useState(today()),[method,setMethod]=useState<(typeof methods)[number]>("UPI"),
   [reference,setReference]=useState(""),[note,setNote]=useState(""),[confirmed,setConfirmed]=useState(false),
@@ -70,11 +69,20 @@ export default function SalaryPage(){
  const difference=(Number(amount)||0)-sharesTotal;
  const shareIds=shares.map(x=>x.accountId).filter(Boolean);
  const duplicateShares=new Set(shareIds).size!==shareIds.length;
+ const byFounder=useMemo(()=>{
+  const assigned=new Map<string,number>();
+  for(const share of shares){
+   const account=activeAccounts.find(x=>x.id===share.accountId);
+   if(account)assigned.set(account.founderUserId,(assigned.get(account.founderUserId)||0)+Number(share.amount||0));
+  }
+  return assigned;
+ },[shares,accounts]);
+ const withinFinance=[...byFounder].every(([id,total])=>{
+  const available=activeAccounts.find(x=>x.founderUserId===id);
+  return !!available&&total<=Number(available.availableBalance)+0.000001;
+ });
  const canPay=!!recipient&&Number(amount)>0&&confirmed&&shares.every(x=>x.accountId&&Number(x.amount)>0)
-  &&!duplicateShares&&Math.abs(difference)<0.005&&shares.every(x=>{
-   const found=activeAccounts.find(a=>a.id===x.accountId);
-   return found&&Number(x.amount)<=Number(found.availableBalance);
-  });
+  &&!duplicateShares&&Math.abs(difference)<0.005&&withinFinance;
  async function action(work:()=>Promise<unknown>,message:string){
   setBusy(true);setError("");setSuccess("");
   try{await work();setSuccess(message);await load();}
@@ -90,7 +98,7 @@ export default function SalaryPage(){
  return <main className="aw-salary-page space-y-6" data-aw-module="salary">
   <BusinessWorkspaceNav/>
   <PageHeader eyebrow="TEAM & PAYROLL" title={founder?"Salary & founder funding":"My salary"}
-   description={founder?"Record confirmed salary payments, split them across founder accounts and track actual amounts funded without changing the ordinary income register.":
+   description={founder?"Record salary payments funded directly from each founder’s remaining Finance balance. Split across multiple funding sources without creating a second wallet.":
     "Your recorded salary payments are visible here. Entries are created by founders; no bank transfer is initiated by DigiMarket."}
    actions={<button className="btn-secondary" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button>}/>
   {error&&<div role="alert" className="rounded-lg border border-red-500/40 p-3 text-red-400">{error}</div>}
@@ -130,7 +138,7 @@ export default function SalaryPage(){
      },"Funding account created.")}><Plus size={16}/>Add account</button>
      {accounts.length===0?<p className="text-sm opacity-60">No founder salary funding accounts recorded.</p>:
       <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left opacity-60">
-       <th className="py-2">Founder / account</th><th>Available</th><th>Status</th></tr></thead>
+       <th className="py-2">Founder / source</th><th>Finance remaining (shared)</th><th>Status</th></tr></thead>
        <tbody>{accounts.map(a=><tr key={a.id} className="border-t border-white/10">
         <td className="py-2"><strong>{a.founderName}</strong><span className="block text-xs opacity-70">{a.name}</span></td>
         <td>{rupees(a.availableBalance)}</td>
@@ -168,7 +176,7 @@ export default function SalaryPage(){
    </div>
    <section className="rounded-xl border border-white/10 p-5 space-y-4">
     <h2 className="text-xl font-semibold flex gap-2 items-center"><Banknote size={21}/>Record a salary payment</h2>
-    <p className="text-sm opacity-70">Choose an employee or founder, then assign the exact funding split to one or more founder accounts. This records a payment you have already made, not an automatic transfer.</p>
+    <p className="text-sm opacity-70">Choose a recipient and allocate the salary between sources. The combined amount funded by each founder cannot exceed their remaining Finance Net posted. DigiMarket records a payment already made, not a transfer.</p>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
      <label className="text-sm space-y-1">Recipient<select className="field w-full" value={recipient} onChange={e=>setRecipient(e.target.value)}>
       <option value="">Choose staff member</option>{people.map(p=><option value={p.id} key={p.id}>{p.displayName}{p.isFounder?" (Founder)":""}</option>)}
@@ -190,7 +198,7 @@ export default function SalaryPage(){
     {shares.map((share,i)=><div key={i} className="grid gap-2 grid-cols-[minmax(0,1fr)_minmax(100px,160px)_auto] items-end">
      <label className="text-sm space-y-1">Founder account
       <select className="field w-full" value={share.accountId} onChange={e=>updateShare(i,"accountId",e.target.value)}>
-       <option value="">Select source</option>{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.founderName} · {a.name} (Available {rupees(a.availableBalance)})</option>)}
+       <option value="">Select source</option>{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.founderName} · {a.name} (Finance remaining {rupees(a.availableBalance)})</option>)}
       </select></label>
      <label className="text-sm space-y-1">Share (₹)<input className="field w-full" type="number" min="0.01" step="0.01"
       value={share.amount} onChange={e=>updateShare(i,"amount",e.target.value)}/></label>
@@ -261,7 +269,7 @@ export default function SalaryPage(){
          <button className="btn-secondary" disabled={busy||voidReason.trim().length<4}
           onClick={()=>void action(async()=>{await request("/salary/payments/"+x.id+"/void",
            {method:"POST",body:{reason:voidReason.trim()}});setVoidId(null);},
-           "Salary entry voided; each funding account was credited back.")}>Confirm reversal</button>
+           "Salary voided. The funding founders’ Finance remaining balances have been restored.")}>Confirm reversal</button>
          <button className="btn-secondary" onClick={()=>setVoidId(null)}>Cancel</button>
         </div>
        </div>}
