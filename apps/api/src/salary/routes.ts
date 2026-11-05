@@ -204,6 +204,13 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
      reference:input.reference||null,note:input.note||null,
      allocations:{create:input.allocations.map(x=>({accountId:x.accountId,amount:dec(x.amount)}))}
     }});
+    await tx.notification.create({data:{
+     organizationId:a.organizationId,recipientId:input.recipientUserId,
+     dedupeKey:"salary.payment."+payment.id,kind:"SALARY_PAYMENT",
+     title:"Salary payment recorded",
+     body:"A salary payment for "+input.salaryMonth+" was recorded. Review it in My Salary.",
+     href:"/app/salary"
+    }});
     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
      action:"salary.payment_recorded",entityType:"SalaryPayment",entityId:payment.id,
      afterRedacted:{recipientUserId:input.recipientUserId,amount:input.amount,
@@ -231,6 +238,13 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
    for(const share of payment.allocations)
     await tx.salaryFundingAccount.update({where:{id:share.accountId},
      data:{availableBalance:{increment:share.amount}}});
+   await tx.notification.create({data:{
+    organizationId:a.organizationId,recipientId:payment.recipientUserId,
+    dedupeKey:"salary.void."+id,kind:"SALARY_PAYMENT",
+    title:"Salary record reversed",
+    body:"A recorded salary payment was voided. Review your salary history.",
+    href:"/app/salary"
+   }});
    await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
     action:"salary.payment_voided",entityType:"SalaryPayment",entityId:id,
     afterRedacted:{reason:input.reason}}});
