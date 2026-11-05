@@ -17,6 +17,7 @@ import { registerTaskRoutes } from "./tasks/routes";
 import { registerProjectRoutes } from "./projects/routes";
 import { registerAssetRoutes } from "./assets/routes";
 import { registerClientRoutes } from "./clients/routes";
+import { registerReviewCardRoutes } from "./review-cards/routes";
 import { registerLeadRoutes } from "./leads/routes";
 import { registerWhatsAppWebhook } from "./whatsapp/webhook";
 import { registerVGrapleWebhook } from "./vgraple/webhook";
@@ -149,6 +150,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     registerProjectRoutes(app, authService);
     registerLeadRoutes(app, authService);
     registerClientRoutes(app, authService);
+    registerReviewCardRoutes(app, authService);
     registerAssetRoutes(app, authService);
     registerFinanceRoutes(app, authService);
     registerApprovalRoutes(app, authService);
