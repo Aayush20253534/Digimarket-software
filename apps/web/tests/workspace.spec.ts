@@ -1007,11 +1007,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.route(pattern,async route=>{
    const term=new URL(route.request().url()).searchParams.get("q")??"";
    if(term==="phase7-old")await oldGate;
-   await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
+   await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({data:{
     query:term,items:[{id:term,kind:"task",
      title:term==="phase7-old"?"Old result":"Latest result",
      detail:"Isolated test response",href:"/app/tasks"}]
-   })});
+   }})});
    if(term==="phase7-old")acknowledgeOld();
   });
   const queryBox=page.getByPlaceholder("Client, task, invoice number…");
