@@ -1177,6 +1177,39 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await login(page,"admin-e2e",UPDATED);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await visitWorkspace(page,"/app/finance");
+  // Client-funded Meta Ads queries must retain their scope through the
+  // Next.js gateway. Prior to the fix, the proxy dropped scope=client_ads
+  // and returned the agency ledger despite the separate ad-spend summary.
+  await expect(page.getByRole("button",{name:"Agency totals & register"})).toHaveClass(/btn-primary/);
+  const clientScopedResponse=page.waitForResponse(response=>{
+    const u=new URL(response.url());
+    return u.pathname==="/api/v1/finance/entries"&&
+      u.searchParams.get("view")==="all"&&u.searchParams.get("scope")==="client_ads";
+  });
+  const agencyScopedResponse=page.waitForResponse(response=>{
+    const u=new URL(response.url());
+    return u.pathname==="/api/v1/finance/entries"&&
+      u.searchParams.get("view")==="all"&&!u.searchParams.has("scope");
+  });
+  await page.getByRole("button",{name:"Refresh",exact:true}).click();
+  const [clientScoped,agencyScoped]=await Promise.all([clientScopedResponse,agencyScopedResponse]);
+  expect(clientScoped.status()).toBe(200);
+  expect(agencyScoped.status()).toBe(200);
+  const clientPayload=await clientScoped.json() as {data:unknown[]};
+  const agencyPayload=await agencyScoped.json() as {data:unknown[]};
+  expect(clientPayload.data,"Client Meta Ads scope must not return agency expenses").toEqual([]);
+  expect(agencyPayload.data.length,"Agency register must still return existing entries").toBeGreaterThan(0);
+  const metaExportResponse=page.waitForResponse(response=>{
+    const u=new URL(response.url());
+    return u.pathname==="/api/v1/finance/export"&&
+      u.searchParams.get("view")==="all"&&u.searchParams.get("scope")==="meta_ads";
+  });
+  await page.getByRole("button",{name:"Export Meta Ads CSV"}).click();
+  const metaExport=await metaExportResponse;
+  expect(metaExport.status()).toBe(200);
+  const metaExportPayload=await metaExport.json() as {data:{csv:string}};
+  expect(metaExportPayload.data.csv).not.toContain("CI Revenue Category");
+  expect(metaExportPayload.data.csv).not.toContain("CI Admin Category Updated");
   const incomeRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Revenue Category"});
   const expenseRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Admin Category Updated"});
   await expect(incomeRow.getByRole("button",{name:/Edit income/})).toBeVisible();

@@ -38,6 +38,7 @@ const endpoints: Record<string, string[]> = {
   "finance/categories": ["GET", "POST"],
   "finance/entries": ["GET", "POST"],
   "finance/assignees": ["GET"],
+  "finance/meta-ad-clients": ["GET"],
   "finance/summary": ["GET"],
   "finance/export": ["GET"],
   "finance/report-breakdown": ["GET"],
@@ -251,6 +252,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (path === "approvals" || ["finance/entries","finance/summary","finance/export"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");
     if (view && (path==="approvals"?["mine","queue","history"]:["mine","all"]).includes(view)) url.searchParams.set("view", view);
+  }
+  // Finance registers and CSV exports use a distinct client-funded Meta Ads
+  // scope. Dropping this parameter silently returns agency-only entries even
+  // while the summary correctly reports client ad spend. Forward only valid
+  // server-supported values; the backend still enforces per-user access.
+  if (path==="finance/entries" || path==="finance/export") {
+    const scope = request.nextUrl.searchParams.get("scope");
+    if (scope && ["agency","client_ads","meta_ads"].includes(scope)) url.searchParams.set("scope",scope);
   }
   if(path==="notes"&&request.nextUrl.searchParams.get("trash")==="true")url.searchParams.set("trash","true");
   if(noteDetailPattern.test(path)&&request.method==="DELETE"){
