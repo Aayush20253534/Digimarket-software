@@ -1,7 +1,7 @@
 "use client";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
-import {ArrowLeft,RefreshCw,Search,Video} from "lucide-react";
+import {ArrowLeft,RefreshCw,Search} from "lucide-react";
 import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {ClientVideoReadiness} from "@/components/client-video-readiness";
 import {useAuth} from "@/components/auth-provider";
