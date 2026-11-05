@@ -20,6 +20,7 @@ type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED"
   category:{id:string;name:string;active:boolean};
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
 type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
+  postedNetBeforeSalary?:string;postedSalaryExpense?:string;
   pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];
   clientAdSpend?:{posted:string;pending:string;count:number};recurringIncome?:RecurringIncome};
 type FinancePolicy={category:string;active:boolean};
@@ -110,7 +111,7 @@ export default function FinancePage(){
   // Bar widths are visual comparisons only; displayed money uses the existing
   // exact decimal-string formatter and server-owned summary calculations.
   const founderSalaryRows=salarySummary?.founderFunding.filter(x=>view==="all"||x.founderUserId===session?.identity.userId)??[];
-  const fundedSalaryExpense=founderSalaryRows.reduce((total,x)=>total+Number(x.amount),0);
+  const fundedSalaryExpense=Number(totals.postedSalaryExpense??"0");
   const fundedSalaryText=fundedSalaryExpense.toFixed(2);
   const postedIncomeValue=Number(totals.postedIncome);
   const postedExpenseValue=Number(totals.postedExpense);
@@ -392,7 +393,7 @@ export default function FinancePage(){
       ] as const).map(([label,value])=><Card key={label}>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
         <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(value)}</p>
-        <p className="mt-2 text-xs text-slate-500">{label==="Net posted"?"Income − agency expenses − posted client Meta Ads":(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
+        <p className="mt-2 text-xs text-slate-500">{label==="Net posted"?"Income − agency expenses − posted client Meta Ads − salary funded":(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
       </Card>)}
       <Card>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Client Meta Ads spend</p>
@@ -427,7 +428,7 @@ export default function FinancePage(){
       <div className="space-y-2">{founderSalaryRows.map(x=><div key={x.founderUserId} className="flex gap-2 justify-between border-b border-white/10 py-2 text-sm">
         <span>{x.name}</span><strong>{money(x.amount)}</strong></div>)}</div>
       <p className="font-semibold">Total founder-funded salary expense: {money(fundedSalaryText)}</p>
-      {view==="all"&&<p className="text-sm opacity-70">Operational net after salary: {money((Number(totals.postedNet)-Number(salarySummary?.totalPaid||"0")).toFixed(2))}. This adjusts company costs for external founder-paid salaries; it is not a bank balance.</p>}
+      {view==="all"&&<p className="text-sm opacity-70">Net posted (after founder-funded salaries): {money(totals.postedNet)}. Net before salaries: {money(totals.postedNetBeforeSalary??"0")}. These are Finance ledger balances, not verified bank balances.</p>}
     </section>}
     {!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
