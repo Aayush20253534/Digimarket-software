@@ -261,6 +261,44 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Category name",{exact:true}).fill("CI Revenue Category");
   await page.getByRole("button",{name:"Add category"}).click();
   await expect(page.getByText("CI Revenue Category",{exact:true}).last()).toBeVisible();
+
+  // Regression: client-only filter must explain existing Agency Meta Ads
+  // and provide a direct path to correct the linked payer without altering data.
+  await page.getByLabel("Type",{exact:true}).selectOption("EXPENSE");
+  await page.getByLabel("Category name",{exact:true}).fill("Meta Ads");
+  await page.getByRole("button",{name:"Add category"}).click();
+  await expect(page.getByText("Meta Ads",{exact:true}).last()).toBeVisible();
+  const metaCategoryId=await page.locator("#finance-category option").filter({hasText:"Meta Ads"}).getAttribute("value");
+  expect(metaCategoryId).toBeTruthy();
+  const mockedMetaId="00000000-0000-4000-8000-000000000099";
+  const metaRoute="**/api/v1/finance/entries?view=all&scope=meta_ads";
+  await page.route(metaRoute,async route=>route.fulfill({
+    status:200,contentType:"application/json",body:JSON.stringify({data:[{
+      id:mockedMetaId,kind:"EXPENSE",status:"POSTED",amount:"125.0000",currencyCode:"INR",
+      occurredOn:"2026-11-05",method:"UPI",description:"Isolated mock only",
+      merchantOrSource:"Meta",createdAt:"2026-11-05T08:00:00.000Z",
+      approvalRequestId:"00000000-0000-4000-8000-000000000098",
+      enteredById:"00000000-0000-4000-8000-000000000097",
+      receiptAssetId:null,clientId:null,client:null,
+      category:{id:metaCategoryId,name:"Meta Ads",active:true},
+      enteredBy:{displayName:"CI Admin",loginId:"admin-e2e"},
+      submittedBy:{displayName:"CI Admin"},
+    }]})
+  }));
+  await page.getByRole("button",{name:"Refresh",exact:true}).click();
+  const adFilters=page.getByRole("group",{name:"Meta Ads funding filter"});
+  await expect(page.locator("#finance-meta-"+mockedMetaId)).toBeVisible();
+  await adFilters.getByRole("button",{name:"Client",exact:true}).click();
+  await expect(page.getByText(/No Meta Ads entries are linked to a client/)).toBeVisible();
+  await page.getByRole("button",{name:"Review 1 Agency entry"}).click();
+  const adRow=page.locator("#finance-meta-"+mockedMetaId);
+  await expect(adRow.getByRole("button",{name:/Assign client to Meta Ads entry/})).toBeVisible();
+  await adRow.getByRole("button",{name:/Assign client to Meta Ads entry/}).click();
+  const editAd=page.getByRole("dialog",{name:"Edit expense"});
+  await expect(editAd.getByLabel("Meta Ads paid by")).toHaveValue("CLIENT");
+  await expect(editAd.getByLabel("Client",{exact:true})).toBeVisible();
+  await editAd.getByRole("button",{name:"Cancel"}).click();
+  await page.unroute(metaRoute);
   await expect(page.getByRole("link",{name:"Invoices & payments"})).toHaveCount(0);
   await visitWorkspace(page,"/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval policy configuration"})).toBeVisible();

@@ -95,6 +95,8 @@ export default function FinancePage(){
       row.merchantOrSource??"",row.enteredBy.displayName]
      .some(value=>value.toLocaleLowerCase().includes(metaSearch.trim().toLocaleLowerCase())))),
    [metaAdEntries,metaFundingFilter,metaSearch]);
+  const agencyMetaAdCount=metaAdEntries.filter(row=>!row.clientId).length;
+  const clientMetaAdCount=metaAdEntries.length-agencyMetaAdCount;
   const filteredEntries=useMemo(()=>entries.filter(row=>
    (entryKindFilter==="ALL"||row.kind===entryKindFilter)&&
    (entryStatusFilter==="ALL"||row.status===entryStatusFilter)&&
@@ -291,8 +293,8 @@ export default function FinancePage(){
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
-  function beginEntryEdit(row:Entry){
-    setEditingEntry(row);setError("");setEditAdFunding(row.clientId?"CLIENT":"SELF");
+  function beginEntryEdit(row:Entry,assignClient=false){
+    setEditingEntry(row);setError("");setEditAdFunding(assignClient?"CLIENT":row.clientId?"CLIENT":"SELF");
     setEntryEdit({categoryId:row.category.id,
       amount:row.amount,occurredOn:row.occurredOn,method:row.method,
       merchantOrSource:row.merchantOrSource??"",description:row.description??"",
@@ -498,7 +500,7 @@ export default function FinancePage(){
           <button key={value} type="button" aria-pressed={metaFundingFilter===value}
             onClick={()=>setMetaFundingFilter(value)}>{label}</button>)}
        </div>
-       <span className="aw-v5-register-count">{filteredMetaAdEntries.length} of {metaAdEntries.length} loaded</span>
+       <span className="aw-v5-register-count">{filteredMetaAdEntries.length} of {metaAdEntries.length} loaded · {clientMetaAdCount} Client · {agencyMetaAdCount} Agency</span>
       </div>
       {!metaAdEntries.length?<EmptyState title="No Meta Ads expenses recorded" description="Expenses categorized as Meta Ads appear here, whether paid by Self or a client."/>:
       <div className="aw-finance-register-scroll" role="region" aria-label="All Meta Ads register" tabIndex={0}>
@@ -508,6 +510,8 @@ export default function FinancePage(){
         </tr></thead><tbody>{filteredMetaAdEntries.map(row=><tr key={row.id} id={"finance-meta-"+row.id}>
           {adminFinance&&<td><div className="flex gap-2">
             {row.status!=="CANCELLED"&&<>
+              {!row.clientId&&<button type="button" className="btn-secondary text-xs" disabled={busy}
+                onClick={()=>beginEntryEdit(row,true)} aria-label={"Assign client to Meta Ads entry "+money(row.amount)}>Assign client</button>}
               <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>beginEntryEdit(row)}>Edit</button>
               <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>void deleteEntry(row)}>Delete</button>
             </>}
@@ -524,10 +528,15 @@ export default function FinancePage(){
           <td><Link className="underline" href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)}>View approval</Link></td>
         </tr>)}</tbody></table>
       </div>}
-      {metaAdEntries.length>0&&!filteredMetaAdEntries.length&&<p className="aw-v5-no-matches" role="status">
-       No Meta Ads records match these filters.
-       <button type="button" onClick={()=>{setMetaSearch("");setMetaFundingFilter("ALL");}}>Clear filters</button>
-      </p>}
+      {metaAdEntries.length>0&&!filteredMetaAdEntries.length&&<div className="aw-v5-no-matches" role="status">
+       {metaFundingFilter==="CLIENT"&&!metaSearch.trim()&&clientMetaAdCount===0?<>
+         <p>No Meta Ads entries are linked to a client. {agencyMetaAdCount} {agencyMetaAdCount===1?"entry is":"entries are"} currently marked Agency. Review those records and assign only the ones actually funded by clients.</p>
+         <button type="button" onClick={()=>setMetaFundingFilter("SELF")}>Review {agencyMetaAdCount} Agency {agencyMetaAdCount===1?"entry":"entries"}</button>
+       </>:<>
+         <p>No Meta Ads records match these filters.</p>
+         <button type="button" onClick={()=>{setMetaSearch("");setMetaFundingFilter("ALL");}}>Clear filters</button>
+       </>}
+      </div>}
     </Card>
     <div id="finance-register" className="aw-v5-finance-anchor"/>
     <Card title={view==="all"?"Agency financial register":"My financial register"} description="Saved records, including pending, posted, rejected and cancelled entries. Latest 200 shown; CSV export includes up to 5,000.">
@@ -610,7 +619,7 @@ export default function FinancePage(){
             {categories.filter(c=>c.kind===editingEntry.kind&&(c.active||c.id===editingEntry.category.id)).map(c=>
               <option key={c.id} value={c.id}>{c.name}{!c.active?" (archived)":""}</option>)}
           </select></FormField>
-          {editingEntry.kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===entryEdit.categoryId)?.name??"")&&<>
+          {editingEntry.kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===entryEdit.categoryId)?.name??editingEntry.category.name)&&<>
             <FormField id="edit-meta-payer" label="Meta Ads paid by">
               <select id="edit-meta-payer" className="field" value={editAdFunding} onChange={e=>{setEditAdFunding(e.target.value as "SELF"|"CLIENT");setEntryEdit(v=>({...v,clientId:null}));}}>
                 <option value="SELF">Self (agency expense)</option>
