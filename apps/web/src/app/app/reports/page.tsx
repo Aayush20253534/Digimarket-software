@@ -1,7 +1,7 @@
 "use client";
 import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
-import {Activity,ArrowUpRight,BarChart3,CalendarDays,ChartNoAxesCombined,RefreshCcw,ShieldCheck,TrendingUp,Users,Wallet} from "lucide-react";
+import {Activity,ArrowUpRight,BarChart3,CalendarDays,ChartNoAxesCombined,RefreshCcw,ShieldCheck,TrendingUp,Users,Wallet,ArrowDownLeft} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
 import {Notice,PageHeader,Spinner} from "@/components/ui";
@@ -30,6 +30,17 @@ export default function ReportsPage(){
  }),[report,setReport]=useState<Report|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
  const reportSequence=useRef(0);
+ const applyPreset=(preset:"month"|"last30"|"year")=>{
+  const end=today();
+  const start=preset==="month"?end.slice(0,7)+"-01":
+   preset==="year"?end.slice(0,4)+"-01-01":
+   (()=>{const date=new Date(end+"T12:00:00Z");
+    date.setUTCDate(date.getUTCDate()-29);return date.toISOString().slice(0,10);})();
+  setFrom(start);setTo(end);
+  const url=new URL(window.location.href);
+  url.searchParams.set("from",start);url.searchParams.set("to",end);
+  window.history.replaceState(null,"",url.pathname+url.search+url.hash);
+ };
  const load=useCallback(async()=>{
   const sequence=++reportSequence.current;
   if(!can)return;
@@ -65,12 +76,24 @@ export default function ReportsPage(){
  const leadConversionRate=report?.sections.leads?.conversionRatePercent;
  const leadConversionValue=typeof leadConversionRate==="number" ? leadConversionRate:
    typeof leadConversionRate==="string" ? Number(leadConversionRate):null;
- return <div className="aw-report-page space-y-6">
+ return <div className="aw-report-page aw-v5-reports-page space-y-6" data-aw-module="reports">
   <PageHeader eyebrow="Agency intelligence" title="Performance reports"
    description="A comprehensive view of your business, delivered from real records and enforced by the current API permissions."/>
+  <nav className="aw-v5-report-jump" aria-label="Reporting breakdowns">
+    <Link href={"/app/reports/leads?"+new URLSearchParams({from,to})}><Users size={16} aria-hidden="true"/>Leads analytics</Link>
+    <Link href={"/app/reports/income?"+new URLSearchParams({from,to})}><ArrowDownLeft size={16} aria-hidden="true"/>Income breakdown</Link>
+    <Link href={"/app/reports/expenses?"+new URLSearchParams({from,to})}><ArrowUpRight size={16} aria-hidden="true"/>Expense breakdown</Link>
+   </nav>
   <section className="aw-report-toolbar" aria-label="Reporting period">
     <div className="aw-report-toolbar-title"><CalendarDays size={21}/><div><strong>Reporting period</strong>
      <p>Filter live activity across your agency</p></div></div>
+    <div className="aw-v5-date-presets" role="group" aria-label="Quick report periods">
+      <button type="button" onClick={()=>applyPreset("month")}
+        aria-pressed={from===today().slice(0,7)+"-01"&&to===today()}>This month</button>
+      <button type="button" onClick={()=>applyPreset("last30")}>Last 30 days</button>
+      <button type="button" onClick={()=>applyPreset("year")}
+        aria-pressed={from===today().slice(0,4)+"-01-01"&&to===today()}>This year</button>
+    </div>
     <div className="aw-report-dates">
      <label>From<input type="date" className="field" value={from} max={to} onChange={e=>setFrom(e.target.value)}/></label>
      <label>Through<input type="date" className="field" value={to} min={from} onChange={e=>setTo(e.target.value)}/></label>
@@ -81,9 +104,13 @@ export default function ReportsPage(){
   {error&&<Notice kind="error">{error}</Notice>}
   {busy&&!report&&<Spinner label="Calculating permitted metrics…"/>}
   {report&&<>
-   <div className="aw-report-sectionhead"><div><p>BUSINESS OVERVIEW</p><h2>Key performance indicators</h2></div>
+   <div className="aw-v5-report-period-note" role="status">
+    <span>Reporting window</span><strong>{report.from} to {report.to}</strong>
+    <small>Last calculated {new Date(report.asOf).toLocaleString("en-IN")}</small>
+   </div>
+   <div id="report-kpis" className="aw-report-sectionhead"><div><p>BUSINESS OVERVIEW</p><h2>Key performance indicators</h2></div>
     <span><ShieldCheck size={15}/> Live, role-protected metrics</span></div>
-   {(leadStages.length>0||financeBars.length>0)&&<section className="aw-report-visuals" aria-label="Operational charts">
+   {(leadStages.length>0||financeBars.length>0)&&<section id="report-charts" className="aw-report-visuals" aria-label="Operational charts">
     {leadStages.length>0&&<div className="aw-insights-card">
      <div className="aw-insights-head">
       <div><h3 className="aw-insights-title">Lead pipeline by current stage</h3>
@@ -114,7 +141,7 @@ export default function ReportsPage(){
      <p className="aw-insights-chart-note">Client-funded Meta Ads spending is excluded from agency expenses.</p>
     </div>}
    </section>}
-   <div className="aw-report-grid">
+   <div className="aw-report-grid" id="report-breakdown-cards">
     {leadConversionValue!==null&&Number.isFinite(leadConversionValue)&&
      <article className="aw-report-card aw-report-mint" aria-label="Lead conversion rate">
        <div className="aw-report-card-top"><span className="aw-report-icon"><TrendingUp size={22}/></span>
@@ -155,7 +182,7 @@ export default function ReportsPage(){
     })}
    </div>
    {!cards.length&&<p className="aw-report-empty">No report sections are available for this period.</p>}
-   <section className="aw-report-footnote"><ShieldCheck size={21}/><div>
+   <section id="report-definitions" className="aw-report-footnote"><ShieldCheck size={21}/><div>
     <h2>Data integrity and definitions</h2><p>Calculated {new Date(report.asOf).toLocaleString()} using current agency records. No estimated data.</p>
     <dl>{Object.entries(report.definitions).map(([k,v])=><div key={k}><dt>{label(k)}</dt><dd>{v}</dd></div>)}</dl>
    </div></section>
