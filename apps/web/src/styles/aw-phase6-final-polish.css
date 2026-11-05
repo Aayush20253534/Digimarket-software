@@ -1,0 +1,392 @@
+/*
+ * DigiMarket UI v2 · Phase 6
+ * Final monochrome cleanup, communication, settings and accessibility.
+ * The original AmplifyWorld logo and semantic workflow statuses are retained.
+ * This file overrides legacy CSS without changing API or persistence logic.
+ */
+
+/* Shared contrast, keyboard access and release-safe overflow rules. */
+.aw-workspace :is(
+ [data-aw-module="settings"],[data-aw-module="profile"],
+ [data-aw-module="team-users"],[data-aw-module="founders"],
+ [data-aw-module="integrations"],[data-aw-module="search"]
+){min-width:0;color:var(--ui-strong);}
+.aw-workspace :is(
+ .aw-v6-messages,.aw-v6-settings-page,.aw-v6-profile-page,
+ .aw-v6-team-page,.aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(a,button,input,select,textarea):focus-visible{
+ outline:2px solid var(--ui-focus)!important;outline-offset:2px;
+}
+.aw-workspace :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(.aw-v2-card,.aw-card){
+ min-width:0;background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:12px!important;box-shadow:var(--ui-shadow)!important;
+}
+.aw-workspace :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(h1,h2,h3,h4,strong,legend){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(.text-slate-500,.text-slate-600,small,dt){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) :is(.field,input.field,select.field,textarea.field){
+ color-scheme:inherit!important;background:var(--ui-input)!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:9px!important;box-shadow:none!important;
+}
+.aw-workspace :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) .btn-secondary{
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+ color:var(--ui-strong)!important;box-shadow:none!important;
+}
+.aw-workspace :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) .btn-secondary:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace :is(
+ .aw-v6-settings-page,.aw-v6-profile-page,.aw-v6-team-page,
+ .aw-v6-founders-page,.aw-v6-integrations-page,.aw-v6-search-page
+) .btn-primary{
+ background:var(--ui-primary)!important;color:var(--ui-action-text)!important;
+ border-color:var(--ui-primary)!important;box-shadow:none!important;
+}
+
+/* Settings hub, organization snapshot and existing policy forms. */
+.aw-workspace .aw-v6-settings-hub{
+ display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.aw-workspace .aw-v6-settings-hub .aw-v2-settings-link{
+ display:flex;align-items:center;gap:12px;min-height:76px;padding:16px;
+ border:1px solid var(--ui-border)!important;border-radius:11px!important;
+ background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;text-decoration:none!important;
+ box-shadow:none!important;
+}
+.aw-workspace .aw-v6-settings-hub .aw-v2-settings-link:hover{
+ border-color:var(--ui-subtle)!important;background:var(--ui-raised)!important;
+}
+.aw-workspace .aw-v6-settings-hub .aw-v2-settings-link[aria-current="page"]{
+ border-color:var(--ui-subtle)!important;
+ box-shadow:inset 3px 0 0 var(--ui-primary)!important;
+}
+.aw-workspace .aw-v6-settings-hub .aw-v2-settings-link>svg{
+ color:var(--ui-strong)!important;flex:none;
+}
+.aw-workspace .aw-v6-settings-hub .aw-v2-settings-link>svg:last-child{
+ margin-left:auto;color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v6-settings-hub .aw-v2-settings-link strong{
+ display:block;font-size:13px;font-weight:710;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-settings-hub .aw-v2-settings-link small{
+ display:block;margin-top:4px;font-size:11px;line-height:1.4;
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v6-settings-summary{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;
+}
+.aw-workspace .aw-v6-settings-summary>div{
+ display:flex;flex-direction:column;gap:13px;min-height:91px;
+ background:var(--ui-surface);border:1px solid var(--ui-border);
+ border-radius:11px;padding:15px 17px;min-width:0;
+}
+.aw-workspace .aw-v6-settings-summary span{
+ font-size:11px;font-weight:650;color:var(--ui-muted);
+}
+.aw-workspace .aw-v6-settings-summary strong{
+ font-size:clamp(1rem,1.4vw,1.3rem);line-height:1.3;font-weight:730;
+ overflow-wrap:anywhere;color:var(--ui-strong);
+}
+.aw-workspace .aw-v6-settings-page .aw-v2-card .rounded-lg.border{
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+ border-radius:9px!important;
+}
+.aw-workspace .aw-v6-settings-page .aw-v2-card .rounded-lg.border span{
+ color:var(--ui-strong);
+}
+.aw-workspace .aw-v6-settings-page .aw-v2-card .rounded-lg.border span:last-child{
+ color:var(--ui-muted);
+}
+.aw-workspace .aw-v6-settings-page .aw-v2-card .text-green-700{
+ color:var(--stage-success-fg)!important;
+}
+
+/* Profile: existing authenticated avatar workflow, native keyboard input. */
+.aw-workspace .aw-v6-profile-page .aw-profile-photo-frame{
+ background:var(--ui-raised)!important;border:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-profile-page .aw-profile-photo-actions{
+ min-width:0;
+}
+.aw-workspace .aw-v6-profile-page .aw-profile-photo-actions label.btn-secondary{
+ position:relative;min-height:42px;cursor:pointer;
+}
+.aw-workspace .aw-v6-profile-page .aw-v6-avatar-input{
+ position:absolute!important;width:1px!important;height:1px!important;
+ overflow:hidden!important;clip:rect(0,0,0,0)!important;
+ white-space:nowrap!important;opacity:0!important;
+}
+.aw-workspace .aw-v6-profile-page .aw-profile-photo-actions label:focus-within{
+ outline:2px solid var(--ui-focus)!important;outline-offset:3px;
+}
+.aw-workspace .aw-v6-profile-upload-status{
+ font-size:12px;color:var(--ui-muted);
+}
+.aw-workspace .aw-v6-profile-page .bg-indigo-50{
+ background:var(--ui-raised)!important;border:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-profile-page :is(.bg-slate-100,.border-slate-200){
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-profile-page :is(.text-indigo-600,.text-indigo-700){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-profile-page .font-mono{
+ color:var(--ui-strong)!important;overflow-wrap:anywhere;
+}
+
+/* Team and leadership administration: neutral tables, no surprise theme. */
+.aw-workspace :is(.aw-v6-team-page,.aw-v6-founders-page,.aw-v6-integrations-page)
+ :is(.aw-team-table-scroll,.overflow-x-auto){
+ max-width:100%;scrollbar-width:thin;
+ scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
+}
+.aw-workspace :is(.aw-v6-team-page,.aw-v6-founders-page,.aw-v6-integrations-page)
+ :is(.rounded-lg.border,.rounded-xl.border){
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-team-page :is(thead,th){
+ color:var(--ui-muted)!important;background:var(--ui-raised)!important;
+}
+.aw-workspace .aw-v6-team-page td{
+ color:var(--ui-strong)!important;
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-team-page tr:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-v6-integrations-page :is(.bg-emerald-50,.bg-indigo-50){
+ background:var(--ui-raised)!important;
+}
+
+/* Search: permission-scoped links have clear hit area and visible focus. */
+.aw-workspace .aw-v6-search-result{
+ background:var(--ui-raised)!important;border:1px solid var(--ui-border)!important;
+ border-radius:9px!important;color:var(--ui-strong)!important;
+ text-decoration:none!important;min-height:66px;
+}
+.aw-workspace .aw-v6-search-result:hover{
+ background:var(--ui-hover)!important;border-color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-v6-search-result b{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-search-result :is(p,span){
+ color:var(--ui-muted)!important;
+}
+
+/* Messages: unify the whole panel including scroll tracks, avatars and chat. */
+.aw-workspace .aw-v6-messages{
+ background:var(--ui-canvas)!important;color:var(--ui-strong)!important;
+ background-image:none!important;min-width:0;
+ border-top:1px solid var(--ui-border);
+}
+.aw-workspace .aw-v6-messages .aw-chat-directory{
+ background:var(--ui-surface)!important;background-image:none!important;
+ border-right:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-directory-header h1{
+ color:var(--ui-strong)!important;font-size:22px;
+}
+.aw-workspace .aw-v6-messages :is(.aw-chat-eyebrow,.aw-chat-directory-caption){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-contact-count{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:8px!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-search{
+ background:var(--ui-input)!important;color:var(--ui-muted)!important;
+ border:1px solid var(--ui-border)!important;border-radius:9px!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-search:focus-within{
+ outline:2px solid var(--ui-focus);outline-offset:1px;
+}
+.aw-workspace .aw-v6-messages .aw-chat-search input{
+ color:var(--ui-strong)!important;background:transparent!important;
+}
+.aw-workspace .aw-v6-messages :is(.aw-chat-search input,.aw-chat-input)::placeholder{
+ color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-v6-chat-tools{
+ display:flex;align-items:center;gap:5px;
+ margin:0 12px 14px;min-height:38px;max-width:100%;
+}
+.aw-workspace .aw-v6-chat-tools button{
+ display:inline-flex;align-items:center;justify-content:center;gap:6px;
+ padding:7px 9px;min-height:34px;border:1px solid transparent;
+ border-radius:8px;background:transparent;color:var(--ui-muted);
+ font-size:12px;font-weight:665;
+}
+.aw-workspace .aw-v6-chat-tools button:hover{
+ background:var(--ui-hover)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-chat-tools button[aria-pressed="true"]{
+ border-color:var(--ui-border);background:var(--ui-raised);
+ color:var(--ui-strong);
+}
+.aw-workspace .aw-v6-chat-tools button:last-child{
+ margin-left:auto;min-width:34px;
+}
+.aw-workspace .aw-v6-chat-tools button span{
+ color:var(--ui-strong);font-size:11px;font-variant-numeric:tabular-nums;
+}
+.aw-workspace .aw-v6-messages .aw-chat-contacts{
+ scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-contact{
+ background:transparent!important;color:var(--ui-strong)!important;
+ border:1px solid transparent!important;border-radius:9px!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-contact:hover{
+ background:var(--ui-hover)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-contact[aria-current="true"]{
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-contact-details strong{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-contact-details small,
+.aw-workspace .aw-v6-messages .aw-chat-empty-list{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-avatar{
+ border:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-avatar-fallback{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-unread{
+ background:var(--ui-primary)!important;color:var(--ui-action-text)!important;
+ border:1px solid var(--ui-primary)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-conversation{
+ background:var(--ui-canvas)!important;background-image:none!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-conversation-header{
+ background:var(--ui-surface)!important;
+ border-bottom:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-messages :is(.aw-chat-peer-label h2,.aw-chat-blank h2,.aw-chat-placeholder strong){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-messages :is(.aw-chat-peer-label p,.aw-chat-header-status,.aw-chat-blank,.aw-chat-placeholder){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-header-status{
+ background:var(--ui-raised)!important;border:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-back{
+ color:var(--ui-strong)!important;border-color:var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-thread{
+ scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-message-bubble{
+ border:1px solid var(--ui-border)!important;border-radius:14px!important;
+ background:var(--ui-surface)!important;background-image:none!important;
+ color:var(--ui-strong)!important;box-shadow:none!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-message-own .aw-chat-message-bubble{
+ background:var(--ui-raised)!important;border-color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-message-bubble :is(p,strong,a){
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-message-bubble :is(time,small){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace .aw-v6-messages :is(.aw-chat-note-attachment,.aw-chat-file-link){
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-composer{
+ background:var(--ui-surface)!important;border-top:1px solid var(--ui-border)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-input{
+ background:var(--ui-input)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:9px!important;
+ box-shadow:none!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-input:focus{
+ border-color:var(--ui-subtle)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-attach{
+ position:relative;background:var(--ui-raised)!important;
+ color:var(--ui-strong)!important;border:1px solid var(--ui-border)!important;
+ border-radius:9px!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-attach input{
+ display:block!important;position:absolute!important;width:1px!important;
+ height:1px!important;overflow:hidden!important;opacity:0!important;
+ clip:rect(0,0,0,0)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-attach:focus-within{
+ outline:2px solid var(--ui-focus)!important;outline-offset:2px;
+}
+.aw-workspace .aw-v6-messages .aw-chat-send{
+ background:var(--ui-primary)!important;color:var(--ui-action-text)!important;
+ border:1px solid var(--ui-primary)!important;border-radius:9px!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-upload-preview{
+ color:var(--ui-strong)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-error{
+ background:var(--stage-danger-bg)!important;color:var(--stage-danger-fg)!important;
+ border-top:1px solid var(--stage-danger-border)!important;
+}
+.aw-workspace .aw-v6-messages .aw-chat-blank-icon{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border);
+}
+.aw-workspace .aw-v6-messages .aw-chat-blank a{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+}
+@media(max-width:1080px){
+ .aw-workspace .aw-v6-settings-summary{grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:720px){
+ .aw-workspace .aw-v6-settings-hub{grid-template-columns:1fr;}
+ .aw-workspace .aw-v6-chat-tools{
+  margin:0 5px 11px;flex-wrap:wrap;
+ }
+ .aw-workspace .aw-v6-chat-tools button{font-size:11px;padding:7px 8px;}
+}
+@media(max-width:480px){
+ .aw-workspace .aw-v6-settings-summary>div{padding:12px;min-height:82px;}
+ .aw-workspace .aw-v6-settings-summary strong{font-size:1rem;}
+ .aw-workspace .aw-v6-messages .aw-chat-composer{padding:10px!important;}
+ .aw-workspace .aw-v6-messages .aw-chat-message-bubble{padding:11px 12px;}
+ .aw-workspace .aw-v6-messages .aw-chat-conversation-header{gap:10px;}
+}
+@media(prefers-reduced-motion:reduce){
+ .aw-workspace .aw-v6-messages :is(.aw-chat-contact,.aw-chat-send){
+  transition:none!important;animation:none!important;
+ }
+}
