@@ -38,7 +38,7 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   if (!session) return null;
   const { user, identity } = session;
-  return <div className="space-y-7">
+  return <div className="aw-v6-profile-page space-y-7" data-aw-module="profile">
     <PageHeader eyebrow="Account settings" title="My profile" description="Identity and granted permissions are obtained from the authenticated API." />
     <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
       <Card title="Account details">
@@ -46,9 +46,10 @@ export default function ProfilePage() {
          <div className="aw-profile-photo-actions">
           <label className={"btn-secondary cursor-pointer"+(uploading?" pointer-events-none opacity-60":"")} aria-disabled={uploading}>
             {uploading?"Processing photo...":"Upload profile photo"}
-            <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} className="hidden" onChange={e=>{void uploadAvatar(e.target.files?.[0]);e.target.value="";}}/>
+            <input type="file" aria-label="Upload profile photo" accept="image/png,image/jpeg,image/webp" disabled={uploading} className="aw-v6-avatar-input sr-only" onChange={e=>{void uploadAvatar(e.target.files?.[0]);e.target.value="";}}/>
           </label>
           {avatar&&<button type="button" className="btn-secondary" disabled={uploading} onClick={()=>void removeAvatar()}>Remove</button>}
+          {uploading&&<span role="status" className="aw-v6-profile-upload-status">Updating photo…</span>}
           <p className="aw-profile-photo-hint">Photos are cropped without stretching. Re-upload the original photo if a previous upload looks distorted.</p>
          </div></div>
         <dl className="space-y-5 text-sm">
