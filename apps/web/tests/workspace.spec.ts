@@ -404,6 +404,27 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(conversations.getByRole("button",{name:/Unread/})).toHaveAttribute("aria-pressed","true");
   await conversations.getByRole("button",{name:"All members"}).click();
   await expect(conversations.getByRole("button",{name:"All members"})).toHaveAttribute("aria-pressed","true");
+  // Phase 7 privacy: the file reader may finish after choosing a different
+  // recipient. It must never attach the old file to the new conversation.
+  const contacts=page.locator(".aw-chat-contact");
+  await expect(contacts.nth(1)).toBeVisible();
+  await contacts.first().click();
+  await page.evaluate(()=>{
+   const OriginalFileReader=window.FileReader;
+   window.FileReader=class extends OriginalFileReader{
+    readAsDataURL(blob:Blob){
+     window.setTimeout(()=>super.readAsDataURL(blob),200);
+    }
+   };
+  });
+  await page.getByLabel("Attach file").setInputFiles({
+   name:"phase7-private.txt",mimeType:"text/plain",buffer:Buffer.from("CI attachment; never send")
+  });
+  await contacts.nth(1).click();
+  await expect(page.locator(".aw-chat-upload-preview")).toHaveCount(0);
+  await page.waitForTimeout(240);
+  await expect(page.locator(".aw-chat-upload-preview")).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Send message"})).toBeDisabled();
   await expect(page.getByRole("link",{name:"Open Notes Studio"})).toHaveCount(0);
   // Theme tokens must reach internal chat scroll containers, not only the app shell.
   if(await page.getByRole("button",{name:"Switch to dark theme"}).count()){
