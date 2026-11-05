@@ -24,6 +24,7 @@ export default function MessagesPage(){
  const [items,setItems]=useState<Message[]>([]);
  const [draft,setDraft]=useState("");
  const [attachment,setAttachment]=useState<Attachment|null>(null);
+ const [readingFile,setReadingFile]=useState(false);
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
  const [loadingMembers,setLoadingMembers]=useState(true);
@@ -61,7 +62,7 @@ export default function MessagesPage(){
   activeReader.current?.abort();
   activeReader.current=null;
   selectedRef.current="";
-  setPeer("");setPeople([]);setItems([]);setDraft("");setAttachment(null);
+  setPeer("");setPeople([]);setItems([]);setDraft("");setAttachment(null);setReadingFile(false);
   setError("");setLoadingMembers(Boolean(userId));
  },[userId]);
  useEffect(()=>{
@@ -109,11 +110,11 @@ export default function MessagesPage(){
   activeReader.current?.abort();
   activeReader.current=null;
   selectedRef.current=id;
-  setPeer(id);setDraft("");setAttachment(null);setError("");
+  setPeer(id);setDraft("");setAttachment(null);setReadingFile(false);setError("");
  };
  const send=async()=>{
   const target=peer,owner=activeUserRef.current;
-  if(!target||!owner||(!draft.trim()&&!attachment)||busy)return;
+  if(!target||!owner||(!draft.trim()&&!attachment)||busy||readingFile)return;
   const body={recipientId:target,text:draft,...(attachment?{attachment}:{})};
   setBusy(true);setError("");
   try{
@@ -135,19 +136,20 @@ export default function MessagesPage(){
   const target=peer,owner=activeUserRef.current,run=++attachmentSequence.current;
   activeReader.current?.abort();
   activeReader.current=null;
-  setAttachment(null);
+  setAttachment(null);setReadingFile(false);
   if(file.size>1024*1024){setError("Attachments must be 1 MB or smaller.");return;}
+  setError("");setReadingFile(true);
   const reader=new FileReader();
   activeReader.current=reader;
   const valid=()=>run===attachmentSequence.current&&selectedRef.current===target&&activeUserRef.current===owner;
   reader.onload=()=>{
    if(!valid())return;
    setAttachment({name:file.name,mime:file.type||"application/octet-stream",data:String(reader.result)});
-   setError("");
+   setError("");setReadingFile(false);
    activeReader.current=null;
   };
   reader.onerror=()=>{
-   if(valid())setError("File could not be read.");
+   if(valid()){setError("File could not be read.");setReadingFile(false);}
    activeReader.current=null;
   };
   reader.readAsDataURL(file);
@@ -209,6 +211,7 @@ export default function MessagesPage(){
      <div ref={bottom}/>
     </div>
     <div className="aw-chat-composer">
+     {readingFile&&<p className="aw-v7-chat-file-status" role="status">Preparing attachment…</p>}
      {attachment&&<div className="aw-chat-upload-preview"><Paperclip size={16}/><span>{attachment.name}</span>
        <button type="button" aria-label="Remove attachment" onClick={()=>setAttachment(null)}><X size={16}/></button></div>}
      <form onSubmit={e=>{e.preventDefault();void send();}} className="aw-chat-compose-row">
@@ -217,7 +220,7 @@ export default function MessagesPage(){
       </label>
       <input className="aw-chat-input" aria-label="Message" placeholder={"Message "+current.displayName+"..."} value={draft} maxLength={5000}
         onChange={e=>setDraft(e.target.value)}/>
-      <button type="submit" className="aw-chat-send" disabled={busy||(!draft.trim()&&!attachment)} aria-label="Send message"><Send size={19}/></button>
+      <button type="submit" className="aw-chat-send" disabled={busy||readingFile||(!draft.trim()&&!attachment)} aria-label="Send message"><Send size={19}/></button>
      </form>
     </div>
    </>:<div className="aw-chat-blank"><span className="aw-chat-blank-icon"><Users size={40}/></span>
