@@ -41,7 +41,7 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.json({data:await svc.deliverySummary(actor(res))});
  });
  // Month buckets: week 1 = days 1–7, week 2 = 8–14, ... week 5 = 29–end.
- const month=z.string().regex(/^\\d{4}-(0[1-9]|1[0-2])$/);
+ const month=z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/);
  const weekNumber=z.coerce.number().int().min(1).max(5);
  const videoWeekInput=z.strictObject({month,readyAdded:z.number().int().min(0).max(10000),
   delivered:z.number().int().min(0).max(10000),
