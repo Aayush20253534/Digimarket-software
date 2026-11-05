@@ -413,3 +413,26 @@
 ) :is(.text-indigo-600,.text-indigo-700,.text-indigo-800){
  color:var(--ui-strong)!important;
 }
+
+/* Profile's legacy photo frame and permission chips also inherit hard-coded
+ * violet colours from previous releases. Neutralize only their presentation. */
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ :is(.aw-profile-photo-frame,.aw-profile-photo-placeholder){
+ background:var(--ui-raised)!important;background-image:none!important;
+ color:var(--ui-strong)!important;stroke:var(--ui-strong)!important;
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ :is(.aw-profile-photo-hint,.aw-v2-card dt,.aw-v2-card .text-xs){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ .aw-v2-card ul li{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;
+}
+.aw-workspace[data-restyled="true"] .aw-work-content .aw-v6-profile-page
+ .aw-v2-card .bg-indigo-50{
+ background:var(--ui-raised)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;
+}
