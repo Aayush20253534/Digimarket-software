@@ -33,3 +33,11 @@ DigiMarket has no connected company bank account. Salary tracks **confirmed paym
 - No new third-party API keys or environment variables are required for Salary.
 - Test: posted Finance income of ₹12,000 for founder A and ₹8,000 for founder B; record a ₹20,000 salary allocated between them. Both founders\' Finance Net posted must become ₹0, company salary cost must count ₹20,000 once, and the recipient does not receive a Finance income entry. A later posted Finance receipt/expense immediately changes the founder\'s Salary remaining balance. Voiding restores the salary-funded part without manufacturing a Finance income or salary credit.
 - Test employee view and founder access restrictions using separate authenticated accounts.
+
+## Finance register visibility (linked Salary expenses)
+- Salary funding allocations appear as **read-only Salary-tagged expense rows** in Finance's regular **My entries** and **Agency totals & register** views. Each funding source generates one entry for its own founder share: for example ₹2,000 from founder A and ₹3,000 from founder B. My entries shows just A's ₹2,000 or B's ₹3,000. Agency shows **both rows** (₹5,000 total).
+- The recipient/payee, salary month, funding source, paid date, assigned founder and recorder are visible in the relevant row. The Approval column points to the Salary module, not a fabricated approval request. Voided Salary payments remain visible as cancelled entries.
+- Finance **CSV export** includes these same Salary expense rows with identifiers prefixed `salary:`. Existing financial transaction rows are not altered.
+- Finance summary displays both ordinary posted expenses and **Expenses incl. salary**, while **Net posted** continues subtracting salaries only once. Salary expense rows are projections of existing allocations and are **not new FinancialTransaction rows**.
+- **Salary** is a reserved option in the Expense category picker. It directs founders to the Salary form rather than letting them manually enter a disconnected duplicate expense. Existing user-made categories named Salary cannot be used to submit a new ordinary expense.
+- Only founders can view detailed Salary funding entries through Finance. An ordinary employee's Salary page remains limited to their own salary history.

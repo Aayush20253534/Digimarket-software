@@ -83,6 +83,7 @@ export class FinanceService {
   async addCategory(actor:Principal,input:FinanceCategoryInput){
     need(actor,"finance.category.manage");
     const normalizedName=normalize(input.name);
+    if(input.kind==="EXPENSE"&&normalizedName==="salary")throw invalid("Salary is system-linked; record salary payments in the Salary module");
     try {
       return await this.db.$transaction(async tx=>{
         const category=await tx.financialCategory.create({data:{
@@ -120,6 +121,7 @@ export class FinanceService {
   async renameCategory(actor:Principal,id:string,name:string){
     this.administrator(actor);
     const normalizedName=normalize(name);
+    if(normalizedName==="salary")throw invalid("Salary is a reserved payroll category");
     try{
       return await this.db.$transaction(async tx=>{
         const updated=await tx.financialCategory.updateMany({
@@ -196,6 +198,7 @@ export class FinanceService {
           ...(input.categoryId===entry.categoryId?{}:{active:true})},
       });
       if(!category)throw invalid("Choose a valid "+entry.kind.toLowerCase()+" category in this organization");
+      if(entry.kind==="EXPENSE"&&normalize(category.name)==="salary")throw invalid("Salary entries are managed through Salary");
       const requestedClientId=input.clientId===undefined?entry.clientId:input.clientId;
       if(requestedClientId&&!isMetaAds(category.name))
         throw invalid("A client can only be linked to a Meta Ads expense");
@@ -297,6 +300,7 @@ export class FinanceService {
       this.db.user.findFirst({where:{id:enteredById,organizationId:actor.organizationId,status:"ACTIVE"},select:{id:true}}),
     ]);
     if(!category)throw invalid("Select an active category belonging to this workspace and type");
+    if(input.kind==="EXPENSE"&&normalize(category.name)==="salary")throw invalid("Record salary payments through Salary to avoid duplicate expense accounting");
     if(input.clientId){
       if(input.kind!=="EXPENSE"||!isMetaAds(category.name))
         throw invalid("A client can only be linked to a Meta Ads expense");
@@ -486,6 +490,55 @@ export class FinanceService {
     return {...row,amount:row.amount.toFixed(4),occurredOn:row.occurredOn.toISOString().slice(0,10)};
   }
 
+  /**
+   * Read-only projection of funding allocations. Never create normal Finance
+   * transactions for salaries: totals already subtract the underlying payment.
+   * Only founders can inspect other people's salary records.
+   */
+  private async salaryExpenseEntries(actor:Principal,view:View,take:number){
+    if(!isFounder(actor))return [];
+    const shares=await this.db.salaryFundingAllocation.findMany({
+      where:{payment:{organizationId:actor.organizationId},
+        account:{organizationId:actor.organizationId,
+          ...(view==="mine"?{founderUserId:actor.userId}:{})}},
+      include:{
+        account:{select:{name:true,founderUserId:true,
+          founder:{select:{displayName:true,loginId:true}}}},
+        payment:{select:{id:true,paidOn:true,createdAt:true,method:true,
+          status:true,salaryMonth:true,reference:true,note:true,
+          recipient:{select:{displayName:true}},
+          recorder:{select:{displayName:true}}}},
+      },
+      orderBy:[{payment:{createdAt:"desc"}},{id:"desc"}],take,
+    });
+    return shares.map(share=>{
+      const payment=share.payment;
+      const notes=[
+        "Salary for "+payment.salaryMonth+" · Recipient: "+payment.recipient.displayName,
+        "Funding source: "+share.account.name,
+        payment.note||"",
+        payment.reference?"Reference: "+payment.reference:"",
+      ].filter(Boolean).join(" · ");
+      return {
+        id:"salary:"+share.id,sourceType:"SALARY" as const,
+        salaryPaymentId:payment.id,salaryMonth:payment.salaryMonth,
+        kind:"EXPENSE" as const,
+        status:payment.status==="VOID"?"CANCELLED" as const:"POSTED" as const,
+        category:{id:"salary-system",name:"Salary",active:true},
+        categoryId:"salary-system",
+        amount:share.amount.toFixed(4),currencyCode:"INR",
+        occurredOn:payment.paidOn.toISOString().slice(0,10),
+        method:payment.method,merchantOrSource:payment.recipient.displayName,
+        description:notes,createdAt:payment.createdAt.toISOString(),
+        postedAt:payment.status==="PAID"?payment.createdAt.toISOString():null,
+        enteredById:share.account.founderUserId,
+        enteredBy:share.account.founder,
+        submittedBy:payment.recorder,approvalRequestId:null,
+        clientId:null,client:null,receiptAssetId:null,
+      };
+    });
+  }
+
   async entries(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency"){
     const where=scope==="agency"?this.scope(actor,view):
       await this.metaAdsWhere(actor,view,scope==="client_ads"?"client_ads":"all");
@@ -496,8 +549,14 @@ export class FinanceService {
         enteredBy:{select:{displayName:true,loginId:true}},
         approvalRequest:{select:{requester:{select:{displayName:true}}}}},
     });
-    return rows.map(r=>({...this.present(r),category:r.category,client:r.client,
+    const financeRows=rows.map(r=>({...this.present(r),sourceType:"FINANCE" as const,
+      createdAt:r.createdAt.toISOString(),category:r.category,client:r.client,
       enteredBy:r.enteredBy,submittedBy:r.approvalRequest.requester}));
+    if(scope!=="agency"||!isFounder(actor))return financeRows;
+    const salaryRows=await this.salaryExpenseEntries(actor,view,200);
+    return [...financeRows,...salaryRows]
+      .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
+      .slice(0,200);
   }
 
   async totals(actor:Principal,view:View){
@@ -538,6 +597,7 @@ export class FinanceService {
     const beforeSalary=income.minus(expense).minus(postedClientAds);
     return {currency:"INR",postedIncome:income.toFixed(4),postedExpense:expense.toFixed(4),
       postedSalaryExpense:postedSalaryExpense.toFixed(4),
+      postedExpenseIncludingSalary:expense.plus(postedSalaryExpense).toFixed(4),
       postedNetBeforeSalary:beforeSalary.toFixed(4),
       postedNet:beforeSalary.minus(postedSalaryExpense).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
@@ -556,12 +616,21 @@ export class FinanceService {
       include:{category:{select:{name:true}},client:{select:{businessName:true}},
         enteredBy:{select:{loginId:true}}},
     });
-    if(rows.length>5000)throw new AuthError(422,"EXPORT_LIMIT","Export exceeds 5000 records; use a shorter reporting period when available");
+    const salaryRows=scope==="agency"&&isFounder(actor)
+      ?await this.salaryExpenseEntries(actor,view,5001):[];
+    if(rows.length+salaryRows.length>5000)
+      throw new AuthError(422,"EXPORT_LIMIT","Export exceeds 5000 records; narrow the reporting scope");
     const header=["id","kind","status","category","amount","currency","occurred_on","payment_method","merchant_or_source","description","entered_by","approval_request_id","posted_at","client"];
     const records=rows.map(r=>[r.id,r.kind,r.status,r.category.name,r.amount.toFixed(4),
       r.currencyCode,r.occurredOn.toISOString().slice(0,10),r.method,r.merchantOrSource??"",
       r.description??"",r.enteredBy.loginId,r.approvalRequestId,r.postedAt?.toISOString()??"",r.client?.businessName??""]
       .map(csvCell).join(","));
-    return {filename:"digimarket-finance-"+scope+"-"+view+".csv",csv:[header.join(","),...records].join("\r\n")+"\r\n"};
+    const salaryRecords=salaryRows.map(r=>[
+      r.id,r.kind,r.status,r.category.name,r.amount,r.currencyCode,r.occurredOn,
+      r.method,r.merchantOrSource??"",r.description??"",
+      r.enteredBy.loginId,"",r.postedAt??"",""
+    ].map(csvCell).join(","));
+    return {filename:"digimarket-finance-"+scope+"-"+view+".csv",
+      csv:[header.join(","),...records,...salaryRecords].join("\r\n")+"\r\n"};
   }
 }
