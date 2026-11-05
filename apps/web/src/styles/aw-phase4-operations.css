@@ -1,0 +1,414 @@
+/*
+ * DigiMarket UI v2 Phase 4. Client Deliveries, Tasks/History and Approvals.
+ * Strictly presentation: all existing permissions, endpoints, record states,
+ * schedule recurrence rules and confirmation requirements remain unchanged.
+ */
+.aw-workspace .aw-v4-operations-nav{
+ display:flex;align-items:center;gap:6px;max-width:100%;padding:0 0 12px;
+ overflow-x:auto;border-bottom:1px solid var(--ui-border);scrollbar-width:thin;
+}
+.aw-workspace .aw-v4-operations-link{
+ display:inline-flex;align-items:center;gap:9px;flex:none;min-height:40px;
+ padding:9px 14px;border:1px solid transparent;border-radius:9px;
+ background:transparent;color:var(--ui-muted)!important;
+ text-decoration:none!important;font-size:13px;font-weight:620;
+}
+.aw-workspace .aw-v4-operations-link:hover{
+ color:var(--ui-strong)!important;background:var(--ui-hover);
+}
+.aw-workspace .aw-v4-operations-link.is-active{
+ color:var(--ui-strong)!important;background:var(--ui-raised);
+ border-color:var(--ui-border);
+}
+.aw-workspace .aw-v4-operations-link.is-active::after{
+ content:"";width:5px;height:5px;border-radius:50%;background:var(--ui-strong);
+}
+.aw-workspace :is(.aw-v4-operations-link,.aw-v4-filter-buttons button,.aw-v4-task-row):focus-visible{
+ outline:2px solid var(--ui-focus)!important;outline-offset:2px;
+}
+/* Shared operation count cards */
+.aw-workspace :is(
+ .aw-v4-delivery-stats,.aw-v4-task-summary,.aw-v4-history-summary,.aw-v4-approval-summary
+){
+ display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;min-width:0;
+}
+.aw-workspace .aw-v4-history-summary{grid-template-columns:repeat(4,minmax(0,1fr));}
+.aw-workspace .aw-v4-summary-stat{
+ display:flex;flex-direction:column;justify-content:space-between;gap:11px;
+ min-width:0;min-height:98px;padding:16px 18px;
+ background:var(--ui-surface);border:1px solid var(--ui-border);
+ border-radius:12px;box-shadow:var(--ui-shadow);
+}
+.aw-workspace .aw-v4-summary-stat span{
+ font-size:11px;line-height:1.4;font-weight:630;color:var(--ui-muted);
+}
+.aw-workspace .aw-v4-summary-stat strong{
+ font-size:clamp(1.4rem,2.4vw,1.85rem);line-height:1.1;
+ font-weight:740;color:var(--ui-strong);letter-spacing:-.04em;
+ font-variant-numeric:tabular-nums;
+}
+.aw-workspace .aw-v4-scope-note{
+ color:var(--ui-muted)!important;font-size:12px;line-height:1.5;
+}
+.aw-workspace .aw-v4-empty{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;
+ flex-wrap:wrap;padding:15px 18px;border:1px dashed var(--ui-border);
+ border-radius:10px;background:var(--ui-raised);color:var(--ui-muted);font-size:12px;
+}
+.aw-workspace .aw-v4-empty button{
+ padding:8px 12px;color:var(--ui-strong);font-size:12px;
+ background:var(--ui-surface);border:1px solid var(--ui-border);
+ border-radius:8px;font-weight:680;
+}
+/* Delivery tools and schedule checklist. */
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],
+ .aw-client-workspace [data-testid="service-delivery-schedules"]
+){min-width:0;}
+.aw-workspace .aw-v4-delivery-tools{display:grid;gap:13px;margin:18px 0;}
+.aw-workspace .aw-v4-delivery-filters,
+.aw-workspace .aw-v4-approval-tools{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:12px;padding:13px 15px;
+ background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:11px;
+}
+.aw-workspace .aw-v4-search{
+ display:flex;align-items:center;gap:9px;min-width:200px;flex:1 1 250px;
+ max-width:460px;min-height:42px;padding:0 12px;
+ background:var(--ui-input);border:1px solid var(--ui-border);
+ border-radius:9px;color:var(--ui-muted);
+}
+.aw-workspace .aw-v4-search:focus-within{
+ outline:2px solid var(--ui-focus);outline-offset:1px;
+}
+.aw-workspace .aw-v4-search input{
+ width:100%;min-width:0;min-height:40px;outline:0;border:0;
+ color:var(--ui-strong)!important;background:transparent!important;
+ font-size:12px;
+}
+.aw-workspace .aw-v4-search input::placeholder{color:var(--ui-subtle);}
+.aw-workspace .aw-v4-filter-buttons{
+ display:flex;align-items:center;gap:5px;flex-wrap:wrap;
+}
+.aw-workspace .aw-v4-filter-buttons button{
+ min-height:36px;padding:8px 11px;font-size:12px;font-weight:650;
+ background:transparent;border:1px solid transparent;border-radius:8px;
+ color:var(--ui-muted);
+}
+.aw-workspace .aw-v4-filter-buttons button:hover{
+ background:var(--ui-hover);color:var(--ui-strong);
+}
+.aw-workspace .aw-v4-filter-buttons button[aria-pressed="true"]{
+ color:var(--ui-strong);background:var(--ui-raised);border-color:var(--ui-border);
+}
+.aw-workspace .aw-v4-delivery-progress-track{
+ width:100%;height:9px;overflow:hidden;margin:1px 0 14px;
+ border-radius:999px;background:var(--ui-track);
+}
+.aw-workspace .aw-v4-delivery-progress-track>span{
+ display:block;height:100%;border-radius:inherit;background:var(--aw-chart-2);
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"] .aw-client-panel,
+ .aw-client-workspace [data-testid="service-delivery-schedules"]
+){
+ background:var(--ui-surface)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;border-radius:12px!important;
+ color:var(--ui-strong)!important;box-shadow:var(--ui-shadow)!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"] .aw-client-panel h2,
+ .aw-client-workspace [data-testid="service-delivery-schedules"] h2,
+ [data-aw-module="service-deliveries"] .aw-delivery-schedule h3,
+ .aw-client-workspace [data-testid="service-delivery-schedules"] .aw-delivery-schedule h3
+){color:var(--ui-strong)!important;}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) :is(.aw-client-kicker,.aw-client-muted,.aw-delivery-owner,.aw-client-panel-heading p,.aw-delivery-progress,.aw-delivery-week-toolbar){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) :is(.aw-delivery-schedule,.aw-client-subform,.aw-delivery-preview){
+ background:var(--ui-raised)!important;background-image:none!important;
+ border:1px solid var(--ui-border)!important;border-radius:11px!important;
+ color:var(--ui-strong)!important;box-shadow:none!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) :is(.aw-delivery-occurrence,.aw-delivery-weekdays label){
+ background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:9px!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .aw-delivery-occurrence.done{
+ background:var(--stage-success-bg)!important;
+ border-color:var(--stage-success-border)!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .aw-delivery-occurrence.done :is(span,small){
+ color:var(--stage-success-fg)!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .aw-delivery-occurrence small{color:var(--ui-muted)!important;}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .aw-delivery-occurrence:focus-within{
+ outline:2px solid var(--ui-focus);outline-offset:1px;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .aw-delivery-weekdays label.selected{
+ background:var(--ui-hover)!important;border-color:var(--ui-subtle)!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .aw-client-btn{
+ color:var(--ui-strong)!important;background:var(--ui-raised)!important;
+ border:1px solid var(--ui-border)!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .aw-client-primary{
+ background:var(--ui-primary)!important;background-image:none!important;
+ border:1px solid var(--ui-primary)!important;color:var(--ui-action-text)!important;
+ box-shadow:none!important;
+}
+.aw-workspace :is(
+ [data-aw-module="service-deliveries"],.aw-client-workspace [data-testid="service-delivery-schedules"]
+) .field{
+ color:var(--ui-strong)!important;background:var(--ui-input)!important;
+ border:1px solid var(--ui-border)!important;color-scheme:inherit!important;
+}
+
+/* Task page: one neutral register, clear status and project metadata. */
+.aw-workspace [data-aw-module="tasks"]{min-width:0;}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-progress{
+ display:grid;gap:10px;padding:17px 18px;
+ border:1px solid var(--ui-border);border-radius:12px;
+ background:var(--ui-surface);
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-progress>div:first-child{
+ display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-progress strong{font-weight:710;color:var(--ui-strong);font-size:13px;}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-progress span:not([class]){
+ color:var(--ui-muted);font-size:11px;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-progress-track{
+ display:flex;align-items:stretch;gap:2px;width:100%;height:10px;
+ overflow:hidden;border-radius:999px;background:var(--ui-track);
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-progress-track>span{height:100%;flex:none;}
+.aw-workspace .aw-v4-segment-pending{background:var(--aw-chart-1);}
+.aw-workspace .aw-v4-segment-progress{background:var(--aw-chart-2);}
+.aw-workspace .aw-v4-segment-completed{background:var(--aw-chart-3);}
+.aw-workspace .aw-v4-segment-expired{background:var(--aw-chart-4);}
+.aw-workspace .aw-v4-segment-other{background:var(--aw-chart-6);}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-toolbar{
+ display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+ margin-bottom:17px;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-toolbar :is(.field,.btn-secondary){
+ min-height:42px;border-radius:9px!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-search{
+ flex:1 1 220px;display:flex;align-items:center;gap:8px;min-width:170px;
+ background:var(--ui-input);border:1px solid var(--ui-border);
+ border-radius:9px;padding:0 12px;color:var(--ui-muted);
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-search .field{
+ border:none!important;background:transparent!important;
+ box-shadow:none!important;padding:8px 2px!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-search:focus-within{
+ outline:2px solid var(--ui-focus);outline-offset:1px;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-list{display:grid;gap:8px;}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-row{
+ background:var(--ui-surface)!important;border:1px solid var(--ui-border)!important;
+ color:var(--ui-strong)!important;border-radius:10px!important;
+ min-height:76px;padding:14px 17px!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-row:hover,
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-row[aria-pressed="true"]{
+ background:var(--ui-raised)!important;border-color:var(--ui-subtle)!important;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-row-main{min-width:0;flex:1 1 220px;}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-row-main>p:first-child{
+ font-weight:710;color:var(--ui-strong)!important;font-size:13px;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-row-main>p:nth-child(2){
+ line-height:1.5;color:var(--ui-muted)!important;font-size:11px;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-assignee{
+ display:inline-flex;align-items:center;gap:5px;font-size:11px;
+ color:var(--ui-muted)!important;margin-top:6px;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-v4-task-row .aw-task-state{
+ display:inline-flex;align-items:center;padding:6px 10px;
+ border-radius:7px;font-weight:670;font-size:11px;
+}
+.aw-workspace [data-aw-module="tasks"] .aw-register-selected{background:var(--ui-raised)!important;}
+.aw-workspace [data-aw-module="tasks"] :is(.aw-card,.aw-panel,.aw-directory-modal-panel){
+ background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+ border-color:var(--ui-border)!important;box-shadow:none!important;
+}
+.aw-workspace [data-aw-module="tasks"] :is(
+ .aw-card,.aw-panel
+) :is(h2,h3,p,label){color:var(--ui-strong);}
+.aw-workspace [data-aw-module="tasks"] :is(input.field,textarea.field,select.field){
+ background:var(--ui-input)!important;color:var(--ui-strong)!important;
+ border-color:var(--ui-border)!important;color-scheme:inherit!important;
+}
+.aw-workspace [data-aw-module="tasks"] form.rounded-xl{
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+}
+/* History keeps its own archive URL, now an integrated tab of Tasks. */
+.aw-workspace [data-aw-module="task-history"] .aw-personal-task-section{
+ background:var(--ui-surface)!important;color:var(--ui-strong)!important;
+ border:1px solid var(--ui-border)!important;border-radius:12px!important;
+ box-shadow:none!important;
+}
+.aw-workspace [data-aw-module="task-history"] .aw-v4-history-list{
+ display:grid;gap:10px;
+}
+.aw-workspace [data-aw-module="task-history"] .aw-v4-history-row{
+ border:1px solid var(--ui-border)!important;
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border-radius:10px!important;
+}
+.aw-workspace [data-aw-module="task-history"] .aw-v4-history-row :is(h3,p,span){
+ color:var(--ui-strong);
+}
+.aw-workspace [data-aw-module="task-history"] .aw-v4-history-row p{
+ color:var(--ui-muted)!important;
+}
+.aw-workspace [data-aw-module="task-history"] .aw-v4-history-search>span{
+ background:var(--ui-input)!important;border:1px solid var(--ui-border)!important;
+ border-radius:9px!important;
+}
+.aw-workspace [data-aw-module="task-history"] .aw-v4-history-search input{
+ color:var(--ui-strong)!important;background:transparent!important;
+}
+.aw-workspace [data-aw-module="task-history"] :is(
+ .aw-v4-history-search,.aw-v4-history-filter,.aw-personal-task-section>div>div>span
+){color:var(--ui-muted)!important;}
+.aw-workspace [data-aw-module="task-history"] :is(
+ .aw-personal-task-section h2,.aw-personal-task-section .aw-v4-history-row h3
+){color:var(--ui-strong)!important;}
+.aw-workspace [data-aw-module="task-history"] :is(select.field,.aw-dashboard-refresh){
+ background:var(--ui-raised)!important;border-color:var(--ui-border)!important;
+ color:var(--ui-strong)!important;
+}
+.aw-workspace [data-aw-module="task-history"] nav[aria-label="Task history pages"]{
+ border-color:var(--ui-border)!important;
+}
+
+/* Approval inbox view. All decisions stay on the existing protected routes. */
+.aw-workspace [data-aw-module="approvals"]{min-width:0;}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-view{
+ display:flex;flex-wrap:wrap;gap:6px;
+ padding:6px;width:max-content;max-width:100%;
+ background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:10px;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-view button{
+ background:transparent!important;color:var(--ui-muted)!important;
+ border:1px solid transparent!important;border-radius:8px!important;
+ min-height:39px;padding:9px 13px;font-size:12px;font-weight:660;
+ box-shadow:none!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-view button.btn-primary{
+ background:var(--ui-raised)!important;color:var(--ui-strong)!important;
+ border-color:var(--ui-border)!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-tools{
+ margin:2px 0 15px;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-tools>select{
+ width:min(100%,205px);min-height:42px;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-card{
+ background:var(--ui-raised)!important;
+ border:1px solid var(--ui-border)!important;
+ color:var(--ui-strong)!important;border-radius:10px!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-card h3{
+ color:var(--ui-strong)!important;font-size:15px;font-weight:720;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-card :is(p,small){
+ color:var(--ui-muted)!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-card p.whitespace-pre-wrap{
+ line-height:1.6;font-size:13px;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-status{
+ display:inline-flex;align-items:center;flex:none;
+ min-height:26px;padding:5px 10px;border-radius:7px;
+ font-size:11px;font-weight:730;letter-spacing:.02em;
+ color:var(--stage-neutral-fg);background:var(--stage-neutral-bg);
+ border:1px solid var(--stage-neutral-border);
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-status-pending{
+ color:var(--stage-warning-fg)!important;background:var(--stage-warning-bg)!important;
+ border-color:var(--stage-warning-border)!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-status-approved{
+ color:var(--stage-success-fg)!important;background:var(--stage-success-bg)!important;
+ border-color:var(--stage-success-border)!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-status-rejected{
+ color:var(--stage-danger-fg)!important;background:var(--stage-danger-bg)!important;
+ border-color:var(--stage-danger-border)!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-actions{
+ padding-top:13px;border-top:1px solid var(--ui-border);
+}
+.aw-workspace [data-aw-module="approvals"] :is(
+ .aw-v4-approval-card .btn-secondary,.aw-v4-approval-card .btn-primary
+){min-height:40px;border-radius:8px;}
+.aw-workspace [data-aw-module="approvals"] :is(
+ .aw-card,.aw-panel
+){background:var(--ui-surface)!important;border-color:var(--ui-border)!important;}
+.aw-workspace [data-aw-module="approvals"] :is(
+ .aw-card,.aw-panel
+) :is(h2,h3,label,legend){color:var(--ui-strong)!important;}
+.aw-workspace [data-aw-module="approvals"] :is(input.field,textarea.field,select.field){
+ background:var(--ui-input)!important;color:var(--ui-strong)!important;
+ border-color:var(--ui-border)!important;color-scheme:inherit!important;
+}
+.aw-workspace [data-aw-module="approvals"] .aw-v4-approval-actions input.field{
+ max-width:360px;min-width:180px;flex:1 1 230px;
+}
+
+/* Comfortable density and independent table/scroll areas on small devices. */
+@media(max-width:1200px){
+ .aw-workspace :is(.aw-v4-delivery-stats,.aw-v4-task-summary,.aw-v4-approval-summary){
+  grid-template-columns:repeat(3,minmax(0,1fr));
+ }
+}
+@media(max-width:790px){
+ .aw-workspace :is(.aw-v4-history-summary,.aw-v4-delivery-stats,.aw-v4-task-summary,.aw-v4-approval-summary){
+  grid-template-columns:repeat(2,minmax(0,1fr));
+ }
+ .aw-workspace .aw-v4-delivery-filters,.aw-workspace .aw-v4-approval-tools{padding:12px;}
+ .aw-workspace .aw-v4-search{max-width:none;}
+}
+@media(max-width:460px){
+ .aw-workspace .aw-v4-operations-link{padding:8px 11px;font-size:12px;}
+ .aw-workspace .aw-v4-summary-stat{min-height:87px;padding:12px 14px;}
+ .aw-workspace .aw-v4-summary-stat strong{font-size:1.45rem;}
+ .aw-workspace .aw-v4-task-toolbar select.field{flex:1 1 135px;min-width:0;}
+ .aw-workspace .aw-v4-filter-buttons button{padding:7px 9px;}
+ .aw-workspace [data-aw-module="approvals"] .aw-v4-approval-view{
+  width:100%;overflow-x:auto;flex-wrap:nowrap;
+ }
+ .aw-workspace [data-aw-module="approvals"] .aw-v4-approval-view button{flex:none;}
+ .aw-workspace [data-aw-module="approvals"] .aw-v4-approval-card{padding:14px!important;}
+}
+@media(prefers-reduced-motion:reduce){
+ .aw-workspace :is(.aw-v4-operations-link,.aw-v4-task-row){transition:none!important;}
+}
