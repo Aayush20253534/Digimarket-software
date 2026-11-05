@@ -100,6 +100,19 @@ try{
  assert.equal(postedAll.postedNet,"0.0000");
  assert.equal(postedAll.postedSalaryExpense,"20000.0000");
  assert.equal(postedAll.postedNetBeforeSalary,"20000.0000");
+ assert.equal(postedAll.postedExpenseIncludingSalary,"20000.0000");
+ const mineA=await finance.entries(accountA,"mine");
+ const mineB=await finance.entries(accountB,"mine");
+ const agency=await finance.entries(accountA,"all");
+ const salaryRows=(entries:Awaited<ReturnType<typeof finance.entries>>)=>
+  entries.filter(row=>row.sourceType==="SALARY");
+ assert.deepEqual(salaryRows(mineA).map(row=>row.amount),["12000.0000"]);
+ assert.deepEqual(salaryRows(mineB).map(row=>row.amount),["8000.0000"]);
+ assert.equal(salaryRows(agency).length,2);
+ assert.deepEqual(salaryRows(agency).map(row=>row.amount).sort(),["12000.0000","8000.0000"].sort());
+ assert.ok(salaryRows(agency).every(row=>row.category.name==="Salary"&&row.status==="POSTED"));
+ assert.equal((await finance.exportCsv(accountA,"all")).csv.split("salary:").length,3);
+
  const self=await http(api).get("/api/v1/salary/payments").set(auth("employee")).expect(200);
  assert.equal(self.body.data.length,1);
  assert.equal(self.body.data[0].allocations.length,0);
@@ -123,6 +136,8 @@ try{
  assert.equal(state.body.data.find((x:{id:string})=>x.id===b).availableBalance,"8000.0000");
  const afterVoid=await http(api).get("/api/v1/salary/summary").set(auth("founder-a")).expect(200);
  assert.equal(afterVoid.body.data.totalPaid,"0.00");
+ assert.equal(salaryRows(await finance.entries(accountA,"mine"))[0]?.status,"CANCELLED");
+ assert.equal((await finance.totals(accountA,"all")).postedSalaryExpense,"0.0000");
  assert.equal(await db.notification.count({where:{recipientId:employee.id,organizationId:org.id}}),2);
  // Later Finance spending updates salary funding availability without a salary wallet top-up.
  await finance.submit(accountA,{kind:"EXPENSE",categoryId:expenseCategory.id,
