@@ -15,7 +15,8 @@ type Assignee={id:string;displayName:string;loginId:string};
 type MetaAdClient={id:string;businessName:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
   amount:string;currencyCode:string;occurredOn:string;method:string;description:string|null;
-  merchantOrSource:string|null;createdAt:string;approvalRequestId:string;
+  merchantOrSource:string|null;createdAt:string;approvalRequestId:string|null;
+  sourceType?:"FINANCE"|"SALARY";salaryPaymentId?:string;salaryMonth?:string;
   receiptAssetId?:string|null;enteredById:string;clientId:string|null;client:MetaAdClient|null;
   category:{id:string;name:string;active:boolean};
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
@@ -29,6 +30,8 @@ type RecurringIncome={month:string;monthlyServiceTotal:string;monthlyAdBudgetTot
 const zero:Totals={currency:"INR",postedIncome:"0.0000",postedExpense:"0.0000",postedNet:"0.0000",
   pendingIncome:"0.0000",pendingExpense:"0.0000",groups:[]};
 const modes=["CASH","UPI","BANK_TRANSFER","CARD","OTHER"] as const;
+const SALARY_OPTION="__salary_workflow__";
+const isSalaryCategory=(name:string)=>/^salary$/i.test(name.trim());
 const isMetaAdsCategory=(name:string)=>/^meta[\s_-]*(?:ads?|advertising|advertisements?)$/i.test(name.trim());
 function money(value:string){
   const negative=value.startsWith("-"),raw=negative?value.slice(1):value;
@@ -91,7 +94,8 @@ export default function FinancePage(){
   const [uploadStatus,setUploadStatus]=useState("");
   const [categoryKind,setCategoryKind]=useState<Kind>("EXPENSE");
   const [categoryName,setCategoryName]=useState("");
-  const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind),[categories,kind]);
+  const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind&&!isSalaryCategory(c.name)),[categories,kind]);
+  const salarySelected=kind==="EXPENSE"&&categoryId===SALARY_OPTION;
   const metaAdsSelected=kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===categoryId)?.name??"");
   const filteredMetaAdEntries=useMemo(()=>metaAdEntries.filter(row=>
    (metaFundingFilter==="ALL"||(metaFundingFilter==="CLIENT"?Boolean(row.clientId):!row.clientId))&&
@@ -237,6 +241,7 @@ export default function FinancePage(){
   async function submit(e:FormEvent){
     e.preventDefault();
     if(!categoryId){setError("Select a category before saving this entry.");return;}
+    if(salarySelected){setError("Record salaries in the Salary module; linked expenses will appear here automatically.");return;}
     if(metaAdsSelected&&adFunding==="CLIENT"&&!clientId){setError("Select the client paying for this Meta Ads expense.");return;}
     setBusy(true);setError("");setSuccess("");
     try{
@@ -278,6 +283,7 @@ export default function FinancePage(){
   async function addCategory(e:FormEvent){
     e.preventDefault();setBusy(true);setError("");setSuccess("");
     try{
+      if(categoryKind==="EXPENSE"&&isSalaryCategory(categoryName))throw new Error("Salary is a linked category. Use the Salary module to record payments.");
       await request("/finance/categories",{method:"POST",body:{kind:categoryKind,name:categoryName.trim()}});
       setSuccess("Category created for the whole agency.");setCategoryName("");
       await reload();
@@ -453,7 +459,14 @@ export default function FinancePage(){
             <option value="EXPENSE">Expense</option><option value="INCOME">Income</option></select></FormField>
           <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>{setCategoryId(e.target.value);setAdFunding("SELF");setClientId("");}}>
             <option value="">{selected.length?"Select a category":"Create a category first"}</option>
-            {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></FormField>
+            {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            {kind==="EXPENSE"&&isFounder&&<option value={SALARY_OPTION}>Salary (linked payroll entry)</option>}
+          </select></FormField>
+          {salarySelected&&<div className="sm:col-span-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-2" role="status">
+            <p className="font-semibold">Salary expense</p>
+            <p className="text-sm">Record a payment in Salary and split its funding among founders. Each share appears here automatically with a Salary tag. Recording it twice would count the same expense twice.</p>
+            <Link href="/app/salary" className="btn-primary inline-flex"><Plus size={16}/>Record in Salary</Link>
+          </div>}
           {metaAdsSelected&&<>
             <FormField id="finance-meta-funding" label="Meta Ads paid by">
               <select id="finance-meta-funding" className="field" value={adFunding} onChange={e=>{setAdFunding(e.target.value as "SELF"|"CLIENT");setClientId("");}}>
@@ -490,7 +503,7 @@ export default function FinancePage(){
             {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
             {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
           </div>
-          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
+          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||salarySelected||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
             <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?"Save entry":"Submit for approval"}</button></div>
         </form>
       </Card>}
@@ -594,7 +607,7 @@ export default function FinancePage(){
             {["Date","Type","Category","Source","Notes","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
           </tr></thead><tbody>{filteredEntries.map(row=><tr key={row.id} id={"finance-"+row.id}>
             {adminFinance&&<td className="py-3 pr-4">
-              {row.status!=="CANCELLED"&&<div className="flex items-center gap-2">
+              {row.sourceType!=="SALARY"&&row.status!=="CANCELLED"&&<div className="flex items-center gap-2">
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
                   onClick={()=>beginEntryEdit(row)} aria-label={"Edit "+row.kind.toLowerCase()+" "+row.id}>Edit</button>
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
@@ -603,7 +616,7 @@ export default function FinancePage(){
             </td>}
             <td className="py-3 pr-4">{row.occurredOn}</td>
             <td><span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>{row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>} {row.kind==="INCOME"?"Income":"Expense"}</span></td>
-            <td className="py-3 pr-4">{row.category.name}</td>
+            <td className="py-3 pr-4">{row.sourceType==="SALARY"?<span className="inline-flex items-center rounded-md bg-violet-500/15 px-2 py-1 text-xs font-semibold text-violet-400">Salary</span>:row.category.name}</td>
             <td className="py-3 pr-4">{row.merchantOrSource||"—"}</td>
             <td className="py-3 pr-4"><div className="min-w-40 max-w-80 whitespace-pre-wrap break-words text-sm" title={row.description??undefined}>{row.description?.trim()||"—"}</div></td>
             <td className={"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>{money(row.amount)}</td>
@@ -615,7 +628,8 @@ export default function FinancePage(){
               <button type="button" className="btn-secondary" disabled={busy} aria-label={"View receipt for "+row.occurredOn}
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
-              <Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>
+              {row.sourceType==="SALARY"?<Link href="/app/salary" className="aw-finance-approval-link">View salary</Link>:
+                row.approvalRequestId?<Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>:null}
 
             </div></td>
           </tr>)}</tbody></table></div>}
