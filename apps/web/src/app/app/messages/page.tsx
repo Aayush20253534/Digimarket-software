@@ -33,6 +33,7 @@ export default function MessagesPage(){
  const activeUserRef=useRef(session?.identity.userId);
  activeUserRef.current=session?.identity.userId;
  const membersSequence=useRef(0);
+ const threadSequence=useRef(0);
  const attachmentSequence=useRef(0);
  const activeReader=useRef<FileReader|null>(null);
  const bottom=useRef<HTMLDivElement>(null);
@@ -58,11 +59,13 @@ export default function MessagesPage(){
   // A background member refresh or file read must never survive an account
   // switch with the previous account's messages or attachment in React state.
   membersSequence.current++;
+  threadSequence.current++;
   attachmentSequence.current++;
   activeReader.current?.abort();
   activeReader.current=null;
   selectedRef.current="";
   setPeer("");setPeople([]);setItems([]);setDraft("");setAttachment(null);setReadingFile(false);
+  setMemberQuery("");setMemberFilter("all");setBusy(false);setLoadingChat(false);
   setError("");setLoadingMembers(Boolean(userId));
  },[userId]);
  useEffect(()=>{
@@ -75,7 +78,8 @@ export default function MessagesPage(){
  const loadThread=useCallback(async(target:string)=>{
   const owner=activeUserRef.current;
   if(!target||!owner)return;
-  const stillCurrent=()=>selectedRef.current===target&&activeUserRef.current===owner;
+  const run=++threadSequence.current;
+  const stillCurrent=()=>run===threadSequence.current&&selectedRef.current===target&&activeUserRef.current===owner;
   try{
    const data=await request<{items:Message[]}>("/messages?with="+encodeURIComponent(target));
    if(!stillCurrent())return;
@@ -105,12 +109,13 @@ export default function MessagesPage(){
 
  const choose=(id:string)=>{
   if(peer===id){void loadThread(id);return;}
-  // Cancel delayed FileReader events before moving to another recipient.
+  // Invalidate old thread loads and file reads even if this peer is later reopened.
+  threadSequence.current++;
   attachmentSequence.current++;
   activeReader.current?.abort();
   activeReader.current=null;
   selectedRef.current=id;
-  setPeer(id);setDraft("");setAttachment(null);setReadingFile(false);setError("");
+  setPeer(id);setItems([]);setLoadingChat(Boolean(id));setDraft("");setAttachment(null);setReadingFile(false);setError("");
  };
  const send=async()=>{
   const target=peer,owner=activeUserRef.current;
