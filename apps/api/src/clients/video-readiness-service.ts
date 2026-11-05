@@ -104,8 +104,8 @@ export class ClientVideoReadinessService{
     await tx.auditLog.create({data:{
      organizationId:actor.organizationId,actorId:actor.userId,
      action:"clients.video_readiness_saved",entityType:"Client",entityId:clientId,
-     beforeRedacted:previous?{month,week,readyAdded:previous.readyAdded,
-      delivered:previous.delivered,version:previous.version}:null,
+     ...(previous?{beforeRedacted:{month,week,readyAdded:previous.readyAdded,
+      delivered:previous.delivered,version:previous.version}}:{}),
      afterRedacted:{month,week,readyAdded:updated.readyAdded,delivered:updated.delivered,version:updated.version}
     }});
     return {month,week,version:updated.version,readyAdded:updated.readyAdded,
