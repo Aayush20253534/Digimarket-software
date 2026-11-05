@@ -15,7 +15,6 @@ const accountInput=z.strictObject({
  founderUserId:z.uuid(),name:z.string().trim().min(2).max(100),
  openingBalance:zeroOpening
 });
-const creditInput=z.strictObject({amount,recordedOn:isoDay,description:z.string().trim().max(250).optional()});
 const paymentInput=z.strictObject({
  recipientUserId:z.uuid(),idempotencyKey:z.uuid(),amount,salaryMonth:month,
  paidOn:isoDay,method:z.enum(["CASH","UPI","BANK_TRANSFER","CARD","OTHER"]),
@@ -121,7 +120,7 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
  });
 
  // Historical manual credits remain auditable, but no longer create salary funds.
- app.post(root+"/accounts/:id/credits",authenticate,async(req,res)=>{
+ app.post(root+"/accounts/:id/credits",authenticate,async(req)=>{
   const a=own(res);needFounder(a);parsed(z.uuid(),req.params.id);
   throw new AuthError(409,"FINANCE_LINKED","Salary funds now come from Finance. Add posted income to the founder's Finance entries.");
  });
