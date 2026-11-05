@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {ChartNoAxesCombined,FileStack,Wallet} from "lucide-react";
+import {Banknote,ChartNoAxesCombined,FileStack,Wallet} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 
 /** Page-level wayfinding. Existing server-side authorisation remains in place. */
@@ -15,6 +15,7 @@ export function BusinessWorkspaceNav(){
  const links=[
   {label:"Finance",href:"/app/finance",icon:Wallet,
    allowed:grants.has("finance.read.all")||grants.has("finance.entry.read.own")},
+  {label:"Salary",href:"/app/salary",icon:Banknote,allowed:true},
   {label:"Documents",href:"/app/documents/quotations",icon:FileStack,allowed:documentRole},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,
    allowed:grants.has("reports.business.read")},
