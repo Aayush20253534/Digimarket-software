@@ -36,6 +36,8 @@ const endpoints: Record<string, string[]> = {
   "approval-policies": ["GET"],
   "approvals": ["GET", "POST"],
   "finance/categories": ["GET", "POST"],
+  "finance/internal-settlements/founders": ["GET"],
+  "finance/internal-settlements": ["POST"],
   "salary/people": ["GET"],
   "salary/accounts": ["GET","POST"],
   "salary/credits": ["GET"],
@@ -100,6 +102,7 @@ const notificationReadPattern=/^notifications\/[0-9a-fA-F-]{36}\/read$/;
 const founderDetailPattern=/^founders\/[0-9a-fA-F-]{36}$/;
 const financeCategoryDetailPattern = /^finance\/categories\/[0-9a-fA-F-]{36}$/;
 const financeEntryDetailPattern = /^finance\/entries\/[0-9a-fA-F-]{36}$/;
+const financeSettlementVoidPattern = /^finance\/internal-settlements\/[0-9a-fA-F-]{36}\/void$/;
 const financeCategoryStatusPattern = /^finance\/categories\/[0-9a-fA-F-]{36}\/status$/;
 const policyPattern = /^approval-policies\/(GENERAL|FINANCE|CONTENT|DELIVERABLE)$/;
 const approvalPattern = /^approvals\/[0-9a-fA-F-]{36}$/;
@@ -210,6 +213,7 @@ function permitted(path: string, method: string): boolean {
   if (leadAssignPattern.test(path)) return method === "PUT";
   if (leadStageNotePattern.test(path)) return method === "PUT";
   if (leadNotesPattern.test(path)||leadDuplicateReviewPattern.test(path)) return method === "POST";
+  if (financeSettlementVoidPattern.test(path)) return method==="POST";
   if (financeCategoryDetailPattern.test(path)||financeEntryDetailPattern.test(path)) return ["PUT","DELETE"].includes(method);
   if (financeCategoryStatusPattern.test(path)) return method === "PUT";
   if (policyPattern.test(path)) return method === "PUT";

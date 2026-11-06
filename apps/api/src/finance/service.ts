@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
+import { InternalSettlementService } from "./internal-settlements";
 import { founderPolicy, isFounder } from "../approvals/founder";
 import type { FinanceCategoryInput, FinanceEntryInput, FinanceEntryAdminEdit, FinanceKind, FinanceBreakdownQuery } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
@@ -554,7 +555,10 @@ export class FinanceService {
       enteredBy:r.enteredBy,submittedBy:r.approvalRequest.requester}));
     if(scope!=="agency"||!isFounder(actor))return financeRows;
     const salaryRows=await this.salaryExpenseEntries(actor,view,200);
-    return [...financeRows,...salaryRows]
+    // Informational mirror only in each founder\'s My Entries. Never in Agency.
+    const settlementRows=view==="mine"
+      ?await new InternalSettlementService(this.db).projectMine(actor,200):[];
+    return [...financeRows,...salaryRows,...settlementRows]
       .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
       .slice(0,200);
   }
@@ -618,7 +622,9 @@ export class FinanceService {
     });
     const salaryRows=scope==="agency"&&isFounder(actor)
       ?await this.salaryExpenseEntries(actor,view,5001):[];
-    if(rows.length+salaryRows.length>5000)
+    const settlementRows=scope==="agency"&&view==="mine"&&isFounder(actor)
+      ?await new InternalSettlementService(this.db).projectMine(actor,5001):[];
+    if(rows.length+salaryRows.length+settlementRows.length>5000)
       throw new AuthError(422,"EXPORT_LIMIT","Export exceeds 5000 records; narrow the reporting scope");
     const header=["id","kind","status","category","amount","currency","occurred_on","payment_method","merchant_or_source","description","entered_by","approval_request_id","posted_at","client"];
     const records=rows.map(r=>[r.id,r.kind,r.status,r.category.name,r.amount.toFixed(4),
@@ -630,7 +636,12 @@ export class FinanceService {
       r.method,r.merchantOrSource??"",r.description??"",
       r.enteredBy.loginId,"",r.postedAt??"",""
     ].map(csvCell).join(","));
+    const settlementRecords=settlementRows.map(r=>[
+      r.id,r.settlementDirection,r.status,r.category.name,r.amount,
+      r.currencyCode,r.occurredOn,r.method,r.merchantOrSource??"",
+      r.description??"",r.enteredBy.loginId,"","",""
+    ].map(csvCell).join(","));
     return {filename:"digimarket-finance-"+scope+"-"+view+".csv",
-      csv:[header.join(","),...records,...salaryRecords].join("\r\n")+"\r\n"};
+      csv:[header.join(","),...records,...salaryRecords,...settlementRecords].join("\r\n")+"\r\n"};
   }
 }
