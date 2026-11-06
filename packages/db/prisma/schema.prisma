@@ -219,6 +219,7 @@ model Organization {
   founderProfiles FounderProfile[]
   salaryFundingAccounts SalaryFundingAccount[]
   salaryPayments SalaryPayment[]
+  internalSettlements InternalSettlement[]
   salaryFundingCredits SalaryFundingCredit[]
   clientVideoWeeks ClientVideoWeek[]
   clientPostWeeks ClientPostWeek[]
@@ -282,6 +283,9 @@ model User {
   receivedSalaryPayments SalaryPayment[] @relation("SalaryPaymentRecipient")
   recordedSalaryPayments SalaryPayment[] @relation("SalaryPaymentRecorder")
   voidedSalaryPayments SalaryPayment[] @relation("SalaryPaymentVoider")
+  settlementsSent InternalSettlement[] @relation("InternalSettlementSender")
+  settlementsReceived InternalSettlement[] @relation("InternalSettlementRecipient")
+  settlementsVoided InternalSettlement[] @relation("InternalSettlementVoider")
   auditActions       AuditLog[]      @relation("AuditActor")
   approvalSubmissions ApprovalRequest[] @relation("ApprovalRequester")
   approvalActions ApprovalDecision[] @relation("ApprovalActor")
@@ -1586,4 +1590,29 @@ model ClientPostWeek {
   @@unique([clientId,month,week])
   @@index([organizationId,month])
   @@index([clientId,month])
+}
+
+// Informational founder-to-founder settlement memo. Never a FinancialTransaction.
+// Does not enter company assets, Net posted, salary funding, or any totals.
+model InternalSettlement {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  senderId String @db.Uuid
+  recipientId String @db.Uuid
+  idempotencyKey String @db.Uuid
+  amount Decimal @db.Decimal(19,2)
+  occurredOn DateTime @db.Date
+  method FinanceMethod
+  note String? @db.VarChar(500)
+  voidedAt DateTime? @db.Timestamptz(6)
+  voidedById String? @db.Uuid
+  voidReason String? @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  sender User @relation("InternalSettlementSender",fields:[senderId],references:[id],onDelete:Restrict)
+  recipient User @relation("InternalSettlementRecipient",fields:[recipientId],references:[id],onDelete:Restrict)
+  voider User? @relation("InternalSettlementVoider",fields:[voidedById],references:[id],onDelete:Restrict)
+  @@unique([organizationId,idempotencyKey])
+  @@index([organizationId,senderId,createdAt])
+  @@index([organizationId,recipientId,createdAt])
 }
