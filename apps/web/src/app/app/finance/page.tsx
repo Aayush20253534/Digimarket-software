@@ -669,7 +669,8 @@ export default function FinancePage(){
       </div>}
     </Card>
     <div id="finance-register" className="aw-v5-finance-anchor"/>
-    <Card title={view==="all"?"Agency financial register":"My financial register"} description="Saved records, including pending, posted, rejected and cancelled entries. Latest 200 shown; CSV export includes up to 5,000.">
+    <Card title={view==="all"?"Agency financial register":"My financial register"}
+      description={view==="mine"?"Financial entries and informational internal settlements. Settlements do not affect net, company assets, expenses or income. Latest 200 shown; CSV up to 5,000.":"Saved agency financial records. Internal settlements are private to the two founders and excluded from agency totals."}>
       <div className="aw-v5-register-filters" aria-label="Financial register filters">
        <label className="aw-v5-register-search"><Search size={16} aria-hidden="true"/>
         <span className="sr-only">Search loaded financial entries</span>
@@ -696,19 +697,35 @@ export default function FinancePage(){
             {["Date","Type","Category","Source","Notes","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
           </tr></thead><tbody>{filteredEntries.map(row=><tr key={row.id} id={"finance-"+row.id}>
             {adminFinance&&<td className="py-3 pr-4">
-              {row.sourceType!=="SALARY"&&row.status!=="CANCELLED"&&<div className="flex items-center gap-2">
+              {row.sourceType==="FINANCE"&&row.status!=="CANCELLED"&&<div className="flex items-center gap-2">
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
                   onClick={()=>beginEntryEdit(row)} aria-label={"Edit "+row.kind.toLowerCase()+" "+row.id}>Edit</button>
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
                   onClick={()=>void deleteEntry(row)} aria-label={"Delete "+row.kind.toLowerCase()+" "+row.id}>Delete</button>
               </div>}
+              {row.sourceType==="SETTLEMENT"&&row.settlementDirection==="OUTGOING"&&row.status!=="CANCELLED"&&
+                <button type="button" className="btn-secondary text-xs" disabled={busy}
+                  onClick={()=>void voidSettlement(row)}>Void settlement</button>}
             </td>}
             <td className="py-3 pr-4">{row.occurredOn}</td>
-            <td><span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>{row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>} {row.kind==="INCOME"?"Income":"Expense"}</span></td>
-            <td className="py-3 pr-4">{row.sourceType==="SALARY"?<span className="inline-flex items-center rounded-md bg-violet-500/15 px-2 py-1 text-xs font-semibold text-violet-400">Salary</span>:row.category.name}</td>
+            <td>{row.sourceType==="SETTLEMENT"?
+              <span className="inline-flex items-center gap-1 text-sm text-slate-300">
+                {row.settlementDirection==="INCOMING"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>}
+                {row.settlementDirection==="INCOMING"?"Settlement In":"Settlement Out"}
+              </span>:
+              <span className={"aw-finance-kind "+(row.kind==="INCOME"?"income":"expense")}>
+                {row.kind==="INCOME"?<ArrowDownLeft size={16}/>:<ArrowUpRight size={16}/>}
+                {row.kind==="INCOME"?"Income":"Expense"}
+              </span>}</td>
+            <td className="py-3 pr-4">{row.sourceType==="SETTLEMENT"?
+               <span className="inline-flex items-center rounded-md border border-slate-500/40 px-2 py-1 text-xs font-semibold text-slate-300">Internal Settlement</span>:
+               row.sourceType==="SALARY"?<span className="inline-flex items-center rounded-md bg-violet-500/15 px-2 py-1 text-xs font-semibold text-violet-400">Salary</span>:row.category.name}</td>
             <td className="py-3 pr-4">{row.merchantOrSource||"—"}</td>
             <td className="py-3 pr-4"><div className="min-w-40 max-w-80 whitespace-pre-wrap break-words text-sm" title={row.description??undefined}>{row.description?.trim()||"—"}</div></td>
-            <td className={"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>{money(row.amount)}</td>
+            <td className={row.sourceType==="SETTLEMENT"?"aw-finance-amount text-slate-300":"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>
+              {row.sourceType==="SETTLEMENT"?(row.settlementDirection==="OUTGOING"?"−":"+"):""}{money(row.amount)}
+              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">Not included in totals</small>}
+            </td>
             <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
             <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
               {row.submittedBy&&row.submittedBy.displayName!==row.enteredBy.displayName&&
@@ -717,7 +734,8 @@ export default function FinancePage(){
               <button type="button" className="btn-secondary" disabled={busy} aria-label={"View receipt for "+row.occurredOn}
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
-              {row.sourceType==="SALARY"?<Link href="/app/salary" className="aw-finance-approval-link">View salary</Link>:
+              {row.sourceType==="SETTLEMENT"?<span className="text-xs text-slate-500">Informational only</span>:
+                row.sourceType==="SALARY"?<Link href="/app/salary" className="aw-finance-approval-link">View salary</Link>:
                 row.approvalRequestId?<Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>:null}
 
             </div></td>
