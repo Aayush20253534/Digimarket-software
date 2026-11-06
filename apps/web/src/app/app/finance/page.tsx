@@ -16,7 +16,8 @@ type MetaAdClient={id:string;businessName:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
   amount:string;currencyCode:string;occurredOn:string;method:string;description:string|null;
   merchantOrSource:string|null;createdAt:string;approvalRequestId:string|null;
-  sourceType?:"FINANCE"|"SALARY";salaryPaymentId?:string;salaryMonth?:string;
+  sourceType?:"FINANCE"|"SALARY"|"SETTLEMENT";salaryPaymentId?:string;salaryMonth?:string;
+  settlementId?:string;settlementDirection?:"OUTGOING"|"INCOMING";
   receiptAssetId?:string|null;enteredById:string;clientId:string|null;client:MetaAdClient|null;
   category:{id:string;name:string;active:boolean};
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
@@ -81,6 +82,14 @@ export default function FinancePage(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [success,setSuccess]=useState("");
+  const [settlementPeers,setSettlementPeers]=useState<Assignee[]>([]);
+  const [settlementPeer,setSettlementPeer]=useState("");
+  const [settlementAmount,setSettlementAmount]=useState("");
+  const [settlementDate,setSettlementDate]=useState(()=>new Date().toISOString().slice(0,10));
+  const [settlementMethod,setSettlementMethod]=useState<(typeof modes)[number]>("UPI");
+  const [settlementNote,setSettlementNote]=useState("");
+  const [settlementKey,setSettlementKey]=useState(()=>crypto.randomUUID());
+  const [settlementError,setSettlementError]=useState("");
   const [kind,setKind]=useState<Kind>("EXPENSE");
   const [categoryId,setCategoryId]=useState("");
   const [adFunding,setAdFunding]=useState<"SELF"|"CLIENT">("SELF");
@@ -185,6 +194,14 @@ export default function FinancePage(){
     return()=>{reloadSequence.current+=1;};
   },[reload]);
   useEffect(()=>{
+    if(!isFounder||!canReadOwn)return;
+    let active=true;
+    void request<Assignee[]>("/finance/internal-settlements/founders").then(peers=>{
+      if(active){setSettlementPeers(peers);setSettlementError("");}
+    }).catch(e=>{if(active)setSettlementError(e instanceof Error?e.message:"Founder list unavailable");});
+    return()=>{active=false;};
+  },[isFounder,canReadOwn,request]);
+  useEffect(()=>{
     if(!adminFinance)return;
     let active=true;
     void request<Assignee[]>("/finance/assignees").then(users=>{
@@ -279,6 +296,34 @@ export default function FinancePage(){
       setCategoryId("");setAdFunding("SELF");setClientId("");
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
+  }
+  async function recordSettlement(e:FormEvent){
+    e.preventDefault();
+    if(!settlementPeer||!settlementAmount.trim()){setError("Select a receiving founder and positive amount.");return;}
+    setBusy(true);setError("");setSuccess("");
+    try{
+      await request("/finance/internal-settlements",{method:"POST",body:{
+        recipientId:settlementPeer,amount:settlementAmount.trim(),occurredOn:settlementDate,
+        method:settlementMethod,note:settlementNote.trim(),idempotencyKey:settlementKey
+      }});
+      setSettlementAmount("");setSettlementNote("");setSettlementKey(crypto.randomUUID());
+      setSuccess("Settlement recorded for both founders. Income, expenses, balances and assets remain unchanged.");
+      await reload();
+    }catch(e){setError(e instanceof Error?e.message:readable(e));}
+    finally{setBusy(false);}
+  }
+  async function voidSettlement(row:Entry){
+    if(!row.settlementId||row.settlementDirection!=="OUTGOING")return;
+    const reason=window.prompt("Reason for voiding the informational settlement (minimum 4 characters):");
+    if(reason===null)return;
+    if(reason.trim().length<4){setError("At least four characters are required.");return;}
+    setBusy(true);setError("");setSuccess("");
+    try{
+      await request("/finance/internal-settlements/"+row.settlementId+"/void",{method:"POST",body:{reason:reason.trim()}});
+      setSuccess("Settlement voided for both founders. Company totals remain unchanged.");
+      await reload();
+    }catch(e){setError(e instanceof Error?e.message:readable(e));}
+    finally{setBusy(false);}
   }
   async function addCategory(e:FormEvent){
     e.preventDefault();setBusy(true);setError("");setSuccess("");
@@ -381,6 +426,7 @@ export default function FinancePage(){
       <a href="#finance-summary">Overview</a>
       {canAll&&<a href="#finance-recurring">Recurring agreements</a>}
       {canCreate&&<a href="#finance-entry">New entry</a>}
+      {isFounder&&view==="mine"&&<a href="#finance-internal-settlement">Internal Settlement</a>}
       <a href="#finance-meta-ads">Meta Ads spend</a>
       {isFounder&&<a href="#finance-salary">Founder-funded salary</a>}
       <a href="#finance-register">Financial register</a>
@@ -526,6 +572,48 @@ export default function FinancePage(){
         </div>):<EmptyState title="No categories yet" description="An administrator can add expense and income categories." icon={Wallet}/>}</div>
       </Card>
     </div>
+    {isFounder&&canCreate&&canReadOwn&&view==="mine"&&
+      <section id="finance-internal-settlement" aria-label="Record internal settlement">
+       <Card title="Internal Settlement" description="Record a settlement from your founder profile to another founder. It appears as Outgoing in your personal entries and Incoming in theirs. It never affects company assets, net, income, expenses or charts.">
+        {settlementError&&<Notice kind="error">{settlementError}</Notice>}
+        <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={e=>void recordSettlement(e)}>
+         <FormField id="settlement-recipient" label="Receiving founder">
+          <select id="settlement-recipient" className="field" required value={settlementPeer} onChange={e=>setSettlementPeer(e.target.value)}>
+           <option value="">Select founder</option>
+           {settlementPeers.map(person=><option key={person.id} value={person.id}>{person.displayName}</option>)}
+          </select>
+         </FormField>
+         <FormField id="settlement-amount" label="Amount (INR)">
+          <input id="settlement-amount" className="field" inputMode="decimal" required pattern="(0|[1-9][0-9]{0,12})([.][0-9]{1,2})?"
+           placeholder="2000.00" value={settlementAmount} onChange={e=>setSettlementAmount(e.target.value)}/>
+         </FormField>
+         <FormField id="settlement-date" label="Settlement date">
+          <input id="settlement-date" className="field" type="date" required value={settlementDate}
+           onChange={e=>setSettlementDate(e.target.value)}/>
+         </FormField>
+         <FormField id="settlement-method" label="Method">
+          <select id="settlement-method" className="field" value={settlementMethod}
+           onChange={e=>setSettlementMethod(e.target.value as typeof settlementMethod)}>
+           {modes.map(m=><option key={m} value={m}>{m.replaceAll("_"," ")}</option>)}
+          </select>
+         </FormField>
+         <div className="sm:col-span-2">
+          <FormField id="settlement-note" label="Note (optional)">
+           <textarea id="settlement-note" className="field min-h-20" maxLength={500}
+            value={settlementNote} placeholder="Purpose or reference" onChange={e=>setSettlementNote(e.target.value)}/>
+          </FormField>
+         </div>
+         <p className="sm:col-span-2 text-sm text-slate-500">
+          Informational record only. DigiMarket does not transfer money or change any financial calculation. Each founder sees their own direction in My Entries.
+         </p>
+         <div className="sm:col-span-2">
+          <button className="btn-primary" type="submit" disabled={busy||!settlementPeer||!settlementAmount||!settlementPeers.length}>
+           <Plus size={16}/>{busy?"Saving…":"Record internal settlement"}
+          </button>
+         </div>
+        </form>
+       </Card>
+      </section>}
     <div id="finance-meta-ads" className="aw-v5-finance-anchor"/>
     <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Posted client spending reduces Net posted without increasing agency expenses. Latest 200 entries shown.">
       <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("meta_ads")}>
