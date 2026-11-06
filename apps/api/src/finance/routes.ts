@@ -32,7 +32,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   const ledgerScope=(req:Request)=>parse(z.enum(["agency","client_ads","meta_ads"]).default("agency"),req.query.scope);
   const internalInput=z.strictObject({
     recipientId:z.uuid(),
-    amount:z.string().regex(/^(0|[1-9][0-9]{0,12})(?:\\.[0-9]{1,2})?$/),
+    amount:z.string().regex(/^(0|[1-9][0-9]{0,12})(?:\.[0-9]{1,2})?$/),
     occurredOn:z.iso.date(),
     method:z.enum(["CASH","UPI","BANK_TRANSFER","CARD","OTHER"]),
     note:z.string().trim().max(500).optional(),
