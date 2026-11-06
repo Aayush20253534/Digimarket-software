@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {BriefcaseBusiness, CalendarClock, CalendarDays, Users, Video} from "lucide-react";
+import {BriefcaseBusiness, CalendarClock, CalendarDays, Users, Video, Newspaper} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 
 /**
@@ -20,11 +20,12 @@ export function SalesWorkspaceNav(){
   {label:"Meetings",href:"/app/meetings",icon:CalendarDays,allowed:grants.has("leads.read")},
   {label:"Clients",href:"/app/clients",icon:Users,allowed:grants.has("clients.read")},
   {label:"Video readiness",href:"/app/clients/video-readiness",icon:Video,allowed:grants.has("clients.read")},
+  {label:"Post readiness",href:"/app/clients/post-readiness",icon:Newspaper,allowed:grants.has("clients.read")},
  ].filter(x=>x.allowed);
  if(routes.length<2)return null;
  return <nav aria-label="Sales workspace sections" className="aw-v3-sales-nav">
   {routes.map(({label,href,icon:Icon})=>{
-   const active=pathname===href||(href==="/app/clients"&&pathname.startsWith("/app/clients/")&&!pathname.startsWith("/app/clients/video-readiness"));
+   const active=pathname===href||(href==="/app/clients"&&pathname.startsWith("/app/clients/")&&!pathname.startsWith("/app/clients/video-readiness")&&!pathname.startsWith("/app/clients/post-readiness"));
    return <Link key={href} href={href} aria-current={active?"page":undefined}
     className={"aw-v3-sales-link"+(active?" is-active":"")}>
     <Icon size={16} strokeWidth={1.8} aria-hidden="true"/><span>{label}</span>

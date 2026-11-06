@@ -2,15 +2,16 @@
 import {FormEvent,useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
-import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,ClipboardList,FolderKanban,RefreshCw,Users,FolderOpen,Video} from "lucide-react";
+import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,ClipboardList,FolderKanban,RefreshCw,Users,FolderOpen,Video,Newspaper} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ClientDeliveryWorkspace} from "@/components/client-delivery-workspace";
 import {ClientVideoReadiness} from "@/components/client-video-readiness";
+import {ClientPostReadiness} from "@/components/client-post-readiness";
 import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {Spinner} from "@/components/ui";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
-type ClientTab="delivery"|"video"|"services"|"agreement"|"contacts"|"files";
+type ClientTab="delivery"|"video"|"post"|"services"|"agreement"|"contacts"|"files";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
 type Service={id:string;name:string;description:string|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Detail={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;notes:string|null;
@@ -20,7 +21,7 @@ type Editing={businessName:string;businessType:string;phone:string;email:string;
  contractStartOn:string;contractEndOn:string;monthlyFee:string;monthlyAdBudget:string;status:Status};
 type ServiceDraft={name:string;description:string;status:Service["status"]};
 const blankService:ServiceDraft={name:"",description:"",status:"ACTIVE"};
-const tabs=[["delivery","Delivery",FolderKanban],["video","Video readiness",Video],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users],["files","Files & Assets",FolderOpen]] as const;
+const tabs=[["delivery","Delivery",FolderKanban],["video","Video readiness",Video],["post","Post readiness",Newspaper],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users],["files","Files & Assets",FolderOpen]] as const;
 function formFrom(c:Detail):Editing{return {
  businessName:c.businessName,businessType:c.businessType??"",phone:c.phone??"",email:c.email??"",location:c.location??"",notes:c.notes??"",
  contractStartOn:c.contractStartOn?.slice(0,10)??"",contractEndOn:c.contractEndOn?.slice(0,10)??"",
@@ -112,6 +113,7 @@ export default function ClientWorkspacePage(){
     <p className="aw-client-muted">You do not have access to the shared asset library.</p>}
   </section>}
   {tab==="video"&&<ClientVideoReadiness clientId={client.id}/>}
+  {tab==="post"&&<ClientPostReadiness clientId={client.id}/>}
   {tab==="delivery"&&<>
     {client.services.length===0&&<div className="aw-client-callout"><div><strong>Start with the service agreement</strong><p>No service commitments are recorded. You can record an agreed service or schedule a named delivery directly.</p></div>
      <button className="aw-client-btn" type="button" onClick={()=>setTab("services")}>Add services <ArrowRight size={15}/></button></div>}

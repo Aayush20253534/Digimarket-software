@@ -8,6 +8,7 @@ import { AuthError, unauthorized } from "../auth/errors";
 import { ClientsService } from "./service";
 import { ServiceDeliveryService } from "./delivery-service";
 import { ClientVideoReadinessService } from "./video-readiness-service";
+import { ClientPostReadinessService } from "./post-readiness-service";
 const id=z.uuid();
 function parse<T>(schema:z.ZodType<T>,value:unknown):T {
  const result=schema.safeParse(value);
@@ -18,6 +19,7 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  const svc=new ClientsService(auth.database);
  const deliveries=new ServiceDeliveryService(auth.database);
  const videos=new ClientVideoReadinessService(auth.database);
+ const posts=new ClientPostReadinessService(auth.database);
  const authenticated=async(req:Request,res:Response,next:NextFunction)=>{
    try{
      const token=req.get("authorization");
@@ -53,6 +55,16 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  app.put(root+"/:id/video-readiness/:week",authenticated,async(req,res)=>{
   const body=parse(videoWeekInput,req.body);
   res.json({data:await videos.saveWeek(actor(res),parse(id,req.params.id),body.month,
+   parse(weekNumber,req.params.week),body)});
+ });
+ // Post readiness uses the same week buckets as videos but independent stock.
+ app.get(root+"/:id/post-readiness",authenticated,async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json({data:await posts.monthly(actor(res),parse(id,req.params.id),parse(month,req.query.month))});
+ });
+ app.put(root+"/:id/post-readiness/:week",authenticated,async(req,res)=>{
+  const body=parse(videoWeekInput,req.body);
+  res.json({data:await posts.saveWeek(actor(res),parse(id,req.params.id),body.month,
    parse(weekNumber,req.params.week),body)});
  });
  app.get(root+"/:id",authenticated,async(req,res)=>{

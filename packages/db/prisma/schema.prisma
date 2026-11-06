@@ -221,6 +221,7 @@ model Organization {
   salaryPayments SalaryPayment[]
   salaryFundingCredits SalaryFundingCredit[]
   clientVideoWeeks ClientVideoWeek[]
+  clientPostWeeks ClientPostWeek[]
   auditLogs       AuditLog[]
   outboxEvents    OutboxEvent[]
   notifications Notification[]
@@ -301,6 +302,7 @@ model User {
   reviewedLeadDuplicates LeadDuplicateCandidate[] @relation("LeadDuplicateReviewer")
   clientsCreated Client[] @relation("ClientCreator")
   videoWeeksUpdated ClientVideoWeek[] @relation("ClientVideoWeekUpdater")
+  postWeeksUpdated ClientPostWeek[] @relation("ClientPostWeekUpdater")
   reviewCardsCreated ReviewCard[] @relation("ReviewCardCreator")
   assetsCreated Asset[] @relation("AssetCreator")
   assetIntentsCreated AssetUploadIntent[] @relation("AssetIntentCreator")
@@ -670,6 +672,7 @@ model Client {
   metaAdSpend FinancialTransaction[] @relation("ClientMetaAdSpend")
   reviewCards ReviewCard[]
   videoWeeks ClientVideoWeek[]
+  postWeeks ClientPostWeek[]
   revenueRecognitions RevenueRecognition[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
@@ -1559,6 +1562,27 @@ model ClientVideoWeek {
   organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
   client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
   updatedBy User @relation("ClientVideoWeekUpdater",fields:[updatedById],references:[id],onDelete:Restrict)
+  @@unique([clientId,month,week])
+  @@index([organizationId,month])
+  @@index([clientId,month])
+}
+
+model ClientPostWeek {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  month String @db.VarChar(7)
+  week Int
+  readyAdded Int @default(0)
+  delivered Int @default(0)
+  note String? @db.VarChar(500)
+  version Int @default(1)
+  updatedById String @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  updatedBy User @relation("ClientPostWeekUpdater",fields:[updatedById],references:[id],onDelete:Restrict)
   @@unique([clientId,month,week])
   @@index([organizationId,month])
   @@index([clientId,month])

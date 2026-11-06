@@ -130,6 +130,8 @@ const clientDetailPattern = /^clients\/[0-9a-fA-F-]{36}$/;
 // Allow only the client-scoped video readiness read and weekly update routes.
 const clientVideoReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness$/;
 const clientVideoWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness\/[1-5]$/;
+const clientPostReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/post-readiness$/;
+const clientPostWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/post-readiness\/[1-5]$/;
 const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/(contacts|services)$/;
 const clientServiceEditPattern = /^clients\/[0-9a-fA-F-]{36}\/services\/[0-9a-fA-F-]{36}$/;
 const deliveryPlanEditPattern=/^service-deliveries\/[0-9a-fA-F-]{36}$/;
@@ -197,6 +199,8 @@ function permitted(path: string, method: string): boolean {
   if (assetActionPattern.test(path)) return method==="POST";
   if (clientVideoReadinessPattern.test(path)) return method === "GET";
   if (clientVideoWeekPattern.test(path)) return method === "PUT";
+  if (clientPostReadinessPattern.test(path)) return method === "GET";
+  if (clientPostWeekPattern.test(path)) return method === "PUT";
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (clientChildrenPattern.test(path)) return method === "POST";
   if (clientServiceEditPattern.test(path)) return method === "PUT";
@@ -375,7 +379,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (path === "salary/payments" || path === "salary/summary") {
     for(const key of ["from","to"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
-  if (clientVideoReadinessPattern.test(path)) {
+  if (clientVideoReadinessPattern.test(path) || clientPostReadinessPattern.test(path)) {
     const month = request.nextUrl.searchParams.get("month");
     if (month !== null) url.searchParams.set("month", month);
   }
