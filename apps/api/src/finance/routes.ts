@@ -6,6 +6,7 @@ import {
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { FinanceService } from "./service";
+import { InternalSettlementService } from "./internal-settlements";
 import { AssetService } from "../assets/service";
 import { assetIntentSchema,assetConfirmSchema } from "@digimarket/contracts";
 
@@ -16,6 +17,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T {
 }
 export function registerFinanceRoutes(app:Express,auth:AuthService) {
   const finance=new FinanceService(auth.database);
+  const internal=new InternalSettlementService(auth.database);
   const proofAssets=new AssetService(auth.database);
   const authenticate=async(req:Request,res:Response,next:NextFunction)=>{
     try{
@@ -28,6 +30,16 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   const actor=(res:Response)=>res.locals.principal as Principal;
   const view=(req:Request)=>parse(financeViewSchema,req.query.view??"mine");
   const ledgerScope=(req:Request)=>parse(z.enum(["agency","client_ads","meta_ads"]).default("agency"),req.query.scope);
+  const internalInput=z.strictObject({
+    recipientId:z.uuid(),
+    amount:z.string().regex(/^(0|[1-9][0-9]{0,12})(?:\\.[0-9]{1,2})?$/),
+    occurredOn:z.iso.date(),
+    method:z.enum(["CASH","UPI","BANK_TRANSFER","CARD","OTHER"]),
+    note:z.string().trim().max(500).optional(),
+    idempotencyKey:z.uuid()
+  });
+  const internalVoidInput=z.strictObject({reason:z.string().trim().min(4).max(500)});
+
   app.post("/api/v1/finance/proof-intent",authenticate,async(req,res)=>{
     const body=parse(assetIntentSchema,req.body);
     res.status(201).json({data:await proofAssets.intent(actor(res),body,true)});
@@ -62,6 +74,17 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   app.get("/api/v1/finance/meta-ad-clients",authenticate,async(_req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({data:await finance.metaAdClients(actor(res))});
+  });
+  app.get("/api/v1/finance/internal-settlements/founders",authenticate,async(_req,res)=>{
+    res.set("Cache-Control","no-store").json({data:await internal.founders(actor(res))});
+  });
+  app.post("/api/v1/finance/internal-settlements",authenticate,async(req,res)=>{
+    const input=parse(internalInput,req.body);
+    res.status(201).json({data:await internal.record(actor(res),input)});
+  });
+  app.post("/api/v1/finance/internal-settlements/:id/void",authenticate,async(req,res)=>{
+    res.json({data:await internal.void(actor(res),parse(z.uuid(),req.params.id),
+      parse(internalVoidInput,req.body).reason)});
   });
   app.get("/api/v1/finance/assignees",authenticate,async(_req,res)=>{
     res.set("Cache-Control","no-store");
