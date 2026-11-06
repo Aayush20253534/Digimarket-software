@@ -44,7 +44,7 @@ export default function VideoReadinessPage(){
  return <div className="aw-client-workspace space-y-5" data-aw-module="clients-video-readiness">
   <SalesWorkspaceNav/>
   <PageHeader eyebrow="CLIENT CONTENT PIPELINE" title="Weekly video readiness"
-   description="Choose a client and month to see ready-to-post video stock, weekly production and deliveries."
+   description="Choose a client and month to track ready-to-post videos, weekly deliveries, and carried-forward stock."
    actions={<div className="flex gap-2 flex-wrap">
     <Link className="aw-client-btn" href="/app/clients"><ArrowLeft size={16}/>Clients</Link>
     <button type="button" className="aw-client-btn" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh clients</button>
