@@ -25,12 +25,14 @@ function fixture() {
   const groupTransactions = vi.fn().mockResolvedValue([]);
   const salaryFundingAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const salaryFundingFindMany=vi.fn().mockResolvedValue([]);
+  const settlementFindMany=vi.fn().mockResolvedValue([]);
   const salaryPaymentAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const db = {
     financialCategory: { findMany: findCategories },
     financialTransaction: { findMany: findTransactions, groupBy: groupTransactions },
     salaryFundingAllocation:{aggregate:salaryFundingAggregate,findMany:salaryFundingFindMany},
     salaryPayment:{aggregate:salaryPaymentAggregate},
+    internalSettlement:{findMany:settlementFindMany},
   } as unknown as PrismaClient;
   return {
     service: new FinanceService(db),
