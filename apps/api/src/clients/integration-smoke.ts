@@ -5,11 +5,12 @@ import type { Principal } from "../auth/service";
 import { ClientsService } from "./service";
 import { ServiceDeliveryService,datesInRange } from "./delivery-service";
 import { ClientVideoReadinessService,monthWeeks } from "./video-readiness-service";
+import { ClientPostReadinessService } from "./post-readiness-service";
 import { LeadsService } from "../leads/service";
 
 if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarket_ci"))
  throw new Error("Clients integration requires isolated digimarket_ci PostgreSQL");
-const db=createDatabaseClient(),clients=new ClientsService(db),leads=new LeadsService(db),deliveries=new ServiceDeliveryService(db),videos=new ClientVideoReadinessService(db);
+const db=createDatabaseClient(),clients=new ClientsService(db),leads=new LeadsService(db),deliveries=new ServiceDeliveryService(db),videos=new ClientVideoReadinessService(db),posts=new ClientPostReadinessService(db);
 const actor=(id:string,org:string,grants:string[]):Principal=>({
  userId:id,organizationId:org,sessionId:"ci",roles:["FOUNDER"],permissions:new Set(grants),
 });
@@ -86,6 +87,46 @@ try{
   {readyAdded:10,delivered:0,version:0}),fail(404));
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,
   action:"clients.video_readiness_saved",entityId:client.id}}))>=4);
+ 
+ // Post readiness is an independent stock ledger. Post edits never change videos.
+ const initialPosts=await posts.monthly(manager,client.id,"2026-11");
+ assert.equal(initialPosts.remainingStock,0);
+ assert.equal(initialPosts.weeks.length,5);
+ const firstPost=await posts.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:10,delivered:0,note:"Ten completed graphics",version:0});
+ assert.equal(firstPost.version,1);
+ await posts.saveWeek(team,client.id,"2026-11",2,
+  {readyAdded:2,delivered:6,note:"Six posts delivered",version:0});
+ const novPosts=await posts.monthly(manager,client.id,"2026-11");
+ assert.equal(novPosts.readyThisMonth,12);
+ assert.equal(novPosts.deliveredThisMonth,6);
+ assert.equal(novPosts.remainingStock,6);
+ assert.equal(novPosts.weeks[1].availableBefore,10);
+ assert.equal((await posts.monthly(manager,client.id,"2026-12")).openingStock,6);
+ await posts.saveWeek(team,client.id,"2026-12",1,
+  {readyAdded:1,delivered:4,note:"Four December deliveries",version:0});
+ assert.equal((await posts.monthly(manager,client.id,"2026-12")).remainingStock,3);
+ await assert.rejects(()=>posts.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:11,delivered:0,version:0}),fail(409));
+ await assert.rejects(()=>posts.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:5,delivered:0,version:1}),fail(422));
+ await assert.rejects(()=>posts.saveWeek(manager,client.id,"2026-11",2,
+  {readyAdded:0,delivered:15,version:1}),fail(422));
+ await assert.rejects(()=>posts.saveWeek(manager,client.id,"2026-02",5,
+  {readyAdded:1,delivered:0,version:0}),fail(422));
+ const postUpdated=await posts.saveWeek(manager,client.id,"2026-11",1,
+  {readyAdded:11,delivered:0,note:"Updated stock",version:1});
+ assert.equal(postUpdated.version,2);
+ assert.equal((await posts.monthly(team,client.id,"2026-12")).remainingStock,4);
+ assert.equal((await videos.monthly(team,client.id,"2026-12")).remainingStock,2);
+ await assert.rejects(()=>posts.saveWeek(viewer,client.id,"2026-11",3,
+  {readyAdded:1,delivered:0,version:0}),fail(403));
+ await assert.rejects(()=>posts.monthly(external,client.id,"2026-11"),fail(404));
+ await assert.rejects(()=>posts.saveWeek(external,client.id,"2026-11",3,
+  {readyAdded:2,delivered:0,version:0}),fail(404));
+ assert.ok((await db.auditLog.count({where:{organizationId:org.id,
+  action:"clients.post_readiness_saved",entityId:client.id}}))>=4);
+
 
  const updated=await clients.update(team,client.id,{version:1,businessName:"Agency Cafe Updated",businessType:"Hospitality"});
  assert.equal(updated.version,2);
