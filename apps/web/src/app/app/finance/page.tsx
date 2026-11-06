@@ -703,9 +703,6 @@ export default function FinancePage(){
                 <button type="button" className="btn-secondary text-xs" disabled={busy}
                   onClick={()=>void deleteEntry(row)} aria-label={"Delete "+row.kind.toLowerCase()+" "+row.id}>Delete</button>
               </div>}
-              {row.sourceType==="SETTLEMENT"&&row.settlementDirection==="OUTGOING"&&row.status!=="CANCELLED"&&
-                <button type="button" className="btn-secondary text-xs" disabled={busy}
-                  onClick={()=>void voidSettlement(row)}>Void settlement</button>}
             </td>}
             <td className="py-3 pr-4">{row.occurredOn}</td>
             <td>{row.sourceType==="SETTLEMENT"?
@@ -734,7 +731,12 @@ export default function FinancePage(){
               <button type="button" className="btn-secondary" disabled={busy} aria-label={"View receipt for "+row.occurredOn}
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
-              {row.sourceType==="SETTLEMENT"?<span className="text-xs text-slate-500">Informational only</span>:
+              {row.sourceType==="SETTLEMENT"?<>
+                <span className="text-xs text-slate-500">Informational only</span>
+                {row.settlementDirection==="OUTGOING"&&row.status!=="CANCELLED"&&
+                  <button type="button" className="btn-secondary text-xs" disabled={busy}
+                    onClick={()=>void voidSettlement(row)}>Void settlement</button>}
+              </>:
                 row.sourceType==="SALARY"?<Link href="/app/salary" className="aw-finance-approval-link">View salary</Link>:
                 row.approvalRequestId?<Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>:null}
 
