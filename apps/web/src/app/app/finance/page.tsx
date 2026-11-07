@@ -731,7 +731,7 @@ export default function FinancePage(){
             <td className="py-3 pr-4"><div className="min-w-40 max-w-80 whitespace-pre-wrap break-words text-sm" title={row.description??undefined}>{row.description?.trim()||"—"}</div></td>
             <td className={row.sourceType==="SETTLEMENT"?"aw-finance-amount text-slate-300":"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>
               {row.sourceType==="SETTLEMENT"?(row.settlementDirection==="OUTGOING"?"−":"+"):""}{money(row.amount)}
-              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">Not included in totals</small>}
+              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">{row.settlementDirection==="INCOMING"?"Reduces recipient personal expenses":"Sender totals unchanged"}</small>}
             </td>
             <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
             <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
