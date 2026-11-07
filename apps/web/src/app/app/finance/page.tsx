@@ -23,6 +23,7 @@ type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED"
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
 type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
   postedNetBeforeSalary?:string;postedSalaryExpense?:string;postedExpenseIncludingSalary?:string;
+  postedExpenseBeforeSettlement?:string;receivedInternalSettlement?:string;
   pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];
   clientAdSpend?:{posted:string;pending:string;count:number};recurringIncome?:RecurringIncome};
 type FinancePolicy={category:string;active:boolean};
@@ -307,7 +308,7 @@ export default function FinancePage(){
         method:settlementMethod,note:settlementNote.trim(),idempotencyKey:settlementKey
       }});
       setSettlementAmount("");setSettlementNote("");setSettlementKey(crypto.randomUUID());
-      setSuccess("Settlement recorded for both founders. Income, expenses, balances and assets remain unchanged.");
+      setSuccess("Settlement recorded for both founders. Recipient personal expenses and net updated; agency totals and assets unchanged.");
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}
     finally{setBusy(false);}
@@ -446,7 +447,9 @@ export default function FinancePage(){
       ] as const).map(([label,value])=><Card key={label}>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
         <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(value)}</p>
-        <p className="mt-2 text-xs text-slate-500">{label==="Net posted"?"Income − agency expenses − posted client Meta Ads − salary funded":(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
+        <p className="mt-2 text-xs text-slate-500">{label==="Net posted"
+          ?(view==="mine"&&isFounder?"Income − adjusted personal expenses − client Meta Ads − salary funded":"Income − agency expenses − posted client Meta Ads − salary funded")
+          :label==="Posted expenses"&&view==="mine"&&isFounder?"After incoming internal settlements":(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
       </Card>)}
       <Card>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Client Meta Ads spend</p>
@@ -454,10 +457,17 @@ export default function FinancePage(){
         <p className="mt-2 text-xs text-slate-500">Posted · Pending: {money(totals.clientAdSpend?.pending??"0.0000")}</p>
       </Card>
     </div>
+    {isFounder&&view==="mine"&&Number(totals.receivedInternalSettlement??"0")!==0&&
+      <p className="text-sm text-slate-400" role="status">
+        Personal expense adjustment: original posted expenses {money(totals.postedExpenseBeforeSettlement??"0")}
+        {" − received Internal Settlements "+money(totals.receivedInternalSettlement??"0")+" = "}
+        {money(totals.postedExpense)} adjusted posted expenses. Personal Net Posted reflects the same credit.
+        Sender totals, actual transactions, agency totals and assets are unaffected.
+      </p>}
     <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
       <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
-        <h2>Posted agency income and expenses</h2>
-        <p>Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income.</p>
+        <h2>{view==="mine"?"Personal posted income and adjusted expenses":"Posted agency income and expenses"}</h2>
+        <p>{view==="mine"?"Incoming internal settlement credits reduce only the recipient’s displayed personal expenses; agency ledger and salaries remain unchanged.":"Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income."}</p>
        </div><Scale size={20} aria-hidden="true"/></header>
       <div className="aw-v5-finance-compare">
        {([["Income",totals.postedIncome,postedIncomeValue],
@@ -471,7 +481,7 @@ export default function FinancePage(){
           </div>
          </div>)}
       </div>
-      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included in posted totals.</p>
+      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Personal settlement credits are only adjustments to the recipient’s display, not actual agency expense reversals.</p>
     </section>
     {isFounder&&<section id="finance-salary" className="rounded-xl border border-white/10 p-5 space-y-3" aria-label="Separate founder salary funding expenses">
       <div className="flex flex-wrap justify-between gap-2"><div><h2 className="font-semibold text-lg">Founder-funded salary expenses</h2>
@@ -574,7 +584,7 @@ export default function FinancePage(){
     </div>
     {isFounder&&canCreate&&canReadOwn&&view==="mine"&&
       <section id="finance-internal-settlement" aria-label="Record internal settlement">
-       <Card title="Internal Settlement" description="Record a settlement from your founder profile to another founder. It appears as Outgoing in your personal entries and Incoming in theirs. It never affects company assets, net, income, expenses or charts.">
+       <Card title="Internal Settlement" description="Record a settlement from your founder profile to another founder. Your personal figures remain unchanged; the recipient’s personal Posted Expenses decrease and Net Posted increases. Agency finances and assets stay unchanged.">
         {settlementError&&<Notice kind="error">{settlementError}</Notice>}
         <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={e=>void recordSettlement(e)}>
          <FormField id="settlement-recipient" label="Receiving founder">
@@ -604,7 +614,7 @@ export default function FinancePage(){
           </FormField>
          </div>
          <p className="sm:col-span-2 text-sm text-slate-500">
-          Informational record only. DigiMarket does not transfer money or change any financial calculation. Each founder sees their own direction in My Entries.
+          Informational record only; DigiMarket does not transfer money. The recipient receives a personal expense credit, but actual expenses, founder balances and agency figures remain unchanged.
          </p>
          <div className="sm:col-span-2">
           <button className="btn-primary" type="submit" disabled={busy||!settlementPeer||!settlementAmount||!settlementPeers.length}>
@@ -670,7 +680,7 @@ export default function FinancePage(){
     </Card>
     <div id="finance-register" className="aw-v5-finance-anchor"/>
     <Card title={view==="all"?"Agency financial register":"My financial register"}
-      description={view==="mine"?"Financial entries and informational internal settlements. Settlements do not affect net, company assets, expenses or income. Latest 200 shown; CSV up to 5,000.":"Saved agency financial records. Internal settlements are private to the two founders and excluded from agency totals."}>
+      description={view==="mine"?"Financial entries and internal settlements. Incoming settlement credits reduce only the recipient’s personal expense statistics and increase personal Net Posted. Agency accounts remain unchanged. Latest 200 shown; CSV up to 5,000.":"Saved agency financial records. Internal settlements are private to the two founders and excluded from agency totals."}>
       <div className="aw-v5-register-filters" aria-label="Financial register filters">
        <label className="aw-v5-register-search"><Search size={16} aria-hidden="true"/>
         <span className="sr-only">Search loaded financial entries</span>
@@ -721,7 +731,7 @@ export default function FinancePage(){
             <td className="py-3 pr-4"><div className="min-w-40 max-w-80 whitespace-pre-wrap break-words text-sm" title={row.description??undefined}>{row.description?.trim()||"—"}</div></td>
             <td className={row.sourceType==="SETTLEMENT"?"aw-finance-amount text-slate-300":"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>
               {row.sourceType==="SETTLEMENT"?(row.settlementDirection==="OUTGOING"?"−":"+"):""}{money(row.amount)}
-              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">Not included in totals</small>}
+              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">{row.settlementDirection==="INCOMING"?"Reduces recipient personal expenses":"Sender totals unchanged"}</small>}
             </td>
             <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
             <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
