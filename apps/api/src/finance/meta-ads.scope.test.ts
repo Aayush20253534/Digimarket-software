@@ -122,6 +122,35 @@ describe("Meta Ads register scopes", () => {
     });
   });
 
+  it("applies incoming settlement credit only to recipient personal stats, never agency accounting", async()=>{
+    const {service,groupTransactions,salaryFundingAggregate,settlementAggregate}=fixture();
+    groupTransactions.mockImplementation(async ({where}:{where:{clientId:unknown}})=>
+      where.clientId===null?[
+        {kind:"INCOME",status:"POSTED",_sum:{amount:new Prisma.Decimal("5000.0000")},_count:{_all:1}},
+        {kind:"EXPENSE",status:"POSTED",_sum:{amount:new Prisma.Decimal("3500.0000")},_count:{_all:1}}
+      ]:[]);
+    salaryFundingAggregate.mockResolvedValue({_sum:{amount:new Prisma.Decimal("700.0000")}});
+    settlementAggregate.mockResolvedValue({_sum:{amount:new Prisma.Decimal("1200.5000")}});
+    const personal=await service.totals(actor,"mine");
+    expect(personal.receivedInternalSettlement).toBe("1200.5000");
+    expect(personal.postedExpenseBeforeSettlement).toBe("3500.0000");
+    expect(personal.postedExpense).toBe("2299.5000");
+    expect(personal.postedExpenseIncludingSalary).toBe("2999.5000");
+    expect(personal.postedIncome).toBe("5000.0000");
+    expect(personal.postedNetBeforeSalary).toBe("2700.5000");
+    expect(personal.postedNet).toBe("2000.5000");
+    expect(settlementAggregate.mock.calls[0][0].where).toEqual({
+      organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null
+    });
+    const allActor={...actor,permissions:new Set(["finance.entry.read.own","finance.read.all"])};
+    const agency=await service.totals(allActor,"all");
+    expect(agency.postedExpense).toBe("3500.0000");
+    expect(agency.postedExpenseBeforeSettlement).toBe("3500.0000");
+    expect(agency.receivedInternalSettlement).toBe("0.0000");
+    expect(agency.postedNet).toBe("1500.0000");
+    expect(settlementAggregate).toHaveBeenCalledTimes(1);
+  });
+
   it("allows a negative net if posted client ad spend exceeds posted income", async () => {
     const { service, groupTransactions } = fixture();
     groupTransactions.mockImplementation(async ({ where }: { where: { clientId: unknown } }) =>
