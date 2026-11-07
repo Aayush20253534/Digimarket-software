@@ -565,7 +565,7 @@ export class FinanceService {
 
   async totals(actor:Principal,view:View){
     const clientAdWhere=await this.metaAdsWhere(actor,view,"client_ads");
-    const [grouped,clientGroups,salaryExpense]=await Promise.all([
+    const [grouped,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
       this.db.financialTransaction.groupBy({
         by:["kind","status"],where:this.scope(actor,view),
         _sum:{amount:true},_count:{_all:true},
@@ -580,6 +580,13 @@ export class FinanceService {
         where:{payment:{organizationId:actor.organizationId,status:"PAID"},
          account:{organizationId:actor.organizationId,founderUserId:actor.userId}},_sum:{amount:true}
       }),
+      // Settlement credits are personal display-only offsets, not real
+      // FinancialTransaction income or agency expense reversals.
+      view==="mine"&&isFounder(actor)
+        ?this.db.internalSettlement.aggregate({
+          where:{organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null},
+          _sum:{amount:true}
+        }):Promise.resolve(null),
     ]);
     const entries=grouped.map(g=>({kind:g.kind,status:g.status,
       amount:(g._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:g._count._all}));
@@ -598,10 +605,18 @@ export class FinanceService {
     // founder accounts funded it. "Mine" charges the funding founder, not
     // the person recording the payment or receiving their salary.
     const postedSalaryExpense=salaryExpense._sum.amount??new Prisma.Decimal(0);
-    const beforeSalary=income.minus(expense).minus(postedClientAds);
-    return {currency:"INR",postedIncome:income.toFixed(4),postedExpense:expense.toFixed(4),
+    const receivedSettlementCredit=receivedSettlements?._sum.amount??new Prisma.Decimal(0);
+    // Recipient: subtract active incoming settlement amounts ONLY from their
+    // displayed My Entries expense totals. Sender: no adjustment. Agency:
+    // no adjustment. Leave underlying transactions and salary funding intact.
+    const personalExpense=expense.minus(receivedSettlementCredit);
+    const beforeSalary=income.minus(personalExpense).minus(postedClientAds);
+    return {currency:"INR",postedIncome:income.toFixed(4),
+      postedExpense:personalExpense.toFixed(4),
+      postedExpenseBeforeSettlement:expense.toFixed(4),
+      receivedInternalSettlement:receivedSettlementCredit.toFixed(4),
       postedSalaryExpense:postedSalaryExpense.toFixed(4),
-      postedExpenseIncludingSalary:expense.plus(postedSalaryExpense).toFixed(4),
+      postedExpenseIncludingSalary:personalExpense.plus(postedSalaryExpense).toFixed(4),
       postedNetBeforeSalary:beforeSalary.toFixed(4),
       postedNet:beforeSalary.minus(postedSalaryExpense).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
