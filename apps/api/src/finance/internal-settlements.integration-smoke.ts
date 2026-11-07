@@ -73,7 +73,21 @@ try{
  assert.equal(await db.financialTransaction.count({where:{organizationId:organization.id}}),transactions);
  assert.deepEqual(await finance.totals(a,"all"),beforeAll);
  assert.deepEqual(await finance.totals(a,"mine"),beforeA);
- assert.deepEqual(await finance.totals(b,"mine"),beforeB);
+ const recipientTotals=await finance.totals(b,"mine");
+ assert.equal(recipientTotals.receivedInternalSettlement,"2000.0000");
+ assert.equal(recipientTotals.postedExpenseBeforeSettlement,beforeB.postedExpense);
+ assert.equal(recipientTotals.postedExpense,
+  (Number(beforeB.postedExpense)-2000).toFixed(4));
+ assert.equal(recipientTotals.postedExpenseIncludingSalary,
+  (Number(beforeB.postedExpenseIncludingSalary)-2000).toFixed(4));
+ assert.equal(recipientTotals.postedNet,
+  (Number(beforeB.postedNet)+2000).toFixed(4));
+ assert.equal(recipientTotals.postedNetBeforeSalary,
+  (Number(beforeB.postedNetBeforeSalary)+2000).toFixed(4));
+ assert.equal(recipientTotals.postedIncome,beforeB.postedIncome);
+ assert.equal(recipientTotals.pendingExpense,beforeB.pendingExpense);
+ assert.equal(recipientTotals.pendingIncome,beforeB.pendingIncome);
+ assert.deepEqual(recipientTotals.groups,beforeB.groups);
  const afterBalance=await founderLedgerBalances(db,organization.id,[a.userId,b.userId]);
  for(const id of [a.userId,b.userId]){
   assert.equal(afterBalance.get(id)?.remaining.toFixed(4),beforeBalance.get(id)?.remaining.toFixed(4));
@@ -110,8 +124,10 @@ try{
  assert.equal((await finance.entries(a,"mine")).find(x=>x.sourceType==="SETTLEMENT")?.status,"CANCELLED");
  assert.equal((await finance.entries(b,"mine")).find(x=>x.sourceType==="SETTLEMENT")?.status,"CANCELLED");
  assert.deepEqual(await finance.totals(a,"all"),beforeAll);
+ assert.deepEqual(await finance.totals(a,"mine"),beforeA);
+ assert.deepEqual(await finance.totals(b,"mine"),beforeB);
  assert.equal(await db.financialTransaction.count({where:{organizationId:organization.id}}),transactions);
  assert.equal(await db.auditLog.count({where:{organizationId:organization.id,
   entityType:"InternalSettlement",entityId:saved.id}}),2);
- console.info("Internal Settlement PASS: opposite founder entries, privacy, non-accounting, idempotency, CSV and void.");
+ console.info("Internal Settlement PASS: recipient-only expense credit, sender/agency unchanged, rollback on void, privacy and CSV.");
 }finally{await db.$disconnect();}
