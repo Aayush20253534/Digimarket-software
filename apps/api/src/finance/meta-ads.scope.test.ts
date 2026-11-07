@@ -30,6 +30,7 @@ function fixture() {
   const salaryPaymentAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const db = {
     financialCategory: { findMany: findCategories },
+    client:{findMany:vi.fn().mockResolvedValue([])},
     financialTransaction: { findMany: findTransactions, groupBy: groupTransactions },
     salaryFundingAllocation:{aggregate:salaryFundingAggregate,findMany:salaryFundingFindMany},
     salaryPayment:{aggregate:salaryPaymentAggregate},
