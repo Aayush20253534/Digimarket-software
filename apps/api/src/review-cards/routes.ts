@@ -189,6 +189,15 @@ export function registerReviewCardRoutes(app:Express,auth:AuthService){
   if(result.count!==1)throw notFound();
   res.json({data:await db.reviewCard.findUniqueOrThrow({where:{id}})});
  });
+ app.delete(base+"/:id",authenticated,async(req,res)=>{
+  const p=actor(res);check(p,"clients.edit");
+  const id=validate(idSchema,req.params.id);
+  // Tenant-scoped atomic deletion; ON DELETE CASCADE removes review-card events.
+  // The client, its other CRM records and external Google reviews remain intact.
+  const result=await db.reviewCard.deleteMany({where:{id,organizationId:p.organizationId}});
+  if(result.count!==1)throw notFound();
+  res.status(204).end();
+ });
 
  // Public endpoints never return internal client IDs or tenant IDs.
  app.use(base+"/public",publicLimiter);

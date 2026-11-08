@@ -1,6 +1,6 @@
 "use client";
-import {useCallback,useEffect,useMemo,useState} from "react";
-import {Check,Copy,ExternalLink,Plus,QrCode,RefreshCw,Printer,Save,ShieldCheck} from "lucide-react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
+import {Check,Copy,ExternalLink,Plus,QrCode,RefreshCw,Printer,Save,ShieldCheck,Trash2} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {PageHeader,Spinner} from "@/components/ui";
 
@@ -28,6 +28,8 @@ export default function AiReviewCards(){
  const [form,setForm]=useState<Form>(empty);
  const [printId,setPrintId]=useState<string|null>(null);
  const [copied,setCopied]=useState("");
+ const [deleteTarget,setDeleteTarget]=useState<Card|null>(null);
+ const deleteDialogRef=useRef<HTMLDialogElement>(null);
  const load=useCallback(async()=>{
   if(!permitted)return;
   setLoading(true);
@@ -52,6 +54,12 @@ export default function AiReviewCards(){
   window.addEventListener("afterprint",done);
   return()=>window.removeEventListener("afterprint",done);
  },[]);
+ useEffect(()=>{
+  const dialog=deleteDialogRef.current;
+  if(!dialog)return;
+  if(deleteTarget&&!dialog.open)dialog.showModal();
+  else if(!deleteTarget&&dialog.open)dialog.close();
+ },[deleteTarget]);
  const editing=useMemo(()=>cards.find(c=>c.id===editId),[cards,editId]);
  function selectCard(card:Card){
   setEditId(card.id);
@@ -80,13 +88,32 @@ export default function AiReviewCards(){
    await load();
   }catch(e){setError(errorText(e));}finally{setBusy(false);}
  }
+ function askDelete(card:Card){
+  if(!canEdit||busy)return;
+  setError("");setNotice("");setDeleteTarget(card);
+ }
+ async function deleteCard(){
+  const target=deleteTarget;
+  if(!canEdit||busy||!target)return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   await request<void>("/review-cards/"+target.id,{method:"DELETE"});
+   setCards(list=>list.filter(card=>card.id!==target.id));
+   if(editId===target.id){setEditId(null);setForm(empty);}
+   setDeleteTarget(null);
+   setNotice("Review card for "+target.businessName+" permanently deleted.");
+  }catch(e){
+   setDeleteTarget(null);
+   setError("Unable to delete review card for "+target.businessName+": "+errorText(e));
+  }finally{setBusy(false);}
+ }
  const origin=typeof window==="undefined"?"":window.location.origin;
  if(!session)return <Spinner label="Checking access…"/>;
  if(!permitted)return <div role="alert">Clients read permission is required to manage review cards.</div>;
  return <main className="aw-review-admin space-y-5 p-4 md:p-6">
   <PageHeader eyebrow="REPUTATION MANAGEMENT" title="AI Review Cards"
    description="Scan the QR to open Google reviews directly. An optional AI draft preview is available separately."/>
-  <style>{`@media print {
+  <style>{` .aw-review-admin dialog::backdrop{background:rgba(0,0,0,.78)} @media print {
    body * {visibility:hidden!important}
    .aw-review-admin .review-print-card,.aw-review-admin .review-print-card *{visibility:visible!important}
    .aw-review-admin .review-print-card{position:fixed!important;left:0!important;top:0!important;width:100%!important;
@@ -169,10 +196,28 @@ export default function AiReviewCards(){
       <a className="aw-client-btn" href={link+"?draft=1"} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/>AI draft preview</a>
       <a className="aw-client-btn" href={qr(link,1200)} target="_blank" rel="noopener noreferrer"><QrCode size={15}/>QR PNG</a>
       <button className="aw-client-btn" onClick={()=>{setPrintId(card.id);setTimeout(()=>window.print(),150)}}><Printer size={15}/>Print / PDF</button>
+      <button type="button" className="aw-client-btn" style={{color:"#fca5a5",borderColor:"rgba(248,113,113,.45)"}} disabled={!canEdit||busy} onClick={()=>askDelete(card)} aria-label={"Delete review card for "+card.businessName}><Trash2 size={15}/>Delete</button>
      </div>
     </article>
    })}</div>
   </section>
+  <dialog ref={deleteDialogRef} aria-labelledby="review-delete-title" aria-describedby="review-delete-description"
+   onCancel={e=>{if(busy)e.preventDefault();else setDeleteTarget(null)}}
+   className="w-[min(92vw,28rem)] max-w-md rounded-2xl border border-red-500/30 bg-[#18181d] p-6 text-white shadow-2xl">
+   <div className="flex items-center gap-3 text-red-300"><Trash2 size={22}/><h2 id="review-delete-title" className="text-lg font-bold">Delete review card?</h2></div>
+   <p id="review-delete-description" className="mt-4 text-sm leading-relaxed text-neutral-200">
+    Permanently delete the review card for <strong>{deleteTarget?.businessName}</strong>? Its QR link will stop working,
+    and scan, draft and click statistics for this card will be removed. This cannot be undone.
+   </p>
+   <p className="mt-3 text-xs text-neutral-400">The CRM client and any Google reviews will not be deleted.</p>
+   <div className="mt-6 flex flex-wrap justify-end gap-3">
+    <button type="button" className="aw-client-btn" disabled={busy} onClick={()=>setDeleteTarget(null)}>Cancel</button>
+    <button type="button" disabled={!deleteTarget||busy||!canEdit} onClick={()=>void deleteCard()}
+     className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/60 bg-red-600 px-4 py-2 font-semibold text-white disabled:opacity-50">
+     <Trash2 size={16}/>{busy?"Deleting…":"Permanently delete"}
+    </button>
+   </div>
+  </dialog>
   <p className="flex gap-2 text-sm opacity-70"><ShieldCheck size={18}/>All generated text is editable. Customers verify their experience and submit reviews directly on Google. No fabricated reviews, incentives or automatic submission.</p>
  </main>;
 }

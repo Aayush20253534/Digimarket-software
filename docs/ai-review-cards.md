@@ -1,7 +1,8 @@
 # DigiMarket AI Review Cards
 
 ## Customer flow
-- Founders/staff with `clients.read` can inspect cards; `clients.edit` can create/edit/pause them.
+- Founders/staff with `clients.read` can inspect cards; `clients.edit` can create, edit, pause, and permanently delete them.
+- Each card has a Delete action with a confirmation dialog. Deletion removes the card and its SCAN/GENERATED/CLICK events (via database cascade), invalidates printed QR links, and does **not** delete the CRM client or Google reviews.
 - Create one card for an existing CRM client, entering the exact Google Business Profile “Ask for reviews” link.
 - A unique opaque slug and QR code point to `/review/<slug>`. Print the card from the dashboard.
 - On scanning, the public page automatically navigates to the stored official Google write-review URL; no draft is generated.
@@ -22,6 +23,6 @@
 - `ReviewCardEvent` stores only `SCAN`, `GENERATED` and `CLICK` events with timestamps, no customer identity, clipboard content, or review contents.
 - Direct QR scans record `SCAN` and `CLICK` redirect-attempt events when telemetry is available, **not** verified published reviews or guaranteed local SEO gains.
 - AI draft generation is opt-in and records `SCAN` and `GENERATED`. Scan tracking is best-effort and must not delay Google navigation for more than 900 ms.
-- Public endpoints are rate-limited. Cards can be paused from the dashboard. QR links do not change after editing.
+- Public endpoints are rate-limited. Cards can be paused or permanently deleted from the dashboard. QR links do not change after editing; deleted QR links become invalid. The DELETE endpoint requires `clients.edit` and filters by organization.
 - QR artwork currently uses the public `api.qrserver.com` image endpoint and therefore depends on that provider for rendering. A local QR renderer would require adding and locking a dependency.
 - The default AI prompt disallows invented customer experiences, fake praise, star ratings, incentives, and posting automation.
