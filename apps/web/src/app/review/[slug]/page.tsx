@@ -14,15 +14,29 @@ export default function PublicReviewPage(){
  const [busy,setBusy]=useState(true);
  const [error,setError]=useState("");
  const [copied,setCopied]=useState(false);
+ const [redirecting,setRedirecting]=useState(true);
  useEffect(()=>{
   if(!slug)return;
   let mounted=true;
+  const draftRequested=new URLSearchParams(window.location.search).get("draft")==="1";
+  setRedirecting(!draftRequested);
   (async()=>{
    try{
     const card=await apiRequest<Business>("/review-cards/public/"+encodeURIComponent(slug));
     if(!mounted)return;
     setBusiness(card);
-    // Automatic generation on scan. No generate or write-your-own option.
+    if(!draftRequested){
+     // Legacy printed QR codes now open Google automatically, without an AI draft screen.
+     // Tracking is best-effort; it must not block the review link.
+     try{
+      await Promise.race([
+       apiRequest("/review-cards/public/"+encodeURIComponent(slug)+"/scan",{method:"POST",body:{}}),
+       new Promise<void>(resolve=>setTimeout(resolve,900))
+      ]);
+     }catch{/* Older backend deployments may not yet support scan tracking. */}
+     if(mounted)window.location.replace(card.googleReviewUrl);
+     return;
+    }
     const generated=await apiRequest<Draft>("/review-cards/public/"+encodeURIComponent(slug)+"/draft",{method:"POST",body:{}});
     if(mounted){setDraft(generated.text);setSource(generated.source);}
    }catch(e){if(mounted)setError(readable(e));}
@@ -46,6 +60,14 @@ export default function PublicReviewPage(){
   try{await apiRequest("/review-cards/public/"+business.slug+"/click",{method:"POST",body:{}});}catch{/* The Google link must remain usable even if analytics fail. */}
   window.location.assign(business.googleReviewUrl);
  }
+ if(redirecting)return <main className="min-h-screen bg-[#0d0d10] text-white flex justify-center items-center p-5">
+  <section className="max-w-md w-full rounded-2xl border border-white/10 bg-[#18181d] p-7 space-y-4 text-center">
+   {business?.logoUrl&&<img src={business.logoUrl} alt="" className="mx-auto h-20 max-w-48 object-contain"/>}
+   <h1 className="text-xl font-semibold">{error?"Unable to open Google reviews":"Opening Google reviews…"}</h1>
+   <p className="text-white/65 text-sm">{error||"Redirecting to this business\u0027s official Google review page."}</p>
+   {business&&<a href={business.googleReviewUrl} className="inline-flex justify-center rounded-xl bg-white px-5 py-3 font-semibold text-black">Open Google review page <ArrowUpRight size={18} className="ml-2"/></a>}
+  </section>
+ </main>;
  return <main className="min-h-screen bg-[#0d0d10] text-white flex justify-center items-center p-4 py-12">
   <section className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#18181d] shadow-2xl">
    <header className="p-7 text-center space-y-3" style={{borderTop:"5px solid "+(business?.accentColor||"#A855F7")}}>

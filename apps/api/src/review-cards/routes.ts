@@ -138,8 +138,10 @@ async function aiDraft(card:CardInfo):Promise<{text:string;source:"ai"|"template
   return {text:fallback,source:"template"};
  }
 }
-const publicLimiter=rateLimit({windowMs:60*60*1000,limit:45,standardHeaders:"draft-8",legacyHeaders:false,
+const publicLimiter=rateLimit({windowMs:60*60*1000,limit:600,standardHeaders:"draft-8",legacyHeaders:false,
  message:{error:{code:"RATE_LIMITED",message:"Too many requests. Try again later."}}});
+const draftLimiter=rateLimit({windowMs:60*60*1000,limit:45,standardHeaders:"draft-8",legacyHeaders:false,
+ message:{error:{code:"RATE_LIMITED",message:"Too many draft requests. Try again later."}}});
 
 export function registerReviewCardRoutes(app:Express,auth:AuthService){
  const db=auth.database;
@@ -197,7 +199,14 @@ export function registerReviewCardRoutes(app:Express,auth:AuthService){
   res.json({data:{slug:card.slug,businessName:card.businessName,businessDetails:card.businessDetails,
    logoUrl:card.logoUrl,accentColor:card.accentColor,language:card.language,googleReviewUrl:card.googleReviewUrl}});
  });
- app.post(base+"/public/:slug/draft",async(req,res)=>{
+ app.post(base+"/public/:slug/scan",async(req,res)=>{
+  const card=await db.reviewCard.findUnique({where:{slug:String(req.params.slug||"")}});
+  if(!card||!card.enabled)throw notFound();
+  await db.reviewCardEvent.createMany({data:[{cardId:card.id,kind:"SCAN"},{cardId:card.id,kind:"CLICK"}]});
+  res.set("Cache-Control","no-store");
+  res.json({data:{ok:true}});
+ });
+ app.post(base+"/public/:slug/draft",draftLimiter,async(req,res)=>{
   const card=await db.reviewCard.findUnique({where:{slug:String(req.params.slug||"")}});
   if(!card||!card.enabled)throw notFound();
   const updated=await db.reviewCard.update({where:{id:card.id},data:{generationCount:{increment:1}},

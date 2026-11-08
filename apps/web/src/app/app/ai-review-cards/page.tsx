@@ -85,7 +85,7 @@ export default function AiReviewCards(){
  if(!permitted)return <div role="alert">Clients read permission is required to manage review cards.</div>;
  return <main className="aw-review-admin space-y-5 p-4 md:p-6">
   <PageHeader eyebrow="REPUTATION MANAGEMENT" title="AI Review Cards"
-   description="Create a branded QR card per client. Customers receive a fresh review draft automatically and choose what to post."/>
+   description="Scan the QR to open Google reviews directly. An optional AI draft preview is available separately."/>
   <style>{`@media print {
    body * {visibility:hidden!important}
    .aw-review-admin .review-print-card,.aw-review-admin .review-print-card *{visibility:visible!important}
@@ -138,7 +138,7 @@ export default function AiReviewCards(){
      ["Google clicks",cards.reduce((n,c)=>n+c.metrics.clicks,0)]
     ].map(([label,value])=><div key={label} className="rounded-lg border border-neutral-700/60 p-3 text-center">
      <strong className="block text-xl">{value}</strong><span className="text-xs opacity-70">{label}</span></div>)}</div>
-    <p className="text-sm opacity-75">Scans, generated drafts and outbound clicks are recorded. Published Google reviews cannot be confirmed from a click.</p>
+    <p className="text-sm opacity-75">QR visits and Google redirect attempts are recorded. AI drafts count only when explicitly opened. Published reviews cannot be confirmed.</p>
     <p className="text-sm">Cards: <strong>{cards.length}</strong> | Enabled: <strong>{cards.filter(c=>c.enabled).length}</strong></p>
     <button className="aw-client-btn" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh analytics</button>
     <p className="text-xs opacity-70">AI integration uses backend GROQ_API_KEY (preferred) or OPENAI_API_KEY. If it is not configured or the provider is unavailable, the page displays a clearly labeled editable starter draft.</p>
@@ -165,7 +165,8 @@ export default function AiReviewCards(){
       <button className="aw-client-btn" onClick={()=>selectCard(card)}>Edit</button>
       <button className="aw-client-btn" disabled={!canEdit||busy} onClick={()=>void toggle(card)}>{card.enabled?"Pause":"Enable"}</button>
       <button className="aw-client-btn" onClick={async()=>{await navigator.clipboard.writeText(link);setCopied(card.id);}}>{copied===card.id?<Check size={15}/>:<Copy size={15}/>}Copy</button>
-      <a className="aw-client-btn" href={link} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/>Preview</a>
+      <a className="aw-client-btn" href={link} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/>Test QR → Google</a>
+      <a className="aw-client-btn" href={link+"?draft=1"} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/>AI draft preview</a>
       <a className="aw-client-btn" href={qr(link,1200)} target="_blank" rel="noopener noreferrer"><QrCode size={15}/>QR PNG</a>
       <button className="aw-client-btn" onClick={()=>{setPrintId(card.id);setTimeout(()=>window.print(),150)}}><Printer size={15}/>Print / PDF</button>
      </div>
