@@ -127,6 +127,46 @@ try{
  assert.ok((await db.auditLog.count({where:{organizationId:org.id,
   action:"clients.post_readiness_saved",entityId:client.id}}))>=4);
 
+ // Festival posts are counted separately and must never consume regular stock.
+ const festivalWeek=await posts.saveWeek(manager,client.id,"2026-11",3,{
+  readyAdded:0,delivered:0,festivalReadyAdded:3,festivalDelivered:1,
+  festivalNote:"Chhath creative",version:0
+ });
+ assert.equal(festivalWeek.festivalReadyAdded,3);
+ await posts.saveWeek(team,client.id,"2026-11",4,{
+  readyAdded:0,delivered:0,festivalReadyAdded:0,festivalDelivered:1,
+  festivalNote:"Festival post published",version:0
+ });
+ let festivalMonth=await posts.monthly(manager,client.id,"2026-11");
+ assert.equal(festivalMonth.festivalReadyThisMonth,3);
+ assert.equal(festivalMonth.festivalDeliveredThisMonth,2);
+ assert.equal(festivalMonth.festivalRemainingStock,1);
+ assert.equal(festivalMonth.remainingStock,7);
+ assert.equal(festivalMonth.weeks[2].festivalAvailableBefore,0);
+ assert.equal(festivalMonth.weeks[2].festivalRemainingStock,2);
+ assert.equal((await posts.monthly(manager,client.id,"2026-12")).festivalOpeningStock,1);
+ // December already has a regular post movement at version 1.
+ await posts.saveWeek(manager,client.id,"2026-12",1,{
+  readyAdded:1,delivered:4,festivalReadyAdded:0,festivalDelivered:1,version:1
+ });
+ const decemberPosts=await posts.monthly(manager,client.id,"2026-12");
+ assert.equal(decemberPosts.festivalRemainingStock,0);
+ assert.equal(decemberPosts.remainingStock,4);
+ await assert.rejects(()=>posts.saveWeek(manager,client.id,"2026-11",3,{
+  readyAdded:0,delivered:0,festivalReadyAdded:1,festivalDelivered:1,version:1
+ }),fail(422));
+ await assert.rejects(()=>posts.saveWeek(manager,client.id,"2026-11",4,{
+  readyAdded:0,delivered:0,festivalReadyAdded:0,festivalDelivered:10,version:1
+ }),fail(422));
+ // Older apps that omit festival fields must preserve the existing inventory.
+ await posts.saveWeek(manager,client.id,"2026-11",3,{
+  readyAdded:0,delivered:0,note:"Legacy regular post update",version:1
+ });
+ festivalMonth=await posts.monthly(manager,client.id,"2026-11");
+ assert.equal(festivalMonth.festivalRemainingStock,1);
+ assert.equal(festivalMonth.weeks[2].festivalNote,"Chhath creative");
+ assert.equal((await posts.monthly(manager,client.id,"2026-12")).festivalRemainingStock,0);
+
 
  const updated=await clients.update(team,client.id,{version:1,businessName:"Agency Cafe Updated",businessType:"Hospitality"});
  assert.equal(updated.version,2);

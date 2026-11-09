@@ -1580,6 +1580,10 @@ model ClientPostWeek {
   readyAdded Int @default(0)
   delivered Int @default(0)
   note String? @db.VarChar(500)
+  // Independent festival-post movements. Never part of regular-post stock.
+  festivalReadyAdded Int @default(0)
+  festivalDelivered Int @default(0)
+  festivalNote String? @db.VarChar(500)
   version Int @default(1)
   updatedById String @db.Uuid
   createdAt DateTime @default(now()) @db.Timestamptz(6)
