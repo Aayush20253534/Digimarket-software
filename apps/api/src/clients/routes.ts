@@ -48,6 +48,11 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  const videoWeekInput=z.strictObject({month,readyAdded:z.number().int().min(0).max(10000),
   delivered:z.number().int().min(0).max(10000),
   note:z.string().trim().max(500).optional(),version:z.number().int().min(0)});
+ const postWeekInput=videoWeekInput.safeExtend({
+  festivalReadyAdded:z.number().int().min(0).max(10000).optional(),
+  festivalDelivered:z.number().int().min(0).max(10000).optional(),
+  festivalNote:z.string().trim().max(500).nullable().optional()
+ });
  app.get(root+"/:id/video-readiness",authenticated,async(req,res)=>{
   res.set("Cache-Control","no-store");
   res.json({data:await videos.monthly(actor(res),parse(id,req.params.id),parse(month,req.query.month))});
@@ -63,7 +68,7 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
   res.json({data:await posts.monthly(actor(res),parse(id,req.params.id),parse(month,req.query.month))});
  });
  app.put(root+"/:id/post-readiness/:week",authenticated,async(req,res)=>{
-  const body=parse(videoWeekInput,req.body);
+  const body=parse(postWeekInput,req.body);
   res.json({data:await posts.saveWeek(actor(res),parse(id,req.params.id),body.month,
    parse(weekNumber,req.params.week),body)});
  });
