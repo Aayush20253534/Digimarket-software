@@ -11,8 +11,12 @@ export const monthWeeks=(month:string)=>{
   week:i+1,from:i*7+1,to:Math.min((i+1)*7,days),
  }));
 };
-export type PostWeekInput={readyAdded:number;delivered:number;note?:string|null;version:number};
-type Movement={month:string;week:number;readyAdded:number;delivered:number};
+export type PostWeekInput={
+ readyAdded:number;delivered:number;note?:string|null;version:number;
+ festivalReadyAdded?:number;festivalDelivered?:number;festivalNote?:string|null;
+};
+type Movement={month:string;week:number;readyAdded:number;delivered:number;
+ festivalReadyAdded:number;festivalDelivered:number};
 const ordered=(a:Movement,b:Movement)=>a.month.localeCompare(b.month)||a.week-b.week;
 
 /**
@@ -38,21 +42,28 @@ export class ClientPostReadinessService{
    where:{organizationId:actor.organizationId,clientId,month:{lte:month}},
    orderBy:[{month:"asc"},{week:"asc"}],
    select:{id:true,month:true,week:true,readyAdded:true,delivered:true,note:true,
+    festivalReadyAdded:true,festivalDelivered:true,festivalNote:true,
     version:true,updatedAt:true,updatedBy:{select:{displayName:true}}}
   });
   const prior=entries.filter(row=>row.month<month);
   const openingStock=prior.reduce((total,row)=>total+row.readyAdded-row.delivered,0);
-  let remaining=openingStock;
+  const festivalOpeningStock=prior.reduce((total,row)=>total+row.festivalReadyAdded-row.festivalDelivered,0);
+  let remaining=openingStock,festivalRemaining=festivalOpeningStock;
   const current=entries.filter(row=>row.month===month);
   const byWeek=new Map(current.map(row=>[row.week,row]));
   const weeks=monthWeeks(month).map(range=>{
    const row=byWeek.get(range.week);
-   const availableBefore=remaining;
+   const availableBefore=remaining,festivalAvailableBefore=festivalRemaining;
    remaining+=row?.readyAdded??0;
    remaining-=row?.delivered??0;
+   festivalRemaining+=row?.festivalReadyAdded??0;
+   festivalRemaining-=row?.festivalDelivered??0;
    return {
     ...range,readyAdded:row?.readyAdded??0,delivered:row?.delivered??0,
     availableBefore,remainingStock:remaining,version:row?.version??0,
+    festivalReadyAdded:row?.festivalReadyAdded??0,festivalDelivered:row?.festivalDelivered??0,
+    festivalAvailableBefore,festivalRemainingStock:festivalRemaining,
+    festivalNote:row?.festivalNote??"",
     note:row?.note??"",updatedAt:row?.updatedAt?.toISOString()??null,
     updatedBy:row?.updatedBy.displayName??null
    };
@@ -60,7 +71,11 @@ export class ClientPostReadinessService{
   return {clientId,clientName:client.businessName,month,openingStock,
    readyThisMonth:current.reduce((n,row)=>n+row.readyAdded,0),
    deliveredThisMonth:current.reduce((n,row)=>n+row.delivered,0),
-   remainingStock:remaining,weeks};
+   remainingStock:remaining,
+   festivalOpeningStock,
+   festivalReadyThisMonth:current.reduce((n,row)=>n+row.festivalReadyAdded,0),
+   festivalDeliveredThisMonth:current.reduce((n,row)=>n+row.festivalDelivered,0),
+   festivalRemainingStock:festivalRemaining,weeks};
  }
  async saveWeek(actor:Principal,clientId:string,month:string,week:number,input:PostWeekInput){
   await this.allowed(actor,clientId,true);
@@ -71,19 +86,29 @@ export class ClientPostReadinessService{
     const rows=await tx.clientPostWeek.findMany({
      where:{organizationId:actor.organizationId,clientId},
      orderBy:[{month:"asc"},{week:"asc"}],
-     select:{id:true,month:true,week:true,readyAdded:true,delivered:true,version:true,note:true}
+     select:{id:true,month:true,week:true,readyAdded:true,delivered:true,version:true,note:true,
+      festivalReadyAdded:true,festivalDelivered:true,festivalNote:true}
     });
     const previous=rows.find(row=>row.month===month&&row.week===week);
     if((previous?.version??0)!==input.version)throw conflict();
+    // Missing festival fields are left unchanged for older app versions.
+    const festivalReadyAdded=input.festivalReadyAdded??previous?.festivalReadyAdded??0;
+    const festivalDelivered=input.festivalDelivered??previous?.festivalDelivered??0;
+    const festivalNote=input.festivalNote===undefined
+     ?previous?.festivalNote??null:input.festivalNote?.trim()||null;
     const movements=[
      ...rows.filter(row=>row.month!==month||row.week!==week),
-     {month,week,readyAdded:input.readyAdded,delivered:input.delivered}
+     {month,week,readyAdded:input.readyAdded,delivered:input.delivered,
+      festivalReadyAdded,festivalDelivered}
     ].sort(ordered);
-    let available=0;
+    let available=0,festivalAvailable=0;
     for(const row of movements){
      available+=row.readyAdded-row.delivered;
+     festivalAvailable+=row.festivalReadyAdded-row.festivalDelivered;
      if(available<0)throw new AuthError(422,"INSUFFICIENT_POST_STOCK",
       "Delivered posts exceed ready stock, including a later week. Add ready posts first or correct the delivered count.");
+     if(festivalAvailable<0)throw new AuthError(422,"INSUFFICIENT_FESTIVAL_POST_STOCK",
+      "Delivered festival posts exceed festival-ready stock, including a later week. Add ready festival posts first or correct the delivered count.");
     }
     const note=input.note?.trim()||null;
     const updated=previous
@@ -91,6 +116,7 @@ export class ClientPostReadinessService{
        const changed=await tx.clientPostWeek.updateMany({
         where:{id:previous.id,organizationId:actor.organizationId,version:input.version},
         data:{readyAdded:input.readyAdded,delivered:input.delivered,note,
+         festivalReadyAdded,festivalDelivered,festivalNote,
          updatedById:actor.userId,version:{increment:1}}
        });
        if(changed.count!==1)throw conflict();
@@ -99,17 +125,22 @@ export class ClientPostReadinessService{
      :await tx.clientPostWeek.create({data:{
        organizationId:actor.organizationId,clientId,month,week,
        readyAdded:input.readyAdded,delivered:input.delivered,note,
+       festivalReadyAdded,festivalDelivered,festivalNote,
        updatedById:actor.userId
       }});
     await tx.auditLog.create({data:{
      organizationId:actor.organizationId,actorId:actor.userId,
      action:"clients.post_readiness_saved",entityType:"Client",entityId:clientId,
      ...(previous?{beforeRedacted:{month,week,readyAdded:previous.readyAdded,
-      delivered:previous.delivered,version:previous.version}}:{}),
-     afterRedacted:{month,week,readyAdded:updated.readyAdded,delivered:updated.delivered,version:updated.version}
+      delivered:previous.delivered,festivalReadyAdded:previous.festivalReadyAdded,
+      festivalDelivered:previous.festivalDelivered,version:previous.version}}:{}),
+     afterRedacted:{month,week,readyAdded:updated.readyAdded,delivered:updated.delivered,
+      festivalReadyAdded:updated.festivalReadyAdded,festivalDelivered:updated.festivalDelivered,
+      version:updated.version}
     }});
     return {month,week,version:updated.version,readyAdded:updated.readyAdded,
-     delivered:updated.delivered};
+     delivered:updated.delivered,festivalReadyAdded:updated.festivalReadyAdded,
+     festivalDelivered:updated.festivalDelivered};
    },{isolationLevel:Prisma.TransactionIsolationLevel.Serializable});
   }catch(error){
    if(error instanceof AuthError)throw error;
