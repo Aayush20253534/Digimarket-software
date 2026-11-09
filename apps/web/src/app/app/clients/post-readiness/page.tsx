@@ -44,7 +44,7 @@ export default function PostReadinessPage(){
  return <div className="aw-client-workspace space-y-5" data-aw-module="clients-post-readiness">
   <SalesWorkspaceNav/>
   <PageHeader eyebrow="CLIENT CONTENT PIPELINE" title="Weekly post readiness"
-   description="Choose a client and month to track regular and festival post readiness in separate weekly inventories."
+   description="Choose a client and month, then switch between Regular posts and Festival posts to track ready stock, deliveries, and monthly carry-forward separately."
    actions={<div className="flex gap-2 flex-wrap">
     <Link className="aw-client-btn" href="/app/clients"><ArrowLeft size={16}/>Clients</Link>
     <button type="button" className="aw-client-btn" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh clients</button>
