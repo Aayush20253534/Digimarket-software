@@ -93,7 +93,7 @@ describe("Meta Ads distribution reconciliation",()=>{
     expect(result.daily.map(d=>d.date)).toEqual(["2026-11-03","2026-11-02","2026-11-01","2026-10-31"]);
     expect(result.monthly.map(d=>d.date)).toEqual(["2026-11","2026-10"]);
     for(const field of ["posted","pending","total"] as const){
-      const sum=(values:{[key:string]:unknown}[])=>values.reduce(
+      const sum=(values:Array<{posted:string;pending:string;total:string}>)=>values.reduce(
         (acc,row)=>acc.plus(String(row[field])),new Prisma.Decimal(0)).toFixed(4);
       expect(sum(result.daily)).toBe(result[field==="posted"?"totalPosted":field==="pending"?"totalPending":"total"]);
       expect(sum(result.monthly)).toBe(result[field==="posted"?"totalPosted":field==="pending"?"totalPending":"total"]);
