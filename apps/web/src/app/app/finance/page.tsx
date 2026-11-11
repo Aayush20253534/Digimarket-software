@@ -827,9 +827,9 @@ export default function FinancePage(){
        <span className="aw-v5-register-count">{filteredMetaAdEntries.length} of {metaAdEntries.length} loaded · {clientMetaAdCount} Client · {agencyMetaAdCount} Self
          {(metaFrom||metaTo)?" · Date filter applied":""}</span>
       </div>
-      {!metaAdEntries.length?<EmptyState title="No Meta Ads expenses recorded" description="Expenses categorized as Meta Ads appear here, whether paid by Self or a client."/>:
+      {!metaAdEntries.length?<EmptyState title="No Meta Ads expenses recorded" description="Expenses categorized as Meta Ads appear here, whether paid by Self or a client."/>:<>
       <div className="space-y-3 md:hidden" aria-label="Meta Ads spending entries, mobile view">
-        {filteredMetaAdEntries.map(row=><article key={row.id} id={"finance-meta-"+row.id} className="rounded-xl border border-slate-700/50 p-4">
+        {filteredMetaAdEntries.map(row=><article key={row.id} id={"finance-meta-mobile-"+row.id} className="rounded-xl border border-slate-700/50 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <strong className="text-lg">{money(row.amount)}</strong>
             <span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span>
@@ -884,7 +884,7 @@ export default function FinancePage(){
           <td>{row.receiptAssetId?<button type="button" disabled={busy} className="btn-secondary text-xs" onClick={()=>void showReceipt(row.id)}>Proof</button>:"—"}</td>
           <td>{row.approvalRequestId?<Link className="underline" href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)}>View approval</Link>:"—"}</td>
         </tr>)}</tbody></table>
-      </div>}
+      </div></>}
       {metaAdEntries.length>0&&!filteredMetaAdEntries.length&&<div className="aw-v5-no-matches" role="status">
        {metaFundingFilter==="CLIENT"&&!metaSearch.trim()&&clientMetaAdCount===0?<>
          <p>No Meta Ads entries are linked to a client. {agencyMetaAdCount} {agencyMetaAdCount===1?"entry is":"entries are"} currently marked Agency. Review those records and assign only the ones actually funded by clients.</p>
