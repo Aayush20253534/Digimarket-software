@@ -1199,6 +1199,29 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const agencyPayload=await agencyScoped.json() as {data:unknown[]};
   expect(clientPayload.data,"Client Meta Ads scope must not return agency expenses").toEqual([]);
   expect(agencyPayload.data.length,"Agency register must still return existing entries").toBeGreaterThan(0);
+  // Verify the actual upstream data, not only the browser URL. The gateway
+  // once dropped view/from/to, silently showing My entries in Agency mode.
+  await page.getByLabel("Meta Ads from date").fill("2026-11-01");
+  const scopedDistribution=page.waitForResponse(response=>{
+    const u=new URL(response.url());
+    return u.pathname==="/api/v1/finance/meta-ads-distribution"&&
+      u.searchParams.get("view")==="all"&&u.searchParams.get("from")==="2026-11-01"&&
+      u.searchParams.get("to")==="2026-11-10";
+  });
+  await page.getByLabel("Meta Ads to date").fill("2026-11-10");
+  const distributionResponse=await scopedDistribution;
+  expect(distributionResponse.status(),"Agency Meta Ads distribution must be routed").toBe(200);
+  const dist=await distributionResponse.json() as {data:{
+    view:string;from:string|null;to:string|null;
+    totalPosted:string;totalPending:string;daily:{date:string}[];
+  }};
+  expect(dist.data).toMatchObject({
+    view:"all",from:"2026-11-01",to:"2026-11-10",
+  });
+  expect(Array.isArray(dist.data.daily)).toBe(true);
+  expect(typeof dist.data.totalPosted).toBe("string");
+  await page.getByRole("button",{name:"All time",exact:true}).click();
+
   const metaExportResponse=page.waitForResponse(response=>{
     const u=new URL(response.url());
     return u.pathname==="/api/v1/finance/export"&&
