@@ -440,8 +440,18 @@ export default function FinancePage(){
     if(metaFrom)params.set("from",metaFrom);
     if(metaTo)params.set("to",metaTo);
     void request<MetaDistribution>("/finance/meta-ads-distribution?"+params.toString())
-      .then(data=>{if(active){setMetaDistribution(data);setMetaDistributionLoading(false);}})
-      .catch(e=>{if(active){setMetaDistribution(null);setMetaDistributionError(readable(e));setMetaDistributionLoading(false);}});
+      .then(data=>{
+        if(!Array.isArray(data.daily)||!Array.isArray(data.monthly)||
+          !Array.isArray(data.individuals)||typeof data.total!=="string")
+          throw new Error("Finance API update required: redeploy the latest main branch on Render.");
+        if(active){setMetaDistribution(data);setMetaDistributionLoading(false);}
+      })
+      .catch(e=>{if(active){
+        setMetaDistribution(null);
+        setMetaDistributionError(e instanceof ApiError?readable(e):
+          e instanceof Error?e.message:"Could not load Meta Ads distribution.");
+        setMetaDistributionLoading(false);
+      }});
     return()=>{active=false;};
   },[request,view,canReadOwn,canAll,metaFrom,metaTo,metaDistributionRefresh]);
   if(!session)return <Spinner label="Checking finance access…"/>;
