@@ -7,7 +7,7 @@
  *
  * Run: node apps/web/scripts/verify-route-compat.mjs
  */
-import {access} from "node:fs/promises";
+import {access,readFile} from "node:fs/promises";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
 
@@ -21,6 +21,22 @@ export const phase0Routes = [
   "settings", "team/users", "profile", "search", "notifications",
   "billing", "profitability", "projects",
 ];
+
+// Regression guard: the Meta Ads summary must receive the same selected
+// finance visibility and date range as the transaction register. Dropping
+// these gateway query parameters once caused 19 entries to appear as 6.
+const gateway=await readFile(fileURLToPath(new URL("../src/app/api/v1/[...path]/route.ts",import.meta.url)),"utf8");
+const missingFinanceFilters=[];
+if(!gateway.includes('"finance/meta-ads-distribution"].includes(path)')||
+   !gateway.includes('url.searchParams.set("view", view)'))
+  missingFinanceFilters.push("agency/mine visibility");
+if(!gateway.includes('if(path==="finance/meta-ads-distribution"){')||
+   !gateway.includes('for(const key of ["from","to"])'))
+  missingFinanceFilters.push("inclusive from/to dates");
+if(missingFinanceFilters.length){
+  process.stderr.write("Meta Ads proxy query forwarding missing: "+missingFinanceFilters.join(", ")+"\\n");
+  process.exitCode=1;
+}
 
 const appDir=fileURLToPath(new URL("../src/app/app/",import.meta.url));
 const missing=[];
