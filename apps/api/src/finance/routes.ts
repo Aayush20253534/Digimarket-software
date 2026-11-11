@@ -109,6 +109,14 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
     res.set("Cache-Control","no-store");
     res.json({data:await finance.recurringIncome(actor(res))});
   });
+  app.get("/api/v1/finance/meta-ads-distribution",authenticate,async(req,res)=>{
+    const query=parse(z.object({
+      view:financeViewSchema.default("mine"),
+      from:z.iso.date().optional(),to:z.iso.date().optional(),
+    }).refine(v=>!v.from||!v.to||v.from<=v.to),req.query);
+    res.set("Cache-Control","no-store");
+    res.json({data:await finance.metaAdsDistribution(actor(res),query.view,query.from,query.to)});
+  });
   app.get("/api/v1/finance/summary",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({data:await finance.totals(actor(res),view(req))});

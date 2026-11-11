@@ -67,6 +67,42 @@ export class FinanceService {
       categoryId:{in:categories.filter(c=>isMetaAds(c.name)).map(c=>c.id)}};
   }
 
+
+  async metaAdsDistribution(actor:Principal,view:View,from?:string,to?:string){
+    const where=await this.metaAdsWhere(actor,view,"all");
+    if(from||to)where.occurredOn={
+      ...(from?{gte:new Date(from+"T00:00:00.000Z")}:{}),
+      ...(to?{lte:new Date(to+"T23:59:59.999Z")}:{}),
+    };
+    const groups=await this.db.financialTransaction.groupBy({
+      by:["clientId","status"],where,_sum:{amount:true},_count:{_all:true},
+    });
+    const clientIds=[...new Set(groups.map(g=>g.clientId).filter((id):id is string=>id!==null))];
+    const clients=await this.db.client.findMany({
+      where:{organizationId:actor.organizationId,id:{in:clientIds}},
+      select:{id:true,businessName:true},
+    });
+    const names=new Map(clients.map(c=>[c.id,c.businessName]));
+    const buckets=new Map<string,{clientId:string|null;name:string;posted:Prisma.Decimal;pending:Prisma.Decimal;count:number}>();
+    for(const g of groups){
+      const key=g.clientId??"SELF";
+      const bucket=buckets.get(key)??{clientId:g.clientId,name:g.clientId?(names.get(g.clientId)??"Unknown client"):"Self",
+        posted:new Prisma.Decimal(0),pending:new Prisma.Decimal(0),count:0};
+      if(g.status==="POSTED")bucket.posted=bucket.posted.plus(g._sum.amount??0);
+      if(g.status==="PENDING")bucket.pending=bucket.pending.plus(g._sum.amount??0);
+      bucket.count+=g._count._all;
+      buckets.set(key,bucket);
+    }
+    const categories=[...buckets.values()].map(b=>({
+      clientId:b.clientId,name:b.name,posted:b.posted.toFixed(4),pending:b.pending.toFixed(4),count:b.count,
+    })).sort((a,b)=>Number(b.posted)-Number(a.posted));
+    const total=(field:"posted"|"pending",self:boolean|null)=>
+      [...buckets.values()].filter(b=>self===null||(b.clientId===null)===self)
+        .reduce((sum,b)=>sum.plus(b[field]),new Prisma.Decimal(0)).toFixed(4);
+    return {totalPosted:total("posted",null),totalPending:total("pending",null),
+      selfPosted:total("posted",true),clientPosted:total("posted",false),categories};
+  }
+
   async metaAdClients(actor:Principal){
     if(!actor.permissions.has("finance.entry.create")&&!actor.permissions.has("finance.category.manage"))throw forbidden();
     return this.db.client.findMany({where:{organizationId:actor.organizationId,status:"ACTIVE"},

@@ -12,6 +12,8 @@ type Kind="INCOME"|"EXPENSE";
 type View="mine"|"all";
 type Category={id:string;kind:Kind;name:string;active:boolean};
 type Assignee={id:string;displayName:string;loginId:string};
+type MetaDistribution={totalPosted:string;totalPending:string;selfPosted:string;clientPosted:string;
+  categories:{clientId:string|null;name:string;posted:string;pending:string;count:number}[]};
 type MetaAdClient={id:string;businessName:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
   amount:string;currencyCode:string;occurredOn:string;method:string;description:string|null;
@@ -65,6 +67,10 @@ export default function FinancePage(){
   const [categories,setCategories]=useState<Category[]>([]);
   const [entries,setEntries]=useState<Entry[]>([]);
   const [metaAdEntries,setMetaAdEntries]=useState<Entry[]>([]);
+  const [metaDistribution,setMetaDistribution]=useState<MetaDistribution|null>(null);
+  const [metaFrom,setMetaFrom]=useState("");
+  const [metaTo,setMetaTo]=useState("");
+  const [metaDistributionError,setMetaDistributionError]=useState("");
   const [metaSearch,setMetaSearch]=useState("");
   const [metaFundingFilter,setMetaFundingFilter]=useState<"ALL"|"SELF"|"CLIENT">("ALL");
   const [entrySearch,setEntrySearch]=useState("");
@@ -412,6 +418,18 @@ export default function FinancePage(){
       setSuccess("CSV exported for the selected permission-scoped view.");
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
+  useEffect(()=>{
+    if(!canReadOwn&&!canAll)return;
+    let active=true;
+    const target=view==="all"&&canAll?"all":"mine";
+    const params=new URLSearchParams({view:target});
+    if(metaFrom)params.set("from",metaFrom);
+    if(metaTo)params.set("to",metaTo);
+    void request<MetaDistribution>("/finance/meta-ads-distribution?"+params.toString())
+      .then(data=>{if(active){setMetaDistribution(data);setMetaDistributionError("");}})
+      .catch(e=>{if(active){setMetaDistribution(null);setMetaDistributionError(readable(e));}});
+    return()=>{active=false;};
+  },[request,view,canReadOwn,canAll,metaFrom,metaTo,loading]);
   if(!session)return <Spinner label="Checking finance access…"/>;
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
   return <div className="aw-finance-page aw-v5-finance-page space-y-7" data-aw-module="finance">
@@ -625,6 +643,35 @@ export default function FinancePage(){
        </Card>
       </section>}
     <div id="finance-meta-ads" className="aw-v5-finance-anchor"/>
+    <Card title="Total Meta Ads spending by category" description="All recorded Meta Ads transactions, including Self and individual clients. Totals are calculated across the full ledger, not limited to the latest 200 entries.">
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <label className="text-sm">From <input aria-label="Meta Ads from date" className="field mt-1" type="date" value={metaFrom} max={metaTo||undefined} onChange={e=>setMetaFrom(e.target.value)}/></label>
+        <label className="text-sm">To <input aria-label="Meta Ads to date" className="field mt-1" type="date" value={metaTo} min={metaFrom||undefined} onChange={e=>setMetaTo(e.target.value)}/></label>
+        <button type="button" className="btn-secondary" onClick={()=>{setMetaFrom("");setMetaTo("");}}>All time</button>
+        <button type="button" className="btn-secondary" disabled={!metaDistribution} onClick={()=>{
+          if(!metaDistribution)return;
+          const rows=[["Category","Posted","Pending","Transactions"],...metaDistribution.categories.map(c=>[c.name,c.posted,c.pending,String(c.count)])];
+          const csv=rows.map(row=>row.map(cell=>'"'+cell.replaceAll('"','""')+'"').join(",")).join("\r\n");
+          const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+          const a=document.createElement("a");a.href=url;a.download="meta-ads-distribution.csv";a.click();URL.revokeObjectURL(url);
+        }}><Download size={16}/>Export breakdown</button>
+      </div>
+      {metaDistributionError&&<Notice kind="error">{metaDistributionError}</Notice>}
+      {metaDistribution&&<>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          {([["Total posted",metaDistribution.totalPosted],["Self posted",metaDistribution.selfPosted],["Client posted",metaDistribution.clientPosted],["Pending",metaDistribution.totalPending]] as const).map(([label,value])=>
+            <div key={label} className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="text-xl font-semibold">{money(value)}</p></div>)}
+        </div>
+        {metaDistribution.categories.length===0?<p className="text-sm text-muted-foreground">No Meta Ads spending for the selected dates.</p>:
+        <div className="space-y-3">
+          {metaDistribution.categories.map(c=><div key={c.clientId??"self"} className="rounded-lg border p-3">
+            <div className="flex flex-wrap justify-between gap-2 text-sm"><strong>{c.name}</strong><span>{money(c.posted)} posted · {money(c.pending)} pending</span></div>
+            <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden"><div className="h-full rounded-full bg-indigo-600" style={{width:(Number(metaDistribution.totalPosted)>0?Math.max(0,Math.min(100,Number(c.posted)/Number(metaDistribution.totalPosted)*100)):0)+"%"}}/></div>
+          </div>)}
+        </div>}
+      </>}
+    </Card>
+
     <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Posted client spending reduces Net posted without increasing agency expenses. Latest 200 entries shown.">
       <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("meta_ads")}>
         <Download className="h-4 w-4"/> Export Meta Ads CSV
