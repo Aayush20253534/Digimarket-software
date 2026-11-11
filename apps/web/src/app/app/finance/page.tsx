@@ -12,8 +12,15 @@ type Kind="INCOME"|"EXPENSE";
 type View="mine"|"all";
 type Category={id:string;kind:Kind;name:string;active:boolean};
 type Assignee={id:string;displayName:string;loginId:string};
-type MetaDistribution={view:"mine"|"all";individuals:{userId:string;name:string;posted:string;pending:string}[];totalPosted:string;totalPending:string;selfPosted:string;clientPosted:string;
-  categories:{clientId:string|null;name:string;posted:string;pending:string;count:number}[]};
+type MetaBucket={posted:string;pending:string;total:string;excluded:string;count:number;excludedCount:number};
+type MetaCategory=MetaBucket&{clientId:string|null;name:string};
+type MetaPeriod=MetaBucket&{date:string;selfPosted:string;selfPending:string;clientPosted:string;
+  clientPending:string;categories:MetaCategory[]};
+type MetaPerson=MetaBucket&{userId:string;name:string;categories:MetaCategory[]};
+type MetaDistribution={view:"mine"|"all";from:string|null;to:string|null;
+  totalPosted:string;totalPending:string;total:string;excludedAmount:string;excludedCount:number;
+  transactionCount:number;selfPosted:string;selfPending:string;clientPosted:string;clientPending:string;
+  categories:MetaCategory[];individuals:MetaPerson[];daily:MetaPeriod[];monthly:MetaPeriod[]};
 type MetaAdClient={id:string;businessName:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
   amount:string;currencyCode:string;occurredOn:string;method:string;description:string|null;
@@ -68,6 +75,9 @@ export default function FinancePage(){
   const [entries,setEntries]=useState<Entry[]>([]);
   const [metaAdEntries,setMetaAdEntries]=useState<Entry[]>([]);
   const [metaDistribution,setMetaDistribution]=useState<MetaDistribution|null>(null);
+  const [metaDistributionLoading,setMetaDistributionLoading]=useState(true);
+  const [metaDistributionRefresh,setMetaDistributionRefresh]=useState(0);
+  const [metaPeriodMode,setMetaPeriodMode]=useState<"daily"|"monthly">("daily");
   const [metaFrom,setMetaFrom]=useState("");
   const [metaTo,setMetaTo]=useState("");
   const [metaDistributionError,setMetaDistributionError]=useState("");
@@ -187,6 +197,7 @@ export default function FinancePage(){
     ];
     setError(problems.join(" "));
     setLoading(false);
+    setMetaDistributionRefresh(v=>v+1);
   },[request,view,canReadOwn,canAll]);
   useEffect(()=>{
     if(!isFounder)return;
@@ -421,15 +432,18 @@ export default function FinancePage(){
   useEffect(()=>{
     if(!canReadOwn&&!canAll)return;
     let active=true;
+    setMetaDistribution(null);
+    setMetaDistributionLoading(true);
+    setMetaDistributionError("");
     const target=view==="all"&&canAll?"all":"mine";
     const params=new URLSearchParams({view:target});
     if(metaFrom)params.set("from",metaFrom);
     if(metaTo)params.set("to",metaTo);
     void request<MetaDistribution>("/finance/meta-ads-distribution?"+params.toString())
-      .then(data=>{if(active){setMetaDistribution(data);setMetaDistributionError("");}})
-      .catch(e=>{if(active){setMetaDistribution(null);setMetaDistributionError(readable(e));}});
+      .then(data=>{if(active){setMetaDistribution(data);setMetaDistributionLoading(false);}})
+      .catch(e=>{if(active){setMetaDistribution(null);setMetaDistributionError(readable(e));setMetaDistributionLoading(false);}});
     return()=>{active=false;};
-  },[request,view,canReadOwn,canAll,metaFrom,metaTo,loading]);
+  },[request,view,canReadOwn,canAll,metaFrom,metaTo,metaDistributionRefresh]);
   if(!session)return <Spinner label="Checking finance access…"/>;
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
   return <div className="aw-finance-page aw-v5-finance-page space-y-7" data-aw-module="finance">
@@ -643,39 +657,144 @@ export default function FinancePage(){
        </Card>
       </section>}
     <div id="finance-meta-ads" className="aw-v5-finance-anchor"/>
-    <Card title={view==="mine"?"My Meta Ads spending breakdown":"Agency Meta Ads spending breakdown"} description={view==="mine"?"Only transactions entered by your account. Self and client spending are separated.":"All team members combined, including Self and client spending. Totals cover the full ledger, not just the latest 200 entries."}>
+    <Card title={view==="mine"?"My Meta Ads spending breakdown":"Agency Meta Ads spending breakdown"}
+      description={view==="mine"?"Only transactions assigned to your account, split by Self and each client.":"All team members combined, with person-wise, client-wise and date-wise totals."}>
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <label className="text-sm">From <input aria-label="Meta Ads from date" className="field mt-1" type="date" value={metaFrom} max={metaTo||undefined} onChange={e=>setMetaFrom(e.target.value)}/></label>
-        <label className="text-sm">To <input aria-label="Meta Ads to date" className="field mt-1" type="date" value={metaTo} min={metaFrom||undefined} onChange={e=>setMetaTo(e.target.value)}/></label>
+        <label className="flex flex-col gap-1 text-sm">From date
+          <input aria-label="Meta Ads from date" className="field w-full min-w-0" type="date"
+            value={metaFrom} max={metaTo||undefined} onChange={e=>setMetaFrom(e.target.value)}/>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">To date (inclusive)
+          <input aria-label="Meta Ads to date" className="field w-full min-w-0" type="date"
+            value={metaTo} min={metaFrom||undefined} onChange={e=>setMetaTo(e.target.value)}/>
+        </label>
         <button type="button" className="btn-secondary" onClick={()=>{setMetaFrom("");setMetaTo("");}}>All time</button>
-        <button type="button" className="btn-secondary" disabled={!metaDistribution} onClick={()=>{
+        <button type="button" className="btn-secondary" onClick={()=>setMetaDistributionRefresh(x=>x+1)}
+          disabled={metaDistributionLoading}><RefreshCw size={16}/>Refresh breakdown</button>
+        <button type="button" className="btn-secondary" disabled={!metaDistribution||metaDistributionLoading} onClick={()=>{
           if(!metaDistribution)return;
-          const rows=[["View",view==="mine"?"My entries":"Agency totals"],["Category","Posted","Pending","Transactions"],...metaDistribution.categories.map(c=>[c.name,c.posted,c.pending,String(c.count)]),[],["Individual","Posted","Pending"],...metaDistribution.individuals.map(p=>[p.name,p.posted,p.pending])];
+          const report=metaDistribution;
+          const rows:string[][]=[
+            ["Meta Ads spending report",report.view==="mine"?"My entries":"Agency totals"],
+            ["From",report.from??"All time","To",report.to??"All time"],
+            ["Status","Posted","Pending","Posted + pending","Excluded (rejected/cancelled)"],
+            ["Totals",report.totalPosted,report.totalPending,report.total,report.excludedAmount],
+            ["Self",report.selfPosted,report.selfPending],
+            ["Clients",report.clientPosted,report.clientPending],
+            [],
+            ["Category","Posted","Pending","Posted + pending","Excluded","Transactions"],
+            ...report.categories.map(c=>[c.name,c.posted,c.pending,c.total,c.excluded,String(c.count)]),
+            [],
+            ["Person","Posted","Pending","Posted + pending","Excluded","Transactions"],
+            ...report.individuals.map(p=>[p.name,p.posted,p.pending,p.total,p.excluded,String(p.count)]),
+            [],
+            ["Date","Posted","Pending","Posted + pending","Self posted","Client posted","Transactions"],
+            ...report.daily.map(d=>[d.date,d.posted,d.pending,d.total,d.selfPosted,d.clientPosted,String(d.count)]),
+            [],
+            ["Month","Posted","Pending","Posted + pending","Self posted","Client posted","Transactions"],
+            ...report.monthly.map(d=>[d.date,d.posted,d.pending,d.total,d.selfPosted,d.clientPosted,String(d.count)]),
+            [],
+            ["Date","Category","Posted","Pending","Posted + pending","Transactions"],
+            ...report.daily.flatMap(d=>d.categories.map(c=>[d.date,c.name,c.posted,c.pending,c.total,String(c.count)])),
+          ];
           const csv=rows.map(row=>row.map(cell=>'"'+cell.replaceAll('"','""')+'"').join(",")).join("\r\n");
           const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-          const a=document.createElement("a");a.href=url;a.download="meta-ads-distribution.csv";a.click();URL.revokeObjectURL(url);
+          const a=document.createElement("a");a.href=url;a.download="meta-ads-"+report.view+"-breakdown.csv";a.click();
+          URL.revokeObjectURL(url);
         }}><Download size={16}/>Export breakdown</button>
       </div>
+      {metaDistributionLoading&&<p role="status" className="text-sm text-slate-500 mb-3">Calculating Meta Ads totals…</p>}
       {metaDistributionError&&<Notice kind="error">{metaDistributionError}</Notice>}
-      {metaDistribution&&<>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-          {([["Total posted",metaDistribution.totalPosted],["Self posted",metaDistribution.selfPosted],["Client posted",metaDistribution.clientPosted],["Pending",metaDistribution.totalPending]] as const).map(([label,value])=>
-            <div key={label} className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="text-xl font-semibold">{money(value)}</p></div>)}
+      {metaDistribution&&!metaDistributionLoading&&<>
+        <p className="text-sm text-slate-500 mb-3">
+          {view==="mine"?"My recorded transactions":"Agency-wide transactions"} ·
+          {metaDistribution.from||metaDistribution.to
+            ?" "+(metaDistribution.from??"Beginning")+" to "+(metaDistribution.to??"Today")
+            :" All dates"} · {metaDistribution.transactionCount} posted/pending entries
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+          {([
+            ["Recorded total (posted + pending)",metaDistribution.total],
+            ["Posted spending",metaDistribution.totalPosted],
+            ["Pending approval",metaDistribution.totalPending],
+            ["Self posted",metaDistribution.selfPosted],
+            ["Client posted",metaDistribution.clientPosted],
+            ["Excluded (rejected/cancelled)",metaDistribution.excludedAmount],
+          ] as const).map(([label,value])=>
+            <div key={label} className="rounded-xl border p-4">
+              <p className="text-sm text-slate-500">{label}</p>
+              <p className="text-xl font-semibold break-all">{money(value)}</p>
+            </div>)}
         </div>
-        {view==="all"&&metaDistribution.individuals.length>0&&<div className="mb-5">
-          <h3 className="font-semibold mb-2">Individual spending by team member</h3>
-          <div className="space-y-2">{metaDistribution.individuals.map(p=><div key={p.userId} className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
-            <strong>{p.name}</strong><span>{money(p.posted)} posted · {money(p.pending)} pending</span>
-          </div>)}</div>
-        </div>}
-        <h3 className="font-semibold mb-2">Spending by category (Self and clients)</h3>
-        {metaDistribution.categories.length===0?<p className="text-sm text-muted-foreground">No Meta Ads spending for the selected dates.</p>:
-        <div className="space-y-3">
-          {metaDistribution.categories.map(c=><div key={c.clientId??"self"} className="rounded-lg border p-3">
-            <div className="flex flex-wrap justify-between gap-2 text-sm"><strong>{c.name}</strong><span>{money(c.posted)} posted · {money(c.pending)} pending</span></div>
-            <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden"><div className="h-full rounded-full bg-indigo-600" style={{width:(Number(metaDistribution.totalPosted)>0?Math.max(0,Math.min(100,Number(c.posted)/Number(metaDistribution.totalPosted)*100)):0)+"%"}}/></div>
-          </div>)}
-        </div>}
+        <p className="mb-5 text-xs text-slate-500">
+          Self means Meta Ads without a linked client. Posted + pending is a recorded total, not final paid spending.
+          Rejected/cancelled entries ({metaDistribution.excludedCount}) are shown separately, never added to spending.
+        </p>
+        {view==="all"&&<section className="mb-6" aria-label="Individual Meta Ads distribution">
+          <h3 className="font-semibold mb-3">Individual spending by team member</h3>
+          {metaDistribution.individuals.length===0?<p className="text-sm text-slate-500">No recorded spending.</p>:
+            <div className="space-y-2">{metaDistribution.individuals.map(p=>
+              <details key={p.userId} className="rounded-lg border p-3">
+                <summary className="cursor-pointer text-sm">
+                  <strong>{p.name}</strong>
+                  <span className="block text-slate-500 mt-1">Posted {money(p.posted)} · Pending {money(p.pending)} · Total {money(p.total)}</span>
+                </summary>
+                <div className="mt-3 space-y-2 text-sm">
+                  {p.categories.map(c=><div key={c.clientId??"self"} className="flex flex-wrap justify-between gap-2 border-t pt-2">
+                    <span>{c.name}</span><span>{money(c.posted)} posted · {money(c.pending)} pending</span>
+                  </div>)}
+                </div>
+              </details>)}</div>}
+        </section>}
+        <section className="mb-6" aria-label="Meta Ads category totals">
+          <h3 className="font-semibold mb-3">Category totals: Self and individual clients</h3>
+          {metaDistribution.categories.length===0?<p className="text-sm text-slate-500">No Meta Ads entries in this date range.</p>:
+          <div className="space-y-3">{metaDistribution.categories.map(c=>
+            <div key={c.clientId??"self"} className="rounded-lg border p-3">
+              <div className="flex flex-wrap justify-between gap-2 text-sm">
+                <strong>{c.name}</strong>
+                <span>Posted {money(c.posted)} · Pending {money(c.pending)}</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">Recorded total: {money(c.total)} · {c.count} entries</p>
+              <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div className="h-full rounded-full bg-indigo-600" style={{width:
+                  (Number(metaDistribution.totalPosted)>0
+                    ?Math.max(0,Math.min(100,Number(c.posted)/Number(metaDistribution.totalPosted)*100)):0)+"%"}}/>
+              </div>
+            </div>)}</div>}
+        </section>
+        <section aria-label="Date wise Meta Ads spending">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h3 className="font-semibold">Date-wise spending</h3>
+            <div className="flex gap-2" role="group" aria-label="Date grouping">
+              <button type="button" className={metaPeriodMode==="daily"?"btn-primary":"btn-secondary"}
+                aria-pressed={metaPeriodMode==="daily"} onClick={()=>setMetaPeriodMode("daily")}>Day-wise</button>
+              <button type="button" className={metaPeriodMode==="monthly"?"btn-primary":"btn-secondary"}
+                aria-pressed={metaPeriodMode==="monthly"} onClick={()=>setMetaPeriodMode("monthly")}>Month-wise</button>
+            </div>
+          </div>
+          {(metaPeriodMode==="daily"?metaDistribution.daily:metaDistribution.monthly).length===0
+            ?<p className="text-sm text-slate-500">No transactions in this period.</p>:
+          <div className="space-y-2">
+            {(metaPeriodMode==="daily"?metaDistribution.daily:metaDistribution.monthly).map(d=>
+              <details key={d.date} className="rounded-lg border p-3">
+                <summary className="cursor-pointer text-sm">
+                  <strong>{d.date}</strong>
+                  <span className="block text-slate-500 mt-1">Posted {money(d.posted)} · Pending {money(d.pending)} · Total {money(d.total)}</span>
+                </summary>
+                <div className="mt-3 text-sm">
+                  <div className="flex flex-wrap justify-between gap-2 pb-2">
+                    <span>Self: {money(d.selfPosted)} posted · {money(d.selfPending)} pending</span>
+                    <span>Clients: {money(d.clientPosted)} posted · {money(d.clientPending)} pending</span>
+                  </div>
+                  {d.categories.map(c=><div key={c.clientId??"self"} className="flex flex-wrap justify-between gap-2 border-t py-2">
+                    <span>{c.name}</span>
+                    <span>{money(c.posted)} posted · {money(c.pending)} pending</span>
+                  </div>)}
+                </div>
+              </details>)}
+          </div>}
+        </section>
       </>}
     </Card>
 
