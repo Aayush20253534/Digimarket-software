@@ -68,61 +68,111 @@ export class FinanceService {
   }
 
 
+  // All views use the exact same filtered, database-wide grouping. Finance
+  // entries() intentionally paginates to 200 and must not drive these totals.
   async metaAdsDistribution(actor:Principal,view:View,from?:string,to?:string){
     const where=await this.metaAdsWhere(actor,view,"all");
-    if(from||to)where.occurredOn={
-      ...(from?{gte:new Date(from+"T00:00:00.000Z")}:{}),
-      ...(to?{lte:new Date(to+"T23:59:59.999Z")}:{}),
-    };
-    const [groups,peopleGroups]=await Promise.all([
-      this.db.financialTransaction.groupBy({
-        by:["clientId","status"],where,_sum:{amount:true},_count:{_all:true},
-      }),
-      this.db.financialTransaction.groupBy({
-        by:["enteredById","status"],where,_sum:{amount:true},_count:{_all:true},
-      }),
+    if(from||to){
+      where.occurredOn={
+        ...(from?{gte:new Date(from+"T00:00:00.000Z")}:{}),
+        ...(to?{lte:new Date(to+"T00:00:00.000Z")}:{}),
+      };
+    }
+    // occurredOn is a PostgreSQL DATE. Group on that business date, never
+    // createdAt/postedAt, so date-only ranges include both endpoints.
+    const groups=await this.db.financialTransaction.groupBy({
+      by:["occurredOn","clientId","enteredById","status"],
+      where,_sum:{amount:true},_count:{_all:true},
+    });
+    const clientIds=[...new Set(groups.flatMap(g=>g.clientId?[g.clientId]:[]))];
+    const userIds=[...new Set(groups.map(g=>g.enteredById))];
+    const [clients,users]=await Promise.all([
+      clientIds.length?this.db.client.findMany({
+        where:{organizationId:actor.organizationId,id:{in:clientIds}},
+        select:{id:true,businessName:true},
+      }):Promise.resolve([]),
+      userIds.length?this.db.user.findMany({
+        where:{organizationId:actor.organizationId,id:{in:userIds}},
+        select:{id:true,displayName:true},
+      }):Promise.resolve([]),
     ]);
-    const clientIds=[...new Set(groups.map(g=>g.clientId).filter((id):id is string=>id!==null))];
-    const clients=await this.db.client.findMany({
-      where:{organizationId:actor.organizationId,id:{in:clientIds}},
-      select:{id:true,businessName:true},
+    const clientNames=new Map(clients.map(c=>[c.id,c.businessName]));
+    const userNames=new Map(users.map(u=>[u.id,u.displayName]));
+    type Bucket={posted:Prisma.Decimal;pending:Prisma.Decimal;excluded:Prisma.Decimal;
+      count:number;excludedCount:number};
+    const empty=():Bucket=>({posted:new Prisma.Decimal(0),pending:new Prisma.Decimal(0),
+      excluded:new Prisma.Decimal(0),count:0,excludedCount:0});
+    const get=(map:Map<string,Bucket>,key:string)=>{
+      let bucket=map.get(key);
+      if(!bucket){bucket=empty();map.set(key,bucket);}
+      return bucket;
+    };
+    const apply=(b:Bucket,status:string,amount:Prisma.Decimal,count:number)=>{
+      if(status==="POSTED"){b.posted=b.posted.plus(amount);b.count+=count;}
+      else if(status==="PENDING"){b.pending=b.pending.plus(amount);b.count+=count;}
+      else {b.excluded=b.excluded.plus(amount);b.excludedCount+=count;}
+    };
+    const format=(b:Bucket)=>({
+      posted:b.posted.toFixed(4),pending:b.pending.toFixed(4),
+      total:b.posted.plus(b.pending).toFixed(4),
+      excluded:b.excluded.toFixed(4),count:b.count,excludedCount:b.excludedCount,
     });
-    const names=new Map(clients.map(c=>[c.id,c.businessName]));
-    const buckets=new Map<string,{clientId:string|null;name:string;posted:Prisma.Decimal;pending:Prisma.Decimal;count:number}>();
+    type Period={totals:Bucket;self:Bucket;clients:Bucket;categories:Map<string,Bucket>};
+    const makePeriod=():Period=>({totals:empty(),self:empty(),clients:empty(),
+      categories:new Map<string,Bucket>()});
+    const periods=new Map<string,Period>();
+    const months=new Map<string,Period>();
+    const categories=new Map<string,Bucket>();
+    const individuals=new Map<string,Bucket>();
+    const byPersonCategory=new Map<string,Map<string,Bucket>>();
+    const totals=empty(),self=empty(),clientSpend=empty();
     for(const g of groups){
-      const key=g.clientId??"SELF";
-      const bucket=buckets.get(key)??{clientId:g.clientId,name:g.clientId?(names.get(g.clientId)??"Unknown client"):"Self",
-        posted:new Prisma.Decimal(0),pending:new Prisma.Decimal(0),count:0};
-      if(g.status==="POSTED")bucket.posted=bucket.posted.plus(g._sum.amount??0);
-      if(g.status==="PENDING")bucket.pending=bucket.pending.plus(g._sum.amount??0);
-      bucket.count+=g._count._all;
-      buckets.set(key,bucket);
+      const amount=g._sum.amount??new Prisma.Decimal(0);
+      const count=g._count._all;
+      const categoryKey=g.clientId??"SELF";
+      const date=g.occurredOn.toISOString().slice(0,10);
+      const month=date.slice(0,7);
+      apply(totals,g.status,amount,count);
+      apply(g.clientId?clientSpend:self,g.status,amount,count);
+      apply(get(categories,categoryKey),g.status,amount,count);
+      apply(get(individuals,g.enteredById),g.status,amount,count);
+      let personCategories=byPersonCategory.get(g.enteredById);
+      if(!personCategories){personCategories=new Map();byPersonCategory.set(g.enteredById,personCategories);}
+      apply(get(personCategories,categoryKey),g.status,amount,count);
+      for(const [key,map] of [[date,periods],[month,months]] as const){
+        let period=map.get(key);
+        if(!period){period=makePeriod();map.set(key,period);}
+        apply(period.totals,g.status,amount,count);
+        apply(g.clientId?period.clients:period.self,g.status,amount,count);
+        apply(get(period.categories,categoryKey),g.status,amount,count);
+      }
     }
-    const categories=[...buckets.values()].map(b=>({
-      clientId:b.clientId,name:b.name,posted:b.posted.toFixed(4),pending:b.pending.toFixed(4),count:b.count,
-    })).sort((a,b)=>Number(b.posted)-Number(a.posted));
-    const total=(field:"posted"|"pending",self:boolean|null)=>
-      [...buckets.values()].filter(b=>self===null||(b.clientId===null)===self)
-        .reduce((sum,b)=>sum.plus(b[field]),new Prisma.Decimal(0)).toFixed(4);
-    const people=await this.db.user.findMany({
-      where:{organizationId:actor.organizationId,id:{in:peopleGroups.map(g=>g.enteredById)}},
-      select:{id:true,displayName:true},
-    });
-    const peopleNames=new Map(people.map(p=>[p.id,p.displayName]));
-    const byPerson=new Map<string,{userId:string;name:string;posted:Prisma.Decimal;pending:Prisma.Decimal}>();
-    for(const g of peopleGroups){
-      const bucket=byPerson.get(g.enteredById)??{userId:g.enteredById,
-        name:peopleNames.get(g.enteredById)??"Unknown user",
-        posted:new Prisma.Decimal(0),pending:new Prisma.Decimal(0)};
-      if(g.status==="POSTED")bucket.posted=bucket.posted.plus(g._sum.amount??0);
-      if(g.status==="PENDING")bucket.pending=bucket.pending.plus(g._sum.amount??0);
-      byPerson.set(g.enteredById,bucket);
-    }
-    const individuals=[...byPerson.values()].map(p=>({
-      userId:p.userId,name:p.name,posted:p.posted.toFixed(4),pending:p.pending.toFixed(4),
-    })).sort((a,b)=>Number(b.posted)-Number(a.posted));
-    return {view,individuals,totalPosted:total("posted",null),totalPending:total("pending",null),
-      selfPosted:total("posted",true),clientPosted:total("posted",false),categories};
+    const categoryRows=(map:Map<string,Bucket>)=>[...map.entries()].map(([key,b])=>({
+      clientId:key==="SELF"?null:key,
+      name:key==="SELF"?"Self (agency)":clientNames.get(key)??"Unknown client",
+      ...format(b),
+    })).sort((a,b)=>b.posted.localeCompare(a.posted,undefined,{numeric:true})||a.name.localeCompare(b.name));
+    const periodRows=(map:Map<string,Period>)=>[...map.entries()].map(([date,p])=>({
+      date,...format(p.totals),
+      selfPosted:p.self.posted.toFixed(4),selfPending:p.self.pending.toFixed(4),
+      clientPosted:p.clients.posted.toFixed(4),clientPending:p.clients.pending.toFixed(4),
+      categories:categoryRows(p.categories),
+    })).sort((a,b)=>b.date.localeCompare(a.date));
+    return {
+      view,from:from??null,to:to??null,
+      totalPosted:totals.posted.toFixed(4),totalPending:totals.pending.toFixed(4),
+      total:totals.posted.plus(totals.pending).toFixed(4),
+      excludedAmount:totals.excluded.toFixed(4),excludedCount:totals.excludedCount,
+      transactionCount:totals.count,
+      selfPosted:self.posted.toFixed(4),selfPending:self.pending.toFixed(4),
+      clientPosted:clientSpend.posted.toFixed(4),clientPending:clientSpend.pending.toFixed(4),
+      categories:categoryRows(categories),
+      individuals:[...individuals.entries()].map(([userId,b])=>({
+        userId,name:userNames.get(userId)??"Unknown user",...format(b),
+        categories:categoryRows(byPersonCategory.get(userId)??new Map()),
+      })).sort((a,b)=>b.posted.localeCompare(a.posted,undefined,{numeric:true})||a.name.localeCompare(b.name)),
+      daily:periodRows(periods),monthly:periodRows(months),
+    };
   }
 
   async metaAdClients(actor:Principal){
