@@ -12,7 +12,7 @@ type Kind="INCOME"|"EXPENSE";
 type View="mine"|"all";
 type Category={id:string;kind:Kind;name:string;active:boolean};
 type Assignee={id:string;displayName:string;loginId:string};
-type MetaDistribution={totalPosted:string;totalPending:string;selfPosted:string;clientPosted:string;
+type MetaDistribution={view:"mine"|"all";individuals:{userId:string;name:string;posted:string;pending:string}[];totalPosted:string;totalPending:string;selfPosted:string;clientPosted:string;
   categories:{clientId:string|null;name:string;posted:string;pending:string;count:number}[]};
 type MetaAdClient={id:string;businessName:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
@@ -643,14 +643,14 @@ export default function FinancePage(){
        </Card>
       </section>}
     <div id="finance-meta-ads" className="aw-v5-finance-anchor"/>
-    <Card title="Total Meta Ads spending by category" description="All recorded Meta Ads transactions, including Self and individual clients. Totals are calculated across the full ledger, not limited to the latest 200 entries.">
+    <Card title={view==="mine"?"My Meta Ads spending breakdown":"Agency Meta Ads spending breakdown"} description={view==="mine"?"Only transactions entered by your account. Self and client spending are separated.":"All team members combined, including Self and client spending. Totals cover the full ledger, not just the latest 200 entries."}>
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <label className="text-sm">From <input aria-label="Meta Ads from date" className="field mt-1" type="date" value={metaFrom} max={metaTo||undefined} onChange={e=>setMetaFrom(e.target.value)}/></label>
         <label className="text-sm">To <input aria-label="Meta Ads to date" className="field mt-1" type="date" value={metaTo} min={metaFrom||undefined} onChange={e=>setMetaTo(e.target.value)}/></label>
         <button type="button" className="btn-secondary" onClick={()=>{setMetaFrom("");setMetaTo("");}}>All time</button>
         <button type="button" className="btn-secondary" disabled={!metaDistribution} onClick={()=>{
           if(!metaDistribution)return;
-          const rows=[["Category","Posted","Pending","Transactions"],...metaDistribution.categories.map(c=>[c.name,c.posted,c.pending,String(c.count)])];
+          const rows=[["View",view==="mine"?"My entries":"Agency totals"],["Category","Posted","Pending","Transactions"],...metaDistribution.categories.map(c=>[c.name,c.posted,c.pending,String(c.count)]),[],["Individual","Posted","Pending"],...metaDistribution.individuals.map(p=>[p.name,p.posted,p.pending])];
           const csv=rows.map(row=>row.map(cell=>'"'+cell.replaceAll('"','""')+'"').join(",")).join("\r\n");
           const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
           const a=document.createElement("a");a.href=url;a.download="meta-ads-distribution.csv";a.click();URL.revokeObjectURL(url);
@@ -662,6 +662,13 @@ export default function FinancePage(){
           {([["Total posted",metaDistribution.totalPosted],["Self posted",metaDistribution.selfPosted],["Client posted",metaDistribution.clientPosted],["Pending",metaDistribution.totalPending]] as const).map(([label,value])=>
             <div key={label} className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="text-xl font-semibold">{money(value)}</p></div>)}
         </div>
+        {view==="all"&&metaDistribution.individuals.length>0&&<div className="mb-5">
+          <h3 className="font-semibold mb-2">Individual spending by team member</h3>
+          <div className="space-y-2">{metaDistribution.individuals.map(p=><div key={p.userId} className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
+            <strong>{p.name}</strong><span>{money(p.posted)} posted · {money(p.pending)} pending</span>
+          </div>)}</div>
+        </div>}
+        <h3 className="font-semibold mb-2">Spending by category (Self and clients)</h3>
         {metaDistribution.categories.length===0?<p className="text-sm text-muted-foreground">No Meta Ads spending for the selected dates.</p>:
         <div className="space-y-3">
           {metaDistribution.categories.map(c=><div key={c.clientId??"self"} className="rounded-lg border p-3">

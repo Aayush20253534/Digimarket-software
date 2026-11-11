@@ -74,9 +74,14 @@ export class FinanceService {
       ...(from?{gte:new Date(from+"T00:00:00.000Z")}:{}),
       ...(to?{lte:new Date(to+"T23:59:59.999Z")}:{}),
     };
-    const groups=await this.db.financialTransaction.groupBy({
-      by:["clientId","status"],where,_sum:{amount:true},_count:{_all:true},
-    });
+    const [groups,peopleGroups]=await Promise.all([
+      this.db.financialTransaction.groupBy({
+        by:["clientId","status"],where,_sum:{amount:true},_count:{_all:true},
+      }),
+      this.db.financialTransaction.groupBy({
+        by:["enteredById","status"],where,_sum:{amount:true},_count:{_all:true},
+      }),
+    ]);
     const clientIds=[...new Set(groups.map(g=>g.clientId).filter((id):id is string=>id!==null))];
     const clients=await this.db.client.findMany({
       where:{organizationId:actor.organizationId,id:{in:clientIds}},
@@ -99,7 +104,24 @@ export class FinanceService {
     const total=(field:"posted"|"pending",self:boolean|null)=>
       [...buckets.values()].filter(b=>self===null||(b.clientId===null)===self)
         .reduce((sum,b)=>sum.plus(b[field]),new Prisma.Decimal(0)).toFixed(4);
-    return {totalPosted:total("posted",null),totalPending:total("pending",null),
+    const people=await this.db.user.findMany({
+      where:{organizationId:actor.organizationId,id:{in:peopleGroups.map(g=>g.enteredById)}},
+      select:{id:true,displayName:true},
+    });
+    const peopleNames=new Map(people.map(p=>[p.id,p.displayName]));
+    const byPerson=new Map<string,{userId:string;name:string;posted:Prisma.Decimal;pending:Prisma.Decimal}>();
+    for(const g of peopleGroups){
+      const bucket=byPerson.get(g.enteredById)??{userId:g.enteredById,
+        name:peopleNames.get(g.enteredById)??"Unknown user",
+        posted:new Prisma.Decimal(0),pending:new Prisma.Decimal(0)};
+      if(g.status==="POSTED")bucket.posted=bucket.posted.plus(g._sum.amount??0);
+      if(g.status==="PENDING")bucket.pending=bucket.pending.plus(g._sum.amount??0);
+      byPerson.set(g.enteredById,bucket);
+    }
+    const individuals=[...byPerson.values()].map(p=>({
+      userId:p.userId,name:p.name,posted:p.posted.toFixed(4),pending:p.pending.toFixed(4),
+    })).sort((a,b)=>Number(b.posted)-Number(a.posted));
+    return {view,individuals,totalPosted:total("posted",null),totalPending:total("pending",null),
       selfPosted:total("posted",true),clientPosted:total("posted",false),categories};
   }
 
