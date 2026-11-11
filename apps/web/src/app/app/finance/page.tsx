@@ -124,11 +124,12 @@ export default function FinancePage(){
   const salarySelected=kind==="EXPENSE"&&categoryId===SALARY_OPTION;
   const metaAdsSelected=kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===categoryId)?.name??"");
   const filteredMetaAdEntries=useMemo(()=>metaAdEntries.filter(row=>
+   (!metaFrom||row.occurredOn>=metaFrom)&&(!metaTo||row.occurredOn<=metaTo)&&
    (metaFundingFilter==="ALL"||(metaFundingFilter==="CLIENT"?Boolean(row.clientId):!row.clientId))&&
    (!metaSearch.trim()||[row.client?.businessName??"",row.description??"",
       row.merchantOrSource??"",row.enteredBy.displayName]
      .some(value=>value.toLocaleLowerCase().includes(metaSearch.trim().toLocaleLowerCase())))),
-   [metaAdEntries,metaFundingFilter,metaSearch]);
+   [metaAdEntries,metaFundingFilter,metaSearch,metaFrom,metaTo]);
   const agencyMetaAdCount=metaAdEntries.filter(row=>!row.clientId).length;
   const clientMetaAdCount=metaAdEntries.length-agencyMetaAdCount;
   const filteredEntries=useMemo(()=>entries.filter(row=>
@@ -182,7 +183,7 @@ export default function FinancePage(){
         if(row.kind==="EXPENSE"&&isMetaAdsCategory(row.category?.name??""))unique.set(row.id,row);
       }
       setMetaAdEntries([...unique.values()]
-        .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
+        .sort((a,b)=>b.occurredOn.localeCompare(a.occurredOn)||b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
         .slice(0,200));
     }
     if(sums.status==="fulfilled"){setTotals(sums.value);setRecurring(target==="all"?sums.value.recurringIncome??null:null);}
@@ -823,10 +824,43 @@ export default function FinancePage(){
           <button key={value} type="button" aria-pressed={metaFundingFilter===value}
             onClick={()=>setMetaFundingFilter(value)}>{label}</button>)}
        </div>
-       <span className="aw-v5-register-count">{filteredMetaAdEntries.length} of {metaAdEntries.length} loaded · {clientMetaAdCount} Client · {agencyMetaAdCount} Agency</span>
+       <span className="aw-v5-register-count">{filteredMetaAdEntries.length} of {metaAdEntries.length} loaded · {clientMetaAdCount} Client · {agencyMetaAdCount} Self
+         {(metaFrom||metaTo)?" · Date filter applied":""}</span>
       </div>
       {!metaAdEntries.length?<EmptyState title="No Meta Ads expenses recorded" description="Expenses categorized as Meta Ads appear here, whether paid by Self or a client."/>:
-      <div className="aw-finance-register-scroll" role="region" aria-label="All Meta Ads register" tabIndex={0}>
+      <div className="space-y-3 md:hidden" aria-label="Meta Ads spending entries, mobile view">
+        {filteredMetaAdEntries.map(row=><article key={row.id} id={"finance-meta-"+row.id} className="rounded-xl border border-slate-700/50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong className="text-lg">{money(row.amount)}</strong>
+            <span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+            <span>{row.occurredOn}</span><span>·</span><span>{row.clientId?"Client":"Self"}</span>
+          </div>
+          <div className="mt-2 font-semibold break-words">
+            {row.clientId
+              ?row.client?<Link className="underline" href={"/app/clients/"+row.client.id}>{row.client.businessName}</Link>:"Client unavailable"
+              :"Agency / Self"}
+          </div>
+          <div className="mt-3 grid gap-1 text-sm text-slate-400">
+            <p>Recorded by: {row.enteredBy.displayName}</p>
+            <p>Payment method: {row.method.replaceAll("_"," ")}</p>
+            {row.description&&<p className="break-words">Notes: {row.description}</p>}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {row.receiptAssetId&&<button type="button" disabled={busy} className="btn-secondary text-xs"
+              onClick={()=>void showReceipt(row.id)}>Proof</button>}
+            {row.approvalRequestId&&<Link className="underline text-sm" href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)}>View approval</Link>}
+            {adminFinance&&row.status!=="CANCELLED"&&<>
+              {!row.clientId&&<button type="button" className="btn-secondary text-xs" disabled={busy}
+                onClick={()=>beginEntryEdit(row,true)}>Assign client</button>}
+              <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>beginEntryEdit(row)}>Edit</button>
+              <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>void deleteEntry(row)}>Delete</button>
+            </>}
+          </div>
+        </article>)}
+      </div>
+      <div className="aw-finance-register-scroll hidden md:block" role="region" aria-label="All Meta Ads register" tabIndex={0}>
         <table className="aw-finance-register"><thead><tr>
           {adminFinance&&<th>Actions</th>}
           {["Date","Paid by","Client","Amount","Payment method","Status","Recorded by","Notes","Receipt","Approval"].map(label=><th key={label}>{label}</th>)}
