@@ -46,6 +46,7 @@ const endpoints: Record<string, string[]> = {
   "finance/entries": ["GET", "POST"],
   "finance/assignees": ["GET"],
   "finance/meta-ad-clients": ["GET"],
+  "finance/meta-ads-distribution": ["GET"],
   "finance/summary": ["GET"],
   "finance/export": ["GET"],
   "finance/report-breakdown": ["GET"],
