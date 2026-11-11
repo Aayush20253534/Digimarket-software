@@ -281,7 +281,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if(path==="service-deliveries"){
     for(const key of ["clientId","mine"]){const value=request.nextUrl.searchParams.get(key);if(value)url.searchParams.set(key,value);}
   }
-  if (path === "approvals" || ["finance/entries","finance/summary","finance/export"].includes(path)) {
+  if (path === "approvals" || ["finance/entries","finance/summary","finance/export","finance/meta-ads-distribution"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");
     if (view && (path==="approvals"?["mine","queue","history"]:["mine","all"]).includes(view)) url.searchParams.set("view", view);
   }
@@ -321,6 +321,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
   // Preserve the validated drill-down filters through the Next.js gateway.
   // The backend still validates kind, dates, search and pagination.
+  // The Meta Ads dashboard must receive the same view and inclusive DATE
+  // range as the ledger. The API owns permission and date validation.
+  if(path==="finance/meta-ads-distribution"){
+    for(const key of ["from","to"]){
+      const value=request.nextUrl.searchParams.get(key);
+      if(value!==null)url.searchParams.set(key,value);
+    }
+  }
   if(path==="finance/report-breakdown"||path==="finance/report-breakdown/export"){
     for(const key of ["kind","from","to","q","page","limit"]){
       const v=request.nextUrl.searchParams.get(key);
