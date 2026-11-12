@@ -26,6 +26,7 @@ function fixture() {
   const salaryFundingAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const salaryFundingFindMany=vi.fn().mockResolvedValue([]);
   const settlementFindMany=vi.fn().mockResolvedValue([]);
+  const settlementFindFirst=vi.fn().mockResolvedValue(null);
   const settlementAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const salaryPaymentAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const db = {
@@ -34,12 +35,12 @@ function fixture() {
     financialTransaction: { findMany: findTransactions, groupBy: groupTransactions },
     salaryFundingAllocation:{aggregate:salaryFundingAggregate,findMany:salaryFundingFindMany},
     salaryPayment:{aggregate:salaryPaymentAggregate},
-    internalSettlement:{findMany:settlementFindMany,aggregate:settlementAggregate},
+    internalSettlement:{findMany:settlementFindMany,findFirst:settlementFindFirst,aggregate:settlementAggregate},
   } as unknown as PrismaClient;
   return {
     service: new FinanceService(db),
     findCategories, findTransactions, groupTransactions, salaryFundingAggregate, salaryFundingFindMany,
-    salaryPaymentAggregate,settlementAggregate,categoryId,
+    salaryPaymentAggregate,settlementAggregate,settlementFindFirst,categoryId,
   };
 }
 
@@ -123,33 +124,56 @@ describe("Meta Ads register scopes", () => {
     });
   });
 
-  it("applies incoming settlement credit only to recipient personal stats, never agency accounting", async()=>{
-    const {service,groupTransactions,salaryFundingAggregate,settlementAggregate}=fixture();
-    groupTransactions.mockImplementation(async ({where}:{where:{clientId:unknown}})=>
-      where.clientId===null?[
+  it("resets personal expenses after a settlement without changing agency transactions", async()=>{
+    const {service,groupTransactions,salaryFundingAggregate,settlementAggregate,settlementFindFirst}=fixture();
+    const checkpoint=new Date("2026-11-12T12:00:00.000Z");
+    settlementFindFirst.mockResolvedValue({createdAt:checkpoint});
+    groupTransactions.mockImplementation(async ({where}:{where:{
+      clientId:unknown;kind?:string;
+    }})=>{
+      if(where.clientId!==null)return [];
+      if(where.kind==="EXPENSE")return [];
+      return [
         {kind:"INCOME",status:"POSTED",_sum:{amount:new Prisma.Decimal("5000.0000")},_count:{_all:1}},
         {kind:"EXPENSE",status:"POSTED",_sum:{amount:new Prisma.Decimal("3500.0000")},_count:{_all:1}}
-      ]:[]);
-    salaryFundingAggregate.mockResolvedValue({_sum:{amount:new Prisma.Decimal("700.0000")}});
+      ];
+    });
+    salaryFundingAggregate.mockImplementation(async ({where}:{where:{
+      payment:{createdAt?:unknown}
+    }})=>where.payment.createdAt?{_sum:{amount:null}}:{_sum:{amount:new Prisma.Decimal("700.0000")}});
     settlementAggregate.mockResolvedValue({_sum:{amount:new Prisma.Decimal("1200.5000")}});
     const personal=await service.totals(actor,"mine");
+    expect(personal.personalSettlementResetAt).toBe(checkpoint.toISOString());
     expect(personal.receivedInternalSettlement).toBe("1200.5000");
     expect(personal.postedExpenseBeforeSettlement).toBe("3500.0000");
-    expect(personal.postedExpense).toBe("2299.5000");
-    expect(personal.postedExpenseIncludingSalary).toBe("2999.5000");
+    expect(personal.postedExpense).toBe("0.0000");
+    expect(personal.postedSalaryExpense).toBe("0.0000");
+    expect(personal.postedExpenseIncludingSalary).toBe("0.0000");
     expect(personal.postedIncome).toBe("5000.0000");
-    expect(personal.postedNetBeforeSalary).toBe("2700.5000");
-    expect(personal.postedNet).toBe("2000.5000");
+    expect(personal.postedNetBeforeSalary).toBe("5000.0000");
+    expect(personal.postedNet).toBe("5000.0000");
+    expect(groupTransactions.mock.calls[1][0].where).toMatchObject({
+      kind:"EXPENSE",OR:[
+        {status:"POSTED",OR:[{postedAt:{gt:checkpoint}},{postedAt:null,createdAt:{gt:checkpoint}}]},
+        {status:{not:"POSTED"},createdAt:{gt:checkpoint}}
+      ]
+    });
+    expect(salaryFundingAggregate.mock.calls[0][0].where.payment.createdAt).toEqual({gt:checkpoint});
+    expect(settlementFindFirst.mock.calls[0][0].where.OR).toEqual([
+      {senderId:actor.userId},{recipientId:actor.userId}
+    ]);
     expect(settlementAggregate.mock.calls[0][0].where).toEqual({
       organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null
     });
     const allActor={...actor,permissions:new Set(["finance.entry.read.own","finance.read.all"])};
     const agency=await service.totals(allActor,"all");
+    expect(agency.personalSettlementResetAt).toBe(null);
     expect(agency.postedExpense).toBe("3500.0000");
     expect(agency.postedExpenseBeforeSettlement).toBe("3500.0000");
     expect(agency.receivedInternalSettlement).toBe("0.0000");
     expect(agency.postedNet).toBe("1500.0000");
     expect(settlementAggregate).toHaveBeenCalledTimes(1);
+    expect(settlementFindFirst).toHaveBeenCalledTimes(1);
   });
 
   it("allows a negative net if posted client ad spend exceeds posted income", async () => {
