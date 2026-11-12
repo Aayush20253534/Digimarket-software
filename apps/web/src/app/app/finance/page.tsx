@@ -507,7 +507,7 @@ export default function FinancePage(){
         {" Prior posted expenses: "+money(totals.postedExpenseBeforeSettlement??"0")+". "}
         {"Current-cycle expenses: "+money(totals.postedExpense)+". "}
         Historical transactions remain in the register and agency totals are unchanged.
-      </p>
+      </p>}
     <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
       <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
         <h2>{view==="mine"?"Personal income and current-cycle expenses":"Posted agency income and expenses"}</h2>
