@@ -129,10 +129,10 @@ describe("Meta Ads register scopes", () => {
     const checkpoint=new Date("2026-11-12T12:00:00.000Z");
     settlementFindFirst.mockResolvedValue({createdAt:checkpoint});
     groupTransactions.mockImplementation(async ({where}:{where:{
-      clientId:unknown;kind?:string;
+      clientId:unknown;OR?:unknown;
     }})=>{
       if(where.clientId!==null)return [];
-      if(where.kind==="EXPENSE")return [];
+      if(where.OR)return [];
       return [
         {kind:"INCOME",status:"POSTED",_sum:{amount:new Prisma.Decimal("5000.0000")},_count:{_all:1}},
         {kind:"EXPENSE",status:"POSTED",_sum:{amount:new Prisma.Decimal("3500.0000")},_count:{_all:1}}
@@ -149,15 +149,21 @@ describe("Meta Ads register scopes", () => {
     expect(personal.postedExpense).toBe("0.0000");
     expect(personal.postedSalaryExpense).toBe("0.0000");
     expect(personal.postedExpenseIncludingSalary).toBe("0.0000");
-    expect(personal.postedIncome).toBe("5000.0000");
-    expect(personal.postedNetBeforeSalary).toBe("5000.0000");
-    expect(personal.postedNet).toBe("5000.0000");
+    expect(personal.postedIncome).toBe("0.0000");
+    expect(personal.pendingIncome).toBe("0.0000");
+    expect(personal.pendingExpense).toBe("0.0000");
+    expect(personal.clientAdSpend.posted).toBe("0.0000");
+    expect(personal.clientAdSpend.pending).toBe("0.0000");
+    expect(personal.groups).toEqual([]);
+    expect(personal.postedNetBeforeSalary).toBe("0.0000");
+    expect(personal.postedNet).toBe("0.0000");
     expect(groupTransactions.mock.calls[1][0].where).toMatchObject({
-      kind:"EXPENSE",OR:[
+      OR:[
         {status:"POSTED",OR:[{postedAt:{gt:checkpoint}},{postedAt:null,createdAt:{gt:checkpoint}}]},
         {status:{not:"POSTED"},createdAt:{gt:checkpoint}}
       ]
     });
+    expect(groupTransactions.mock.calls[1][0].where).not.toHaveProperty("kind");
     expect(salaryFundingAggregate.mock.calls[0][0].where.payment.createdAt).toEqual({gt:checkpoint});
     expect(settlementFindFirst.mock.calls[0][0].where.OR).toEqual([
       {senderId:actor.userId},{recipientId:actor.userId}
@@ -174,6 +180,48 @@ describe("Meta Ads register scopes", () => {
     expect(agency.postedNet).toBe("1500.0000");
     expect(settlementAggregate).toHaveBeenCalledTimes(1);
     expect(settlementFindFirst).toHaveBeenCalledTimes(1);
+  });
+
+
+  it("calculates every personal summary card from the current settlement cycle", async()=>{
+    const {service,groupTransactions,salaryFundingAggregate,settlementFindFirst}=fixture();
+    const checkpoint=new Date("2026-11-12T12:00:00.000Z");
+    settlementFindFirst.mockResolvedValue({createdAt:checkpoint});
+    groupTransactions.mockImplementation(async ({where}:{where:{
+      clientId:unknown;OR?:unknown
+    }})=>{
+      if(where.clientId!==null)return where.OR?[
+        {status:"POSTED",_sum:{amount:new Prisma.Decimal("50")},_count:{_all:1}},
+        {status:"PENDING",_sum:{amount:new Prisma.Decimal("12")},_count:{_all:1}}
+      ]:[];
+      if(where.OR)return [
+        {kind:"INCOME",status:"POSTED",_sum:{amount:new Prisma.Decimal("200")},_count:{_all:1}},
+        {kind:"INCOME",status:"PENDING",_sum:{amount:new Prisma.Decimal("30")},_count:{_all:1}},
+        {kind:"EXPENSE",status:"POSTED",_sum:{amount:new Prisma.Decimal("40")},_count:{_all:1}},
+        {kind:"EXPENSE",status:"PENDING",_sum:{amount:new Prisma.Decimal("7")},_count:{_all:1}}
+      ];
+      return [
+        {kind:"INCOME",status:"POSTED",_sum:{amount:new Prisma.Decimal("10200")},_count:{_all:2}},
+        {kind:"EXPENSE",status:"POSTED",_sum:{amount:new Prisma.Decimal("3040")},_count:{_all:2}}
+      ];
+    });
+    salaryFundingAggregate.mockResolvedValue({_sum:{amount:new Prisma.Decimal("10")}});
+    const current=await service.totals(actor,"mine");
+    expect(current.postedIncome).toBe("200.0000");
+    expect(current.pendingIncome).toBe("30.0000");
+    expect(current.postedExpense).toBe("40.0000");
+    expect(current.pendingExpense).toBe("7.0000");
+    expect(current.postedSalaryExpense).toBe("10.0000");
+    expect(current.postedExpenseIncludingSalary).toBe("50.0000");
+    expect(current.clientAdSpend).toEqual({posted:"50.0000",pending:"12.0000",count:2});
+    expect(current.postedNet).toBe("100.0000");
+    expect(current.postedExpenseBeforeSettlement).toBe("3040.0000");
+    expect(groupTransactions).toHaveBeenCalledTimes(3);
+    expect(groupTransactions.mock.calls[1][0].where).toMatchObject({
+      OR:[{status:"POSTED",OR:[{postedAt:{gt:checkpoint}},{postedAt:null,createdAt:{gt:checkpoint}}]},
+        {status:{not:"POSTED"},createdAt:{gt:checkpoint}}]
+    });
+    expect(groupTransactions.mock.calls[1][0].where).not.toHaveProperty("kind");
   });
 
   it("allows a negative net if posted client ad spend exceeds posted income", async () => {

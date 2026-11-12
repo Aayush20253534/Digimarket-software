@@ -538,25 +538,30 @@ export default function FinancePage(){
         <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(value)}</p>
         <p className="mt-2 text-xs text-slate-500">{label==="Net posted"
           ?(view==="mine"&&isFounder?"Income − current-cycle expenses − client Meta Ads − salary funded":"Income − agency expenses − posted client Meta Ads − salary funded")
-          :label==="Posted expenses"&&view==="mine"&&isFounder?"Since latest internal settlement":(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
+          :view==="mine"&&isFounder&&totals.personalSettlementResetAt
+            ?"Since latest internal settlement · "+totals.currency
+            :(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
       </Card>)}
       <Card>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Client Meta Ads spend</p>
         <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(totals.clientAdSpend?.posted??"0.0000")}</p>
-        <p className="mt-2 text-xs text-slate-500">Posted · Pending: {money(totals.clientAdSpend?.pending??"0.0000")}</p>
+        <p className="mt-2 text-xs text-slate-500">
+          {view==="mine"&&isFounder&&totals.personalSettlementResetAt?"Since latest settlement · ":""}
+          Posted · Pending: {money(totals.clientAdSpend?.pending??"0.0000")}
+        </p>
       </Card>
     </div>
     {isFounder&&view==="mine"&&totals.personalSettlementResetAt&&
       <p className="text-sm text-slate-400" role="status">
-        Expense cycle reset: {new Date(totals.personalSettlementResetAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Kolkata"})}.
+        My entries summary reset: {new Date(totals.personalSettlementResetAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Kolkata"})}.
         {" Prior posted expenses: "+money(totals.postedExpenseBeforeSettlement??"0")+". "}
-        {"Current-cycle expenses: "+money(totals.postedExpense)+". "}
+        {"All summary cards show transactions since this settlement. Current-cycle expenses: "+money(totals.postedExpense)+". "}
         Historical transactions remain in the register and agency totals are unchanged.
       </p>}
     <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
       <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
-        <h2>{view==="mine"?"Personal income and current-cycle expenses":"Posted agency income and expenses"}</h2>
-        <p>{view==="mine"?"An active settlement restarts personal expense reporting for both founders. Agency records and salary history remain unchanged.":"Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income."}</p>
+        <h2>{view==="mine"?"Personal current-cycle income and expenses":"Posted agency income and expenses"}</h2>
+        <p>{view==="mine"?"An active settlement restarts all personal summary totals for both founders. Agency records and salary history remain unchanged.":"Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income."}</p>
        </div><Scale size={20} aria-hidden="true"/></header>
       <div className="aw-v5-finance-compare">
        {([["Income",totals.postedIncome,postedIncomeValue],
@@ -570,7 +575,7 @@ export default function FinancePage(){
           </div>
          </div>)}
       </div>
-      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Personal expense-cycle resets affect only My Entries summaries; they never reverse agency expenses or delete the transaction history.</p>
+      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Personal settlement-cycle resets affect only My Entries summaries; they never reverse agency expenses or delete the transaction history.</p>
     </section>
     {isFounder&&<section id="finance-salary" className="rounded-xl border border-white/10 p-5 space-y-3" aria-label="Separate founder salary funding expenses">
       <div className="flex flex-wrap justify-between gap-2"><div><h2 className="font-semibold text-lg">Founder-funded salary expenses</h2>

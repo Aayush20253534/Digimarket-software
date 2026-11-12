@@ -674,7 +674,7 @@ export class FinanceService {
   async totals(actor:Principal,view:View){
     const clientAdWhere=await this.metaAdsWhere(actor,view,"client_ads");
     // A founder's latest active internal settlement (incoming OR outgoing)
-    // starts a new personal expense reporting cycle. The agency ledger never
+    // starts a new personal summary reporting cycle. The agency ledger never
     // resets. Use the actual record timestamp, not an editable occurredOn.
     const checkpoint=view==="mine"&&isFounder(actor)
       ?await this.db.internalSettlement.findFirst({
@@ -690,13 +690,13 @@ export class FinanceService {
       {status:"POSTED",OR:[{postedAt:{gt:resetAt}},{postedAt:null,createdAt:{gt:resetAt}}]},
       {status:{not:"POSTED"},createdAt:{gt:resetAt}}
     ]}:{};
-    const [allGrouped,currentExpenseGroups,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
+    const [allGrouped,currentCycleGroups,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
       this.db.financialTransaction.groupBy({
         by:["kind","status"],where:this.scope(actor,view),
         _sum:{amount:true},_count:{_all:true},
       }),
       resetAt?this.db.financialTransaction.groupBy({
-        by:["kind","status"],where:{...this.scope(actor,view),kind:"EXPENSE",...sinceReset},
+        by:["kind","status"],where:{...this.scope(actor,view),...sinceReset},
         _sum:{amount:true},_count:{_all:true},
       }):Promise.resolve(null),
       this.db.financialTransaction.groupBy({
@@ -717,9 +717,9 @@ export class FinanceService {
           _sum:{amount:true}
         }):Promise.resolve(null),
     ]);
-    const grouped=resetAt
-      ?[...allGrouped.filter(g=>g.kind!=="EXPENSE"),...(currentExpenseGroups??[])]
-      :allGrouped;
+    // Every My Entries card must use the same checkpoint, including posted
+    // and pending income. Lifetime amounts are retained only for reconciliation.
+    const grouped=resetAt?(currentCycleGroups??[]):allGrouped;
     const entries=grouped.map(g=>({kind:g.kind,status:g.status,
       amount:(g._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:g._count._all}));
     const sumFrom=(rows:typeof allGrouped,kind:FinanceKind,status:"POSTED"|"PENDING")=>rows
