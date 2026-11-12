@@ -78,6 +78,11 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   app.get("/api/v1/finance/internal-settlements/founders",authenticate,async(_req,res)=>{
     res.set("Cache-Control","no-store").json({data:await internal.founders(actor(res))});
   });
+  // Personal history includes incoming and outgoing settlements regardless
+  // of the 200-entry limit in the combined financial register.
+  app.get("/api/v1/finance/internal-settlements/mine",authenticate,async(_req,res)=>{
+    res.set("Cache-Control","no-store").json({data:await internal.projectMine(actor(res))});
+  });
   app.post("/api/v1/finance/internal-settlements",authenticate,async(req,res)=>{
     const input=parse(internalInput,req.body);
     res.status(201).json({data:await internal.record(actor(res),input)});

@@ -63,7 +63,9 @@ export default function FinancePage(){
   const canCreate=!!session?.identity.permissions.includes("finance.entry.create");
   const canReadOwn=!!session?.identity.permissions.includes("finance.entry.read.own");
   const [view,setView]=useState<View>("mine");
-  useEffect(()=>{if(canAll)setView("all");},[canAll]);
+  // Agency-wide founders open My Entries first so received settlements are visible.
+  // Non-founder administrators keep the agency-first view.
+  useEffect(()=>{if(canAll&&!isFounder)setView("all");},[canAll,isFounder]);
   const [editingCategory,setEditingCategory]=useState<Category|null>(null);
   const [editedCategoryName,setEditedCategoryName]=useState("");
   const [editingEntry,setEditingEntry]=useState<Entry|null>(null);
@@ -100,6 +102,8 @@ export default function FinancePage(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [success,setSuccess]=useState("");
+  const [settlementHistory,setSettlementHistory]=useState<Entry[]>([]);
+  const [settlementHistoryError,setSettlementHistoryError]=useState("");
   const [settlementPeers,setSettlementPeers]=useState<Assignee[]>([]);
   const [settlementPeer,setSettlementPeer]=useState("");
   const [settlementAmount,setSettlementAmount]=useState("");
@@ -160,18 +164,30 @@ export default function FinancePage(){
     const target=view==="all"&&canAll?"all":"mine";
     // Treat the ledger and summary independently: an unavailable summary must
     // never make saved transactions disappear from the register on refresh.
-    const [ledger,clientAds,metaAds,sums,cats,policies]=await Promise.allSettled([
+    const [ledger,clientAds,metaAds,sums,cats,policies,settlements]=await Promise.allSettled([
       request<Entry[]>("/finance/entries?view="+target),
       request<Entry[]>("/finance/entries?view="+target+"&scope=client_ads"),
       request<Entry[]>("/finance/entries?view="+target+"&scope=meta_ads"),
       request<Totals>("/finance/summary?view="+target),
       request<Category[]>("/finance/categories"),
       request<FinancePolicy[]>("/approval-policies"),
+      target==="mine"&&isFounder&&canReadOwn
+        ?request<Entry[]>("/finance/internal-settlements/mine")
+        :Promise.resolve([] as Entry[]),
     ]);
     if(sequence!==reloadSequence.current)return;
     if(ledger.status==="fulfilled"){
       setEntries(ledger.value);
       setHasLoadedEntries(true);
+    }
+    if(settlements.status==="fulfilled"){
+      setSettlementHistory(settlements.value);
+      setSettlementHistoryError("");
+    }else{
+      // The existing ledger supplies a fallback during staggered deployments.
+      if(ledger.status==="fulfilled")
+        setSettlementHistory(ledger.value.filter(row=>row.sourceType==="SETTLEMENT"));
+      setSettlementHistoryError("Separate settlement history could not be refreshed.");
     }
     // Defensively filter by the Meta Ads category as an older API version
     // may ignore unsupported scope query parameters and return unrelated entries.
@@ -200,7 +216,7 @@ export default function FinancePage(){
     setError(problems.join(" "));
     setLoading(false);
     setMetaDistributionRefresh(v=>v+1);
-  },[request,view,canReadOwn,canAll]);
+  },[request,view,canReadOwn,canAll,isFounder]);
   useEffect(()=>{
     if(!isFounder)return;
     let active=true;
@@ -471,6 +487,7 @@ export default function FinancePage(){
       <a href="#finance-summary">Overview</a>
       {canAll&&<a href="#finance-recurring">Recurring agreements</a>}
       {canCreate&&<a href="#finance-entry">New entry</a>}
+      {isFounder&&view==="mine"&&<a href="#finance-settlement-history">Received & sent settlements</a>}
       {isFounder&&view==="mine"&&<a href="#finance-internal-settlement">Internal Settlement</a>}
       <a href="#finance-meta-ads">Meta Ads spend</a>
       {isFounder&&<a href="#finance-salary">Founder-funded salary</a>}
@@ -480,6 +497,34 @@ export default function FinancePage(){
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
     </div>
+    {isFounder&&canReadOwn&&view==="mine"&&
+      <section id="finance-settlement-history" aria-label="My internal settlements">
+        <Card title="Internal settlements received & sent"
+          description="The recipient sees Settlement In and the sender sees Settlement Out. These are private, informational records that do not change company finances.">
+          {settlementHistoryError&&<p role="status" className="text-sm text-amber-400">{settlementHistoryError}</p>}
+          {loading&&!settlementHistory.length?<Spinner label="Loading settlement history…"/>:
+           !settlementHistory.length?<p className="text-sm text-slate-400">No internal settlements received or sent.</p>:
+           <div className="space-y-3" role="region" aria-label="Internal settlement history">
+             {settlementHistory.map(row=>
+               <div key={row.id} data-testid="personal-settlement-entry"
+                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 p-3">
+                 <div className="space-y-1">
+                   <p className="font-semibold">{row.settlementDirection==="INCOMING"?"Settlement In · Received from ":"Settlement Out · Sent to "}{row.merchantOrSource}</p>
+                   <p className="text-xs text-slate-400">{row.occurredOn} · {row.method.replaceAll("_"," ")} · {row.status}</p>
+                   {row.description&&<p className="text-sm text-slate-400">{row.description}</p>}
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <strong className={row.settlementDirection==="INCOMING"?"text-emerald-400":"text-slate-200"}>
+                     {row.settlementDirection==="INCOMING"?"+":"−"}{money(row.amount)}
+                   </strong>
+                   {row.settlementDirection==="OUTGOING"&&row.status!=="CANCELLED"&&
+                     <button className="btn-secondary text-xs" type="button" disabled={busy}
+                       onClick={()=>void voidSettlement(row)}>Void</button>}
+                 </div>
+               </div>)}
+           </div>}
+        </Card>
+      </section>}
     <div id="finance-summary" className="aw-finance-summary-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="Financial totals">
       {([
         ["Posted income",totals.postedIncome],

@@ -4,9 +4,9 @@ Internal Settlement records an **informational founder-to-founder movement**, wi
 
 ## Behavior
 
-- Open **Finance → My Entries → Internal Settlement**.
+- Open **Finance → My Entries → Internal Settlement**. Founder accounts default to My Entries, not the agency-wide register.
 - The logged-in founder is the sender. Select an **active founder in the same organization** as recipient; enter amount (positive INR with up to two decimal places), date, method and optional note.
-- Saving creates **one** InternalSettlement record. It appears in the sender's **My financial register** as **Settlement Out**, and in the recipient's **My financial register** as **Settlement In**, both tagged **Internal Settlement**.
+- Saving creates **one** InternalSettlement record. It appears in the sender's **My financial register** as **Settlement Out**, and in the recipient's **My financial register** as **Settlement In**, both tagged **Internal Settlement**. Both founders see the same record in a dedicated **Internal settlements received & sent** section, independent of the finance register's 200-item limit.
 - The two entries are read-only projections of one record, so they cannot diverge. They are **not** company income or company expense, and are marked **Not included in company totals**. They can be searched and exported in each founder's personal Finance CSV. They are not shown in Agency totals/register, Meta Ads, company financial exports or company reports.
 - Only the sending founder can void an entry with a reason. Voiding preserves both personal-history entries as CANCELLED, restores the prior personal expense cycle, and does not change agency accounting.
 - No actual transfer is performed or verified by DigiMarket.

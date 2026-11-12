@@ -125,6 +125,22 @@ try{
  assert.equal(outgoing[0].merchantOrSource,"Founder B");
  assert.equal(incoming[0].merchantOrSource,"Founder A");
  assert.equal(outgoing[0].settlementId,incoming[0].settlementId);
+ // The dedicated history API reads the same record from both founder accounts.
+ const sentHistory=await settlements.projectMine(a);
+ const receivedHistory=await settlements.projectMine(b);
+ assert.equal(sentHistory.length,1);
+ assert.equal(receivedHistory.length,1);
+ assert.equal(sentHistory[0].id,receivedHistory[0].id);
+ assert.equal(sentHistory[0].settlementId,saved.id);
+ assert.equal(receivedHistory[0].settlementDirection,"INCOMING");
+ assert.equal(sentHistory[0].settlementDirection,"OUTGOING");
+ assert.equal(receivedHistory[0].enteredById,b.userId);
+ assert.equal(receivedHistory[0].merchantOrSource,"Founder A");
+ assert.equal(sentHistory[0].merchantOrSource,"Founder B");
+ assert.equal(receivedHistory[0].status,"POSTED");
+ assert.deepEqual(await settlements.projectMine(c),[]);
+ await assert.rejects(()=>settlements.projectMine(staff),forbidden(403));
+ await assert.rejects(()=>settlements.projectMine(stranger),forbidden(403));
  assert.equal((await finance.entries(a,"all")).some(x=>x.sourceType==="SETTLEMENT"),false);
  assert.equal((await finance.entries(a,"mine")).some(x=>x.id===oldA.id),true);
  assert.equal((await finance.entries(b,"mine")).some(x=>x.id===oldB.id),true);
@@ -168,6 +184,7 @@ try{
  await assert.rejects(()=>settlements.void(a,saved.id,"Another void"),forbidden(409));
  assert.equal((await finance.entries(a,"mine")).find(x=>x.sourceType==="SETTLEMENT")?.status,"CANCELLED");
  assert.equal((await finance.entries(b,"mine")).find(x=>x.sourceType==="SETTLEMENT")?.status,"CANCELLED");
+ assert.equal((await settlements.projectMine(b)).find(row=>row.settlementId===saved.id)?.status,"CANCELLED");
  assert.deepEqual(await finance.totals(a,"all"),agencyAfterNew);
  const restoredA=await finance.totals(a,"mine"),restoredB=await finance.totals(b,"mine");
  assert.equal(restoredA.personalSettlementResetAt,null);
