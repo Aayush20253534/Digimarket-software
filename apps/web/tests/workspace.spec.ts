@@ -973,11 +973,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await deliveryForm.getByRole("button",{name:"Create dated checklist"}).click();
   await expect(workspace.getByRole("heading",{name:"CI three-day interval"})).toBeVisible();
   await expect(workspace.getByText("Every 3 days")).toBeVisible();
-  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(2);
+  // Oct 28–Nov 3 is the first week (three deliveries), Nov 4–8 the second (one).
+  // Navigate to week one regardless of the CI runner's current calendar date.
+  const previousIntervalWeek=workspace.getByRole("button",{name:"Previous week for CI three-day interval"});
+  if(await previousIntervalWeek.isEnabled())await previousIntervalWeek.click();
+  await expect(previousIntervalWeek).toBeDisabled();
+  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(3);
   await workspace.getByRole("button",{name:"Next week for CI three-day interval"}).click();
-  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(2);
-  await workspace.getByRole("button",{name:"Previous week for CI three-day interval"}).click();
-  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(2);
+  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(1);
+  await previousIntervalWeek.click();
+  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(3);
   await workspace.getByRole("button",{name:"Edit schedule / reassign"}).first().click();
   await expect(deliveryForm.getByLabel("Repeat pattern")).toHaveValue("interval");
   await expect(deliveryForm.getByLabel("Repeat every")).toHaveValue("3");
