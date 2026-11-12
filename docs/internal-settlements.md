@@ -8,18 +8,18 @@ Internal Settlement records an **informational founder-to-founder movement**, wi
 - The logged-in founder is the sender. Select an **active founder in the same organization** as recipient; enter amount (positive INR with up to two decimal places), date, method and optional note.
 - Saving creates **one** InternalSettlement record. It appears in the sender's **My financial register** as **Settlement Out**, and in the recipient's **My financial register** as **Settlement In**, both tagged **Internal Settlement**.
 - The two entries are read-only projections of one record, so they cannot diverge. They are **not** company income or company expense, and are marked **Not included in company totals**. They can be searched and exported in each founder's personal Finance CSV. They are not shown in Agency totals/register, Meta Ads, company financial exports or company reports.
-- Only the sending founder can void an entry with a reason. Voiding preserves both personal-history entries as CANCELLED and does not change accounting.
+- Only the sending founder can void an entry with a reason. Voiding preserves both personal-history entries as CANCELLED, restores the prior personal expense cycle, and does not change agency accounting.
 - No actual transfer is performed or verified by DigiMarket.
 
 ## Accounting exclusion
 
 The InternalSettlement model is separate from FinancialTransaction, FinancialCategory, ApprovalRequest, SalaryPayment, SalaryFundingAllocation, RevenueRecognition and Payment. None of these records are created, updated, reversed, or deleted by settlement actions. The agency summary, company charts, company posted net, founder funding accounts, salary balances, assets and profitability remain based on actual financial tables and **never include InternalSettlement**.
 
-**Recipient-only personal adjustment:** An active incoming settlement reduces the **recipient's** displayed Finance **My Entries → Posted Expenses** and **Expenses incl. salary** by that amount. Their **Net Posted** and **Net Posted before salary** increase by the same amount. Their Posted Income, pending totals and actual expense transactions stay unchanged. The sender's personal expense and net totals do **not** change. The Agency view does **not** change.
+**Personal expense-cycle reset:** When an InternalSettlement is recorded, the sender and recipient each begin a new **My Entries** expense cycle. All pre-settlement posted expense, pending expense, attributed salary expense, and Client Meta Ads summary amounts move to historical figures and the **My Entries** expense counters start at **₹0**. Subsequent transactions accrue normally from zero. The reset is based on the server-side settlement creation timestamp, not the editable settlement date. Posted transactions are selected by their posting timestamp (with a creation-time fallback); pending transactions by their creation timestamp. Backdated transactions submitted later belong to the new cycle.
 
-The personal summary exposes `receivedInternalSettlement` and `postedExpenseBeforeSettlement` to reconcile the adjustment. Multiple active incoming settlements are added together; voided settlements are excluded. If the credit exceeds posted expenses, the displayed personal expense figure may be negative. This is a *net personal attribution*, not a refund, real bank balance, or negative company expense.
+The personal summary exposes `personalSettlementResetAt`, `postedExpenseBeforeSettlement`, and `receivedInternalSettlement` for reconciliation. Settlement amounts are informational; **they are not subtracted from company or personal expenses**. A newer settlement creates the next cycle; voiding a settlement restores the previous active cutoff, and voiding all settlements returns the full historical personal expense total.
 
-The "INCOMING" and "OUTGOING" directions remain display-only entries in the personal register. Only the recipient's **computed personal summary** is adjusted, with no journal entries or underlying asset transfers.
+**No company changes:** Historical FinancialTransaction records, salary payments, Meta Ads distribution reports, personal register entries and CSV exports remain intact. Agency totals, income, assets, salary funding balances, founder ledger balances and profitability do not reset. This is a personal reporting-period reset, **not proof that all liabilities were actually paid**.
 
 ## Permissions and integrity
 
@@ -34,4 +34,4 @@ The "INCOMING" and "OUTGOING" directions remain display-only entries in the pers
 
 Apply the additive PostgreSQL migration `20261106122500_internal_settlements` via the existing Render backend startup migration procedure. Deploy backend and Vercel frontend from the same merged `main` commit. Do not reset the production database.
 
-The Finance CI integration smoke covers sender/recipient mirroring, agency and staff isolation, CSV, duplicate submissions, voiding and **unchanged sender and agency summaries, unchanged financial transactions and founder balances, recipient-only personal summary adjustments, and reset after voiding**.
+The Finance CI integration smoke covers sender/recipient mirroring, agency and staff isolation, CSV, duplicates, **both founders' personal expense-cycle reset, new spending after a reset, a second reset and void restoration**, unchanged agency totals, unchanged transaction history and founder balances.

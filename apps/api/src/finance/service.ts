@@ -673,58 +673,74 @@ export class FinanceService {
 
   async totals(actor:Principal,view:View){
     const clientAdWhere=await this.metaAdsWhere(actor,view,"client_ads");
-    const [grouped,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
+    // A founder's latest active internal settlement (incoming OR outgoing)
+    // starts a new personal expense reporting cycle. The agency ledger never
+    // resets. Use the actual record timestamp, not an editable occurredOn.
+    const checkpoint=view==="mine"&&isFounder(actor)
+      ?await this.db.internalSettlement.findFirst({
+        where:{organizationId:actor.organizationId,voidedAt:null,
+          OR:[{senderId:actor.userId},{recipientId:actor.userId}]},
+        orderBy:[{createdAt:"desc"},{id:"desc"}],
+        select:{createdAt:true}
+      }):null;
+    const resetAt=checkpoint?.createdAt??null;
+    // Approvals posted after a settlement belong to the new cycle even if
+    // submitted earlier. Pending records use their original creation time.
+    const sinceReset:Prisma.FinancialTransactionWhereInput=resetAt?{OR:[
+      {status:"POSTED",OR:[{postedAt:{gt:resetAt}},{postedAt:null,createdAt:{gt:resetAt}}]},
+      {status:{not:"POSTED"},createdAt:{gt:resetAt}}
+    ]}:{};
+    const [allGrouped,currentExpenseGroups,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
       this.db.financialTransaction.groupBy({
         by:["kind","status"],where:this.scope(actor,view),
         _sum:{amount:true},_count:{_all:true},
       }),
+      resetAt?this.db.financialTransaction.groupBy({
+        by:["kind","status"],where:{...this.scope(actor,view),kind:"EXPENSE",...sinceReset},
+        _sum:{amount:true},_count:{_all:true},
+      }):Promise.resolve(null),
       this.db.financialTransaction.groupBy({
-        by:["status"],where:clientAdWhere,
+        by:["status"],where:{...clientAdWhere,...sinceReset},
         _sum:{amount:true},_count:{_all:true},
       }),
       view==="all"?this.db.salaryPayment.aggregate({
         where:{organizationId:actor.organizationId,status:"PAID"},_sum:{amount:true}
       }):this.db.salaryFundingAllocation.aggregate({
-        where:{payment:{organizationId:actor.organizationId,status:"PAID"},
+        where:{payment:{organizationId:actor.organizationId,status:"PAID",
+          ...(resetAt?{createdAt:{gt:resetAt}}:{})},
          account:{organizationId:actor.organizationId,founderUserId:actor.userId}},_sum:{amount:true}
       }),
-      // Settlement credits are personal display-only offsets, not real
-      // FinancialTransaction income or agency expense reversals.
+      // Amount is a personal memo, not a subtraction from expense accounts.
       view==="mine"&&isFounder(actor)
         ?this.db.internalSettlement.aggregate({
           where:{organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null},
           _sum:{amount:true}
         }):Promise.resolve(null),
     ]);
+    const grouped=resetAt
+      ?[...allGrouped.filter(g=>g.kind!=="EXPENSE"),...(currentExpenseGroups??[])]
+      :allGrouped;
     const entries=grouped.map(g=>({kind:g.kind,status:g.status,
       amount:(g._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:g._count._all}));
-    const sum=(kind:FinanceKind,status:"POSTED"|"PENDING")=>grouped
+    const sumFrom=(rows:typeof allGrouped,kind:FinanceKind,status:"POSTED"|"PENDING")=>rows
       .filter(g=>g.kind===kind&&g.status===status)
       .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
+    const sum=(kind:FinanceKind,status:"POSTED"|"PENDING")=>sumFrom(grouped,kind,status);
     const income=sum("INCOME","POSTED"),expense=sum("EXPENSE","POSTED");
     const clientSum=(status:"POSTED"|"PENDING")=>clientGroups
       .filter(g=>g.status===status)
       .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
-    // Client-funded Meta Ads are outside agency expenses, but posted spend
-    // reduces the net amount retained from received income. Pending, rejected
-    // and cancelled client spending must never reduce the posted net.
     const postedClientAds=clientSum("POSTED");
-    // One salary payment is a single agency expense, regardless of how many
-    // founder accounts funded it. "Mine" charges the funding founder, not
-    // the person recording the payment or receiving their salary.
     const postedSalaryExpense=salaryExpense._sum.amount??new Prisma.Decimal(0);
     const receivedSettlementCredit=receivedSettlements?._sum.amount??new Prisma.Decimal(0);
-    // Recipient: subtract active incoming settlement amounts ONLY from their
-    // displayed My Entries expense totals. Sender: no adjustment. Agency:
-    // no adjustment. Leave underlying transactions and salary funding intact.
-    const personalExpense=expense.minus(receivedSettlementCredit);
-    const beforeSalary=income.minus(personalExpense).minus(postedClientAds);
+    const beforeSalary=income.minus(expense).minus(postedClientAds);
     return {currency:"INR",postedIncome:income.toFixed(4),
-      postedExpense:personalExpense.toFixed(4),
-      postedExpenseBeforeSettlement:expense.toFixed(4),
+      postedExpense:expense.toFixed(4),
+      postedExpenseBeforeSettlement:sumFrom(allGrouped,"EXPENSE","POSTED").toFixed(4),
       receivedInternalSettlement:receivedSettlementCredit.toFixed(4),
+      personalSettlementResetAt:resetAt?.toISOString()??null,
       postedSalaryExpense:postedSalaryExpense.toFixed(4),
-      postedExpenseIncludingSalary:personalExpense.plus(postedSalaryExpense).toFixed(4),
+      postedExpenseIncludingSalary:expense.plus(postedSalaryExpense).toFixed(4),
       postedNetBeforeSalary:beforeSalary.toFixed(4),
       postedNet:beforeSalary.minus(postedSalaryExpense).toFixed(4),
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
