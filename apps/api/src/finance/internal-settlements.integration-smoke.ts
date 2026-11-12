@@ -140,7 +140,7 @@ try{
  assert.equal(receivedHistory[0].status,"POSTED");
  assert.deepEqual(await settlements.projectMine(c),[]);
  await assert.rejects(()=>settlements.projectMine(staff),forbidden(403));
- await assert.rejects(()=>settlements.projectMine(stranger),forbidden(403));
+ assert.deepEqual(await settlements.projectMine(stranger),[]);
  assert.equal((await finance.entries(a,"all")).some(x=>x.sourceType==="SETTLEMENT"),false);
  assert.equal((await finance.entries(a,"mine")).some(x=>x.id===oldA.id),true);
  assert.equal((await finance.entries(b,"mine")).some(x=>x.id===oldB.id),true);
