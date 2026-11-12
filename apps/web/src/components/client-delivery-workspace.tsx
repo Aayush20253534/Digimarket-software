@@ -29,18 +29,24 @@ export const scheduledDates=(start:string,end:string,weekdays:number[],repeatEve
  const dates:string[]=[];for(let t=from;t<=to;t+=86400000){const date=new Date(t);if(selected.has(date.getUTCDay()))dates.push(date.toISOString().slice(0,10));}
  return dates;
 };
-const weekStart=(value:string)=>{
- const date=new Date(ymd(value)+"T00:00:00Z");
- date.setUTCDate(date.getUTCDate()-(date.getUTCDay()+6)%7);
- return date.toISOString().slice(0,10);
-};
 const plusDays=(value:string,days:number)=>new Date(Date.parse(value+"T00:00:00Z")+days*86400000).toISOString().slice(0,10);
+// Each seven-day posting week begins on the delivery schedule's start date.
 const calendarWeeks=(start:string,end:string)=>{
  if(!start||!end||start>end)return [] as string[];
  const result:string[]=[];
- for(let week=weekStart(start);week<=end;week=plusDays(week,7))result.push(week);
+ for(let week=start;week<=end;week=plusDays(week,7))result.push(week);
  return result;
 };
+const calendarWeekForDate=(start:string,value:string)=>{
+ const days=Math.floor((Date.parse(value+"T00:00:00Z")-Date.parse(start+"T00:00:00Z"))/86400000);
+ return plusDays(start,Math.floor(days/7)*7);
+};
+// Earlier occurrences may remain on the server as audit history after editing
+// a schedule. Only dates within the current bounds belong in this checklist.
+const activeOccurrences=(plan:Schedule)=>plan.occurrences.filter(occurrence=>{
+ const day=ymd(occurrence.scheduledOn);
+ return day>=ymd(plan.startOn)&&day<=ymd(plan.endOn);
+});
 export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,services=[]}:{
  clientId?:string;contractStartOn?:string|null;contractEndOn?:string|null;services?:Service[]
 }){
@@ -71,7 +77,7 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
  const summary=useMemo(()=>{
   const current=today();
   const counts={schedules:plans.length,completed:0,overdue:0,dueToday:0,upcoming:0};
-  for(const plan of plans)for(const occurrence of plan.occurrences){
+  for(const plan of plans)for(const occurrence of activeOccurrences(plan)){
    if(occurrence.status==="COMPLETED"){counts.completed++;continue;}
    const date=ymd(occurrence.scheduledOn);
    if(date<current)counts.overdue++;
@@ -86,8 +92,9 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
    if(q&&![plan.title,plan.client.businessName,plan.assignee.displayName,plan.service?.name??""]
     .some(text=>text.toLocaleLowerCase().includes(q)))return false;
    if(deliveryFilter==="all")return true;
-   if(deliveryFilter==="completed")return plan.occurrences.length>0&&plan.occurrences.every(o=>o.status==="COMPLETED");
-   return plan.occurrences.some(o=>o.status==="PENDING"&&
+   const occurrences=activeOccurrences(plan);
+   if(deliveryFilter==="completed")return occurrences.length>0&&occurrences.every(o=>o.status==="COMPLETED");
+   return occurrences.some(o=>o.status==="PENDING"&&
     (deliveryFilter==="overdue"?ymd(o.scheduledOn)<current:
      deliveryFilter==="today"?ymd(o.scheduledOn)===current:ymd(o.scheduledOn)>current));
   });
@@ -119,7 +126,7 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
   if(busy)return;
   const completed=o.status!=="COMPLETED";
   // Keep the current checklist week visible while a checkbox is updated.
-  setWeekBySchedule(previous=>({...previous,[p.id]:previous[p.id]??weekStart(ymd(o.scheduledOn))}));
+  setWeekBySchedule(previous=>({...previous,[p.id]:previous[p.id]??calendarWeekForDate(ymd(p.startOn),ymd(o.scheduledOn))}));
   // Optimistic checkbox update, server remains authoritative.
   setPlans(all=>all.map(schedule=>schedule.id===p.id?{...schedule,
     occurrences:schedule.occurrences.map(item=>item.id===o.id?{...item,
@@ -224,18 +231,18 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
    <button type="button" onClick={()=>{setSearch("");setDeliveryFilter("all");}}>Clear filters</button>
   </div>}
   <div className="aw-delivery-schedule-list">{visiblePlans.map(p=>{
-   const completed=p.occurrences.filter(x=>x.status==="COMPLETED").length;
-   const overdue=p.occurrences.filter(x=>x.status==="PENDING"&&ymd(x.scheduledOn)<today()).length;
-   const firstOccurrence=ymd(p.occurrences[0]?.scheduledOn??p.startOn);
-   const lastOccurrence=ymd(p.occurrences.at(-1)?.scheduledOn??p.endOn);
-   const weeks=calendarWeeks(firstOccurrence<ymd(p.startOn)?firstOccurrence:ymd(p.startOn),lastOccurrence>ymd(p.endOn)?lastOccurrence:ymd(p.endOn));
-   const currentWeek=weekStart(today());
-   const upcoming=p.occurrences.find(o=>o.status==="PENDING"&&ymd(o.scheduledOn)>=today());
-   const nextPending=p.occurrences.find(o=>o.status==="PENDING");
-   const preferredWeek=weeks.includes(currentWeek)?currentWeek:weekStart(ymd((upcoming??nextPending)?.scheduledOn??p.endOn));
-   const selectedWeek=weeks.includes(weekBySchedule[p.id])?weekBySchedule[p.id]:weeks.includes(preferredWeek)?preferredWeek:weeks.at(-1)??currentWeek;
+   const occurrences=activeOccurrences(p);
+   const completed=occurrences.filter(x=>x.status==="COMPLETED").length;
+   const overdue=occurrences.filter(x=>x.status==="PENDING"&&ymd(x.scheduledOn)<today()).length;
+   const startOn=ymd(p.startOn),endOn=ymd(p.endOn),current=today();
+   const weeks=calendarWeeks(startOn,endOn);
+   // Start at week one for future schedules, and the final week for expired ones.
+   const targetDate=current<startOn?startOn:current>endOn?endOn:current;
+   const preferredWeek=calendarWeekForDate(startOn,targetDate);
+   const selectedWeek=weeks.includes(weekBySchedule[p.id])?weekBySchedule[p.id]:weeks.includes(preferredWeek)?preferredWeek:weeks[0]??startOn;
    const weekIndex=weeks.indexOf(selectedWeek);
-   const weeklyOccurrences=p.occurrences.filter(o=>weekStart(ymd(o.scheduledOn))===selectedWeek);
+   const weekEnd=plusDays(selectedWeek,6);
+   const weeklyOccurrences=occurrences.filter(o=>ymd(o.scheduledOn)>=selectedWeek&&ymd(o.scheduledOn)<=weekEnd);
    return <article key={p.id} className="aw-delivery-schedule">
     <div className="aw-client-panel-heading"><div><h3>{p.title}</h3>
      <p>{p.client.businessName} · {p.weekdays.length||p.repeatEveryDays!==null?format(p.startOn)+" to "+format(p.endOn):format(p.startOn)+" (one-time)"}</p>
@@ -244,14 +251,14 @@ export function ClientDeliveryWorkspace({clientId,contractStartOn,contractEndOn,
      {manager&&clientId&&<button type="button" className="aw-client-btn" disabled={busy} onClick={()=>edit(p)}>Edit schedule / reassign</button>}
      {admin&&clientId&&<button type="button" className="aw-client-btn" disabled={busy} aria-label={"Delete delivery schedule "+p.title} onClick={()=>void remove(p)}><Trash2 size={15}/>Delete</button>}
     </div></div>
-    <div className="aw-delivery-progress"><span>{completed}/{p.occurrences.length} completed</span><span>{overdue} overdue</span></div>
+    <div className="aw-delivery-progress"><span>{completed}/{occurrences.length} completed</span><span>{overdue} overdue</span></div>
     <div className="aw-v4-delivery-progress-track" role="progressbar" aria-label={p.title+" completion"}
-      aria-valuemin={0} aria-valuemax={Math.max(1,p.occurrences.length)} aria-valuenow={completed}>
-      <span style={{width:(p.occurrences.length?completed/p.occurrences.length*100:0)+"%"}}/>
+      aria-valuemin={0} aria-valuemax={Math.max(1,occurrences.length)} aria-valuenow={completed}>
+      <span style={{width:(occurrences.length?completed/occurrences.length*100:0)+"%"}}/>
     </div>
     <div className="aw-delivery-week-toolbar" aria-label={"Week navigation for "+p.title}>
      <button className="aw-client-btn" type="button" aria-label={"Previous week for "+p.title} disabled={weekIndex<=0} onClick={()=>setWeekBySchedule(v=>({...v,[p.id]:weeks[weekIndex-1]}))}>Previous week</button>
-     <strong>Week: {format(selectedWeek)} to {format(plusDays(selectedWeek,6))}</strong>
+     <strong>Week: {format(selectedWeek)} to {format(weekEnd>endOn?endOn:weekEnd)}</strong>
      <button className="aw-client-btn" type="button" aria-label={"Next week for "+p.title} disabled={weekIndex>=weeks.length-1} onClick={()=>setWeekBySchedule(v=>({...v,[p.id]:weeks[weekIndex+1]}))}>Next week</button>
     </div>
     <div className="aw-delivery-occurrences" aria-label={"Dated checklist for "+p.title}>

@@ -949,7 +949,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toHaveCount(0);
   await workspace.getByLabel("Search loaded delivery schedules").fill("");
   await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toBeVisible();
-  await expect(workspace.getByRole("button",{name:"Previous week for CI Thursday shoot"})).toBeDisabled();
+  await expect(workspace.getByRole("button",{name:"Previous week for CI Thursday shoot"})).toBeVisible();
   await expect(workspace.getByRole("button",{name:"Edit schedule / reassign"})).toBeVisible();
   await createDelivery.click();
   await expect(deliveryForm.getByLabel("Repeat this service")).not.toBeChecked();
@@ -982,6 +982,25 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(deliveryForm.getByLabel("Repeat pattern")).toHaveValue("interval");
   await expect(deliveryForm.getByLabel("Repeat every")).toHaveValue("3");
   await deliveryForm.getByRole("button",{name:"Cancel"}).click();
+  // Rescheduling into the future keeps old pending dates for audit history,
+  // but neither the checklist nor the progress/overdue totals may include them.
+  const intervalCard=workspace.locator(".aw-delivery-schedule").filter({hasText:"CI three-day interval"});
+  await intervalCard.getByRole("button",{name:"Edit schedule / reassign"}).click();
+  const futureYear=new Date().getUTCFullYear()+1;
+  await deliveryForm.getByLabel("Start date").fill(futureYear+"-11-13");
+  await deliveryForm.getByLabel("End date").fill(futureYear+"-12-04");
+  await deliveryForm.getByLabel("Repeat every").selectOption("2");
+  await deliveryForm.getByRole("button",{name:"Save schedule changes"}).click();
+  await expect(workspace.getByText("Delivery schedule updated. Completed dates were preserved.")).toBeVisible();
+  await expect(intervalCard.getByText("0/11 completed")).toBeVisible();
+  await expect(intervalCard.getByText("0 overdue")).toBeVisible();
+  await expect(intervalCard.getByText(new RegExp("Week:.*13 Nov.*"+futureYear+".*19 Nov.*"+futureYear))).toBeVisible();
+  await expect(intervalCard.getByRole("button",{name:"Previous week for CI three-day interval"})).toBeDisabled();
+  await expect(intervalCard.getByRole("checkbox",{name:/CI three-day interval.*2025.*completed/})).toHaveCount(0);
+  await expect(intervalCard.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(4);
+  await intervalCard.getByRole("button",{name:"Next week for CI three-day interval"}).click();
+  await expect(intervalCard.getByText(new RegExp("Week:.*20 Nov.*"+futureYear+".*26 Nov.*"+futureYear))).toBeVisible();
+  await expect(intervalCard.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(3);
   await clientTabs.getByRole("tab",{name:"Agreement"}).click();
   await expect(workspace.getByRole("heading",{name:"Client profile & agreement"})).toBeVisible();
   await expect(workspace.getByRole("heading",{name:"Client deliveries"})).toHaveCount(0);
