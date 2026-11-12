@@ -37,6 +37,8 @@ const endpoints: Record<string, string[]> = {
   "approvals": ["GET", "POST"],
   "finance/categories": ["GET", "POST"],
   "finance/internal-settlements/founders": ["GET"],
+  // A founder must be able to read incoming and outgoing settlement history.
+  "finance/internal-settlements/mine": ["GET"],
   "finance/internal-settlements": ["POST"],
   "salary/people": ["GET"],
   "salary/accounts": ["GET","POST"],
@@ -466,7 +468,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     // includes meta.requestId, unlike an actual missing note. Report the
     // deployment mismatch instead of misleading users with "Route not found".
     if (response.status===404 && (path==="notes" || noteDetailPattern.test(path)
-      || path==="finance/assignees" || financeEntryDetailPattern.test(path))) {
+      || path==="finance/assignees" || path==="finance/internal-settlements/mine"
+      || financeEntryDetailPattern.test(path))) {
       const payload=await response.clone().json().catch(()=>null) as
         {error?:{code?:string;message?:string};meta?:{requestId?:string}} | null;
       if(payload?.error?.code==="NOT_FOUND" && payload.error.message==="Route not found"
@@ -474,7 +477,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
         const financePath=path.startsWith("finance/");
         return NextResponse.json({error:{code:financePath?"FINANCE_API_NOT_DEPLOYED":"NOTES_API_NOT_DEPLOYED",
           message:financePath
-            ?"Finance administration routes are missing from the deployed API. Check the Render deployment version."
+            ?"The deployed Render API is missing this Finance route. Deploy the current main branch of digimarket-api on Render."
             :"Notes is not available on the deployed API. Deploy the latest main branch on Render and apply the database migrations."}},
           {status:503,headers:{"Cache-Control":"no-store"}});
       }

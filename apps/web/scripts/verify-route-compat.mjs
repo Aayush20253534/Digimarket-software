@@ -37,6 +37,12 @@ if(missingFinanceFilters.length){
   process.stderr.write("Meta Ads proxy query forwarding missing: "+missingFinanceFilters.join(", ")+"\\n");
   process.exitCode=1;
 }
+// Founders' personal settlement history has its own GET endpoint. A missing
+// gateway allowlist entry silently presented valid settlements as "none".
+if(!gateway.includes('"finance/internal-settlements/mine": ["GET"]')){
+  process.stderr.write("Finance proxy must permit GET /finance/internal-settlements/mine.\\n");
+  process.exitCode=1;
+}
 
 const appDir=fileURLToPath(new URL("../src/app/app/",import.meta.url));
 const missing=[];

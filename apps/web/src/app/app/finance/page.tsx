@@ -187,7 +187,7 @@ export default function FinancePage(){
       // The existing ledger supplies a fallback during staggered deployments.
       if(ledger.status==="fulfilled")
         setSettlementHistory(ledger.value.filter(row=>row.sourceType==="SETTLEMENT"));
-      setSettlementHistoryError("Separate settlement history could not be refreshed.");
+      setSettlementHistoryError("Settlement history unavailable: "+readable(settlements.reason));
     }
     // Defensively filter by the Meta Ads category as an older API version
     // may ignore unsupported scope query parameters and return unrelated entries.
@@ -503,7 +503,11 @@ export default function FinancePage(){
           description="The recipient sees Settlement In and the sender sees Settlement Out. These are private, informational records that do not change company finances.">
           {settlementHistoryError&&<p role="status" className="text-sm text-amber-400">{settlementHistoryError}</p>}
           {loading&&!settlementHistory.length?<Spinner label="Loading settlement history…"/>:
-           !settlementHistory.length?<p className="text-sm text-slate-400">No internal settlements received or sent.</p>:
+           !settlementHistory.length?<p className="text-sm text-slate-400">
+              {settlementHistoryError
+                ?"Unable to confirm historical settlements. No records have been deleted."
+                :"No internal settlements received or sent."}
+            </p>:
            <div className="space-y-3" role="region" aria-label="Internal settlement history">
              {settlementHistory.map(row=>
                <div key={row.id} data-testid="personal-settlement-entry"
