@@ -5,7 +5,7 @@ import {useAuth} from "@/components/auth-provider";
 import {Spinner} from "@/components/ui";
 
 type PostWeek={
- week:number;from:number;to:number;readyAdded:number;delivered:number;
+ week:number;from:string;to:string;readyAdded:number;delivered:number;
  availableBefore:number;remainingStock:number;version:number;note:string;
  festivalReadyAdded:number;festivalDelivered:number;festivalAvailableBefore:number;
  festivalRemainingStock:number;festivalNote:string;
@@ -13,6 +13,7 @@ type PostWeek={
 };
 type Monthly={
  clientId:string;clientName:string;month:string;openingStock:number;
+ contractStartOn:string|null;contractEndOn:string|null;agreementAligned:boolean;
  readyThisMonth:number;deliveredThisMonth:number;remainingStock:number;
  festivalOpeningStock:number;festivalReadyThisMonth:number;festivalDeliveredThisMonth:number;
  festivalRemainingStock:number;weeks:PostWeek[];
@@ -30,10 +31,9 @@ const draftsFrom=(value:Monthly)=>Object.fromEntries(value.weeks.map(w=>[w.week,
  festivalReadyAdded:String(w.festivalReadyAdded),festivalDelivered:String(w.festivalDelivered),
  festivalNote:w.festivalNote
 }]));
-const range=(month:string,week:PostWeek)=>{
- const m=new Date(month+"-01T00:00:00Z").toLocaleString("en-IN",{month:"short",timeZone:"UTC"});
- return m+" "+week.from+"–"+week.to;
-};
+const formatDate=(value:string)=>new Date(value+"T00:00:00Z").toLocaleDateString("en-IN",
+ {day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});
+const range=(week:PostWeek)=>formatDate(week.from)+" – "+formatDate(week.to);
 
 export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}:{
  clientId:string;month?:string;onMonthChange?:(month:string)=>void
@@ -122,12 +122,18 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
   {error&&<p className="aw-client-alert" role="alert">{error}</p>}
   {success&&<p className="aw-client-success" role="status">{success}</p>}
   {loading?<Spinner label="Loading weekly post status…"/>:data&&<>
+   <p className="aw-client-muted text-sm">
+    {data.agreementAligned
+     ?"Agreement period: "+formatDate(data.contractStartOn!)+" to "+(data.contractEndOn?formatDate(data.contractEndOn):"open-ended")+". Weeks run from the start date."
+     :"Contract start date is missing from this client profile. Calendar-month weeks are shown until it is configured."}
+   </p>
    <div className="aw-client-statrow">
     <div className="aw-client-stat"><PackageCheck size={18}/><span>{isFestival?"Festival stock ready":"Regular stock ready"}</span><strong>{count(isFestival?data.festivalRemainingStock:data.remainingStock)}</strong></div>
     <div className="aw-client-stat"><Newspaper size={18}/><span>Ready added this month</span><strong>{count(isFestival?data.festivalReadyThisMonth:data.readyThisMonth)}</strong></div>
     <div className="aw-client-stat"><Send size={18}/><span>Delivered this month</span><strong>{count(isFestival?data.festivalDeliveredThisMonth:data.deliveredThisMonth)}</strong></div>
     <div className="aw-client-stat"><CalendarDays size={18}/><span>Carried from earlier months</span><strong>{count(isFestival?data.festivalOpeningStock:data.openingStock)}</strong></div>
    </div>
+   {data.weeks.length===0&&<p className="aw-client-muted text-sm">No agreement week starts in this month. Weeks that cross month boundaries appear in the month in which they start.</p>}
    <div className="overflow-x-auto">
     <table className="aw-client-table w-full" aria-label={(isFestival?"Festival":"Regular")+" post readiness weeks for "+data.clientName+" "+month}>
      <thead><tr>
@@ -142,7 +148,7 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
       };
       return <tr key={w.week}>
        <td className="min-w-28"><strong>Week {w.week}</strong>
-        <small className="block opacity-70">{range(month,w)}</small></td>
+        <small className="block opacity-70">{range(w)}</small></td>
        <td className="font-semibold">{count(isFestival?w.festivalAvailableBefore:w.availableBefore)}</td>
        <td>{canEdit?<input className="field w-24" aria-label={(isFestival?"Ready festival posts":"Ready posts")+" week "+w.week}
         type="number" min="0" max="10000" step="1"
@@ -171,10 +177,10 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
     </table>
    </div>
    <div className="aw-client-muted text-sm space-y-1">
-    <p>Weekly periods are days 1–7, 8–14, 15–21, 22–28 and, where applicable, 29–month end.</p>
+    <p>Weeks are consecutive seven-day periods from the contract start, ending at the contract end date where provided. A cross-month week appears under its starting month. Without a contract start date, calendar-month periods remain available.</p>
     <p><strong>Stock calculation:</strong> Each category has its own opening stock + newly ready posts − delivered posts. Regular and festival post counts never offset each other. A post enters stock when its design or copy is complete; delivering or publishing it reduces that category’s stock.</p>
     <p>Use festival notes for festival names and deadlines (e.g. Diwali, Holi). This tracker is manually maintained and does not automatically read content assets or social-media publishing status.</p>
-    {!anyStock&&<p>No {isFestival?"festival":"regular"} post quantities recorded for this month. Enter ready or delivered counts and save the week.</p>}
+    {!anyStock&&data.weeks.length>0&&<p>No {isFestival?"festival":"regular"} post quantities recorded for this month. Enter ready or delivered counts and save the week.</p>}
    </div>
   </>}
  </section>;

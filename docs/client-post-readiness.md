@@ -12,7 +12,9 @@ Open **Clients → Post readiness**, select the client and month, or open an ind
 
 Each category's stock after week = its opening stock + its new posts ready − its delivered posts. Festival posts do not automatically count as regular posts or offset missing regular-post inventory. Switching categories preserves unsaved edits until the next refresh or save.
 
-Weeks are 1–7, 8–14, 15–21, 22–28, and 29–month end when applicable. Unused ready posts carry into the next week and next month within their category. Backdated corrections are checked against all subsequent weeks to prevent negative inventory for either category independently.
+Weeks begin on the client's **Contract start** date and continue as consecutive seven-day periods, even across month boundaries. Each period is shown in the month when it starts, and the final period ends on **Contract end**, inclusive. For example, 13 November–12 December 2026 shows 13–19, 20–26 and 27 Nov–3 Dec in November, then 4–10 and 11–12 Dec in December.
+
+ Clients without a Contract start date in their client profile keep the previous 1–7, 8–14, 15–21, 22–28 and 29–month-end buckets until one is configured. Contract dates are not inferred from unlinked Agreements documents by matching business names. Existing saved movements are preserved when contract dates change and may require reconciliation if recorded using the old schedule. Unused posts carry into the next week/month within their category. Backdated corrections are checked against subsequent saved weeks to prevent negative stock.
 
 ## Controls
 

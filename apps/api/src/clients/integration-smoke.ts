@@ -177,6 +177,20 @@ try{
  });
  assert.equal(agreement.monthlyFee?.toFixed(4),"15000.0000");
  assert.equal(agreement.contractEndOn?.toISOString().slice(0,10),"2026-11-28");
+  // Both trackers must share the same dates and reject weeks outside contract.
+  const firstContractVideo=await videos.monthly(manager,client.id,"2026-10");
+  assert.deepEqual(firstContractVideo.weeks.map(w=>[w.from,w.to]),[["2026-10-29","2026-11-04"]]);
+  const contractPosts=await posts.monthly(manager,client.id,"2026-11");
+  assert.deepEqual(contractPosts.weeks.map(w=>[w.from,w.to]),[
+   ["2026-11-05","2026-11-11"],["2026-11-12","2026-11-18"],
+   ["2026-11-19","2026-11-25"],["2026-11-26","2026-11-28"]
+  ]);
+  assert.equal((await videos.monthly(manager,client.id,"2026-12")).weeks.length,0);
+  assert.equal((await posts.monthly(manager,client.id,"2026-12")).weeks.length,0);
+  await assert.rejects(()=>videos.saveWeek(manager,client.id,"2026-12",2,
+   {readyAdded:1,delivered:0,version:0}),fail(422));
+  await assert.rejects(()=>posts.saveWeek(manager,client.id,"2026-12",2,
+   {readyAdded:1,delivered:0,version:0}),fail(422));
  await assert.rejects(()=>clients.update(team,client.id,{version:agreement.version,
    contractStartOn:"2026-12-01",contractEndOn:"2026-11-01"}),fail(422));
  await assert.rejects(()=>clients.update(team,client.id,{version:agreement.version,

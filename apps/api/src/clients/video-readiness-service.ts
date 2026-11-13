@@ -1,16 +1,11 @@
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
+import {monthWeeks} from "./readiness-weeks";
+export {monthWeeks} from "./readiness-weeks";
 
 const clientMissing=()=>new AuthError(404,"NOT_FOUND","Client not found");
 const conflict=()=>new AuthError(409,"VIDEO_WEEK_CONFLICT","Video readiness changed. Refresh and retry.");
-export const monthWeeks=(month:string)=>{
- const [year,monthNumber]=month.split("-").map(Number);
- const days=new Date(Date.UTC(year,monthNumber,0)).getUTCDate();
- return Array.from({length:Math.ceil(days/7)},(_,i)=>({
-  week:i+1,from:i*7+1,to:Math.min((i+1)*7,days),
- }));
-};
 export type VideoWeekInput={readyAdded:number;delivered:number;note?:string|null;version:number};
 type Movement={month:string;week:number;readyAdded:number;delivered:number};
 const ordered=(a:Movement,b:Movement)=>a.month.localeCompare(b.month)||a.week-b.week;
@@ -27,7 +22,7 @@ export class ClientVideoReadinessService{
   if(!actor.permissions.has(edit?"clients.edit":"clients.read"))throw forbidden();
   const client=await this.db.client.findFirst({
    where:{id:clientId,organizationId:actor.organizationId},
-   select:{id:true,businessName:true}
+   select:{id:true,businessName:true,contractStartOn:true,contractEndOn:true}
   });
   if(!client)throw clientMissing();
   return client;
@@ -45,7 +40,7 @@ export class ClientVideoReadinessService{
   let remaining=openingStock;
   const current=entries.filter(row=>row.month===month);
   const byWeek=new Map(current.map(row=>[row.week,row]));
-  const weeks=monthWeeks(month).map(range=>{
+  const weeks=monthWeeks(month,client.contractStartOn,client.contractEndOn).map(range=>{
    const row=byWeek.get(range.week);
    const availableBefore=remaining;
    remaining+=row?.readyAdded??0;
@@ -58,14 +53,17 @@ export class ClientVideoReadinessService{
    };
   });
   return {clientId,clientName:client.businessName,month,openingStock,
+   contractStartOn:client.contractStartOn?.toISOString().slice(0,10)??null,
+   contractEndOn:client.contractEndOn?.toISOString().slice(0,10)??null,
+   agreementAligned:!!client.contractStartOn,
    readyThisMonth:current.reduce((n,row)=>n+row.readyAdded,0),
    deliveredThisMonth:current.reduce((n,row)=>n+row.delivered,0),
    remainingStock:remaining,weeks};
  }
  async saveWeek(actor:Principal,clientId:string,month:string,week:number,input:VideoWeekInput){
-  await this.allowed(actor,clientId,true);
-  if(!monthWeeks(month).some(row=>row.week===week))
-   throw new AuthError(422,"INVALID_VIDEO_WEEK","Week is outside the selected month");
+  const client=await this.allowed(actor,clientId,true);
+  if(!monthWeeks(month,client.contractStartOn,client.contractEndOn).some(row=>row.week===week))
+   throw new AuthError(422,"INVALID_VIDEO_WEEK","Week is outside the client agreement period for the selected month");
   try{
    return await this.db.$transaction(async tx=>{
     const rows=await tx.clientVideoWeek.findMany({

@@ -8,7 +8,9 @@ Requires `clients.read` to view, `clients.edit` to update. Counts are scoped by 
 
 ## Month and week
 
-Choose a month in YYYY-MM. Each month is divided into 7-day buckets: W1 = 1–7, W2 = 8–14, W3 = 15–21, W4 = 22–28, W5 = 29 through month end (only if the last days exist). February with 28 days has four weeks; February with 29 days has five.
+Choose a month in YYYY-MM. Weekly periods are consecutive seven-day blocks from the client's **Contract start** field, regardless of calendar-month boundaries. Each week is displayed once, under the month in which it begins. A configured **Contract end** caps the last week inclusively, and no new week begins after it. For example, a contract from 13 November through 12 December 2026 displays 13–19 Nov, 20–26 Nov, 27 Nov–3 Dec in November, followed by 4–10 Dec and 11–12 Dec in December.
+
+ If the client has no Contract start date saved, the previous calendar-month 1–7, 8–14, 15–21, 22–28 and 29–month-end weeks remain available. Contract dates come from the client's profile; documents in the Agreements module are not linked to a client by their name. Changing contract dates does not delete or automatically redistribute historical saved week movements.
 
 For each client/week manually enter:
 
