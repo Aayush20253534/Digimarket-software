@@ -274,12 +274,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const metaCategoryId=await page.locator("#finance-category option").filter({hasText:"Meta Ads"}).getAttribute("value");
   expect(metaCategoryId).toBeTruthy();
   const mockedMetaId="00000000-0000-4000-8000-000000000099";
-  const metaRoute="**/api/v1/finance/entries?view=all&scope=meta_ads";
+  const mockedMetaDate=await page.getByLabel("Work cycle from").inputValue();
+  const metaRoute=(url:URL)=>url.pathname==="/api/v1/finance/entries"&&url.searchParams.get("view")==="all"&&url.searchParams.get("scope")==="meta_ads";
   await page.route(metaRoute,async route=>route.fulfill({
     status:200,contentType:"application/json",body:JSON.stringify({data:[{
       id:mockedMetaId,kind:"EXPENSE",status:"POSTED",amount:"125.0000",currencyCode:"INR",
-      occurredOn:"2026-11-05",method:"UPI",description:"Isolated mock only",
-      merchantOrSource:"Meta",createdAt:"2026-11-05T08:00:00.000Z",
+      occurredOn:mockedMetaDate,method:"UPI",description:"Isolated mock only",
+      merchantOrSource:"Meta",createdAt:mockedMetaDate+"T08:00:00.000Z",
       approvalRequestId:"00000000-0000-4000-8000-000000000098",
       enteredById:"00000000-0000-4000-8000-000000000097",
       receiptAssetId:null,clientId:null,client:null,

@@ -86,7 +86,7 @@ try{
  let state=await http(api).get("/api/v1/salary/accounts").set(auth("founder-a")).expect(200);
  assert.equal(state.body.data.find((x:{id:string})=>x.id===a).availableBalance,"0.0000");
  assert.equal(state.body.data.find((x:{id:string})=>x.id===b).availableBalance,"0.0000");
- const summary=await http(api).get("/api/v1/salary/summary").set(auth("founder-b")).expect(200);
+ const summary=await http(api).get("/api/v1/salary/summary?from=2026-10-22&to=2026-11-21").set(auth("founder-b")).expect(200);
  assert.equal(summary.body.data.totalPaid,"20000.00");
  assert.equal(summary.body.data.paymentCount,1);
  assert.equal(summary.body.data.founderFunding.length,2);
@@ -113,12 +113,12 @@ try{
  assert.ok(salaryRows(agency).every(row=>row.category.name==="Salary"&&row.status==="POSTED"));
  assert.equal((await finance.exportCsv(accountA,"all")).csv.split("salary:").length,3);
 
- const self=await http(api).get("/api/v1/salary/payments").set(auth("employee")).expect(200);
+ const self=await http(api).get("/api/v1/salary/payments?from=2026-10-22&to=2026-11-21").set(auth("employee")).expect(200);
  assert.equal(self.body.data.length,1);
  assert.equal(self.body.data[0].allocations.length,0);
- const stranger=await http(api).get("/api/v1/salary/payments").set(auth("outsider")).expect(200);
+ const stranger=await http(api).get("/api/v1/salary/payments?from=2026-10-22&to=2026-11-21").set(auth("outsider")).expect(200);
  assert.equal(stranger.body.data.length,0);
- await http(api).get("/api/v1/salary/summary").set(auth("employee")).expect(403);
+ await http(api).get("/api/v1/salary/summary?from=2026-10-22&to=2026-11-21").set(auth("employee")).expect(403);
  await http(api).post("/api/v1/salary/accounts/"+a+"/credits").set(auth("founder-b"))
   .send({recordedOn:"2026-11-05",amount:"5000.00",description:"Fake funds"}).expect(409);
  await financeIncome(accountA,"5000.0000");
@@ -134,7 +134,7 @@ try{
  state=await http(api).get("/api/v1/salary/accounts").set(auth("founder-a")).expect(200);
  assert.equal(state.body.data.find((x:{id:string})=>x.id===a).availableBalance,"17000.0000");
  assert.equal(state.body.data.find((x:{id:string})=>x.id===b).availableBalance,"8000.0000");
- const afterVoid=await http(api).get("/api/v1/salary/summary").set(auth("founder-a")).expect(200);
+ const afterVoid=await http(api).get("/api/v1/salary/summary?from=2026-10-22&to=2026-11-21").set(auth("founder-a")).expect(200);
  assert.equal(afterVoid.body.data.totalPaid,"0.00");
  assert.equal(salaryRows(await finance.entries(accountA,"mine"))[0]?.status,"CANCELLED");
  assert.equal((await finance.totals(accountA,"all")).postedSalaryExpense,"0.0000");
@@ -152,8 +152,8 @@ try{
   allocations:[{accountId:a,amount:"500.00"}]
  }).expect(201);
  assert.equal(await db.financialTransaction.count({where:{organizationId:org.id}}),4);
- assert.equal((await http(api).get("/api/v1/salary/payments").set(auth("employee")).expect(200)).body.data.length,1);
- assert.equal((await http(api).get("/api/v1/salary/summary").set(auth("founder-a")).expect(200)).body.data.totalPaid,"500.00");
+ assert.equal((await http(api).get("/api/v1/salary/payments?from=2026-10-22&to=2026-11-21").set(auth("employee")).expect(200)).body.data.length,1);
+ assert.equal((await http(api).get("/api/v1/salary/summary?from=2026-10-22&to=2026-11-21").set(auth("founder-a")).expect(200)).body.data.totalPaid,"500.00");
  assert.equal((await finance.totals(accountA,"mine")).postedNet,"15500.0000");
  assert.equal((await finance.totals(accountA,"all")).postedSalaryExpense,"500.0000");
  console.info("Salary integration PASS: founder RBAC, employee isolation, paise split, funding balances, idempotency, void reversal, founder salary, notifications and no finance income pollution.");
