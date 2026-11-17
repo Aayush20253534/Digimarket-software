@@ -199,8 +199,8 @@ export async function verifyTotalExpenses(db: PrismaClient) {
   assert.equal((await report.records(second, { ...q, view: "mine" })).matchingAmount, "225.0000");
   assert.equal(
     (await finance.categorySummary(f, "mine", q, "EXPENSE")).total,
-    "390.0000",
-    "existing Expenses stays unchanged",
+    "290.0000",
+    "Expenses excludes salary while Total expense retains funded payroll",
   );
   const pages = await Promise.all(
     [1, 2].map((page) => report.records(f, { ...q, page, limit: 3 })),

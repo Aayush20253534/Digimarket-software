@@ -71,7 +71,6 @@ async function workspace(page: Page, role = "FOUNDER") {
     else if (path === "/finance/category-summary")
       data = {
         ordinary: "26",
-        salary: "0",
         total: "26",
         items: [
           { id: categoryId, name: "Travel", posted: "26", pending: "0", count: 26, active: true },
