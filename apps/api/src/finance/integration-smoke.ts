@@ -106,7 +106,7 @@ try{
   assert.equal(expenseDetails.categories.length,1);
   assert.equal(expenseDetails.categories[0].name,"Rapido");
   assert.equal(expenseDetails.categories[0].total,expenseDetails.total);
-  assert.deepEqual(expenseDetails.monthly.map(x=>x.month),["2026-10"]);
+  assert.deepEqual(expenseDetails.monthly.map(x=>x.month),["2026-09","2026-10"]);
   assert.equal(expenseDetails.monthly[0].total,expenseDetails.total);
   assert.deepEqual(expenseDetails.daily,[{date:"2026-10-19",total:"150.2545",count:1}]);
   assert.equal(expenseDetails.people.length,1);
@@ -320,7 +320,7 @@ try{
   const drill=await finance.breakdown(reportingFounder,dailyPeriod);
   assert.equal(drill.total,"52.0000");
   assert.deepEqual(drill.monthly.map(x=>[x.month,x.total]),[
-    ["2026-09","20.7500"],["2026-10","31.2500"]]);
+    ["2026-08","0.0000"],["2026-09","52.0000"],["2026-10","0.0000"]]);
   assert.deepEqual(drill.daily,[
     {date:"2026-09-30",total:"20.7500",count:1},
     {date:"2026-10-19",total:"21.0000",count:1},

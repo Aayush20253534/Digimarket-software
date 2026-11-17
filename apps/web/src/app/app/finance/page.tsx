@@ -1,4 +1,6 @@
 "use client";
+import {agencyToday,reportingPreset,cycleLabel,type ReportingPeriod} from "@digimarket/contracts";
+import {BusinessPeriodPicker} from "@/components/business-period-picker";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -30,7 +32,7 @@ type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED"
   receiptAssetId?:string|null;enteredById:string;clientId:string|null;client:MetaAdClient|null;
   category:{id:string;name:string;active:boolean};
   enteredBy:{displayName:string;loginId:string};submittedBy:{displayName:string}};
-type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:string;
+type Totals={agencyOperatingNet?:string;currency:string;postedIncome:string;postedExpense:string;postedNet:string;
   postedNetBeforeSalary?:string;postedSalaryExpense?:string;postedExpenseIncludingSalary?:string;
   postedExpenseBeforeSettlement?:string;receivedInternalSettlement?:string;
   personalSettlementResetAt?:string|null;
@@ -38,7 +40,7 @@ type Totals={currency:string;postedIncome:string;postedExpense:string;postedNet:
   clientAdSpend?:{posted:string;pending:string;count:number};recurringIncome?:RecurringIncome};
 type FinancePolicy={category:string;active:boolean};
 type SalaryFinanceSummary={totalPaid:string;founderFunding:{founderUserId:string;name:string;amount:string}[]};
-type RecurringIncome={month:string;monthlyServiceTotal:string;monthlyAdBudgetTotal:string;monthlyCombinedTotal:string;items:{id:string;businessName:string;monthlyServiceCharge:string;monthlyAdBudget:string;monthlyCombined:string;contractEndOn:string|null}[]};
+type RecurringIncome={month:string;from?:string;to?:string;monthlyServiceTotal:string;monthlyAdBudgetTotal:string;monthlyCombinedTotal:string;items:{id:string;businessName:string;monthlyServiceCharge:string;monthlyAdBudget:string;monthlyCombined:string;contractEndOn:string|null}[]};
 const zero:Totals={currency:"INR",postedIncome:"0.0000",postedExpense:"0.0000",postedNet:"0.0000",
   pendingIncome:"0.0000",pendingExpense:"0.0000",groups:[]};
 const modes=["CASH","UPI","BANK_TRANSFER","CARD","OTHER"] as const;
@@ -81,8 +83,9 @@ export default function FinancePage(){
   const [metaDistributionLoading,setMetaDistributionLoading]=useState(true);
   const [metaDistributionRefresh,setMetaDistributionRefresh]=useState(0);
   const [metaPeriodMode,setMetaPeriodMode]=useState<"daily"|"monthly">("daily");
-  const [metaFrom,setMetaFrom]=useState("");
-  const [metaTo,setMetaTo]=useState("");
+  const [period,setPeriod]=useState<ReportingPeriod>(()=>reportingPreset("current"));
+  const metaFrom=period.from,metaTo=period.to;
+  const periodQuery=new URLSearchParams({from:period.from,to:period.to}).toString();
   const [metaDistributionError,setMetaDistributionError]=useState("");
   const [metaSearch,setMetaSearch]=useState("");
   const [metaFundingFilter,setMetaFundingFilter]=useState<"ALL"|"SELF"|"CLIENT">("ALL");
@@ -92,6 +95,7 @@ export default function FinancePage(){
   const [metaAdClients,setMetaAdClients]=useState<MetaAdClient[]>([]);
   const [metaAdClientsError,setMetaAdClientsError]=useState("");
   const [totals,setTotals]=useState<Totals>(zero);
+  const [summaryAvailable,setSummaryAvailable]=useState(false);
   const [financeReady,setFinanceReady]=useState(false);
   const [recurring,setRecurring]=useState<RecurringIncome|null>(null);
   const [salarySummary,setSalarySummary]=useState<SalaryFinanceSummary|null>(null);
@@ -107,7 +111,7 @@ export default function FinancePage(){
   const [settlementPeers,setSettlementPeers]=useState<Assignee[]>([]);
   const [settlementPeer,setSettlementPeer]=useState("");
   const [settlementAmount,setSettlementAmount]=useState("");
-  const [settlementDate,setSettlementDate]=useState(()=>new Date().toISOString().slice(0,10));
+  const [settlementDate,setSettlementDate]=useState(()=>agencyToday());
   const [settlementMethod,setSettlementMethod]=useState<(typeof modes)[number]>("UPI");
   const [settlementNote,setSettlementNote]=useState("");
   const [settlementKey,setSettlementKey]=useState(()=>crypto.randomUUID());
@@ -117,7 +121,7 @@ export default function FinancePage(){
   const [adFunding,setAdFunding]=useState<"SELF"|"CLIENT">("SELF");
   const [clientId,setClientId]=useState("");
   const [amount,setAmount]=useState("");
-  const [occurredOn,setOccurredOn]=useState(()=>new Date().toISOString().slice(0,10));
+  const [occurredOn,setOccurredOn]=useState(()=>agencyToday());
   const [method,setMethod]=useState<(typeof modes)[number]>("UPI");
   const [source,setSource]=useState("");
   const [description,setDescription]=useState("");
@@ -160,19 +164,20 @@ export default function FinancePage(){
   const reload=useCallback(async()=>{
     const sequence=++reloadSequence.current;
     if(!canReadOwn&&!canAll){setLoading(false);return;}
-    setLoading(true);
+    setLoading(true);setSummaryAvailable(false);setTotals(zero);setRecurring(null);
+    setEntries([]);setMetaAdEntries([]);setSettlementHistory([]);
     const target=view==="all"&&canAll?"all":"mine";
     // Treat the ledger and summary independently: an unavailable summary must
     // never make saved transactions disappear from the register on refresh.
     const [ledger,clientAds,metaAds,sums,cats,policies,settlements]=await Promise.allSettled([
-      request<Entry[]>("/finance/entries?view="+target),
-      request<Entry[]>("/finance/entries?view="+target+"&scope=client_ads"),
-      request<Entry[]>("/finance/entries?view="+target+"&scope=meta_ads"),
-      request<Totals>("/finance/summary?view="+target),
+      request<Entry[]>("/finance/entries?view="+target+"&"+periodQuery),
+      request<Entry[]>("/finance/entries?view="+target+"&scope=client_ads&"+periodQuery),
+      request<Entry[]>("/finance/entries?view="+target+"&scope=meta_ads&"+periodQuery),
+      request<Totals>("/finance/summary?view="+target+"&"+periodQuery),
       request<Category[]>("/finance/categories"),
       request<FinancePolicy[]>("/approval-policies"),
       target==="mine"&&isFounder&&canReadOwn
-        ?request<Entry[]>("/finance/internal-settlements/mine")
+        ?request<Entry[]>("/finance/internal-settlements/mine?"+periodQuery)
         :Promise.resolve([] as Entry[]),
     ]);
     if(sequence!==reloadSequence.current)return;
@@ -203,7 +208,7 @@ export default function FinancePage(){
         .sort((a,b)=>b.occurredOn.localeCompare(a.occurredOn)||b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
         .slice(0,200));
     }
-    if(sums.status==="fulfilled"){setTotals(sums.value);setRecurring(target==="all"?sums.value.recurringIncome??null:null);}
+    if(sums.status==="fulfilled"){setSummaryAvailable(true);setTotals(sums.value);setRecurring(target==="all"?sums.value.recurringIncome??null:null);}
     if(cats.status==="fulfilled")setCategories(cats.value);
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(
       p=>p.category==="FINANCE"&&p.active));
@@ -216,15 +221,15 @@ export default function FinancePage(){
     setError(problems.join(" "));
     setLoading(false);
     setMetaDistributionRefresh(v=>v+1);
-  },[request,view,canReadOwn,canAll,isFounder]);
+  },[request,view,canReadOwn,canAll,isFounder,periodQuery]);
   useEffect(()=>{
     if(!isFounder)return;
     let active=true;
-    void request<SalaryFinanceSummary>("/salary/summary").then(summary=>{
+    void request<SalaryFinanceSummary>("/salary/summary?"+periodQuery).then(summary=>{
       if(active){setSalarySummary(summary);setSalaryError("");}
     }).catch(e=>{if(active)setSalaryError(readable(e));});
     return()=>{active=false;};
-  },[isFounder,request]);
+  },[isFounder,request,periodQuery,metaDistributionRefresh]);
   useEffect(()=>{
     void reload();
     return()=>{reloadSequence.current+=1;};
@@ -439,7 +444,7 @@ export default function FinancePage(){
     setBusy(true);setError("");
     try{
       const target=view==="all"&&canAll?"all":"mine";
-      const response=await request<{filename:string;csv:string}>("/finance/export?view="+target+"&scope="+scope);
+      const response=await request<{filename:string;csv:string}>("/finance/export?view="+target+"&scope="+scope+"&"+periodQuery);
       const blob=new Blob([response.csv],{type:"text/csv;charset=utf-8"});
       const url=URL.createObjectURL(blob);
       const a=document.createElement("a");a.href=url;a.download=response.filename;a.click();
@@ -493,6 +498,7 @@ export default function FinancePage(){
       {isFounder&&<a href="#finance-salary">Founder-funded salary</a>}
       <a href="#finance-register">Financial register</a>
     </nav>
+    <BusinessPeriodPicker value={period} onChange={setPeriod} disabled={busy}/>
     <div className="aw-v5-finance-visibility flex gap-2" role="group" aria-label="Finance visibility">
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
@@ -534,21 +540,22 @@ export default function FinancePage(){
         ["Posted income",totals.postedIncome],
         ["Posted expenses",totals.postedExpense],
         ["Expenses incl. salary",totals.postedExpenseIncludingSalary??totals.postedExpense],
-        ["Net posted",totals.postedNet],
+        ["Net after ad outflows",totals.postedNet],
+        ["Agency operating net",totals.agencyOperatingNet??"0"],
         ["Pending income",totals.pendingIncome],
         ["Pending expenses",totals.pendingExpense],
       ] as const).map(([label,value])=><Card key={label}>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-        <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(value)}</p>
-        <p className="mt-2 text-xs text-slate-500">{label==="Net posted"
+        <p className="mt-2 break-words text-xl font-bold">{loading?"…":summaryAvailable?money(value):"Unavailable"}</p>
+        <p className="mt-2 text-xs text-slate-500">{label==="Net after ad outflows"
           ?(view==="mine"&&isFounder?"Income − current-cycle expenses − client Meta Ads − salary funded":"Income − agency expenses − posted client Meta Ads − salary funded")
           :view==="mine"&&isFounder&&totals.personalSettlementResetAt
             ?"Since latest internal settlement · "+totals.currency
-            :(view==="all"?"Organization":"Your entries")+" · "+totals.currency}</p>
+            :label==="Agency operating net"?"Income − agency expenses − salary; client ads separate":(view==="all"?"Organization":"Your entries")+" · Selected work cycle · "+totals.currency}</p>
       </Card>)}
       <Card>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Client Meta Ads spend</p>
-        <p className="mt-2 break-words text-xl font-bold">{loading?"…":money(totals.clientAdSpend?.posted??"0.0000")}</p>
+        <p className="mt-2 break-words text-xl font-bold">{loading?"…":summaryAvailable?money(totals.clientAdSpend?.posted??"0.0000"):"Unavailable"}</p>
         <p className="mt-2 text-xs text-slate-500">
           {view==="mine"&&isFounder&&totals.personalSettlementResetAt?"Since latest settlement · ":""}
           Posted · Pending: {money(totals.clientAdSpend?.pending??"0.0000")}
@@ -565,21 +572,21 @@ export default function FinancePage(){
     <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
       <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
         <h2>{view==="mine"?"Personal current-cycle income and expenses":"Posted agency income and expenses"}</h2>
-        <p>{view==="mine"?"An active settlement restarts all personal summary totals for both founders. Agency records and salary history remain unchanged.":"Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income."}</p>
+        <p>{view==="mine"?"All figures use the selected work cycle. Internal settlements remain separate informational records.":"Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income."}</p>
        </div><Scale size={20} aria-hidden="true"/></header>
       <div className="aw-v5-finance-compare">
        {([["Income",totals.postedIncome,postedIncomeValue],
           ["Expenses",totals.postedExpense,postedExpenseValue],
            ...(isFounder?[["Founder-funded salaries",fundedSalaryText,fundedSalaryExpense] as const]:[])] as const).map(([label,value,number])=>
          <div className="aw-v5-finance-comparison-row" key={label}>
-          <div><span>{label}</span><strong>{loading?"…":money(value)}</strong></div>
+          <div><span>{label}</span><strong>{loading?"…":summaryAvailable?money(value):"Unavailable"}</strong></div>
           <div className="aw-v5-finance-track" role="img"
             aria-label={label+": "+(loading?"loading":money(value))}>
            <span style={{width:(Number.isFinite(number)?Math.max(0,number)/postedMax*100:0)+"%"}}/>
           </div>
          </div>)}
       </div>
-      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Personal settlement-cycle resets affect only My Entries summaries; they never reverse agency expenses or delete the transaction history.</p>
+      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Internal settlements do not restart the selected work cycle or change agency totals.</p>
     </section>
     {isFounder&&<section id="finance-salary" className="rounded-xl border border-white/10 p-5 space-y-3" aria-label="Separate founder salary funding expenses">
       <div className="flex flex-wrap justify-between gap-2"><div><h2 className="font-semibold text-lg">Founder-funded salary expenses</h2>
@@ -594,9 +601,9 @@ export default function FinancePage(){
     {!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}
-    {canAll&&<div id="finance-recurring" className="aw-v5-finance-anchor"><Card title="Recurring income from client agreements" description="Current-month contract projection, not received payments. Ad budgets are separate from agency service revenue.">
+    {canAll&&<div id="finance-recurring" className="aw-v5-finance-anchor"><Card title="Recurring income from client agreements" description="Monthly rates for agreements overlapping the selected dates; projected commitments, not received payments. Ad budgets are separate from service revenue.">
       {recurring?<div className="space-y-4">
-        <p className="text-sm text-slate-500">Period: {recurring.month} · Active client agreements</p>
+        <p className="text-sm text-slate-500">Period: {recurring.from??period.from} through {recurring.to??period.to} · Active client agreements</p>
         <div className="grid gap-3 sm:grid-cols-3">
           <div><p className="text-sm">Monthly service charges</p><strong>{money(recurring.monthlyServiceTotal)}</strong></div>
           <div><p className="text-sm">Monthly ad budgets</p><strong>{money(recurring.monthlyAdBudgetTotal)}</strong></div>
@@ -604,7 +611,7 @@ export default function FinancePage(){
         </div>
         <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr><th>Client</th><th>Service charge</th><th>Ad budget</th><th>Combined / month</th><th>Agreement ends</th></tr></thead>
           <tbody>{recurring.items.map(c=><tr key={c.id}><td><Link href={"/app/clients/"+c.id} className="underline">{c.businessName}</Link></td><td>{money(c.monthlyServiceCharge)}</td><td>{money(c.monthlyAdBudget)}</td><td>{money(c.monthlyCombined)}</td><td>{c.contractEndOn??"Open-ended"}</td></tr>)}</tbody></table></div>
-        {!recurring.items.length&&<p className="text-sm">No active client agreements with monthly charges recorded for this month.</p>}
+        {!recurring.items.length&&<p className="text-sm">No active client agreements with monthly charges recorded for this work cycle.</p>}
       </div>:<p className="text-sm">Recurring agreement projection is unavailable.</p>}
     </Card></div>}
     <div id="finance-entry" className="aw-finance-panels grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
@@ -726,15 +733,7 @@ export default function FinancePage(){
     <Card title={view==="mine"?"My Meta Ads spending breakdown":"Agency Meta Ads spending breakdown"}
       description={view==="mine"?"Only transactions assigned to your account, split by Self and each client.":"All team members combined, with person-wise, client-wise and date-wise totals."}>
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <label className="flex flex-col gap-1 text-sm">From date
-          <input aria-label="Meta Ads from date" className="field w-full min-w-0" type="date"
-            value={metaFrom} max={metaTo||undefined} onChange={e=>setMetaFrom(e.target.value)}/>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">To date (inclusive)
-          <input aria-label="Meta Ads to date" className="field w-full min-w-0" type="date"
-            value={metaTo} min={metaFrom||undefined} onChange={e=>setMetaTo(e.target.value)}/>
-        </label>
-        <button type="button" className="btn-secondary" onClick={()=>{setMetaFrom("");setMetaTo("");}}>All time</button>
+        <p className="text-sm">Uses the work cycle selected above: {metaFrom} through {metaTo}.</p>
         <button type="button" className="btn-secondary" onClick={()=>setMetaDistributionRefresh(x=>x+1)}
           disabled={metaDistributionLoading}><RefreshCw size={16}/>Refresh breakdown</button>
         <button type="button" className="btn-secondary" disabled={!metaDistribution||metaDistributionLoading} onClick={()=>{
@@ -757,8 +756,8 @@ export default function FinancePage(){
             ["Date","Posted","Pending","Posted + pending","Self posted","Client posted","Transactions"],
             ...report.daily.map(d=>[d.date,d.posted,d.pending,d.total,d.selfPosted,d.clientPosted,String(d.count)]),
             [],
-            ["Month","Posted","Pending","Posted + pending","Self posted","Client posted","Transactions"],
-            ...report.monthly.map(d=>[d.date,d.posted,d.pending,d.total,d.selfPosted,d.clientPosted,String(d.count)]),
+            ["Work cycle (closing date exclusive)","Posted","Pending","Posted + pending","Self posted","Client posted","Transactions"],
+            ...report.monthly.map(d=>[cycleLabel(d.date),d.posted,d.pending,d.total,d.selfPosted,d.clientPosted,String(d.count)]),
             [],
             ["Date","Category","Posted","Pending","Posted + pending","Transactions"],
             ...report.daily.flatMap(d=>d.categories.map(c=>[d.date,c.name,c.posted,c.pending,c.total,String(c.count)])),
@@ -836,7 +835,7 @@ export default function FinancePage(){
               <button type="button" className={metaPeriodMode==="daily"?"btn-primary":"btn-secondary"}
                 aria-pressed={metaPeriodMode==="daily"} onClick={()=>setMetaPeriodMode("daily")}>Day-wise</button>
               <button type="button" className={metaPeriodMode==="monthly"?"btn-primary":"btn-secondary"}
-                aria-pressed={metaPeriodMode==="monthly"} onClick={()=>setMetaPeriodMode("monthly")}>Month-wise</button>
+                aria-pressed={metaPeriodMode==="monthly"} onClick={()=>setMetaPeriodMode("monthly")}>Cycle-wise</button>
             </div>
           </div>
           {(metaPeriodMode==="daily"?metaDistribution.daily:metaDistribution.monthly).length===0
@@ -845,7 +844,7 @@ export default function FinancePage(){
             {(metaPeriodMode==="daily"?metaDistribution.daily:metaDistribution.monthly).map(d=>
               <details key={d.date} className="rounded-lg border p-3">
                 <summary className="cursor-pointer text-sm">
-                  <strong>{d.date}</strong>
+                  <strong>{metaPeriodMode==="monthly"?cycleLabel(d.date):d.date}</strong>
                   <span className="block text-slate-500 mt-1">Posted {money(d.posted)} · Pending {money(d.pending)} · Total {money(d.total)}</span>
                 </summary>
                 <div className="mt-3 text-sm">
@@ -864,7 +863,7 @@ export default function FinancePage(){
       </>}
     </Card>
 
-    <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Posted client spending reduces Net posted without increasing agency expenses. Latest 200 entries shown.">
+    <Card title="All Meta Ads spend" description="Meta Ads expenses only, including Self and Client-funded campaigns. Posted client spending reduces Net posted without increasing agency expenses. Latest 200 entries in the selected work cycle shown. Export CSV for the full range.">
       <button type="button" className="btn-secondary mb-4 text-xs" disabled={busy} onClick={()=>void exportCsv("meta_ads")}>
         <Download className="h-4 w-4"/> Export Meta Ads CSV
       </button>

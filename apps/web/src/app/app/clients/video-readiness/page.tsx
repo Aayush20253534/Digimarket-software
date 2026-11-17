@@ -44,7 +44,7 @@ export default function VideoReadinessPage(){
  return <div className="aw-client-workspace space-y-5" data-aw-module="clients-video-readiness">
   <SalesWorkspaceNav/>
   <PageHeader eyebrow="CLIENT CONTENT PIPELINE" title="Weekly video readiness"
-   description="Choose a client and month to track ready-to-post videos, weekly deliveries, and carried-forward stock."
+   description="Choose a client and work cycle to track ready-to-post videos, weekly deliveries, and carried-forward stock."
    actions={<div className="flex gap-2 flex-wrap">
     <Link className="aw-client-btn" href="/app/clients"><ArrowLeft size={16}/>Clients</Link>
     <button type="button" className="aw-client-btn" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh clients</button>
@@ -52,7 +52,7 @@ export default function VideoReadinessPage(){
   {error&&<p role="alert" className="aw-client-alert">{error}</p>}
   <section className="aw-client-panel">
    <div className="aw-client-panel-heading"><div><h2>Select client</h2>
-    <p>Weekly counts are separate for every client's monthly ledger.</p></div></div>
+    <p>Weekly counts are separate for every client's work cycle.</p></div></div>
    {loading?<Spinner label="Loading client directory…"/>:<div className="grid gap-3 sm:grid-cols-2">
     <label className="space-y-1 text-sm"><span className="block">Find business</span>
      <div className="flex items-center gap-2"><Search size={17}/><input className="field w-full" type="search"

@@ -1,3 +1,4 @@
+import {reportingPeriodQuerySchema} from "@digimarket/contracts";
 import type { Express,Request,Response,NextFunction } from "express";
 import { z } from "zod";
 import {
@@ -80,8 +81,8 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   // Personal history includes incoming and outgoing settlements regardless
   // of the 200-entry limit in the combined financial register.
-  app.get("/api/v1/finance/internal-settlements/mine",authenticate,async(_req,res)=>{
-    res.set("Cache-Control","no-store").json({data:await internal.projectMine(actor(res))});
+  app.get("/api/v1/finance/internal-settlements/mine",authenticate,async(req,res)=>{
+    res.set("Cache-Control","no-store").json({data:await internal.projectMine(actor(res),200,parse(reportingPeriodQuerySchema,req.query))});
   });
   app.post("/api/v1/finance/internal-settlements",authenticate,async(req,res)=>{
     const input=parse(internalInput,req.body);
@@ -105,14 +106,14 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.entries(actor(res),view(req),ledgerScope(req))});
+    res.json({data:await finance.entries(actor(res),view(req),ledgerScope(req),parse(reportingPeriodQuerySchema,req.query))});
   });
   app.post("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.status(201).json({data:await finance.submit(actor(res),parse(financeEntryInputSchema,req.body))});
   });
-  app.get("/api/v1/finance/recurring-income",authenticate,async(_req,res)=>{
+  app.get("/api/v1/finance/recurring-income",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.recurringIncome(actor(res))});
+    res.json({data:await finance.recurringIncome(actor(res),parse(reportingPeriodQuerySchema,req.query))});
   });
   app.get("/api/v1/finance/meta-ads-distribution",authenticate,async(req,res)=>{
     const query=parse(z.object({
@@ -120,11 +121,12 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
       from:z.iso.date().optional(),to:z.iso.date().optional(),
     }).refine(v=>!v.from||!v.to||v.from<=v.to),req.query);
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.metaAdsDistribution(actor(res),query.view,query.from,query.to)});
+    const period=parse(reportingPeriodQuerySchema,query);
+    res.json({data:await finance.metaAdsDistribution(actor(res),query.view,period.from,period.to)});
   });
   app.get("/api/v1/finance/summary",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.totals(actor(res),view(req))});
+    res.json({data:await finance.totals(actor(res),view(req),parse(reportingPeriodQuerySchema,req.query))});
   });
   app.get("/api/v1/finance/report-breakdown",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
@@ -136,6 +138,6 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/export",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.exportCsv(actor(res),view(req),ledgerScope(req))});
+    res.json({data:await finance.exportCsv(actor(res),view(req),ledgerScope(req),parse(reportingPeriodQuerySchema,req.query))});
   });
 }

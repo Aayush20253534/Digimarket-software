@@ -1,3 +1,4 @@
+import { businessCycle, reportingPreset, dateOnlyRange, type ReportingPeriod } from "@digimarket/contracts";
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
 import { InternalSettlementService } from "./internal-settlements";
@@ -19,12 +20,10 @@ export class FinanceService {
   constructor(private readonly db:PrismaClient){}
 
   // Contract projections are separate from posted financial transactions.
-  async recurringIncome(actor:Principal){
+  async recurringIncome(actor:Principal,period:ReportingPeriod=reportingPreset("current")){
     need(actor,"finance.read.all");
-    const now=new Date();
-    const year=now.getUTCFullYear(),month=now.getUTCMonth();
-    const periodStart=new Date(Date.UTC(year,month,1));
-    const periodEnd=new Date(Date.UTC(year,month+1,1));
+    const range=dateOnlyRange(period),periodStart=range.gte;
+    const periodEnd=new Date(range.lte.getTime()+86400000);
     const clients=await this.db.client.findMany({
       where:{organizationId:actor.organizationId,status:"ACTIVE",
         OR:[{contractStartOn:null},{contractStartOn:{lt:periodEnd}}],
@@ -42,7 +41,7 @@ export class FinanceService {
         contractStartOn:c.contractStartOn?.toISOString().slice(0,10)??null,
         contractEndOn:c.contractEndOn?.toISOString().slice(0,10)??null};
     });
-    return {month:periodStart.toISOString().slice(0,7),currency:"INR",items,
+    return {month:businessCycle(period.from).key,from:period.from,to:period.to,currency:"INR",items,
       monthlyServiceTotal:serviceTotal.toFixed(4),monthlyAdBudgetTotal:adBudgetTotal.toFixed(4),
       monthlyCombinedTotal:serviceTotal.add(adBudgetTotal).toFixed(4)};
   }
@@ -131,7 +130,7 @@ export class FinanceService {
       const count=g._count._all;
       const categoryKey=g.clientId??"SELF";
       const date=g.occurredOn.toISOString().slice(0,10);
-      const month=date.slice(0,7);
+      const month=businessCycle(date).key;
       apply(totals,g.status,amount,count);
       apply(g.clientId?clientSpend:self,g.status,amount,count);
       apply(get(categories,categoryKey),g.status,amount,count);
@@ -533,15 +532,15 @@ export class FinanceService {
     const fullTotal=categories.reduce((sum,c)=>sum.plus(c._sum.amount??0),new Prisma.Decimal(0));
     const monthly=new Map<string,{amount:Prisma.Decimal,count:number}>();
     for(const group of months){
-      const month=group.occurredOn.toISOString().slice(0,7);
+      const month=businessCycle(group.occurredOn.toISOString().slice(0,10)).key;
       const existing=monthly.get(month)??{amount:new Prisma.Decimal(0),count:0};
       existing.amount=existing.amount.plus(group._sum.amount??0);
       existing.count+=group._count._all;
       monthly.set(month,existing);
     }
     const series:{month:string;total:string;count:number}[]=[];
-    const start=new Date(input.from+"T00:00:00.000Z"),end=new Date(input.to+"T00:00:00.000Z");
-    const cursor=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth(),1));
+    const end=new Date(input.to+"T00:00:00.000Z");
+    const cursor=new Date(businessCycle(input.from).from+"T00:00:00.000Z");
     for(let i=0;i<1200&&cursor<=end;i++){
       const month=cursor.toISOString().slice(0,7),entry=monthly.get(month);
       series.push({month,total:(entry?.amount??new Prisma.Decimal(0)).toFixed(4),
@@ -604,10 +603,10 @@ export class FinanceService {
    * transactions for salaries: totals already subtract the underlying payment.
    * Only founders can inspect other people's salary records.
    */
-  private async salaryExpenseEntries(actor:Principal,view:View,take:number){
+  private async salaryExpenseEntries(actor:Principal,view:View,take:number,period?:ReportingPeriod){
     if(!isFounder(actor))return [];
     const shares=await this.db.salaryFundingAllocation.findMany({
-      where:{payment:{organizationId:actor.organizationId},
+      where:{payment:{organizationId:actor.organizationId,...(period?{paidOn:dateOnlyRange(period)}:{})},
         account:{organizationId:actor.organizationId,
           ...(view==="mine"?{founderUserId:actor.userId}:{})}},
       include:{
@@ -648,9 +647,10 @@ export class FinanceService {
     });
   }
 
-  async entries(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency"){
+  async entries(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency",period?:ReportingPeriod){
     const where=scope==="agency"?this.scope(actor,view):
       await this.metaAdsWhere(actor,view,scope==="client_ads"?"client_ads":"all");
+    if(period)where.occurredOn=dateOnlyRange(period);
     const rows=await this.db.financialTransaction.findMany({
       where,orderBy:[{createdAt:"desc"},{id:"desc"}],take:200,
       include:{category:{select:{id:true,name:true,active:true}},
@@ -662,21 +662,23 @@ export class FinanceService {
       createdAt:r.createdAt.toISOString(),category:r.category,client:r.client,
       enteredBy:r.enteredBy,submittedBy:r.approvalRequest.requester}));
     if(scope!=="agency"||!isFounder(actor))return financeRows;
-    const salaryRows=await this.salaryExpenseEntries(actor,view,200);
+    const salaryRows=await this.salaryExpenseEntries(actor,view,200,period);
     // Informational mirror only in each founder\'s My Entries. Never in Agency.
     const settlementRows=view==="mine"
-      ?await new InternalSettlementService(this.db).projectMine(actor,200):[];
+      ?await new InternalSettlementService(this.db).projectMine(actor,200,period):[];
     return [...financeRows,...salaryRows,...settlementRows]
       .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
       .slice(0,200);
   }
 
-  async totals(actor:Principal,view:View){
+  async totals(actor:Principal,view:View,period?:ReportingPeriod){
+    const occurredOn=period?{occurredOn:dateOnlyRange(period)}:{};
+    const paidOn=period?{paidOn:dateOnlyRange(period)}:{};
     const clientAdWhere=await this.metaAdsWhere(actor,view,"client_ads");
     // A founder's latest active internal settlement (incoming OR outgoing)
     // starts a new personal summary reporting cycle. The agency ledger never
     // resets. Use the actual record timestamp, not an editable occurredOn.
-    const checkpoint=view==="mine"&&isFounder(actor)
+    const checkpoint=!period&&view==="mine"&&isFounder(actor)
       ?await this.db.internalSettlement.findFirst({
         where:{organizationId:actor.organizationId,voidedAt:null,
           OR:[{senderId:actor.userId},{recipientId:actor.userId}]},
@@ -692,7 +694,7 @@ export class FinanceService {
     ]}:{};
     const [allGrouped,currentCycleGroups,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
       this.db.financialTransaction.groupBy({
-        by:["kind","status"],where:this.scope(actor,view),
+        by:["kind","status"],where:{...this.scope(actor,view),...occurredOn},
         _sum:{amount:true},_count:{_all:true},
       }),
       resetAt?this.db.financialTransaction.groupBy({
@@ -700,20 +702,20 @@ export class FinanceService {
         _sum:{amount:true},_count:{_all:true},
       }):Promise.resolve(null),
       this.db.financialTransaction.groupBy({
-        by:["status"],where:{...clientAdWhere,...sinceReset},
+        by:["status"],where:{...clientAdWhere,...sinceReset,...occurredOn},
         _sum:{amount:true},_count:{_all:true},
       }),
       view==="all"?this.db.salaryPayment.aggregate({
-        where:{organizationId:actor.organizationId,status:"PAID"},_sum:{amount:true}
+        where:{organizationId:actor.organizationId,status:"PAID",...paidOn},_sum:{amount:true}
       }):this.db.salaryFundingAllocation.aggregate({
-        where:{payment:{organizationId:actor.organizationId,status:"PAID",
+        where:{payment:{organizationId:actor.organizationId,status:"PAID",...paidOn,
           ...(resetAt?{createdAt:{gt:resetAt}}:{})},
          account:{organizationId:actor.organizationId,founderUserId:actor.userId}},_sum:{amount:true}
       }),
       // Amount is a personal memo, not a subtraction from expense accounts.
       view==="mine"&&isFounder(actor)
         ?this.db.internalSettlement.aggregate({
-          where:{organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null},
+          where:{organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null,...occurredOn},
           _sum:{amount:true}
         }):Promise.resolve(null),
     ]);
@@ -734,7 +736,8 @@ export class FinanceService {
     const postedSalaryExpense=salaryExpense._sum.amount??new Prisma.Decimal(0);
     const receivedSettlementCredit=receivedSettlements?._sum.amount??new Prisma.Decimal(0);
     const beforeSalary=income.minus(expense).minus(postedClientAds);
-    return {currency:"INR",postedIncome:income.toFixed(4),
+    return {currency:"INR",...(period??{}),postedIncome:income.toFixed(4),
+      agencyOperatingNet:income.minus(expense).minus(postedSalaryExpense).toFixed(4),
       postedExpense:expense.toFixed(4),
       postedExpenseBeforeSettlement:sumFrom(allGrouped,"EXPENSE","POSTED").toFixed(4),
       receivedInternalSettlement:receivedSettlementCredit.toFixed(4),
@@ -747,12 +750,13 @@ export class FinanceService {
       pendingExpense:sum("EXPENSE","PENDING").toFixed(4),groups:entries,
       clientAdSpend:{posted:postedClientAds.toFixed(4),pending:clientSum("PENDING").toFixed(4),
         count:clientGroups.filter(g=>g.status!=="CANCELLED").reduce((n,g)=>n+g._count._all,0)},
-       ...(view==="all"?{recurringIncome:await this.recurringIncome(actor)}:{})};
+       ...(view==="all"?{recurringIncome:await this.recurringIncome(actor,period)}:{})};
   }
 
-  async exportCsv(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency"){
+  async exportCsv(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency",period?:ReportingPeriod){
     const where=scope==="agency"?this.scope(actor,view):
       await this.metaAdsWhere(actor,view,scope==="client_ads"?"client_ads":"all");
+    if(period)where.occurredOn=dateOnlyRange(period);
     const rows=await this.db.financialTransaction.findMany({
       where,
       orderBy:[{createdAt:"desc"},{id:"desc"}],take:5001,
@@ -760,9 +764,9 @@ export class FinanceService {
         enteredBy:{select:{loginId:true}}},
     });
     const salaryRows=scope==="agency"&&isFounder(actor)
-      ?await this.salaryExpenseEntries(actor,view,5001):[];
+      ?await this.salaryExpenseEntries(actor,view,5001,period):[];
     const settlementRows=scope==="agency"&&view==="mine"&&isFounder(actor)
-      ?await new InternalSettlementService(this.db).projectMine(actor,5001):[];
+      ?await new InternalSettlementService(this.db).projectMine(actor,5001,period):[];
     if(rows.length+salaryRows.length+settlementRows.length>5000)
       throw new AuthError(422,"EXPORT_LIMIT","Export exceeds 5000 records; narrow the reporting scope");
     const header=["id","kind","status","category","amount","currency","occurred_on","payment_method","merchant_or_source","description","entered_by","approval_request_id","posted_at","client"];
@@ -780,7 +784,7 @@ export class FinanceService {
       r.currencyCode,r.occurredOn,r.method,r.merchantOrSource??"",
       r.description??"",r.enteredBy.loginId,"","",""
     ].map(csvCell).join(","));
-    return {filename:"digimarket-finance-"+scope+"-"+view+".csv",
+    return {filename:"digimarket-finance-"+scope+"-"+view+(period?"-"+period.from+"-to-"+period.to:"")+".csv",
       csv:[header.join(","),...records,...salaryRecords,...settlementRecords].join("\r\n")+"\r\n"};
   }
 }

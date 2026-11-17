@@ -1,4 +1,6 @@
 "use client";
+import {TASKS_ENABLED} from "@digimarket/contracts";
+import {TasksPaused} from "@/components/tasks-paused";
 import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {ArrowLeft,ArrowRight,CheckCheck,Clock3,History,RefreshCw,Search} from "lucide-react";
@@ -18,7 +20,7 @@ type View="mine"|"team";
 const formatDate=(value:string|null)=>value?
  new Date(value).toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"}):"Completion time unavailable";
 
-export default function TaskHistoryPage(){
+function TaskHistoryPageWorkspace(){
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("tasks.read");
  const canManage=!!session?.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN")&&
@@ -148,4 +150,9 @@ export default function TaskHistoryPage(){
    </nav>
   </section>}
  </div>;
+}
+
+// Keep the complete workspace above available for reactivation.
+export default function TaskHistoryPage(){
+ return TASKS_ENABLED?<TaskHistoryPageWorkspace/>:<TasksPaused/>;
 }

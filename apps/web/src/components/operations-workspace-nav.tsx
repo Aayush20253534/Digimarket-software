@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {CalendarCheck2,ClipboardCheck,ShieldCheck} from "lucide-react";
+import {CalendarCheck2,ShieldCheck} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 
 /**
@@ -15,7 +15,7 @@ export function OperationsWorkspaceNav(){
  const granted=new Set(session.identity.permissions);
  const links=[
   {label:"Client Deliveries",href:"/app/deliveries",icon:CalendarCheck2,allowed:granted.has("clients.read")},
-  {label:"Tasks",href:"/app/tasks",icon:ClipboardCheck,allowed:granted.has("tasks.read")},
+// Tasks paused:   {label:"Tasks",href:"/app/tasks",icon:ClipboardCheck,allowed:granted.has("tasks.read")},
   {label:"Approvals",href:"/app/approvals",icon:ShieldCheck,allowed:granted.has("approvals.read")},
  ].filter(link=>link.allowed);
  if(links.length<2)return null;

@@ -1,3 +1,4 @@
+import {dateOnlyRange,type ReportingPeriod} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
@@ -79,10 +80,10 @@ export class InternalSettlementService{
    return {id,status:"VOID" as const};
   });
  }
- async projectMine(actor:Principal,take=200){
+ async projectMine(actor:Principal,take=200,period?:ReportingPeriod){
   founder(actor);
   const rows=await this.db.internalSettlement.findMany({
-   where:{organizationId:actor.organizationId,OR:[{senderId:actor.userId},{recipientId:actor.userId}]},
+   where:{organizationId:actor.organizationId,...(period?{occurredOn:dateOnlyRange(period)}:{}),OR:[{senderId:actor.userId},{recipientId:actor.userId}]},
    include:{sender:{select:{displayName:true,loginId:true}},
     recipient:{select:{displayName:true,loginId:true}}},
    orderBy:[{createdAt:"desc"},{id:"desc"}],take

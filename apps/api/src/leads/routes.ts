@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { leadCreateSchema, leadUpdateSchema, leadAssignSchema, leadNoteSchema, leadDuplicateReviewSchema,
-  leadListQuerySchema, leadImportSchema, leadDeleteSchema } from "@digimarket/contracts";
+  leadListQuerySchema, leadImportSchema, leadDeleteSchema, leadBulkDeleteSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { LeadsService } from "./service";
@@ -82,6 +82,10 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
  app.get(root+"/export",authenticated,async(_req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.export(actor(res))});
+ });
+ app.post(root+"/bulk-delete",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.bulkDelete(actor(res),parse(leadBulkDeleteSchema,req.body))});
  });
  app.delete(root+"/:id",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");

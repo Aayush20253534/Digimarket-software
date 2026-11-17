@@ -36,7 +36,7 @@ const topics = [
   {label:"Leads CRM",permits:["leads.read"],href:"/app/leads",icon:BriefcaseBusiness,detail:"Pipeline, follow-ups, and conversions"},
   {label:"Clients",permits:["clients.read"],href:"/app/clients",icon:Users,detail:"Client contacts and service delivery"},
   {label:"Client Deliveries",permits:["clients.read"],href:"/app/deliveries",icon:FolderKanban,detail:"Agreements, projects, milestones and service targets"},
-  {label:"Tasks",permits:["tasks.read"],href:"/app/tasks",icon:CheckCircle2,detail:"Assignments and recurring work"},
+// Tasks paused:   {label:"Tasks",permits:["tasks.read"],href:"/app/tasks",icon:CheckCircle2,detail:"Assignments and recurring work"},
     {label:"Income & expenses",permits:["finance.entry.read.own","finance.read.all"],href:"/app/finance",icon:Wallet,detail:"Your permitted financial records"},
   {label:"Approval workflows",permits:["approvals.read"],href:"/app/approvals",icon:Workflow,detail:"Reviews and decisions"},
   {label:"Client files",permits:["assets.read"],href:"/app/clients/assets",icon:FileStack,detail:"Client-linked and agency resources"},
@@ -113,7 +113,7 @@ export default function Dashboard() {
     {label:"Follow-ups",href:"/app/follow-ups",description:"Review scheduled calls",icon:Activity,allowed:permitted.has("leads.read")},
     {label:"Meetings",href:"/app/meetings",description:"Track upcoming meetings",icon:Workflow,allowed:permitted.has("leads.read")},
     {label:"Clients",href:"/app/clients",description:"Accounts and agreements",icon:Users,allowed:permitted.has("clients.read")},
-    {label:"Tasks",href:"/app/tasks",description:"Assigned work",icon:CheckCircle2,allowed:permitted.has("tasks.read")},
+// Tasks paused:     {label:"Tasks",href:"/app/tasks",description:"Assigned work",icon:CheckCircle2,allowed:permitted.has("tasks.read")},
     {label:"Deliveries",href:"/app/deliveries",description:"Client commitments",icon:FolderKanban,allowed:permitted.has("clients.read")},
    ].filter(link=>link.allowed);
    return <div className="aw-dashboard aw-v3-dashboard space-y-6" data-dashboard-role={founder?"founder":"member"}>

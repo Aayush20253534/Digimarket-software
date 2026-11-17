@@ -54,6 +54,7 @@ const endpoints: Record<string, string[]> = {
   "finance/report-breakdown": ["GET"],
   "finance/report-breakdown/export": ["GET"],
   "leads": ["GET","POST"],
+  "leads/bulk-delete": ["POST"],
   "leads/metrics": ["GET"],
   "leads/follow-ups": ["GET"],
   "leads/follow-ups/today": ["GET"],

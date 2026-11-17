@@ -1,4 +1,5 @@
 import "dotenv/config";
+import {TASKS_ENABLED} from "@digimarket/contracts";
 import assert from "node:assert/strict";
 import {randomUUID} from "node:crypto";
 import {createDatabaseClient} from "@digimarket/db";
@@ -98,12 +99,12 @@ try{
  assert.equal(publicHits.some(x=>x.id===client.id),false);
  assert.ok(publicHits.some(x=>x.id===lead.id));
  assert.ok(publicHits.some(x=>x.id===visibleProject.id));
- assert.ok(publicHits.some(x=>x.id===visibleTask.id));
+ assert.equal(publicHits.some(x=>x.id===visibleTask.id),TASKS_ENABLED);
  assert.ok(publicHits.some(x=>x.id===visibleContent.id));
  for(const bad of [hiddenProject.id,hiddenTask.id,hiddenContent.id,invoice.id])
   assert.equal(publicHits.some(x=>x.id===bad),false);
  const managedHits=(await insights.search(admin,"Sunrise")).items;
- for(const id of [client.id,lead.id,hiddenProject.id,hiddenTask.id,hiddenContent.id])
+ for(const id of [client.id,lead.id,hiddenProject.id,...(TASKS_ENABLED?[hiddenTask.id]:[]),hiddenContent.id])
   assert.ok(managedHits.some(x=>x.id===id));
  assert.equal(managedHits.some(x=>x.id===invoice.id),false);
  assert.equal((await insights.search(external,"Sunrise")).items.some(x=>x.id===client.id),false);
@@ -111,7 +112,8 @@ try{
  assert.equal("invoices" in report.sections,false);
  assert.equal("cashLedger" in report.sections,false);
  assert.equal((report.sections.projects as {active:number}).active,1);
- assert.equal((report.sections.tasks as {open:number}).open,1);
+ if(TASKS_ENABLED)assert.equal((report.sections.tasks as {open:number}).open,1);
+ else assert.equal("tasks" in report.sections,false);
  assert.equal(typeof (report.sections.leads as {conversionRatePercent:number}).conversionRatePercent,"number");
  assert.equal((report.sections.leads as {followUp:number}).followUp,0);
  const privileged=await insights.report(admin,"2026-10-01","2026-11-30");

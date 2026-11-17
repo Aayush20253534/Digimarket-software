@@ -1,3 +1,4 @@
+import {agencyToday,agencyTimestampRange,businessCycle} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {forbidden,invalid} from "../auth/errors";
@@ -10,9 +11,9 @@ export type LeadAnalyticsQuery={
 const STAGES=["YET_TO_CALL","PENDING","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED"];
 const ACTIVE=new Set(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","NEW","CONTACTED","QUALIFIED","PROPOSAL"]);
 const percentage=(part:number,total:number)=>total?Math.round(part/total*10000)/100:0;
-const isoDay=(date:Date)=>date.toISOString().slice(0,10);
+const isoDay=agencyToday;
 const weekStart=(date:Date)=>{
- const d=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate()));
+ const d=new Date(agencyToday(date)+"T12:00:00Z");
  d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);
  return isoDay(d);
 };
@@ -31,7 +32,7 @@ export class LeadAnalyticsService{
   if(!a.permissions.has("reports.business.read")||!a.permissions.has("leads.read"))throw forbidden();
   if(q.from>q.to)throw invalid("Invalid reporting period");
   return {organizationId:a.organizationId,deletedAt:null,
-   createdAt:{gte:new Date(q.from+"T00:00:00.000Z"),lte:new Date(q.to+"T23:59:59.999Z")},
+   createdAt:agencyTimestampRange(q),
    ...(q.source?{AND:[{OR:q.source==="META_LEADS"?[{source:"META_LEADS"},{source:"WHATSAPP"}]:
      q.source==="COLD_CALL"?[{source:"COLD_CALL"},{source:null}]:[{source:"REFERRAL"}]}]}:{}),
    ...(q.stage?{status:q.stage as Prisma.EnumLeadStageFilter["equals"]}:{}),
@@ -99,7 +100,7 @@ export class LeadAnalyticsService{
   ];
   const trend=(period:"daily"|"weekly"|"monthly")=>{
    const rows=group(leads,x=>period==="daily"?isoDay(x.createdAt):
-    period==="weekly"?weekStart(x.createdAt):isoDay(x.createdAt).slice(0,7));
+    period==="weekly"?weekStart(x.createdAt):businessCycle(agencyToday(x.createdAt)).key);
    return rows.sort((a,b)=>a.name.localeCompare(b.name));
   };
   const sources=["META_LEADS","COLD_CALL","REFERRAL","OTHER"].map(name=>{
@@ -150,7 +151,7 @@ export class LeadAnalyticsService{
    assignees:team.filter(x=>x.id!==null).map(x=>({id:x.id,name:x.name})),
    totalPages:Math.max(1,Math.ceil(total/q.limit)),page:q.page,limit:q.limit,hasMore:start+q.limit<total,items,
    definitions:{
-    cohort:"Non-deleted leads created during the inclusive UTC date range. All filters apply to cards, charts and table.",
+    cohort:"Non-deleted leads created during the inclusive Asia/Kolkata date range. All filters apply to cards, charts and table.",
     approved:"Leads whose current status is APPROVED.",
     converted:"APPROVED leads linked to a client record, counted separately.",
     funnel:"Each stage counts leads with a recorded stage transition or matching current stage. Stages can be skipped, so counts are not necessarily decreasing.",

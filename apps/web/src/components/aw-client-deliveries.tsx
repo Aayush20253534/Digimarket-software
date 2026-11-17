@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, BriefcaseBusiness, CalendarDays, ClipboardCheck, FolderKanban, RefreshCw, Users, Wallet } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarDays,  FolderKanban, RefreshCw, Users, Wallet } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWNotice } from "@/components/aw-ui";
 
@@ -32,7 +32,7 @@ export function AWClientDeliveries(){
       <div>
         <p className="aw-eyebrow">DELIVERY OPERATIONS</p>
         <h2 className="aw-dashboard-title text-2xl font-bold text-white sm:text-3xl">Client Deliveries</h2>
-        <p className="mt-1 text-sm text-[#BFAAD1]">Pending service dates are highlighted with orange borders. Internal Tasks remain separate.</p>
+        <p className="mt-1 text-sm text-[#BFAAD1]">Pending service dates are highlighted with orange borders.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Link href="/app/clients" className="aw-dashboard-refresh"><Users size={16}/>All clients</Link>
@@ -67,7 +67,7 @@ export function AWClientDeliveries(){
         {title:"Leads CRM",desc:"Meetings and conversions",href:"/app/leads",perm:"leads.read",icon:BriefcaseBusiness,tone:"purple"},
         {title:"Clients",desc:"Client delivery workspace",href:"/app/clients",perm:"clients.read",icon:Users,tone:"pink"},
         {title:"Income & expenses",desc:"Financial entries",href:"/app/finance",perm:"finance.entry.read.own",icon:Wallet,tone:"cyan"},
-        {title:"Tasks",desc:"Independent internal work",href:"/app/tasks",perm:"tasks.read",icon:ClipboardCheck,tone:"orange"},
+// Tasks paused:         {title:"Tasks",desc:"Independent internal work",href:"/app/tasks",perm:"tasks.read",icon:ClipboardCheck,tone:"orange"},
       ].filter(item=>session?.identity.permissions.includes(item.perm)||item.href==="/app/finance"&&session?.identity.permissions.includes("finance.read.all")).map(({title,desc,href,icon:Icon,tone})=>
         <Link key={href} href={href} className={"aw-personal-shortcut aw-personal-shortcut-"+tone}>
           <Icon size={19}/><span><strong>{title}</strong><small>{desc}</small></span><ArrowRight size={16}/>

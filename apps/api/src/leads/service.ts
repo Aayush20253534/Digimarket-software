@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { PrismaClient, Prisma } from "@digimarket/db";
-import type { LeadCreateInput, LeadUpdateInput, LeadListQuery } from "@digimarket/contracts";
+import { Prisma, type PrismaClient } from "@digimarket/db";
+import type { LeadCreateInput, LeadUpdateInput, LeadListQuery, LeadBulkDeleteInput } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 
@@ -101,32 +101,42 @@ export class LeadsService {
      conversionRatePercent:total?Math.round(converted/total*10000)/100:0};
  }
  async delete(a:Principal,id:string,version:number){
+   await this.bulkDelete(a,{leads:[{id,version}]});
+   return {id,deleted:true};
+ }
+ async bulkDelete(a:Principal,input:LeadBulkDeleteInput){
+   deny(a,"leads.read");
    if(!a.roles.some(role=>role==="FOUNDER"||role==="ADMIN"||role==="SUPER_ADMIN"))throw forbidden();
-   const existing=await this.find(a,id);
-   // Match manual creation and Meta ingestion's tenant+phone advisory lock.
-   // A deleted number can then be added again without a stale duplicate.
+   const expected=new Map(input.leads.map(lead=>[lead.id,lead.version]));
+   if(!expected.size||expected.size>100||expected.size!==input.leads.length)throw invalid("Select 1–100 unique leads");
+   const ids=[...expected.keys()].sort();
    return this.db.$transaction(async tx=>{
-     if(existing.normalizedPhone)await tx.$queryRaw`SELECT 1 AS acquired FROM (SELECT pg_advisory_xact_lock(hashtextextended(${a.organizationId+":"+existing.normalizedPhone},0))) AS lock_row`;
+     const existing=await tx.lead.findMany({where:{id:{in:ids},organizationId:a.organizationId,deletedAt:null},
+       select:{id:true,normalizedPhone:true}});
+     if(existing.length!==ids.length)throw missing();
+     // Consistent lock ordering prevents two bulk requests deadlocking. Match
+     // manual creation and ingestion's tenant+phone locks before locking rows.
+     const phones=[...new Set(existing.flatMap(row=>row.normalizedPhone?[row.normalizedPhone]:[]))].sort();
+     for(const phone of phones)await tx.$queryRaw`SELECT 1 AS acquired FROM (SELECT pg_advisory_xact_lock(hashtextextended(${a.organizationId+":"+phone},0))) AS lock_row`;
      const rows=await tx.$queryRaw<{id:string;version:number}[]>`
        SELECT "id","version" FROM "Lead"
-       WHERE "id"=${id}::uuid AND "organizationId"=${a.organizationId}::uuid
-         AND "deletedAt" IS NULL FOR UPDATE
+       WHERE "id" IN (${Prisma.join(ids.map(id=>Prisma.sql`${id}::uuid`))})
+         AND "organizationId"=${a.organizationId}::uuid AND "deletedAt" IS NULL
+       ORDER BY "id" FOR UPDATE
      `;
-     if(!rows.length)throw missing();
-     if(rows[0].version!==version)throw clash();
-     // Converted clients are separate business records and must survive.
-     await tx.client.updateMany({where:{organizationId:a.organizationId,sourceLeadId:id},
-       data:{sourceLeadId:null}});
+     if(rows.length!==ids.length)throw missing();
+     if(rows.some(row=>row.version!==expected.get(row.id)))throw clash();
+     // Validate the whole selection before any deletion. Clients survive.
+     await tx.client.updateMany({where:{organizationId:a.organizationId,sourceLeadId:{in:ids}},data:{sourceLeadId:null}});
      await tx.leadDuplicateCandidate.deleteMany({where:{organizationId:a.organizationId,
-       OR:[{leadId:id},{candidateId:id}]}});
-     await tx.leadActivity.deleteMany({where:{leadId:id}});
-     const deleted=await tx.lead.deleteMany({where:{id,organizationId:a.organizationId,version}});
-     if(deleted.count!==1)throw clash();
-     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-       action:"leads.deleted",entityType:"Lead",entityId:id,
-       afterRedacted:{hardDeleted:true}}});
-     return {id,deleted:true};
-   });
+       OR:[{leadId:{in:ids}},{candidateId:{in:ids}}]}});
+     await tx.leadActivity.deleteMany({where:{leadId:{in:ids},lead:{organizationId:a.organizationId}}});
+     const deleted=await tx.lead.deleteMany({where:{id:{in:ids},organizationId:a.organizationId}});
+     if(deleted.count!==ids.length)throw clash();
+     await tx.auditLog.createMany({data:ids.map(id=>({organizationId:a.organizationId,actorId:a.userId,
+       action:"leads.deleted",entityType:"Lead",entityId:id,afterRedacted:{hardDeleted:true,batchSize:ids.length}}))});
+     return {deletedCount:deleted.count,ids};
+   },{maxWait:5_000,timeout:30_000});
  }
  async assignees(a:Principal){
    deny(a,"leads.assign");

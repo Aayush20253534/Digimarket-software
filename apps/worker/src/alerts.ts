@@ -1,3 +1,4 @@
+import {TASKS_ENABLED} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 type Alert={organizationId:string;recipientId:string;dedupeKey:string;kind:string;
  title:string;body:string;href:string};
@@ -7,9 +8,9 @@ const active="ACTIVE";
 export async function sweepAlerts(db:PrismaClient,now=new Date()){
  const day=key(now),today=start(now);
  const [tasks,leads,invoices,approvals]=await Promise.all([
-  db.task.findMany({where:{dueAt:{lt:now},status:{notIn:["DONE","CANCELLED"]}},
+  TASKS_ENABLED?db.task.findMany({where:{dueAt:{lt:now},status:{notIn:["DONE","CANCELLED"]}},
     orderBy:{dueAt:"asc"},take:100,select:{id:true,organizationId:true,createdById:true,
-      assignees:{select:{userId:true}}}}),
+      assignees:{select:{userId:true}}}}):Promise.resolve([]),
   db.lead.findMany({where:{deletedAt:null,nextFollowUpAt:{lt:now},status:{in:["PENDING","MEETING_PROCESS"]}},
     orderBy:{nextFollowUpAt:"asc"},take:100,
     select:{id:true,organizationId:true,assignedToId:true,createdById:true}}),

@@ -1,7 +1,9 @@
 "use client";
+import {reportingPreset} from "@digimarket/contracts";
+import {BusinessPeriodPicker} from "@/components/business-period-picker";
 import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
-import {Activity,ArrowUpRight,BarChart3,CalendarDays,ChartNoAxesCombined,RefreshCcw,ShieldCheck,TrendingUp,Users,Wallet,ArrowDownLeft} from "lucide-react";
+import {Activity,ArrowUpRight,BarChart3,ChartNoAxesCombined,RefreshCcw,ShieldCheck,TrendingUp,Users,Wallet,ArrowDownLeft} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
 import {Notice,PageHeader,Spinner} from "@/components/ui";
@@ -9,8 +11,7 @@ type MetricValue=number|string|{kind:string;amount:string}[];
 type Section=Record<string,MetricValue>;
 type Report={from:string;to:string;asOf:string;sections:Record<string,Section>;definitions:Record<string,string>};
 type SalaryReport={totalPaid:string;paymentCount:number;founderFunding:{founderUserId:string;name:string;amount:string}[]};
-const today=()=>new Date().toISOString().slice(0,10);
-const first=()=>today().slice(0,7)+"-01";
+const first=()=>reportingPreset("current").from;
 const label=(s:string)=>s.replace(/([A-Z])/g," $1").replace(/_/g," ").replace(/^./,x=>x.toUpperCase());
 const themes=["violet","cyan","coral","mint","amber","pink"] as const;
 const icons=[ChartNoAxesCombined,Users,TrendingUp,Wallet,Activity,BarChart3];
@@ -26,24 +27,13 @@ export default function ReportsPage(){
    const candidate=new URLSearchParams(window.location.search).get("from");
    return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:first();
  }),[to,setTo]=useState(()=>{
-   if(typeof window==="undefined")return today();
+   if(typeof window==="undefined")return reportingPreset("current").to;
    const candidate=new URLSearchParams(window.location.search).get("to");
-   return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:today();
+   return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:reportingPreset("current").to;
  }),[report,setReport]=useState<Report|null>(null);
  const [busy,setBusy]=useState(false),[error,setError]=useState("");
  const [salaryReport,setSalaryReport]=useState<SalaryReport|null>(null),[salaryWarning,setSalaryWarning]=useState("");
  const reportSequence=useRef(0);
- const applyPreset=(preset:"month"|"last30"|"year")=>{
-  const end=today();
-  const start=preset==="month"?end.slice(0,7)+"-01":
-   preset==="year"?end.slice(0,4)+"-01-01":
-   (()=>{const date=new Date(end+"T12:00:00Z");
-    date.setUTCDate(date.getUTCDate()-29);return date.toISOString().slice(0,10);})();
-  setFrom(start);setTo(end);
-  const url=new URL(window.location.href);
-  url.searchParams.set("from",start);url.searchParams.set("to",end);
-  window.history.replaceState(null,"",url.pathname+url.search+url.hash);
- };
  const load=useCallback(async()=>{
   const sequence=++reportSequence.current;
   if(!can)return;
@@ -95,23 +85,11 @@ export default function ReportsPage(){
     <Link href={"/app/reports/income?"+new URLSearchParams({from,to})}><ArrowDownLeft size={16} aria-hidden="true"/>Income breakdown</Link>
     <Link href={"/app/reports/expenses?"+new URLSearchParams({from,to})}><ArrowUpRight size={16} aria-hidden="true"/>Expense breakdown</Link>
    </nav>
-  <section className="aw-report-toolbar" aria-label="Reporting period">
-    <div className="aw-report-toolbar-title"><CalendarDays size={21}/><div><strong>Reporting period</strong>
-     <p>Filter live activity across your agency</p></div></div>
-    <div className="aw-v5-date-presets" role="group" aria-label="Quick report periods">
-      <button type="button" onClick={()=>applyPreset("month")}
-        aria-pressed={from===today().slice(0,7)+"-01"&&to===today()}>This month</button>
-      <button type="button" onClick={()=>applyPreset("last30")}>Last 30 days</button>
-      <button type="button" onClick={()=>applyPreset("year")}
-        aria-pressed={from===today().slice(0,4)+"-01-01"&&to===today()}>This year</button>
-    </div>
-    <div className="aw-report-dates">
-     <label>From<input type="date" className="field" value={from} max={to} onChange={e=>setFrom(e.target.value)}/></label>
-     <label>Through<input type="date" className="field" value={to} min={from} onChange={e=>setTo(e.target.value)}/></label>
-     <button className="aw-report-refresh" disabled={busy} type="button" onClick={()=>void load()}>
-      <RefreshCcw size={17} className={busy?"animate-spin":""}/> {busy?"Refreshing…":"Refresh insights"}</button>
-    </div>
-  </section>
+  <BusinessPeriodPicker value={{from,to}} onChange={period=>{setFrom(period.from);setTo(period.to);
+   const url=new URL(window.location.href);url.searchParams.set("from",period.from);url.searchParams.set("to",period.to);
+   window.history.replaceState(null,"",url.pathname+url.search+url.hash);
+  }}/>
+  <button className="btn-secondary" disabled={busy} type="button" onClick={()=>void load()}><RefreshCcw size={17}/>Refresh insights</button>
   {error&&<Notice kind="error">{error}</Notice>}
   {busy&&!report&&<Spinner label="Calculating permitted metrics…"/>}
   {report&&<>

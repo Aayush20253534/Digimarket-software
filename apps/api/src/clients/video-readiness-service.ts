@@ -1,3 +1,4 @@
+import {businessCycle} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
@@ -59,6 +60,24 @@ export class ClientVideoReadinessService{
    readyThisMonth:current.reduce((n,row)=>n+row.readyAdded,0),
    deliveredThisMonth:current.reduce((n,row)=>n+row.delivered,0),
    remainingStock:remaining,weeks};
+ }
+ // Re-group existing contract weeks for the agency cycle without changing
+ // their persisted (month, week) identity or historical stock movements.
+ async cycle(actor:Principal,clientId:string,month:string){
+  const cycle=businessCycle(month+"-22"),next=cycle.endExclusive.slice(0,7);
+  const first=await this.monthly(actor,clientId,month);
+  const second=await this.monthly(actor,clientId,next);
+  const all=[first,second].flatMap(data=>data.weeks.map(week=>({...week,
+   storageMonth:data.month,storageWeek:week.week})));
+  const weeks=all.filter(week=>week.from>=cycle.from&&week.from<cycle.endExclusive)
+   .map((week,index)=>({...week,week:index+1}));
+  const prior=all.filter(week=>week.from<cycle.from).at(-1);
+  const openingStock=weeks[0]?.availableBefore??prior?.remainingStock??first.openingStock;
+  return {...first,from:cycle.from,to:cycle.to,openingStock,weeks,
+   readyThisMonth:weeks.reduce((sum,week)=>sum+week.readyAdded,0),
+   deliveredThisMonth:weeks.reduce((sum,week)=>sum+week.delivered,0),
+   remainingStock:weeks.at(-1)?.remainingStock??openingStock,
+  };
  }
  async saveWeek(actor:Principal,clientId:string,month:string,week:number,input:VideoWeekInput){
   const client=await this.allowed(actor,clientId,true);

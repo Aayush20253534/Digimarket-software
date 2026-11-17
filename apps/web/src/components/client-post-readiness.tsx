@@ -1,11 +1,12 @@
 "use client";
+import {businessCycle,cycleLabel} from "@digimarket/contracts";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {CalendarDays,Check,PackageCheck,RefreshCw,Send,Newspaper} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {Spinner} from "@/components/ui";
 
 type PostWeek={
- week:number;from:string;to:string;readyAdded:number;delivered:number;
+ week:number;storageMonth?:string;storageWeek?:number;from:string;to:string;readyAdded:number;delivered:number;
  availableBefore:number;remainingStock:number;version:number;note:string;
  festivalReadyAdded:number;festivalDelivered:number;festivalAvailableBefore:number;
  festivalRemainingStock:number;festivalNote:string;
@@ -20,10 +21,7 @@ type Monthly={
 };
 type Draft={readyAdded:string;delivered:string;note:string;
  festivalReadyAdded:string;festivalDelivered:string;festivalNote:string};
-const currentMonth=()=>{
- const date=new Date();
- return date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0");
-};
+const currentMonth=()=>businessCycle().key;
 const validCount=(value:string)=>/^(0|[1-9][0-9]{0,4})$/.test(value)&&Number(value)<=10000;
 const count=(x:number)=>new Intl.NumberFormat("en-IN").format(x);
 const draftsFrom=(value:Monthly)=>Object.fromEntries(value.weeks.map(w=>[w.week,{
@@ -51,7 +49,7 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
-   const result=await request<Monthly>("/clients/"+clientId+"/post-readiness?month="+encodeURIComponent(month));
+   const result=await request<Monthly>("/clients/"+clientId+"/post-readiness?month="+encodeURIComponent(month)+"&basis=cycle");
    setData(result);setDrafts(draftsFrom(result));
   }catch(e){setError(e instanceof Error?e.message:"Could not load post stock");setData(null);}
   finally{setLoading(false);}
@@ -88,8 +86,8 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
   }
   setSaving(w.week);setError("");setSuccess("");
   try{
-   await request("/clients/"+clientId+"/post-readiness/"+w.week,{method:"PUT",body:{
-    month,readyAdded:Number(v.readyAdded),delivered:Number(v.delivered),
+   await request("/clients/"+clientId+"/post-readiness/"+(w.storageWeek??w.week),{method:"PUT",body:{
+    month:w.storageMonth??month,readyAdded:Number(v.readyAdded),delivered:Number(v.delivered),
     note:v.note.trim(),version:w.version,
     festivalReadyAdded:Number(v.festivalReadyAdded),
     festivalDelivered:Number(v.festivalDelivered),festivalNote:v.festivalNote.trim()
@@ -103,10 +101,10 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
  return <section className="aw-client-panel space-y-5" aria-label="Client post readiness">
   <div className="aw-client-panel-heading">
    <div><h2 className="flex items-center gap-2"><Newspaper size={21}/>Post Readiness</h2>
-    <p>Track regular posts and festival creatives in separate weekly inventories, each carrying unused stock into the next month.</p></div>
+    <p>Track regular posts and festival creatives in separate weekly inventories, each carrying unused stock into the next cycle.</p></div>
    <div className="flex items-end gap-2 flex-wrap">
-    <label className="text-sm space-y-1"><span className="block">Select month</span>
-     <input type="month" className="field" value={month} min="2000-01" max="2099-12" onChange={e=>changeMonth(e.target.value)}/></label>
+    <label className="text-sm space-y-1"><span className="block">Cycle start month</span>
+     <input type="month" className="field" value={month} min="2026-10" max="2099-12" onChange={e=>changeMonth(e.target.value)}/></label>
     <button className="aw-client-btn" type="button" disabled={loading||saving!==null} onClick={()=>void load()}>
      <RefreshCw size={15}/>Refresh
     </button>
@@ -119,6 +117,7 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
     onClick={()=>{setCategory("festival");setSuccess("");}}><CalendarDays size={16}/>Festival posts</button>
    <span className="aw-client-muted text-sm">Counts are independent; switching tabs keeps unsaved entries until refresh.</span>
   </div>
+  <p className="aw-client-muted text-sm">Work cycle: {cycleLabel(month)}. The closing 22nd starts the next cycle. Each full contract week belongs to the cycle containing its start date.</p>
   {error&&<p className="aw-client-alert" role="alert">{error}</p>}
   {success&&<p className="aw-client-success" role="status">{success}</p>}
   {loading?<Spinner label="Loading weekly post status…"/>:data&&<>
@@ -129,11 +128,11 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
    </p>
    <div className="aw-client-statrow">
     <div className="aw-client-stat"><PackageCheck size={18}/><span>{isFestival?"Festival stock ready":"Regular stock ready"}</span><strong>{count(isFestival?data.festivalRemainingStock:data.remainingStock)}</strong></div>
-    <div className="aw-client-stat"><Newspaper size={18}/><span>Ready added this month</span><strong>{count(isFestival?data.festivalReadyThisMonth:data.readyThisMonth)}</strong></div>
-    <div className="aw-client-stat"><Send size={18}/><span>Delivered this month</span><strong>{count(isFestival?data.festivalDeliveredThisMonth:data.deliveredThisMonth)}</strong></div>
-    <div className="aw-client-stat"><CalendarDays size={18}/><span>Carried from earlier months</span><strong>{count(isFestival?data.festivalOpeningStock:data.openingStock)}</strong></div>
+    <div className="aw-client-stat"><Newspaper size={18}/><span>Ready added this cycle</span><strong>{count(isFestival?data.festivalReadyThisMonth:data.readyThisMonth)}</strong></div>
+    <div className="aw-client-stat"><Send size={18}/><span>Delivered this cycle</span><strong>{count(isFestival?data.festivalDeliveredThisMonth:data.deliveredThisMonth)}</strong></div>
+    <div className="aw-client-stat"><CalendarDays size={18}/><span>Carried from earlier cycles</span><strong>{count(isFestival?data.festivalOpeningStock:data.openingStock)}</strong></div>
    </div>
-   {data.weeks.length===0&&<p className="aw-client-muted text-sm">No agreement week starts in this month. Weeks that cross month boundaries appear in the month in which they start.</p>}
+   {data.weeks.length===0&&<p className="aw-client-muted text-sm">No agreement week starts in this cycle. Weeks that cross cycle boundaries appear in the cycle in which they start.</p>}
    <div className="overflow-x-auto">
     <table className="aw-client-table w-full" aria-label={(isFestival?"Festival":"Regular")+" post readiness weeks for "+data.clientName+" "+month}>
      <thead><tr>
@@ -177,10 +176,10 @@ export function ClientPostReadiness({clientId,month:externalMonth,onMonthChange}
     </table>
    </div>
    <div className="aw-client-muted text-sm space-y-1">
-    <p>Weeks are consecutive seven-day periods from the contract start, ending at the contract end date where provided. A cross-month week appears under its starting month. Without a contract start date, calendar-month periods remain available.</p>
+    <p>Weeks are consecutive seven-day periods from the contract start, ending at the contract end date where provided. A week crossing the 22nd stays in the cycle in which it starts. Without a contract start date, the original calendar weeks are grouped into these cycles.</p>
     <p><strong>Stock calculation:</strong> Each category has its own opening stock + newly ready posts − delivered posts. Regular and festival post counts never offset each other. A post enters stock when its design or copy is complete; delivering or publishing it reduces that category’s stock.</p>
     <p>Use festival notes for festival names and deadlines (e.g. Diwali, Holi). This tracker is manually maintained and does not automatically read content assets or social-media publishing status.</p>
-    {!anyStock&&data.weeks.length>0&&<p>No {isFestival?"festival":"regular"} post quantities recorded for this month. Enter ready or delivered counts and save the week.</p>}
+    {!anyStock&&data.weeks.length>0&&<p>No {isFestival?"festival":"regular"} post quantities recorded for this cycle. Enter ready or delivered counts and save the week.</p>}
    </div>
   </>}
  </section>;

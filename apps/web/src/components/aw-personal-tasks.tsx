@@ -1,4 +1,5 @@
 "use client";
+import {TASKS_ENABLED} from "@digimarket/contracts";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight, CalendarClock, CheckCircle2, ClipboardList, MessageSquarePlus, NotebookPen, RefreshCw, BriefcaseBusiness, Users, Wallet } from "lucide-react";
@@ -10,7 +11,7 @@ const done=new Set(["DONE","CANCELLED"]);
 const due=(a:Task,b:Task)=>(a.dueAt?Date.parse(a.dueAt):Infinity)-(b.dueAt?Date.parse(b.dueAt):Infinity);
 export function AWPersonalTasks(){
  const {session,request}=useAuth();
- const id=session?.identity.userId,allowed=!!session?.identity.permissions.includes("tasks.read");
+ const id=session?.identity.userId,allowed=TASKS_ENABLED&&!!session?.identity.permissions.includes("tasks.read");
  const [items,setItems]=useState<Task[]>([]),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false);
  const [partial,setPartial]=useState(false),[error,setError]=useState(""),[clock,setClock]=useState(()=>Date.now());
  const [commentTaskId,setCommentTaskId]=useState<string|null>(null);
