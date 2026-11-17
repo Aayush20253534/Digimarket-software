@@ -204,6 +204,11 @@ enum AssetResourceType {
 }
 
 model Organization {
+  moneyAccounts MoneyAccount[]
+  clientFunds ClientFundEntry[]
+  moneyTransfers MoneyTransfer[]
+  moneyReconciliations MoneyReconciliation[]
+  financeCloses FinancePeriodClose[]
   id              String           @id @default(uuid()) @db.Uuid
   name            String           @db.VarChar(160)
   timezone        String           @default("Asia/Kolkata") @db.VarChar(80)
@@ -253,6 +258,12 @@ model Organization {
 }
 
 model User {
+  ownedMoneyAccounts MoneyAccount[] @relation("MoneyAccountOwner")
+  createdMoneyAccounts MoneyAccount[] @relation("MoneyAccountCreator")
+  clientFundRecords ClientFundEntry[]
+  moneyTransfers MoneyTransfer[]
+  moneyReconciliations MoneyReconciliation[]
+  financeCloses FinancePeriodClose[]
   id                 String          @id @default(uuid()) @db.Uuid
   organizationId     String          @db.Uuid
   loginId            String          @db.VarChar(80)
@@ -513,6 +524,7 @@ model ApprovalDecision {
 }
 
 model FinancialCategory {
+  purpose FinancialCategoryPurpose @default(GENERAL)
   id             String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   kind           FinanceKind
@@ -529,6 +541,11 @@ model FinancialCategory {
 }
 
 model FinancialTransaction {
+  moneyAccountId String? @db.Uuid
+  moneyAccount MoneyAccount? @relation(fields:[moneyAccountId],references:[id],onDelete:Restrict)
+  reversesId String? @unique @db.Uuid
+  reverses FinancialTransaction? @relation("FinanceReversal",fields:[reversesId],references:[id],onDelete:Restrict)
+  reversedBy FinancialTransaction? @relation("FinanceReversal")
   id                String @id @default(uuid()) @db.Uuid
   organizationId    String @db.Uuid
   enteredById       String @db.Uuid
@@ -638,6 +655,7 @@ model LeadDuplicateCandidate {
 }
 
 model Client {
+  fundEntries ClientFundEntry[]
   id String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   sourceLeadId String? @unique @db.Uuid
@@ -1510,6 +1528,9 @@ model SalaryFundingCredit {
 }
 
 model SalaryPayment {
+  reversesId String? @unique @db.Uuid
+  reverses SalaryPayment? @relation("SalaryReversal",fields:[reversesId],references:[id],onDelete:Restrict)
+  reversedBy SalaryPayment? @relation("SalaryReversal")
   id String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   recipientUserId String @db.Uuid
@@ -1537,6 +1558,8 @@ model SalaryPayment {
 }
 
 model SalaryFundingAllocation {
+  moneyAccountId String? @db.Uuid
+  moneyAccount MoneyAccount? @relation(fields:[moneyAccountId],references:[id],onDelete:Restrict)
   id String @id @default(uuid()) @db.Uuid
   paymentId String @db.Uuid
   accountId String @db.Uuid
@@ -1619,4 +1642,121 @@ model InternalSettlement {
   @@unique([organizationId,idempotencyKey])
   @@index([organizationId,senderId,createdAt])
   @@index([organizationId,recipientId,createdAt])
+}
+
+
+enum FinancialCategoryPurpose {
+  GENERAL
+  META_ADS
+  SALARY
+}
+enum MoneyAccountKind {
+  BANK
+  CASH
+  UPI
+  FOUNDER
+}
+enum ClientFundKind {
+  TOPUP
+  REFUND
+  REVERSAL
+}
+model MoneyAccount {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  name String @db.VarChar(120)
+  normalizedName String @db.VarChar(120)
+  kind MoneyAccountKind
+  ownerUserId String? @db.Uuid
+  createdById String @db.Uuid
+  openingOn DateTime @db.Date
+  openingBalance Decimal @db.Decimal(19,4)
+  active Boolean @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  owner User? @relation("MoneyAccountOwner",fields:[ownerUserId],references:[id],onDelete:Restrict)
+  creator User @relation("MoneyAccountCreator",fields:[createdById],references:[id],onDelete:Restrict)
+  financeEntries FinancialTransaction[]
+  salaryAllocations SalaryFundingAllocation[]
+  clientFunds ClientFundEntry[]
+  transfersOut MoneyTransfer[] @relation("MoneyTransferFrom")
+  transfersIn MoneyTransfer[] @relation("MoneyTransferTo")
+  reconciliations MoneyReconciliation[]
+  @@unique([organizationId,normalizedName])
+  @@index([organizationId,kind])
+}
+model ClientFundEntry {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  clientId String @db.Uuid
+  moneyAccountId String @db.Uuid
+  recordedById String @db.Uuid
+  idempotencyKey String @db.Uuid
+  kind ClientFundKind
+  amount Decimal @db.Decimal(19,4)
+  occurredOn DateTime @db.Date
+  reference String? @db.VarChar(160)
+  note String @db.VarChar(500)
+  reversesId String? @unique @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  client Client @relation(fields:[clientId],references:[id],onDelete:Restrict)
+  account MoneyAccount @relation(fields:[moneyAccountId],references:[id],onDelete:Restrict)
+  recorder User @relation(fields:[recordedById],references:[id],onDelete:Restrict)
+  reverses ClientFundEntry? @relation("ClientFundReversal",fields:[reversesId],references:[id],onDelete:Restrict)
+  reversedBy ClientFundEntry? @relation("ClientFundReversal")
+  @@unique([organizationId,idempotencyKey])
+  @@index([organizationId,clientId,occurredOn])
+  @@index([moneyAccountId,occurredOn])
+}
+model MoneyTransfer {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  fromAccountId String @db.Uuid
+  toAccountId String @db.Uuid
+  recordedById String @db.Uuid
+  idempotencyKey String @db.Uuid
+  amount Decimal @db.Decimal(19,4)
+  occurredOn DateTime @db.Date
+  note String @db.VarChar(500)
+  reversesId String? @unique @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  fromAccount MoneyAccount @relation("MoneyTransferFrom",fields:[fromAccountId],references:[id],onDelete:Restrict)
+  toAccount MoneyAccount @relation("MoneyTransferTo",fields:[toAccountId],references:[id],onDelete:Restrict)
+  recorder User @relation(fields:[recordedById],references:[id],onDelete:Restrict)
+  reverses MoneyTransfer? @relation("MoneyTransferReversal",fields:[reversesId],references:[id],onDelete:Restrict)
+  reversedBy MoneyTransfer? @relation("MoneyTransferReversal")
+  @@unique([organizationId,idempotencyKey])
+  @@index([organizationId,occurredOn])
+}
+model MoneyReconciliation {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  moneyAccountId String @db.Uuid
+  reconciledById String @db.Uuid
+  asOf DateTime @db.Date
+  statementBalance Decimal @db.Decimal(19,4)
+  expectedBalance Decimal @db.Decimal(19,4)
+  note String @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  account MoneyAccount @relation(fields:[moneyAccountId],references:[id],onDelete:Restrict)
+  reconciler User @relation(fields:[reconciledById],references:[id],onDelete:Restrict)
+  @@unique([moneyAccountId,asOf])
+  @@index([organizationId,asOf])
+}
+model FinancePeriodClose {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @db.Uuid
+  from DateTime @db.Date
+  to DateTime @db.Date
+  closedById String @db.Uuid
+  snapshot Json
+  note String @db.VarChar(500)
+  closedAt DateTime @default(now()) @db.Timestamptz(6)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  closer User @relation(fields:[closedById],references:[id],onDelete:Restrict)
+  @@unique([organizationId,from])
+  @@index([organizationId,to])
 }

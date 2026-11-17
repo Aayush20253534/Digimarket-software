@@ -50,11 +50,13 @@ export type ApprovalDecisionInput = z.infer<typeof approvalDecisionSchema>;
 export const financeKindSchema = z.enum(["INCOME","EXPENSE"]);
 export type FinanceKind = z.infer<typeof financeKindSchema>;
 export const financeCategoryInputSchema = z.strictObject({
+  purpose:z.enum(["GENERAL","META_ADS"]).optional(),
   kind: financeKindSchema,
   name: z.string().trim().min(2).max(120),
 });
 export type FinanceCategoryInput = z.infer<typeof financeCategoryInputSchema>;
 export const financeEntryInputSchema = z.strictObject({
+  moneyAccountId:z.uuid().optional(),
   kind: financeKindSchema,
   categoryId: z.uuid(),
   // Only Meta Ads expenses may link to a client. Null/absent means agency-funded.
@@ -73,6 +75,7 @@ export type FinanceEntryInput = z.infer<typeof financeEntryInputSchema>;
 // Financial administration stays role-protected and audited. No arbitrary status edits.
 export const financeCategoryEditSchema=z.strictObject({name:z.string().trim().min(2).max(120)});
 export const financeEntryAdminEditSchema=z.strictObject({
+  moneyAccountId:z.uuid().nullable().optional(),
   categoryId:z.uuid(),clientId:z.uuid().nullable().optional(),amount:financeEntryInputSchema.shape.amount,
   occurredOn:z.iso.date(),method:financeEntryInputSchema.shape.method,
   merchantOrSource:z.string().trim().max(160),description:z.string().trim().max(2000),

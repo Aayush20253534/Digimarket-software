@@ -10,12 +10,14 @@ import { AuthError, forbidden, invalid } from "../auth/errors";
 const need=(actor:Principal,key:string)=>{if(!actor.permissions.has(key))throw forbidden();};
 const duplicate=()=>new AuthError(409,"DUPLICATE","A record with this identifier already exists");
 const normalize=(value:string)=>value.trim().replace(/\s+/g," ").toLocaleLowerCase("en-US");
-const isMetaAds=(name:string)=>/^meta[\s_-]*(?:ads?|advertising|advertisements?)$/i.test(name.trim());
+const inferredPurpose=(name:string)=>/^meta[\s_-]*(?:ads?|advertising|advertisements?)$/i.test(name.trim())?"META_ADS" as const:"GENERAL" as const;
+const isMetaAds=(category:{name:string;purpose?:string})=>(category.purpose??inferredPurpose(category.name))==="META_ADS";
 const csvCell=(value:string)=> {
   const safe=/^[=+@\-\t\r]/.test(value)?"'"+value:value;
   return '"'+safe.replaceAll('"','""')+'"';
 };
 type View="mine"|"all";
+export type FinanceRegisterQuery=ReportingPeriod&{view:View;scope:"agency"|"client_ads"|"meta_ads";funding?:"ALL"|"SELF"|"CLIENT";page:number;limit:number;q:string;kind?:"INCOME"|"EXPENSE";status?:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";categoryId?:string};
 export class FinanceService {
   constructor(private readonly db:PrismaClient){}
 
@@ -60,10 +62,10 @@ export class FinanceService {
     const base=this.scope(actor,view,owner);
     const categories=await this.db.financialCategory.findMany({
       where:{organizationId:actor.organizationId,kind:"EXPENSE"},
-      select:{id:true,name:true},
+      select:{id:true,name:true,purpose:true},
     });
     return {...base,kind:"EXPENSE",
-      categoryId:{in:categories.filter(c=>isMetaAds(c.name)).map(c=>c.id)}};
+      categoryId:{in:categories.filter(c=>isMetaAds(c)).map(c=>c.id)}};
   }
 
 
@@ -184,7 +186,7 @@ export class FinanceService {
     if(!actor.permissions.has("finance.entry.create")&&!actor.permissions.has("finance.read.all")) throw forbidden();
     return this.db.financialCategory.findMany({
       where:{organizationId:actor.organizationId},orderBy:[{kind:"asc"},{name:"asc"}],
-      select:{id:true,kind:true,name:true,active:true,createdAt:true},
+      select:{id:true,kind:true,name:true,purpose:true,active:true,createdAt:true},
     });
   }
 
@@ -196,7 +198,7 @@ export class FinanceService {
       return await this.db.$transaction(async tx=>{
         const category=await tx.financialCategory.create({data:{
           organizationId:actor.organizationId,kind:input.kind,
-          name:input.name.trim(),normalizedName,
+          name:input.name.trim(),normalizedName,purpose:input.kind==="EXPENSE"?(input.purpose??inferredPurpose(input.name)):"GENERAL",
         }});
         await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
           action:"finance.category_created",entityType:"FinancialCategory",entityId:category.id}});
@@ -296,19 +298,19 @@ export class FinanceService {
     return this.db.$transaction(async tx=>{
       const entry=await tx.financialTransaction.findFirst({
         where:{id,organizationId:actor.organizationId},
-        include:{verifiedPayment:{select:{id:true}}},
+        include:{verifiedPayment:{select:{id:true}},reversedBy:{select:{id:true}}},
       });
       if(!entry)throw new AuthError(404,"NOT_FOUND","Financial entry not found");
-      if(entry.status==="CANCELLED"||entry.verifiedPayment)
+      if(entry.status==="CANCELLED"||entry.verifiedPayment||entry.reversesId||entry.reversedBy)
         throw new AuthError(409,"FINANCE_IMMUTABLE","Cancelled or reconciled entries cannot be edited");
       const category=await tx.financialCategory.findFirst({
         where:{id:input.categoryId,organizationId:actor.organizationId,kind:entry.kind,
           ...(input.categoryId===entry.categoryId?{}:{active:true})},
       });
       if(!category)throw invalid("Choose a valid "+entry.kind.toLowerCase()+" category in this organization");
-      if(entry.kind==="EXPENSE"&&normalize(category.name)==="salary")throw invalid("Salary entries are managed through Salary");
+      if(entry.kind==="EXPENSE"&&(category.purpose==="SALARY"||normalize(category.name)==="salary"))throw invalid("Salary entries are managed through Salary");
       const requestedClientId=input.clientId===undefined?entry.clientId:input.clientId;
-      if(requestedClientId&&!isMetaAds(category.name))
+      if(requestedClientId&&!isMetaAds(category))
         throw invalid("A client can only be linked to a Meta Ads expense");
       if(requestedClientId){
         const client=await tx.client.findFirst({where:{id:requestedClientId,organizationId:actor.organizationId},
@@ -322,7 +324,9 @@ export class FinanceService {
         },select:{id:true}});
         if(!assignedUser)throw invalid("Assigned user must be an active member of this organization");
       }
+      if(input.moneyAccountId&&!await tx.moneyAccount.findFirst({where:{id:input.moneyAccountId,organizationId:actor.organizationId,active:true,openingOn:{lte:new Date(input.occurredOn+"T00:00:00Z")}}}))throw invalid("Choose an account open on this transaction date");
       const updated=await tx.financialTransaction.update({where:{id},data:{
+        ...(input.moneyAccountId!==undefined?{moneyAccountId:input.moneyAccountId}:{}),
         categoryId:category.id,amount,occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
         method:input.method,merchantOrSource:input.merchantOrSource,description:input.description,
         clientId:requestedClientId??null,enteredById:assignedUserId,
@@ -356,11 +360,11 @@ export class FinanceService {
     return this.db.$transaction(async tx=>{
       const entry=await tx.financialTransaction.findFirst({
         where:{id,organizationId:actor.organizationId},
-        include:{verifiedPayment:{select:{id:true}}},
+        include:{verifiedPayment:{select:{id:true}},reversedBy:{select:{id:true}}},
       });
       if(!entry)throw new AuthError(404,"NOT_FOUND","Financial entry not found");
       if(entry.status==="CANCELLED")throw new AuthError(409,"ALREADY_CANCELLED","Financial entry already cancelled");
-      if(entry.verifiedPayment)throw new AuthError(409,"FINANCE_IMMUTABLE","Reconciled entries cannot be cancelled");
+      if(entry.verifiedPayment||entry.reversesId||entry.reversedBy)throw new AuthError(409,"FINANCE_IMMUTABLE","Reconciled entries cannot be cancelled");
       await tx.financialTransaction.update({
         where:{id},data:{status:"CANCELLED",postedAt:null},
       });
@@ -408,9 +412,9 @@ export class FinanceService {
       this.db.user.findFirst({where:{id:enteredById,organizationId:actor.organizationId,status:"ACTIVE"},select:{id:true}}),
     ]);
     if(!category)throw invalid("Select an active category belonging to this workspace and type");
-    if(input.kind==="EXPENSE"&&normalize(category.name)==="salary")throw invalid("Record salary payments through Salary to avoid duplicate expense accounting");
+    if(input.kind==="EXPENSE"&&(category.purpose==="SALARY"||normalize(category.name)==="salary"))throw invalid("Record salary payments through Salary to avoid duplicate expense accounting");
     if(input.clientId){
-      if(input.kind!=="EXPENSE"||!isMetaAds(category.name))
+      if(input.kind!=="EXPENSE"||!isMetaAds(category))
         throw invalid("A client can only be linked to a Meta Ads expense");
       const client=await this.db.client.findFirst({where:{id:input.clientId,
         organizationId:actor.organizationId,status:"ACTIVE"},select:{id:true}});
@@ -419,6 +423,7 @@ export class FinanceService {
     if(!assignedUser)throw invalid("Select an active person in this organization");
     if(!founder&&(!policy?.active||!policy.approverRoleKeys.length))throw invalid("An administrator must activate a FINANCE approval policy");
     if(!organization||organization.defaultCurrency!=="INR")throw invalid("This finance module currently supports INR workspaces only");
+    if(input.moneyAccountId&&!await this.db.moneyAccount.findFirst({where:{id:input.moneyAccountId,organizationId:actor.organizationId,active:true,openingOn:{lte:new Date(input.occurredOn+"T00:00:00Z")}}}))throw invalid("Choose an account open on this transaction date");
     if(input.receiptAssetId){
       const proof=await this.db.asset.findFirst({where:{
         id:input.receiptAssetId,organizationId:actor.organizationId,uploadedById:actor.userId,
@@ -442,7 +447,7 @@ export class FinanceService {
         const entry=await tx.financialTransaction.create({data:{
           organizationId:actor.organizationId,enteredById,
           categoryId:category.id,approvalRequestId:approval.id,
-          clientId:input.clientId??null,
+          clientId:input.clientId??null,moneyAccountId:input.moneyAccountId??null,
           idempotencyKey:input.idempotencyKey,kind:input.kind,
           amount:amount.toFixed(4),currencyCode:organization.defaultCurrency,
           occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
@@ -669,6 +674,48 @@ export class FinanceService {
     return [...financeRows,...salaryRows,...settlementRows]
       .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id))
       .slice(0,200);
+  }
+
+  async categorySummary(actor:Principal,view:View,period:ReportingPeriod,kind:FinanceKind){
+    const where={...this.scope(actor,view),kind,occurredOn:dateOnlyRange(period)};
+    const [groups,categories,totals]=await Promise.all([
+      this.db.financialTransaction.groupBy({by:["categoryId","status"],where,_sum:{amount:true},_count:{_all:true}}),
+      this.db.financialCategory.findMany({where:{organizationId:actor.organizationId,kind},orderBy:{name:"asc"}}),this.totals(actor,view,period),
+    ]);
+    return {kind,ordinary:kind==="EXPENSE"?totals.postedExpense:totals.postedIncome,salary:kind==="EXPENSE"?totals.postedSalaryExpense:"0.0000",total:kind==="EXPENSE"?totals.postedExpenseIncludingSalary:totals.postedIncome,
+      items:categories.filter(c=>c.purpose!=="SALARY").map(c=>{const posted=groups.find(g=>g.categoryId===c.id&&g.status==="POSTED"),pending=groups.find(g=>g.categoryId===c.id&&g.status==="PENDING");return {id:c.id,name:c.name,active:c.active,purpose:c.purpose,posted:(posted?._sum.amount??new Prisma.Decimal(0)).toFixed(4),pending:(pending?._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:posted?._count._all??0};})};
+  }
+
+  private async registerWhere(actor:Principal,q:FinanceRegisterQuery){
+    const base=q.scope==="agency"?this.scope(actor,q.view):await this.metaAdsWhere(actor,q.view,q.scope==="client_ads"?"client_ads":"all");
+    return {...base,...(q.scope!=="agency"&&q.funding&&q.funding!=="ALL"?{clientId:q.funding==="SELF"?null:{not:null}}:{}),occurredOn:dateOnlyRange(q),...(q.kind?{kind:q.kind}:{}),...(q.status?{status:q.status}:{}),
+      ...(q.categoryId?{AND:[{categoryId:q.categoryId}]}:{}),
+      ...(q.q?{OR:[{description:{contains:q.q,mode:"insensitive" as const}},{merchantOrSource:{contains:q.q,mode:"insensitive" as const}},
+        {category:{name:{contains:q.q,mode:"insensitive" as const}}},{enteredBy:{displayName:{contains:q.q,mode:"insensitive" as const}}},{client:{businessName:{contains:q.q,mode:"insensitive" as const}}}]}:{})};
+  }
+  async register(actor:Principal,q:FinanceRegisterQuery){
+    const where=await this.registerWhere(actor,q);
+    const [rows,total,aggregate]=await this.db.$transaction([
+      this.db.financialTransaction.findMany({where,include:{category:true,client:{select:{id:true,businessName:true}},enteredBy:{select:{displayName:true,loginId:true}},approvalRequest:{select:{requester:{select:{displayName:true}}}},moneyAccount:{select:{id:true,name:true}},reversedBy:{select:{id:true}}},orderBy:[{occurredOn:"desc"},{createdAt:"desc"},{id:"desc"}],skip:(q.page-1)*q.limit,take:q.limit}),
+      this.db.financialTransaction.count({where}),this.db.financialTransaction.aggregate({where,_sum:{amount:true}}),
+    ]);
+    return {items:rows.map(row=>({...this.present(row),sourceType:"FINANCE" as const,category:row.category,client:row.client,enteredBy:row.enteredBy,submittedBy:row.approvalRequest.requester,moneyAccount:row.moneyAccount,reversesId:row.reversesId,reversedBy:row.reversedBy?.id??null})),total,page:q.page,limit:q.limit,matchingAmount:(aggregate._sum.amount??new Prisma.Decimal(0)).toFixed(4)};
+  }
+  async exportRegister(actor:Principal,q:FinanceRegisterQuery){
+    const where=await this.registerWhere(actor,q);
+    // A repeatable-read snapshot prevents inserts/edits between export pages
+    // from duplicating or skipping records. No silent latest-N truncation.
+    const csv=await this.db.$transaction(async tx=>{
+      const lines=["ID,Date,Kind,Status,Category,Client,Amount,Currency,Person,Account,Description,Reverses"];
+      let skip=0;
+      for(;;){
+        const rows=await tx.financialTransaction.findMany({where,include:{category:true,client:{select:{businessName:true}},enteredBy:{select:{displayName:true}},moneyAccount:{select:{name:true}}},orderBy:[{occurredOn:"desc"},{createdAt:"desc"},{id:"desc"}],skip,take:1000});
+        for(const row of rows)lines.push([row.id,row.occurredOn.toISOString().slice(0,10),row.kind,row.status,row.category.name,row.client?.businessName??"",row.amount.toFixed(4),row.currencyCode,row.enteredBy.displayName,row.moneyAccount?.name??"Unassigned",row.description??"",row.reversesId??""].map(csvCell).join(","));
+        if(rows.length<1000)break;skip+=rows.length;
+      }
+      return lines.join("\r\n");
+    },{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead,timeout:60_000});
+    return {filename:"finance-"+q.from+"-"+q.to+".csv",csv};
   }
 
   async totals(actor:Principal,view:View,period?:ReportingPeriod){

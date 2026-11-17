@@ -128,6 +128,10 @@ export function registerAuthRoutes(app: Express, service: AuthService, allowedOr
   // Only install error handler on auth-enabled app; avoid leaking stack traces.
   app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
     if (response.headersSent) return _next(error);
+    const databaseMessage=error instanceof Error?error.message:"";
+    if(databaseMessage.includes("FINANCE_CYCLE_CLOSED")){response.status(409).json({error:{code:"FINANCE_CYCLE_CLOSED",message:"This work cycle is closed. Record a reversal in an open cycle."}});return;}
+    if(databaseMessage.includes("FINANCE_REVERSED")){response.status(409).json({error:{code:"FINANCE_REVERSED",message:"Reversed records and their source accounts cannot be changed."}});return;}
+    if(databaseMessage.includes("FINANCE_ACCOUNT_SCOPE")){response.status(422).json({error:{code:"FINANCE_ACCOUNT_SCOPE",message:"Account organization or opening date does not match the transaction."}});return;}
     if (error instanceof AuthError) {
       response.status(error.status).json({ error: { code: error.code, message: error.message } });
       return;
