@@ -7,6 +7,7 @@ import { ServiceDeliveryService,datesInRange } from "./delivery-service";
 import { ClientVideoReadinessService,monthWeeks } from "./video-readiness-service";
 import { ClientPostReadinessService } from "./post-readiness-service";
 import { LeadsService } from "../leads/service";
+import { verifyAgreementExpiry } from "./agreement-expiry.integration";
 
 if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarket_ci"))
  throw new Error("Clients integration requires isolated digimarket_ci PostgreSQL");
@@ -17,6 +18,7 @@ const actor=(id:string,org:string,grants:string[]):Principal=>({
 const full=["clients.read","clients.create","clients.edit","leads.read","leads.create","leads.edit","leads.convert"];
 const fail=(status:number)=>(error:{status?:number})=>error.status===status;
 try{
+ await verifyAgreementExpiry(db);
  const org=await db.organization.create({data:{name:"Clients Shared CI"}});
  const other=await db.organization.create({data:{name:"Other Clients CI"}});
  const [owner,member,outsider]=await Promise.all([

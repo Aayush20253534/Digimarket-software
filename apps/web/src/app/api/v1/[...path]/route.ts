@@ -154,6 +154,7 @@ const projectMilestonePattern = /^projects\/[0-9a-fA-F-]{36}\/milestones\/[0-9a-
 const projectDeliverablePattern = /^projects\/[0-9a-fA-F-]{36}\/deliverables\/[0-9a-fA-F-]{36}$/;
 const projectDeliverableSubmitPattern = /^projects\/[0-9a-fA-F-]{36}\/deliverables\/[0-9a-fA-F-]{36}\/submit$/;
 const clientDetailPattern = /^clients\/[0-9a-fA-F-]{36}$/;
+const clientEndAgreementPattern = /^clients\/[0-9a-fA-F-]{36}\/end-agreement$/;
 // Allow only the client-scoped video readiness read and weekly update routes.
 const clientVideoReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness$/;
 const clientVideoWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness\/[1-5]$/;
@@ -229,6 +230,7 @@ function permitted(path: string, method: string): boolean {
   if (clientPostReadinessPattern.test(path)) return method === "GET";
   if (clientPostWeekPattern.test(path)) return method === "PUT";
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
+  if (clientEndAgreementPattern.test(path)) return method === "POST";
   if (clientChildrenPattern.test(path)) return method === "POST";
   if (clientServiceEditPattern.test(path)) return method === "PUT";
   if (deliveryPlanEditPattern.test(path)||deliveryOccurrenceEditPattern.test(path))return method==="PUT";
@@ -423,7 +425,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if (month !== null) url.searchParams.set("month", month);
   }
   if (path === "clients") {
-    for (const key of ["status","q","cursor","limit"]) {
+    for (const key of ["status","section","q","cursor","limit","sort","direction"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }

@@ -58,7 +58,7 @@ function money(value:string){
   return (negative?"−":"")+"₹"+integer+"."+(cents%100n).toString().padStart(2,"0");
 }
 function readable(error:unknown){return error instanceof ApiError?error.message:"Could not complete the finance operation.";}
-export function FinanceSectionWorkspace({section}:{section:"entries"|"ads"|"categories"|"settlements"|"agreements"}){
+export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{section:"entries"|"ads"|"categories"|"settlements"|"agreements";categoryType?:Kind}){
   const windowState=useFinanceWindow();
   const {period,setPeriod,view,setView,ready}=windowState;
   const [page,setPage]=useState(1),[total,setTotal]=useState(0),[categoryFilter,setCategoryFilter]=useState("");
@@ -130,8 +130,10 @@ export function FinanceSectionWorkspace({section}:{section:"entries"|"ads"|"cate
   const [description,setDescription]=useState("");
   const [receipt,setReceipt]=useState<File|null>(null);
   const [uploadStatus,setUploadStatus]=useState("");
-  const [categoryKind,setCategoryKind]=useState<Kind>("EXPENSE");
+  const categoryKind=categoryType;
+  const managedCategories=categories.filter(c=>c.kind===categoryKind);
   const [categoryName,setCategoryName]=useState("");
+  useEffect(()=>{setCategoryName("");setEditingCategory(null);setCategoryPurpose("GENERAL");setError("");setSuccess("");},[categoryKind]);
   const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind&&c.purpose!=="SALARY"&&!isSalaryCategory(c.name)&&(section!=="ads"||isMetaAdsCategory(c))),[categories,kind,section]);
   const salarySelected=kind==="EXPENSE"&&categoryId===SALARY_OPTION;
   const metaAdsSelected=kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===categoryId));
@@ -447,14 +449,19 @@ export function FinanceSectionWorkspace({section}:{section:"entries"|"ads"|"cate
   return <div className="aw-finance-page aw-v5-finance-page space-y-7" data-aw-module="finance">
     <BusinessWorkspaceNav/>
     <Link className="inline-flex text-sm text-violet-300 underline" href={"/app/finance?"+windowState.query}>← Finance overview</Link>
-    <PageHeader eyebrow="Financial operations" title={{entries:"Income & expense register",ads:"Meta Ads",categories:"Finance categories",settlements:"Founder settlements",agreements:"Agreement projections"}[section]}
-      description={isFounder?"Your income and expenses post immediately without approval.":"Entries are submitted for approval. Only posted entries count towards net income."}
+    <PageHeader eyebrow="Financial operations" title={{entries:"Income & expense register",ads:"Meta Ads",categories:categoryKind==="INCOME"?"Income categories":"Expense categories",settlements:"Founder settlements",agreements:"Agreement projections"}[section]}
+      description={section==="categories"?"Manage this category type for the whole agency. Historical entries retain their categories.":isFounder?"Your income and expenses post immediately without approval.":"Entries are submitted for approval. Only posted entries count towards net income."}
       actions={<div className="flex flex-wrap gap-2">
         {forms&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void exportCsv(section==="ads"?"meta_ads":"agency")}><Download className="h-4 w-4"/>Export CSV</button>}
         <button className="btn-secondary" type="button" disabled={loading} onClick={()=>void reload()}><RefreshCw className="h-4 w-4"/>Refresh</button>
       </div>}/>
     {error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}
-    <BusinessPeriodPicker value={period} onChange={setPeriod} disabled={busy}/>
+    {section!=="categories"&&<BusinessPeriodPicker value={period} onChange={setPeriod} disabled={busy}/>}
+    {section==="categories"&&<nav className="flex flex-wrap gap-3" aria-label="Category management">
+      <Link className="btn-secondary" href={"/app/finance/categories?"+windowState.query}>All category types</Link>
+      <Link className={categoryKind==="INCOME"?"btn-primary":"btn-secondary"} href={"/app/finance/categories/income?"+windowState.query}>Income categories</Link>
+      <Link className={categoryKind==="EXPENSE"?"btn-primary":"btn-secondary"} href={"/app/finance/categories/expenses?"+windowState.query}>Expense categories</Link>
+    </nav>}
     {forms&&<div className="aw-v5-finance-visibility flex gap-2" role="group" aria-label="Finance visibility">
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
@@ -559,7 +566,7 @@ export function FinanceSectionWorkspace({section}:{section:"entries"|"ads"|"cate
     {forms&&!isFounder&&!loading&&!financeReady&&<div className="aw-finance-policy-warning" role="status">
     <span aria-hidden="true">i</span><p>Finance approvals are not active yet. An administrator can enable the FINANCE policy in <Link className="font-bold underline" href="/app/approvals">Approval workflows</Link>.</p>
    </div>}
-    {section==="agreements"&&canAll&&<div id="finance-recurring" className="aw-v5-finance-anchor"><Card title="Recurring income from client agreements" description="Monthly rates for agreements overlapping the selected dates; projected commitments, not received payments. Ad budgets are separate from service revenue.">
+    {section==="agreements"&&canAll&&<div id="finance-recurring" className="aw-v5-finance-anchor"><Card title="Recurring income from client agreements" description="Monthly rates for active, unexpired agreements overlapping the selected dates. Ended agreements are excluded. These are projections, not received payments; ad budgets are separate from service revenue.">
       {recurring?<div className="space-y-4">
         <p className="text-sm text-slate-500">Period: {recurring.from??period.from} through {recurring.to??period.to} · Active client agreements</p>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -628,23 +635,21 @@ export function FinanceSectionWorkspace({section}:{section:"entries"|"ads"|"cate
             <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?"Save entry":"Submit for approval"}</button></div>
         </form>
       </Card>}
-      {section==="categories"&&<Card title="Expense and income categories" description="Company-wide categories are set by administrators. Old entries retain their category when it is deactivated.">
+      {section==="categories"&&<Card title={categoryKind==="INCOME"?"Manage income categories":"Manage expense categories"} description="Only this category type is shown. Old entries retain their category when it is deactivated.">
         {canManage&&<form className="flex flex-wrap items-end gap-3" onSubmit={addCategory}>
-          <FormField id="new-category-kind" label="Type"><select id="new-category-kind" className="field" value={categoryKind}
-            onChange={e=>setCategoryKind(e.target.value as Kind)}><option value="EXPENSE">Expense</option><option value="INCOME">Income</option></select></FormField>
           <FormField id="new-category-name" label="Category name"><input id="new-category-name" className="field" required minLength={2}
-            maxLength={120} value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder="Rapido"/></FormField>
+            maxLength={120} value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder={categoryKind==="INCOME"?"Service fees":"Travel"}/></FormField>
           {categoryKind==="EXPENSE"&&<FormField id="new-category-purpose" label="Category purpose"><select id="new-category-purpose" className="field" value={categoryPurpose} onChange={e=>setCategoryPurpose(e.target.value as typeof categoryPurpose)}><option value="GENERAL">Operating expense</option><option value="META_ADS">Meta advertising</option></select></FormField>}
           <button className="btn-primary" type="submit" disabled={busy}>Add category</button>
         </form>}
-        <div className="aw-finance-category-list mt-5 space-y-2" role="region" aria-label="Financial categories" tabIndex={0}>{categories.length?categories.map(c=><div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
+        <div className="aw-finance-category-list mt-5 space-y-2" role="region" aria-label="Financial categories" tabIndex={0}>{managedCategories.length?managedCategories.map(c=><div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
           <div><p className="text-sm font-semibold">{c.name}</p><p className="text-xs text-slate-500">{c.kind} · {c.purpose??"GENERAL"} · {c.active?"Active":"Inactive"}</p></div>
           {canManage&&<div className="flex flex-wrap gap-2">
             <button type="button" className="btn-secondary text-xs" onClick={()=>void toggleCategory(c)} disabled={busy}>{c.active?"Disable":"Enable"}</button>
             {adminFinance&&<><button type="button" className="btn-secondary text-xs" onClick={()=>{setEditingCategory(c);setEditedCategoryName(c.name);}} disabled={busy}>Edit</button>
             <button type="button" className="btn-secondary text-xs" onClick={()=>void deleteCategory(c)} disabled={busy}>Delete</button></>}
           </div>}
-        </div>):<EmptyState title="No categories yet" description="An administrator can add expense and income categories." icon={Wallet}/>}</div>
+        </div>):<EmptyState title={"No "+categoryKind.toLowerCase()+" categories yet"} description="An administrator can add a category above." icon={Wallet}/>}</div>
       </Card>}
     </div>
     {section==="settlements"&&isFounder&&canCreate&&canReadOwn&&
