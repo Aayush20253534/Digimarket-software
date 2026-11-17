@@ -1,4 +1,4 @@
-import { businessCycle, reportingPreset, dateOnlyRange, type ReportingPeriod } from "@digimarket/contracts";
+import { agencyToday, businessCycle, reportingPreset, dateOnlyRange, type ReportingPeriod } from "@digimarket/contracts";
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
 import { InternalSettlementService } from "./internal-settlements";
@@ -6,6 +6,7 @@ import { founderPolicy, isFounder } from "../approvals/founder";
 import type { FinanceCategoryInput, FinanceEntryInput, FinanceEntryAdminEdit, FinanceKind, FinanceBreakdownQuery } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
+import { expiredAgreementWhere } from "../clients/agreement-status";
 
 const need=(actor:Principal,key:string)=>{if(!actor.permissions.has(key))throw forbidden();};
 const duplicate=()=>new AuthError(409,"DUPLICATE","A record with this identifier already exists");
@@ -19,7 +20,7 @@ const csvCell=(value:string)=> {
 type View="mine"|"all";
 export type FinanceRegisterQuery=ReportingPeriod&{view:View;scope:"agency"|"client_ads"|"meta_ads";funding?:"ALL"|"SELF"|"CLIENT";page:number;limit:number;q:string;kind?:"INCOME"|"EXPENSE";status?:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";categoryId?:string};
 export class FinanceService {
-  constructor(private readonly db:PrismaClient){}
+  constructor(private readonly db:PrismaClient,private readonly today=agencyToday){}
 
   // Contract projections are separate from posted financial transactions.
   async recurringIncome(actor:Principal,period:ReportingPeriod=reportingPreset("current")){
@@ -27,7 +28,7 @@ export class FinanceService {
     const range=dateOnlyRange(period),periodStart=range.gte;
     const periodEnd=new Date(range.lte.getTime()+86400000);
     const clients=await this.db.client.findMany({
-      where:{organizationId:actor.organizationId,status:"ACTIVE",
+      where:{organizationId:actor.organizationId,status:"ACTIVE",NOT:expiredAgreementWhere(this.today()),
         OR:[{contractStartOn:null},{contractStartOn:{lt:periodEnd}}],
         AND:[{OR:[{contractEndOn:null},{contractEndOn:{gte:periodStart}}]}]},
       select:{id:true,businessName:true,monthlyFee:true,monthlyAdBudget:true,contractStartOn:true,contractEndOn:true},

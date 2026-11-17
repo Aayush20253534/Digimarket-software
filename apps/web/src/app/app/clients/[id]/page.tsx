@@ -9,13 +9,15 @@ import {ClientVideoReadiness} from "@/components/client-video-readiness";
 import {ClientPostReadiness} from "@/components/client-post-readiness";
 import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {Spinner} from "@/components/ui";
+import {EndClientAgreement} from "@/components/end-client-agreement";
 
-type Status="ACTIVE"|"PAUSED"|"ARCHIVED";
+type Status="ACTIVE"|"PAUSED"|"ARCHIVED"|"EXPIRED";
 type ClientTab="delivery"|"video"|"post"|"services"|"agreement"|"contacts"|"files";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
 type Service={id:string;name:string;description:string|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Detail={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;notes:string|null;
  contractStartOn:string|null;contractEndOn:string|null;monthlyFee:string|null;monthlyAdBudget:string|null;status:Status;version:number;
+ agreementExpired?:boolean;agreementEndedOn?:string|null;agreementEndReason?:string|null;
  sourceLead:{businessName:string}|null;contacts:Contact[];services:Service[]};
 type Editing={businessName:string;businessType:string;phone:string;email:string;location:string;notes:string;
  contractStartOn:string;contractEndOn:string;monthlyFee:string;monthlyAdBudget:string;status:Status};
@@ -83,13 +85,13 @@ export default function ClientWorkspacePage(){
     <div><p className="aw-client-kicker">CLIENT DELIVERY WORKSPACE</p><h1>{client.businessName}</h1>
      <p>{client.businessType||"Business category not recorded"}{client.location?" · "+client.location:""}{client.phone?" · "+client.phone:""}</p>
     </div>
-    <div className="aw-client-hero-actions"><span className={"aw-client-status aw-client-status-"+client.status.toLowerCase()}>{client.status}</span>
+    <div className="aw-client-hero-actions"><span className={"aw-client-status aw-client-status-"+(client.agreementExpired?"ended":client.status.toLowerCase())}>{client.agreementExpired?"EXPIRED":client.status}</span>
      <button className="aw-client-btn" type="button" onClick={()=>void load()} disabled={busy}><RefreshCw size={15}/>Refresh</button>
     </div>
    </div>
    <div className="aw-client-statrow">
     <div className="aw-client-stat"><ClipboardList size={18}/><span>Active services</span><strong>{client.services.filter(s=>s.status==="ACTIVE").length}</strong></div>
-    <div className="aw-client-stat"><CalendarDays size={18}/><span>Agreement ends</span><strong>{client.contractEndOn?client.contractEndOn.slice(0,10):"Not set"}</strong></div>
+    <div className="aw-client-stat"><CalendarDays size={18}/><span>{client.agreementExpired?"Agreement ended":"Agreement ends"}</span><strong>{(client.agreementEndedOn??client.contractEndOn)?.slice(0,10)||"Not set"}</strong></div>
     <div className="aw-client-stat"><CheckCircle2 size={18}/><span>Onboarding</span><strong>{client.services.length&&client.contractStartOn?"Configured":"Needs setup"}</strong></div>
    </div>
   </header>
@@ -141,6 +143,12 @@ export default function ClientWorkspacePage(){
     </form>}
    </section>}
    {tab==="agreement"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Client profile & agreement</h2><p>Keep account information and commercial terms tied to the original client record.</p></div><span className="aw-client-muted">Revision {client.version}</span></div>
+    {client.agreementExpired&&<div className="aw-client-callout" role="status"><div><strong>Agreement expired</strong>
+      <p>Excluded from projected income. {client.agreementEndedOn?"Ended on "+client.agreementEndedOn.slice(0,10)+". ":""}{client.agreementEndReason}</p></div>
+      <Link href="/app/clients/expired" className="aw-client-btn">View expired agreements</Link></div>}
+    {canEdit&&!client.agreementExpired&&client.status!=="EXPIRED"&&client.status!=="ARCHIVED"&&<div className="aw-client-actions mb-4">
+      <EndClientAgreement client={client} onEnded={async()=>{await load();setSuccess("Agreement ended. Client moved to Expired and removed from projected income.");}}/>
+    </div>}
     {client.sourceLead&&<p className="aw-client-muted">Converted from approved lead: {client.sourceLead.businessName}</p>}
     {canEdit?<form className="aw-client-form" onSubmit={saveAgreement} aria-label="Edit client agreement">
      <div className="aw-client-form-grid">
@@ -149,7 +157,7 @@ export default function ClientWorkspacePage(){
       <label>Phone<input className="field" value={form.phone} onChange={e=>setForm(v=>v?{...v,phone:e.target.value}:v)}/></label>
       <label>Email<input className="field" type="email" value={form.email} onChange={e=>setForm(v=>v?{...v,email:e.target.value}:v)}/></label>
       <label>Location<input className="field" value={form.location} onChange={e=>setForm(v=>v?{...v,location:e.target.value}:v)}/></label>
-      <label>Status<select className="field" value={form.status} onChange={e=>setForm(v=>v?{...v,status:e.target.value as Status}:v)}><option>ACTIVE</option><option>PAUSED</option><option>ARCHIVED</option></select></label>
+      <label>Status<select className="field" value={form.status} disabled={!!client.agreementEndedOn} onChange={e=>setForm(v=>v?{...v,status:e.target.value as Status}:v)}><option>ACTIVE</option><option>PAUSED</option><option>ARCHIVED</option>{client.status==="EXPIRED"&&<option>EXPIRED</option>}</select></label>
       <label>Agreement start<input className="field" type="date" value={form.contractStartOn} onChange={e=>setForm(v=>v?{...v,contractStartOn:e.target.value}:v)}/></label>
       <label>Agreement end<input className="field" type="date" min={form.contractStartOn||undefined} value={form.contractEndOn} onChange={e=>setForm(v=>v?{...v,contractEndOn:e.target.value}:v)}/></label>
       {canFinance&&<><label>Monthly service charge only (₹)<input className="field" inputMode="decimal" type="number" min="0" step="0.0001" placeholder="15000" value={form.monthlyFee} onChange={e=>setForm(v=>v?{...v,monthlyFee:e.target.value}:v)}/></label>

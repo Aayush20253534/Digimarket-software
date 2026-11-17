@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { clientUpdateSchema,clientListQuerySchema,
+import { clientUpdateSchema,clientListQuerySchema,clientEndAgreementSchema,
   clientContactSchema,clientServiceSchema,serviceDeliveryPlanSchema,
   serviceDeliveryPlanUpdateSchema,serviceDeliveryOccurrenceUpdateSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
@@ -80,6 +80,9 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  });
  app.put(root+"/:id",authenticated,async(req,res)=>{
    res.json({data:await svc.update(actor(res),parse(id,req.params.id),parse(clientUpdateSchema,req.body))});
+ });
+ app.post(root+"/:id/end-agreement",authenticated,async(req,res)=>{
+   res.json({data:await svc.endAgreement(actor(res),parse(id,req.params.id),parse(clientEndAgreementSchema,req.body))});
  });
  app.post(root+"/:id/contacts",authenticated,async(req,res)=>{
    res.status(201).json({data:await svc.addContact(actor(res),parse(id,req.params.id),

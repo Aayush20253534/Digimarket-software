@@ -161,7 +161,7 @@ export const leadImportSchema = z.strictObject({
 export type LeadListQuery = z.infer<typeof leadListQuerySchema>;
 
 // Module 8 client profile, relationship and conversion contracts.
-export const clientStatusSchema=z.enum(["ACTIVE","PAUSED","ARCHIVED"]);
+export const clientStatusSchema=z.enum(["ACTIVE","PAUSED","ARCHIVED","EXPIRED"]);
 export const clientServiceStatusSchema=z.enum(["ACTIVE","PAUSED","ENDED"]);
 const optionalClientUrl=z.union([z.url({protocol:/^https?$/}).max(500),z.literal("")]).optional();
 const optionalClientEmail=z.union([z.email().max(255),z.literal("")]).optional();
@@ -182,8 +182,13 @@ export const clientUpdateSchema=clientCreateSchema.partial().extend({
 }).strict().refine(x=>!x.contractStartOn||!x.contractEndOn||x.contractStartOn<=x.contractEndOn,
  {message:"Contract start must not exceed end date"});
 export type ClientUpdateInput=z.infer<typeof clientUpdateSchema>;
+export const clientEndAgreementSchema=z.strictObject({
+ version:z.number().int().min(1),endedOn:z.iso.date(),reason:z.string().trim().min(4).max(500),
+});
+export type ClientEndAgreementInput=z.infer<typeof clientEndAgreementSchema>;
 export const clientListQuerySchema=z.strictObject({
  q:z.string().trim().max(100).optional(),status:clientStatusSchema.optional(),
+ section:z.enum(["current","expired","all"]).optional(),
  sort:z.enum(["businessName","businessType","location","status"]).optional(),
  direction:z.enum(["asc","desc"]).optional(),
  cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(30),

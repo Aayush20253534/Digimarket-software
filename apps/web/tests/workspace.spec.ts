@@ -248,6 +248,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.setViewportSize({width:1366,height:768});
   await visitWorkspace(page,"/app/finance/categories");
   await expect(page.getByRole("heading",{name:"Finance categories"})).toBeVisible();
+  await page.getByRole("link",{name:/Expense categories Operating costs/}).click();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
   await page.getByRole("button",{name:"Add category"}).click();
@@ -257,14 +258,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Category name",{exact:true}).last().fill("CI Admin Category Updated");
   await page.getByRole("button",{name:"Save changes"}).click();
   await expect(page.getByText("CI Admin Category Updated",{exact:true}).last()).toBeVisible();
-  await page.getByLabel("Type",{exact:true}).selectOption("INCOME");
+  await page.getByRole("navigation",{name:"Category management"}).getByRole("link",{name:"Income categories",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Income categories",exact:true})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Revenue Category");
   await page.getByRole("button",{name:"Add category"}).click();
   await expect(page.getByText("CI Revenue Category",{exact:true}).last()).toBeVisible();
 
   // Regression: client-only filter must explain existing Agency Meta Ads
   // and provide a direct path to correct the linked payer without altering data.
-  await page.getByLabel("Type",{exact:true}).selectOption("EXPENSE");
+  await page.getByRole("navigation",{name:"Category management"}).getByRole("link",{name:"Expense categories",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Expense categories",exact:true})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("Meta Ads");
   await page.getByLabel("Category purpose").selectOption("META_ADS");
   await page.getByRole("button",{name:"Add category"}).click();

@@ -110,6 +110,7 @@ enum ClientStatus {
   ACTIVE
   PAUSED
   ARCHIVED
+  EXPIRED
 }
 enum ClientServiceStatus {
   ACTIVE
@@ -671,6 +672,8 @@ model Client {
   notes String? @db.VarChar(2000)
   contractStartOn DateTime? @db.Date
   contractEndOn DateTime? @db.Date
+  agreementEndedOn DateTime? @db.Date
+  agreementEndReason String? @db.VarChar(500)
   monthlyFee Decimal? @db.Decimal(19,4)
   monthlyAdBudget Decimal? @db.Decimal(19,4)
   status ClientStatus @default(ACTIVE)

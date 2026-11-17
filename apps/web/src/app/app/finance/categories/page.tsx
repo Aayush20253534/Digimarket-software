@@ -1,2 +1,2 @@
-import {FinanceSectionWorkspace} from "@/components/finance/section-workspace";
-export default function Page(){return <FinanceSectionWorkspace section="categories"/>;}
+import {FinanceCategoryDirectory} from "@/components/finance/category-directory";
+export default FinanceCategoryDirectory;
