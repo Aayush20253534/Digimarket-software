@@ -41,6 +41,14 @@ export default function LeadsPage(){
  const canAssign=!isAdmin&&!!session?.identity.permissions.includes("leads.assign");
  const canBulk=!isAdmin&&!!session?.identity.permissions.includes("leads.bulk");
  const [items,setItems]=useState<Lead[]>([]);
+ const [checkedLeads,setCheckedLeads]=useState<Record<string,number>>({});
+ const selectedCount=Object.keys(checkedLeads).length;
+ const selectLead=(lead:Lead,checked:boolean)=>setCheckedLeads(previous=>{
+   const next={...previous};
+   if(checked&&Object.keys(next).length<100)next[lead.id]=lead.version;
+   else if(!checked)delete next[lead.id];
+   return next;
+ });
  const [totalLeads,setTotalLeads]=useState<number|null>(null);
  const [metrics,setMetrics]=useState<Metrics|null>(null);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
@@ -102,6 +110,7 @@ export default function LeadsPage(){
      JSON.stringify({stage,sourceFilter,search,sortBy,descending}));}
    catch{/* Optional view preferences. */}
  },[preferencesReady,session?.identity.userId,stage,sourceFilter,search,sortBy,descending]);
+ useEffect(()=>{setCheckedLeads({});},[stage,sourceFilter,search,sortBy,descending,session?.identity.userId]);
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
    if(!preferencesReady)return;
@@ -216,10 +225,27 @@ export default function LeadsPage(){
    setBusy(true);setError("");setMessage("");
    try{
      await request("/leads/"+selected.id,{method:"DELETE",body:{version:selected.version}});
-     setSelected(null);setCursor(null);setHistory([]);
+     activeLeadId.current=null;setSelected(null);setCheckedLeads({});setCursor(null);setHistory([]);
      setMessage("Lead permanently deleted from the database. Linked clients are preserved.");
-     await load();
+     if(!cursor)await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
+ }
+ async function deleteSelectedLeads(){
+   if(!canDelete||!selectedCount||busy||loading)return;
+   const leads=Object.entries(checkedLeads).map(([id,version])=>({id,version}));
+   if(!window.confirm("Permanently delete "+leads.length+" selected leads, including selections on other pages? Their notes and activity will be removed. Linked clients will be preserved. This cannot be undone."))return;
+   setBusy(true);setError("");setMessage("");
+   try{
+     await noteWriteQueue.current;
+     const result=await request<{deletedCount:number}>("/leads/bulk-delete",{method:"POST",body:{leads}});
+     if(selected&&checkedLeads[selected.id]){activeLeadId.current=null;setSelected(null);}
+     setCheckedLeads({});
+     for(const lead of leads){try{window.localStorage.removeItem(draftKey(lead.id));}catch{/* Optional local drafts. */}}
+     setMessage(result.deletedCount+" leads permanently deleted. Linked clients preserved.");
+     // Never reload a cursor that was part of the deleted selection.
+     if(cursor){setCursor(null);setHistory([]);}else await load();
+   }catch(e){setCheckedLeads({});await load();setError(errText(e));}
+   finally{setBusy(false);}
  }
  async function assign(e:FormEvent){
    e.preventDefault();if(!selected)return;setBusy(true);setError("");
@@ -321,22 +347,37 @@ export default function LeadsPage(){
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="status">Stage</option><option value="createdAt">Created</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setTotalLeads(null);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
          </div>
+         {canDelete&&<div className="mt-3 flex flex-wrap items-center gap-3" aria-label="Bulk lead actions">
+           <span role="status">{selectedCount} selected · up to 100 across pages</span>
+           <button type="button" className="btn-secondary" disabled={!selectedCount||busy} onClick={()=>setCheckedLeads({})}>Clear selection</button>
+           <button type="button" className="btn-secondary" disabled={!selectedCount||busy||loading} onClick={()=>void deleteSelectedLeads()}>
+             Delete selected ({selectedCount})
+           </button>
+         </div>}
          {loading&&<div className="aw-lead-sync" role="status" aria-live="polite">
            <RefreshCw size={15} className="aw-lead-sync-icon" aria-hidden="true"/>
            {items.length?"Refreshing leads…":"Loading lead records…"}
          </div>}
          {!loading&&!items.length&&<p className="aw-directory-empty-line">No matching leads. Add a prospect or change the filters.</p>}
           <div className="aw-register-scroll mt-4"><table className="aw-register-table" aria-label="Leads directory" aria-busy={loading}>
-            <thead><tr><th>Call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
+            <thead><tr>{canDelete&&<th scope="col"><input type="checkbox" aria-label="Select all leads on this page"
+              checked={items.length>0&&items.every(lead=>checkedLeads[lead.id]!==undefined)} disabled={loading||busy||!items.length}
+              ref={node=>{if(node)node.indeterminate=items.some(lead=>checkedLeads[lead.id]!==undefined)&&!items.every(lead=>checkedLeads[lead.id]!==undefined);}}
+              onChange={e=>{const checked=e.target.checked;setCheckedLeads(previous=>{
+                const next={...previous};for(const lead of items){if(checked&&Object.keys(next).length<100)next[lead.id]=lead.version;else if(!checked)delete next[lead.id];}return next;
+              });}}/></th>}<th>Call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
            <tbody>{loading&&!items.length?
              Array.from({length:5},(_,i)=><tr key={"loading-"+i} aria-hidden="true" className="aw-lead-loading-row">
-               {Array.from({length:9},(_,j)=><td key={j}><div className="aw-lead-skeleton"/></td>)}
+               {Array.from({length:canDelete?10:9},(_,j)=><td key={j}><div className="aw-lead-skeleton"/></td>)}
              </tr>):sorted.map(l=><tr key={l.id} tabIndex={0}
              aria-label={"Open lead "+(l.contactName||l.businessName)}
              className={"aw-lead-clickable"+(selected?.id===l.id?" aw-register-selected":"")}
              onClick={()=>void open(l.id,true)}
              onKeyDown={e=>{if(e.target!==e.currentTarget)return;
                if(e.key==="Enter"||e.key===" "){e.preventDefault();void open(l.id,true);}}}>
+             {canDelete&&<td onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={"Select lead "+(l.contactName||l.businessName)}
+               checked={checkedLeads[l.id]!==undefined} disabled={busy||loading||(selectedCount>=100&&checkedLeads[l.id]===undefined)}
+               onChange={e=>selectLead(l,e.target.checked)}/></td>}
              <td>{l.phone?<a href={callHref(l.phone)} className="aw-lead-action" aria-label={"Call "+l.phone}
                title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
                <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { TASKS_ENABLED } from "@digimarket/contracts";
 import { createApp } from "./app";
 import { sweepRecurrences } from "../../worker/src/recurrence";
 import { createDatabaseClient } from "@digimarket/db";
@@ -58,14 +59,14 @@ async function startServer() {
   // Redis-free recurring task scheduler: database cursor and uniqueness prevent duplicate tasks.
   let scanning=false;
   const scan=async()=>{
-    if(!database||scanning)return;
+    if(!TASKS_ENABLED||!database||scanning)return;
     scanning=true;
     try{await sweepRecurrences(database,new Date(),100);}
     catch(e){console.error("Recurring task scan failed:",e instanceof Error?e.name:"UNKNOWN");}
     finally{scanning=false;}
   };
-  const recurrenceTimer=database?setInterval(()=>{void scan();},60_000):null;
-  if(database)void scan();
+  const recurrenceTimer=TASKS_ENABLED&&database?setInterval(()=>{void scan();},60_000):null;
+  if(TASKS_ENABLED&&database)void scan();
   let closing = false;
   function shutdown(signal: string) {
     if (closing) return;

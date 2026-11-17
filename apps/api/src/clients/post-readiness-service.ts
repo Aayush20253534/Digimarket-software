@@ -1,3 +1,4 @@
+import {businessCycle} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
@@ -74,6 +75,28 @@ export class ClientPostReadinessService{
    festivalReadyThisMonth:current.reduce((n,row)=>n+row.festivalReadyAdded,0),
    festivalDeliveredThisMonth:current.reduce((n,row)=>n+row.festivalDelivered,0),
    festivalRemainingStock:festivalRemaining,weeks};
+ }
+ // Re-group existing contract weeks for the agency cycle without changing
+ // their persisted (month, week) identity or historical stock movements.
+ async cycle(actor:Principal,clientId:string,month:string){
+  const cycle=businessCycle(month+"-22"),next=cycle.endExclusive.slice(0,7);
+  const first=await this.monthly(actor,clientId,month);
+  const second=await this.monthly(actor,clientId,next);
+  const all=[first,second].flatMap(data=>data.weeks.map(week=>({...week,
+   storageMonth:data.month,storageWeek:week.week})));
+  const weeks=all.filter(week=>week.from>=cycle.from&&week.from<cycle.endExclusive)
+   .map((week,index)=>({...week,week:index+1}));
+  const prior=all.filter(week=>week.from<cycle.from).at(-1);
+  const openingStock=weeks[0]?.availableBefore??prior?.remainingStock??first.openingStock;
+  return {...first,from:cycle.from,to:cycle.to,openingStock,weeks,
+   readyThisMonth:weeks.reduce((sum,week)=>sum+week.readyAdded,0),
+   deliveredThisMonth:weeks.reduce((sum,week)=>sum+week.delivered,0),
+   remainingStock:weeks.at(-1)?.remainingStock??openingStock,
+   festivalOpeningStock:weeks[0]?.festivalAvailableBefore??prior?.festivalRemainingStock??first.festivalOpeningStock,
+   festivalReadyThisMonth:weeks.reduce((sum,week)=>sum+week.festivalReadyAdded,0),
+   festivalDeliveredThisMonth:weeks.reduce((sum,week)=>sum+week.festivalDelivered,0),
+   festivalRemainingStock:weeks.at(-1)?.festivalRemainingStock??prior?.festivalRemainingStock??first.festivalOpeningStock,
+  };
  }
  async saveWeek(actor:Principal,clientId:string,month:string,week:number,input:PostWeekInput){
   const client=await this.allowed(actor,clientId,true);

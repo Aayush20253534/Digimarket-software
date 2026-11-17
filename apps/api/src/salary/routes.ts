@@ -1,3 +1,4 @@
+import {businessCycle,reportingPeriodQuerySchema} from "@digimarket/contracts";
 import type {Express,Request,Response,NextFunction} from "express";
 import {Prisma} from "@digimarket/db";
 import {z} from "zod";
@@ -22,7 +23,7 @@ const paymentInput=z.strictObject({
  confirmedPaid:z.literal(true),
  allocations:z.array(z.strictObject({accountId:z.uuid(),amount})).min(1).max(20)
 });
-const periodSchema=z.strictObject({from:isoDay.optional(),to:isoDay.optional()});
+const periodSchema=reportingPeriodQuerySchema;
 const voidInput=z.strictObject({reason:z.string().trim().min(4).max(500)});
 function parsed<T>(schema:z.ZodType<T>,value:unknown):T{
  const result=schema.safeParse(value);
@@ -288,7 +289,7 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
   }
   const monthMap=new Map<string,{amount:Prisma.Decimal,count:number}>();
   for(const group of monthly){
-   const month=group.paidOn.toISOString().slice(0,7),current=monthMap.get(month)??{amount:zero,count:0};
+   const month=businessCycle(group.paidOn.toISOString().slice(0,10)).key,current=monthMap.get(month)??{amount:zero,count:0};
    monthMap.set(month,{amount:current.amount.plus(group._sum.amount??0),count:current.count+group._count._all});
   }
   const linked=await founderLedgerBalances(db,a.organizationId,

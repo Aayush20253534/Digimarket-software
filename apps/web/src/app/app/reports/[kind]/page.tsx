@@ -1,4 +1,5 @@
 "use client";
+import {businessCycle,cycleLabel,reportingPreset} from "@digimarket/contracts";
 import Link from "next/link";
 import {useParams} from "next/navigation";
 import {useAuth} from "@/components/auth-provider";
@@ -16,8 +17,7 @@ type Breakdown={kind:Kind;from:string;to:string;currency:string;total:string;
  people:{id:string;name:string;loginId:string;total:string;count:number}[];
  search:string;matchingTotal:string;
  matchingCount:number;page:number;limit:number;hasMore:boolean;transactions:Transaction[]};
-const today=()=>new Date().toISOString().slice(0,10);
-const currentMonth=()=>today().slice(0,7)+"-01";
+const currentMonth=()=>reportingPreset("current").from;
 const money=(value:string)=>{
  const isNegative=value.startsWith("-"),raw=isNegative?value.slice(1):value;
  const [whole,dec=""]=raw.split("."),padded=dec.padEnd(3,"0");
@@ -27,8 +27,7 @@ const money=(value:string)=>{
 };
 const pretty=(value:string)=>new Date(value+"T00:00:00Z").toLocaleDateString("en-IN",
  {timeZone:"UTC",day:"2-digit",month:"short",year:"numeric"});
-const monthTitle=(month:string)=>new Date(month+"-01T00:00:00Z").toLocaleDateString("en-IN",
- {timeZone:"UTC",month:"short",year:"2-digit"});
+const monthTitle=cycleLabel;
 const errorMessage=(error:unknown)=>error instanceof Error?error.message:"Unable to load financial records.";
 export default function FinanceBreakdownPage(){
  const raw=useParams<{kind:string}>().kind;
@@ -37,7 +36,7 @@ export default function FinanceBreakdownPage(){
  const {session,request}=useAuth();
  const allowed=!!session?.identity.permissions.includes("reports.business.read")&&
   !!session?.identity.permissions.includes("finance.read.all");
- const [from,setFrom]=useState(currentMonth),[to,setTo]=useState(today);
+ const [from,setFrom]=useState(currentMonth),[to,setTo]=useState(()=>reportingPreset("current").to);
  const [ready,setReady]=useState(false);
  const [query,setQuery]=useState("");
  const [page,setPage]=useState(1);
@@ -78,11 +77,7 @@ export default function FinanceBreakdownPage(){
    setSelectedMonth(null);setSelectedDay(null);setSelectedPersonId(null);
  };
  const preset=(mode:"current"|"three"|"year"|"all")=>{
-   const current=new Date(),origin=new Date(Date.UTC(current.getFullYear(),current.getMonth(),1));
-   if(mode==="current")changePeriod(currentMonth(),today());
-   else if(mode==="three"){origin.setUTCMonth(origin.getUTCMonth()-2);changePeriod(origin.toISOString().slice(0,10),today());}
-   else if(mode==="year")changePeriod(today().slice(0,4)+"-01-01",today());
-   else changePeriod("1970-01-01",today());
+   const period=reportingPreset(mode);changePeriod(period.from,period.to);
  };
  const exportCsv=async()=>{
   if(!records||!allowed||!kind||exporting||from>to)return;
@@ -108,9 +103,8 @@ export default function FinanceBreakdownPage(){
  const activePerson=records?.people.find(p=>p.id===selectedPersonId);
  const dailyForMonth:Breakdown["daily"]=[];
  if(records&&selectedMonth){
-   const firstDay=selectedMonth+"-01";
-   const [year,month]=selectedMonth.split("-").map(Number);
-   const finalDay=new Date(Date.UTC(year,month,0)).toISOString().slice(0,10);
+   const cycle=businessCycle(selectedMonth+"-22");
+   const firstDay=cycle.from,finalDay=cycle.to;
    const start=records.from>firstDay?records.from:firstDay;
    const end=records.to<finalDay?records.to:finalDay;
    const byDate=new Map(records.daily.map(entry=>[entry.date,entry]));
@@ -139,10 +133,10 @@ export default function FinanceBreakdownPage(){
   <section className="aw-report-breakdown-filter" aria-label="Financial breakdown filters">
    <div className="flex items-center gap-2 font-bold"><CalendarRange size={17}/>Reporting period</div>
    <div className="aw-report-preset-row">
-    <button type="button" onClick={()=>preset("current")}>This month</button>
-    <button type="button" onClick={()=>preset("three")}>Last 3 months</button>
-    <button type="button" onClick={()=>preset("year")}>This year</button>
-    <button type="button" onClick={()=>preset("all")}>All time</button>
+    <button type="button" onClick={()=>preset("current")}>Current cycle</button>
+    <button type="button" onClick={()=>preset("three")}>Last 3 cycles</button>
+    <button type="button" onClick={()=>preset("year")}>Work year</button>
+    <button type="button" onClick={()=>preset("all")}>Since start</button>
    </div>
    <div className="aw-report-breakdown-fields">
     <label>From<input aria-label="Breakdown from date" className="field" type="date"
@@ -173,10 +167,10 @@ export default function FinanceBreakdownPage(){
    </section>
    <div className="aw-finance-panels">
     <section className="aw-finance-panel" aria-label="Monthly financial trend">
-      <div className="aw-finance-panel-heading"><TrendingUp size={17}/><h2>Monthly {isIncome?"income":"expenses"}</h2></div>
+      <div className="aw-finance-panel-heading"><TrendingUp size={17}/><h2>Cycle-wise {isIncome?"income":"expenses"}</h2></div>
       <p className="aw-finance-panel-caption">{records.monthly.length>18
-        ?"Latest 18 months shown. Select any month to inspect its days."
-        :"Select a month to inspect its day-wise totals and transactions."}</p>
+        ?"Latest 18 cycles shown. Select any cycle to inspect its days."
+        :"Select a cycle to inspect its day-wise totals and transactions."}</p>
       <div className="aw-finance-trend" role="list">
        {chartMonths.map(m=><div role="listitem" className="aw-finance-trend-item" key={m.month}>
          <button type="button" className="aw-finance-trend-trigger"

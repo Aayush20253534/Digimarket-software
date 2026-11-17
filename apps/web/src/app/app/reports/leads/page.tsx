@@ -1,4 +1,5 @@
 "use client";
+import {reportingPreset,cycleLabel} from "@digimarket/contracts";
 import Link from "next/link";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {ArrowDownToLine,ArrowLeft,ArrowRight,CalendarRange,ChartNoAxesCombined,Clock3,Filter,RefreshCcw,Search,ShieldCheck,TrendingUp,Users} from "lucide-react";
@@ -24,9 +25,7 @@ type ResponseData={
  definitions:Record<string,string>;
 };
 type Options={assignees:{id:string;name:string}[];categories:string[];locations:string[]};
-const ymd=(date:Date)=>date.toISOString().slice(0,10);
-const today=()=>ymd(new Date());
-const startMonth=()=>today().slice(0,7)+"-01";
+const startMonth=()=>reportingPreset("current").from;
 const count=(n:number)=>n.toLocaleString("en-IN");
 const label=(v:string)=>v==="META_LEADS"?"Meta Leads":v==="COLD_CALL"?"Cold Call":
  v==="REFERRAL"?"Referral":v==="OTHER"?"Other":v.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
@@ -92,7 +91,7 @@ export default function LeadBreakdownPage(){
  const {session,request}=useAuth();
  const allowed=!!session?.identity.permissions.includes("reports.business.read")&&
   !!session?.identity.permissions.includes("leads.read");
- const [from,setFrom]=useState(startMonth),[to,setTo]=useState(today);
+ const [from,setFrom]=useState(startMonth),[to,setTo]=useState(()=>reportingPreset("current").to);
  const [ready,setReady]=useState(false);
  const [source,setSource]=useState(""),[stage,setStage]=useState(""),[owner,setOwner]=useState("");
  const [category,setCategory]=useState(""),[location,setLocation]=useState(""),[search,setSearch]=useState("");
@@ -130,11 +129,7 @@ export default function LeadBreakdownPage(){
  useEffect(()=>{void refresh();return()=>{sequence.current+=1;};},[refresh]);
  const applyPeriod=(start:string,end:string)=>{setFrom(start);setTo(end);setPage(1);};
  const preset=(kind:"month"|"three"|"year"|"all")=>{
-  const current=new Date(),start=new Date(Date.UTC(current.getFullYear(),current.getMonth(),1));
-  if(kind==="month")applyPeriod(startMonth(),today());
-  if(kind==="three"){start.setUTCMonth(start.getUTCMonth()-2);applyPeriod(ymd(start),today());}
-  if(kind==="year")applyPeriod(today().slice(0,4)+"-01-01",today());
-  if(kind==="all")applyPeriod("1970-01-01",today());
+  const period=reportingPreset(kind==="month"?"current":kind);applyPeriod(period.from,period.to);
  };
  const clear=()=>{setSource("");setStage("");setOwner("");setCategory("");setLocation("");setSearch("");setPage(1);};
  const download=async()=>{
@@ -168,7 +163,7 @@ export default function LeadBreakdownPage(){
   <section className="aw-lead-filter">
    <div className="aw-lead-filter-head"><strong><CalendarRange size={18}/>Reporting period</strong>
     <span><ShieldCheck size={15}/> Live, permission-protected</span></div>
-   <div className="aw-lead-presets">{([["month","This month"],["three","Last 3 months"],["year","This year"],["all","All time"]] as const).map(([key,value])=>
+   <div className="aw-lead-presets">{([["month","Current cycle"],["three","Last 3 cycles"],["year","Work year"],["all","Since start"]] as const).map(([key,value])=>
     <button type="button" key={key} onClick={()=>preset(key)}>{value}</button>)}</div>
    <div className="aw-lead-filter-row">
     <label>From<input className="field" type="date" aria-label="Leads from date" value={from} max={to}
@@ -211,9 +206,9 @@ export default function LeadBreakdownPage(){
    <div className="aw-lead-panels">
     <Section title="Lead acquisition trend" subtitle="New leads by creation date. Switch the time grouping without changing the cohort.">
      <div className="aw-lead-panel-toolbar"><label>Group by <select value={bucket} onChange={e=>setBucket(e.target.value as typeof bucket)}>
-      <option value="daily">Day</option><option value="weekly">Week</option><option value="monthly">Month</option>
+      <option value="daily">Day</option><option value="weekly">Week</option><option value="monthly">Work cycle</option>
      </select></label></div>
-     <Trend rows={report.trends[bucket]}/>
+     <Trend rows={report.trends[bucket].map(row=>({...row,name:bucket==="monthly"?cycleLabel(row.name):row.name}))}/>
     </Section>
     <Section title="Lead sources" subtitle="Acquisition channel distribution"><Donut items={report.sources.map(x=>({name:x.name,count:x.total}))}/></Section>
     <Section title="Current lead statuses" subtitle="Exactly one current status per lead"><Bars items={report.stages}/></Section>

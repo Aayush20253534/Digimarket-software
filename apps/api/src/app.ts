@@ -13,7 +13,7 @@ import { registerBillingRoutes } from "./billing/routes";
 import { registerQuotationRoutes } from "./quotations/routes";
 import { registerAgreementRoutes } from "./agreements/routes";
 import { registerContentRoutes } from "./content/routes";
-import { registerTaskRoutes } from "./tasks/routes";
+// Tasks paused: import { registerTaskRoutes } from "./tasks/routes";
 import { registerProjectRoutes } from "./projects/routes";
 import { registerAssetRoutes } from "./assets/routes";
 import { registerClientRoutes } from "./clients/routes";
@@ -129,7 +129,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
       try{
         const principal=await authService.authenticate(bearer.slice(7));
         if(principal.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")){
-          if(leadOperation&&(request.method==="GET"||request.method==="DELETE"))return next();
+          if(leadOperation&&(request.method==="GET"||request.method==="DELETE"||(request.method==="POST"&&request.path==="/leads/bulk-delete")))return next();
           if(!leadOperation)return response.status(403).json({error:{code:"ADMIN_OPERATION_RESTRICTED",message:"Operational modules are not available to administrator accounts"}});
           return response.status(403).json({error:{code:"ADMIN_OPERATION_RESTRICTED",message:"Administrators may view and delete leads but cannot submit operational changes"}});
         }
@@ -147,7 +147,7 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     registerQuotationRoutes(app, authService);
     registerAgreementRoutes(app, authService);
     registerContentRoutes(app, authService);
-    registerTaskRoutes(app, authService);
+    // Tasks paused: registerTaskRoutes(app, authService);
     registerProjectRoutes(app, authService);
     registerLeadRoutes(app, authService);
     registerClientRoutes(app, authService);

@@ -1,4 +1,5 @@
 "use client";
+import {TASKS_ENABLED,reportingPreset} from "@digimarket/contracts";
 
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
@@ -19,11 +20,7 @@ type OverviewReport = {
 };
 const num=(x:number)=>new Intl.NumberFormat("en-IN").format(x);
 const inr=(x:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(x);
-const today=()=>{
- const now=new Date();
- const year=now.getFullYear(),month=String(now.getMonth()+1).padStart(2,"0");
- return {from:year+"-"+month+"-01",to:year+"-"+month+"-"+String(now.getDate()).padStart(2,"0")};
-};
+const today=()=>reportingPreset("current");
 
 /** Permission-scoped live reports. Charts never infer agency totals from partial pages. */
 export function AWBusinessInsights(){
@@ -44,13 +41,13 @@ export function AWBusinessInsights(){
  },[allowed,request]);
  useEffect(()=>{void load();},[load]);
  const lead=report?.sections.leads,clients=report?.sections.clients,
-  tasks=report?.sections.tasks,cash=report?.sections.cashLedger;
+  tasks=TASKS_ENABLED?report?.sections.tasks:undefined,cash=report?.sections.cashLedger;
  const postedIncome=cash?.posted.find(x=>x.kind==="INCOME");
  const metrics=[
-  lead?{label:"Leads this month",value:num(lead.created),description:"Created in the reporting period",icon:<Target size={20}/>} :null,
+  lead?{label:"Leads this cycle",value:num(lead.created),description:"Created in the reporting period",icon:<Target size={20}/>} :null,
   clients?{label:"Active clients",value:num(clients.active),description:"Active clients in the workspace",icon:<Users size={20}/>} :null,
   tasks?{label:"Open tasks",value:num(tasks.open),description:num(tasks.overdue)+" overdue",icon:<Clock3 size={20}/>} :null,
-  postedIncome?{label:"Posted income",value:inr(Number(postedIncome.amount)),description:"Agency income this month",icon:<Wallet size={20}/>} :null,
+  postedIncome?{label:"Posted income",value:inr(Number(postedIncome.amount)),description:"Agency income this cycle",icon:<Wallet size={20}/>} :null,
  ].filter((item):item is NonNullable<typeof item>=>item!==null);
  const stages=useMemo<Stage[]>(()=>{
   if(lead)return[
@@ -64,7 +61,7 @@ export function AWBusinessInsights(){
   if(tasks)return[
    {name:"Open tasks",count:tasks.open},
    {name:"Overdue tasks",count:tasks.overdue},
-   {name:"Completed this month",count:tasks.completed},
+   {name:"Completed this cycle",count:tasks.completed},
   ];
   if(clients)return[{name:"Active clients",count:clients.active}];
   return [];
@@ -74,7 +71,7 @@ export function AWBusinessInsights(){
  return <section className="aw-live-insights" aria-label="Live business insights">
   <div className="aw-insights-section-header">
    <div><p className="aw-insights-eyebrow"><Activity size={14} aria-hidden="true"/> LIVE WORKSPACE</p>
-    <h2>Business insights</h2><p>Verified activity for the current month, from your permitted records.</p></div>
+    <h2>Business insights</h2><p>Verified activity for the current work cycle, from your permitted records.</p></div>
    <button type="button" className="aw-dashboard-refresh" onClick={()=>void load()} disabled={busy}
     aria-label="Refresh business insights"><Activity size={15} aria-hidden="true"/>{busy?"Updating…":"Refresh insights"}</button>
   </div>
@@ -87,7 +84,7 @@ export function AWBusinessInsights(){
     <div className="aw-insights-card">
      <div className="aw-insights-head">
       <div><h3 className="aw-insights-title">{lead?"Lead pipeline":tasks?"Team task activity":"Client activity"}</h3>
-       <p className="aw-insights-hint">{lead?"Current stages of leads created this month":tasks?"Open, overdue and completed task counts":"Active clients in your workspace"}</p></div>
+       <p className="aw-insights-hint">{lead?"Current stages of leads created this cycle":tasks?"Open, overdue and completed task counts":"Active clients in your workspace"}</p></div>
       <div className="aw-insights-icon"><ChartColumnIncreasing size={18} aria-hidden="true"/></div>
      </div>
      {stages.length?<div className="aw-insights-bar-list" role="img"
@@ -106,7 +103,7 @@ export function AWBusinessInsights(){
      </div>
      <div className="aw-insights-overline">{lead?"Client conversion rate":tasks?"Completed tasks":"Active clients"}</div>
      <div className="aw-insights-number">{lead?lead.conversionRatePercent.toLocaleString("en-IN",{maximumFractionDigits:1})+"%":tasks?num(tasks.completed):clients?num(clients.active):"—"}</div>
-     <p className="aw-insights-hint">{lead?"Of leads created this month":tasks?"Completed during this reporting period":"Current active client records"}</p>
+     <p className="aw-insights-hint">{lead?"Of leads created this cycle":tasks?"Completed during this reporting period":"Current active client records"}</p>
      <div className="aw-insights-divider"/>
      <div className="aw-insights-overline"><Activity size={14} aria-hidden="true"/> Directly sourced from reporting APIs</div>
      <p className="aw-insights-hint">These figures are scoped to your permissions. Missing sections are not estimated.</p>

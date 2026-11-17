@@ -1,4 +1,6 @@
 "use client";
+import {TASKS_ENABLED} from "@digimarket/contracts";
+import {TasksPaused} from "@/components/tasks-paused";
 import { FormEvent,useCallback,useEffect,useMemo,useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError } from "@/lib/api";
@@ -47,7 +49,7 @@ const initialSchedule={title:"",description:"",priority:"MEDIUM" as Priority,pro
  assigneeIds:[] as string[],frequency:"DAILY" as "DAILY"|"WEEKLY"|"MONTHLY",interval:1,
  startAt:"",dueOffsetDays:0};
 
-export default function TasksPage(){
+function TasksPageWorkspace(){
  const {session,request}=useAuth();
  const grants=session?.identity.permissions??[];
  const isAdmin=!!session?.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN");
@@ -420,4 +422,9 @@ export default function TasksPage(){
     </form>
    </Card>}
  </div>;
+}
+
+// Keep the complete workspace above available for reactivation.
+export default function TasksPage(){
+ return TASKS_ENABLED?<TasksPageWorkspace/>:<TasksPaused/>;
 }

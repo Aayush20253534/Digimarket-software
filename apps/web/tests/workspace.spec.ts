@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { TASKS_ENABLED } from "@digimarket/contracts";
 import {mkdir} from "node:fs/promises";
 import path from "node:path";
 
@@ -119,10 +120,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await visitWorkspace(page,"/app/notes");
   await expect(page.getByRole("heading",{name:"Start a new note"})).toBeVisible();
   await visitWorkspace(page,"/app/tasks");
+  if(TASKS_ENABLED){
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Operations workspace sections"})).toBeVisible();
   await expect(page.getByRole("region",{name:"Task status counts on this page"})).toBeVisible();
   await expect(page.getByLabel("Filter visible tasks by priority")).toHaveValue("");
+  }else await expect(page.getByRole("heading",{name:"Tasks are paused"})).toBeVisible();
   await visitWorkspace(page,"/app/approvals");
   await expect(page.getByRole("heading",{name:"Approval workflows"})).toBeVisible();
   await expect(page.getByRole("region",{name:"Approval counts in current view"})).toBeVisible();
@@ -135,7 +138,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
     await expect(page.getByRole("navigation",{name:"Business workspace sections"})).toBeVisible();
     await expect(page.getByRole("navigation",{name:"Reporting breakdowns"})).toBeVisible();
-    await expect(page.getByRole("group",{name:"Quick report periods"})).toBeVisible();
+    await expect(page.getByRole("region",{name:"Work cycle",exact:true})).toBeVisible();
     await expect(page.getByRole("article",{name:"Lead conversion rate"})).toBeVisible();
     const bounds=await page.evaluate(()=>({
       documentWidth:document.documentElement.scrollWidth,
@@ -152,8 +155,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const expenseLink=page.getByRole("link",{name:"View Expenses breakdown"});
   await expect(incomeLink).toBeVisible();
   await expect(expenseLink).toBeVisible();
-  const reportFrom=await page.getByRole("region",{name:"Reporting period"}).getByLabel("From").inputValue();
-  const reportTo=await page.getByRole("region",{name:"Reporting period"}).getByLabel("Through").inputValue();
+  const reportFrom=await page.getByLabel("Work cycle from").inputValue();
+  const reportTo=await page.getByLabel("Work cycle through").inputValue();
   // Guard the Leads breakdown gateway route and its parameter forwarding.
   const leadsBreakdownLink=page.getByRole("link",{name:"Open complete Leads analytics breakdown"});
   await expect(leadsBreakdownLink).toBeVisible();
@@ -307,6 +310,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const founderInitial=await createUser(page,"ci-founder","CI Founder","FOUNDER");
   const employeeInitial=await createUser(page,"ci-employee","CI Employee","EMPLOYEE");
 
+  if(TASKS_ENABLED){
   // An administrator can revise task fields and assignments in one save.
   await visitWorkspace(page,"/app/tasks");
   await expect(page.getByRole("heading",{name:"Tasks & recurring work"})).toBeVisible();
@@ -374,6 +378,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await visitWorkspace(page,"/app/task-history");
   await page.getByLabel("Task history scope").selectOption("team");
   await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toHaveCount(0);
+  }
   await page.getByRole("button",{name:"Sign out"}).click();
   await expect(page).toHaveURL(/\/login/);
 
@@ -1091,17 +1096,24 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await visitWorkspace(page,"/app/dashboard");
   await expect(page.locator('[data-dashboard-role="member"]')).toBeVisible();
   await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
+  if(TASKS_ENABLED){
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Tasks",exact:true})).toBeVisible();
   await visitWorkspace(page,"/app/task-history");
   await expect(page.getByTestId("task-history-page")).toBeVisible();
   await expect(page.getByLabel("Task history scope")).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Tasks",exact:true}).last()).toBeVisible();
+  }else {
+    await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Tasks",exact:true})).toHaveCount(0);
+    await visitWorkspace(page,"/app/task-history");
+    await expect(page.getByRole("heading",{name:"Tasks are paused"})).toBeVisible();
+  }
   await visitWorkspace(page,"/app/dashboard");
   // Overview is now client-delivery based. Task-status cards remain only in the delivery module.
   await page.setViewportSize({width:1366,height:812});
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await expect(page.locator('[data-testid="personal-pending"]')).toHaveCount(0);
   await expect(page.getByRole("link",{name:"All clients"})).toBeVisible();
+  if(TASKS_ENABLED){
   // Non-admin Task Register rows share neutral surfaces, using semantic status pills.
   await visitWorkspace(page,"/app/tasks");
   const taskCardStyles=await page.locator('[data-aw-module="tasks"]').evaluate(container=>{
@@ -1122,6 +1134,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(134, 239, 172)"},
     {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(253, 164, 175)"},
   ]);
+  }
   await visitWorkspace(page,"/app/dashboard");
   await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
   await expect(page.locator('[data-testid="personal-completed"]')).toHaveCount(0);
@@ -1225,14 +1238,14 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   expect(agencyPayload.data.length,"Agency register must still return existing entries").toBeGreaterThan(0);
   // Verify the actual upstream data, not only the browser URL. The gateway
   // once dropped view/from/to, silently showing My entries in Agency mode.
-  await page.getByLabel("Meta Ads from date").fill("2026-11-01");
+  await page.getByLabel("Work cycle from").fill("2026-11-01");
   const scopedDistribution=page.waitForResponse(response=>{
     const u=new URL(response.url());
     return u.pathname==="/api/v1/finance/meta-ads-distribution"&&
       u.searchParams.get("view")==="all"&&u.searchParams.get("from")==="2026-11-01"&&
       u.searchParams.get("to")==="2026-11-10";
   });
-  await page.getByLabel("Meta Ads to date").fill("2026-11-10");
+  await page.getByLabel("Work cycle through").fill("2026-11-10");
   const distributionResponse=await scopedDistribution;
   expect(distributionResponse.status(),"Agency Meta Ads distribution must be routed").toBe(200);
   const dist=await distributionResponse.json() as {data:{
@@ -1244,7 +1257,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   });
   expect(Array.isArray(dist.data.daily)).toBe(true);
   expect(typeof dist.data.totalPosted).toBe("string");
-  await page.getByRole("button",{name:"All time",exact:true}).click();
+  await page.getByRole("button",{name:"Since 22 Oct 2026",exact:true}).click();
 
   const metaExportResponse=page.waitForResponse(response=>{
     const u=new URL(response.url());

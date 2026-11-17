@@ -1,3 +1,4 @@
+export * from "./business-period";
 import { z } from "zod";
 
 export const apiHealthSchema = z.object({
@@ -134,6 +135,11 @@ export type LeadUpdateInput = z.infer<typeof leadUpdateSchema>;
 export const leadAssignSchema = z.strictObject({version:z.number().int().min(1),assignedToId:z.uuid().nullable()});
 export const leadNoteSchema = z.strictObject({note:z.string().trim().min(1).max(2000)});
 export const leadDeleteSchema = z.strictObject({version:z.number().int().positive()});
+export const leadBulkDeleteSchema = z.strictObject({
+ leads:z.array(z.strictObject({id:z.uuid(),version:z.number().int().positive()})).min(1).max(100)
+  .refine(rows=>new Set(rows.map(row=>row.id)).size===rows.length,"Select each lead only once"),
+});
+export type LeadBulkDeleteInput = z.infer<typeof leadBulkDeleteSchema>;
 export const leadDuplicateReviewSchema = z.strictObject({resolution:z.enum(["CONFIRMED","DISMISSED"])});
 export const leadListQuerySchema = z.strictObject({
   stage:leadStageSchema.optional(),

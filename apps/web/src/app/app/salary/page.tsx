@@ -1,4 +1,6 @@
 "use client";
+import {agencyToday,businessCycle,cycleLabel,reportingPreset} from "@digimarket/contracts";
+import {BusinessPeriodPicker} from "@/components/business-period-picker";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {Banknote,Check,Plus,RefreshCw,RotateCcw,ShieldCheck,Users,Wallet} from "lucide-react";
@@ -18,7 +20,7 @@ type Overview={currency:string;totalPaid:string;paymentCount:number;
  recipients:{userId:string;name:string;amount:string;count:number}[];
  monthly:{month:string;amount:string;count:number}[];accounts:Account[];
  founderBalances:{founderUserId:string;name:string;financeNetBeforeSalary:string;salaryFunded:string;remaining:string}[]};
-const today=()=>new Date().toISOString().slice(0,10);
+const today=agencyToday;
 const rupees=(s:string|number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",
  minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(s)||0);
 const err=(error:unknown)=>error instanceof Error?error.message:"The operation was not completed.";
@@ -33,10 +35,10 @@ export default function SalaryPage(){
  const [overview,setOverview]=useState<Overview|null>(null);
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [error,setError]=useState(""),[success,setSuccess]=useState("");
- const [dateFrom,setDateFrom]=useState(today().slice(0,7)+"-01");
- const [dateTo,setDateTo]=useState(today());
+ const [dateFrom,setDateFrom]=useState(()=>reportingPreset("current").from);
+ const [dateTo,setDateTo]=useState(()=>reportingPreset("current").to);
  const [accountFounder,setAccountFounder]=useState(""),[accountName,setAccountName]=useState("");
- const [recipient,setRecipient]=useState(""),[amount,setAmount]=useState(""),[salaryMonth,setSalaryMonth]=useState(today().slice(0,7)),
+ const [recipient,setRecipient]=useState(""),[amount,setAmount]=useState(""),[salaryMonth,setSalaryMonth]=useState(()=>businessCycle().key),
   [paidOn,setPaidOn]=useState(today()),[method,setMethod]=useState<(typeof methods)[number]>("UPI"),
   [reference,setReference]=useState(""),[note,setNote]=useState(""),[confirmed,setConfirmed]=useState(false),
   [shares,setShares]=useState<Share[]>([{accountId:"",amount:""}]);
@@ -103,11 +105,8 @@ export default function SalaryPage(){
    actions={<button className="btn-secondary" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button>}/>
   {error&&<div role="alert" className="rounded-lg border border-red-500/40 p-3 text-red-400">{error}</div>}
   {success&&<div role="status" className="rounded-lg border border-emerald-500/40 p-3">{success}</div>}
-  <div className="rounded-xl border border-white/10 p-4 flex flex-wrap gap-3 items-end">
-   <label className="space-y-1 text-sm">From<input className="field block" type="date" max={dateTo} value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/></label>
-   <label className="space-y-1 text-sm">Through<input className="field block" type="date" min={dateFrom} value={dateTo} onChange={e=>setDateTo(e.target.value)}/></label>
-   <p className="text-sm opacity-70">All salary figures use the selected payment date range. Account balances always reflect all-time entries.</p>
-  </div>
+  <BusinessPeriodPicker value={{from:dateFrom,to:dateTo}} onChange={period=>{setDateFrom(period.from);setDateTo(period.to);}} disabled={busy}/>
+  <p className="text-sm opacity-70">Salary costs use the selected payment dates. Available funding carries forward across cycles and always reflects all-time entries.</p>
   {founder&&<>
    <section className="grid gap-3 sm:grid-cols-3">
     {[["Total salaries paid",overview?.totalPaid||"0.00","Company salary expense, counted once"],
@@ -220,9 +219,9 @@ export default function SalaryPage(){
      {totals.length===0&&<p className="text-sm opacity-60">No founder-funded salary expenses in this period.</p>}
     </section>
     <section className="rounded-xl border border-white/10 p-5 space-y-3">
-     <h2 className="text-lg font-semibold">Monthly salary cost</h2>
+     <h2 className="text-lg font-semibold">Salary cost by work cycle</h2>
      {(overview?.monthly||[]).map(x=><div key={x.month} className="space-y-1">
-      <div className="flex justify-between text-sm"><span>{x.month}</span><strong>{rupees(x.amount)}</strong></div>
+      <div className="flex justify-between text-sm"><span>{cycleLabel(x.month)}</span><strong>{rupees(x.amount)}</strong></div>
       <div className="h-3 rounded bg-white/10 overflow-hidden"><div className="h-full bg-sky-500" style={{width:Number(x.amount)/monthMax*100+"%"}}/></div>
      </div>)}
      {!(overview?.monthly||[]).length&&<p className="text-sm opacity-60">No salary costs in this period.</p>}

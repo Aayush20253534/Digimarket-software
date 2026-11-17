@@ -1,3 +1,4 @@
+import {TASKS_ENABLED} from "@digimarket/contracts";
 import "dotenv/config";
 import { Queue, Worker, type ConnectionOptions } from "bullmq";
 import { createDatabaseClient } from "@digimarket/db";
@@ -41,12 +42,15 @@ const worker=new Worker("digimarket-task-recurrence",async job=>{
   return reconcileInvoices(db,new Date());
  }
  if(job.name!=="scan-recurring-tasks")throw new Error("Unknown worker job");
+ if(!TASKS_ENABLED)return {paused:true};
  const outcome=await sweepRecurrences(db,new Date(),100);
  if(outcome.created||outcome.disabled)console.info("Task recurrence sweep",outcome);
  return outcome;
 },{connection,concurrency:1});
 worker.on("failed",(job,error)=>console.error("Task recurrence job failed",job?.id,error.message));
-await queue.upsertJobScheduler("minute-sweep",{every:60_000},{
+if(!TASKS_ENABLED)await queue.removeJobScheduler("minute-sweep");
+// Task schedules remain stored; only recurring execution is paused.
+if(TASKS_ENABLED)await queue.upsertJobScheduler("minute-sweep",{every:60_000},{
  name:"scan-recurring-tasks",data:{},
  opts:{attempts:4,backoff:{type:"exponential",delay:1500},
    removeOnComplete:100,removeOnFail:1000},

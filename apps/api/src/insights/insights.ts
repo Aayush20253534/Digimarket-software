@@ -1,3 +1,4 @@
+import {agencyTimestampRange,TASKS_ENABLED} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {forbidden} from "../auth/errors";
@@ -35,7 +36,7 @@ export class InsightsService{
    where:{organizationId:org,OR:[{createdById:me},{members:{some:{userId:me}}}],AND:[{OR:[{name:match},{description:match}]}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,name:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"project",id:x.id,title:x.name,detail:"Project · "+x.status,href:url("projects",x.id)}))));
-  if(can(a,"tasks.read"))parts.push(this.db.task.findMany({
+  if(TASKS_ENABLED&&can(a,"tasks.read"))parts.push(this.db.task.findMany({
    where:{organizationId:org,OR:[{createdById:me},{assignees:{some:{userId:me}}}],AND:[{OR:[{title:match},{description:match}]}]},
    take:8,orderBy:{updatedAt:"desc"},select:{id:true,title:true,status:true},
   }).then(rows=>rows.map(x=>({kind:"task",id:x.id,title:x.title,detail:"Task · "+x.status,href:url("tasks",x.id)}))));
@@ -81,10 +82,11 @@ export class InsightsService{
   requireGrant(a,"reports.business.read");
   const org=a.organizationId;
   const start=new Date(from+"T00:00:00.000Z"),end=new Date(to+"T23:59:59.999Z");
+  const timestampRange=agencyTimestampRange({from,to});
   const sections:Record<string,unknown>={};
   const work:Promise<void>[]=[];
   if(can(a,"leads.read"))work.push((async()=>{
-    const scope={organizationId:org,deletedAt:null,createdAt:{gte:start,lte:end}};
+    const scope={organizationId:org,deletedAt:null,createdAt:timestampRange};
     const [created,converted,rejected,approved,pending,meetingProcess,decisionPending,agreementPending,followUp,overdue]=await Promise.all([
       this.db.lead.count({where:scope}),
       this.db.client.count({where:{organizationId:org,sourceLead:{...scope,status:"APPROVED"}}}),
@@ -111,19 +113,19 @@ export class InsightsService{
       this.db.project.count({where:{...scope,status:"COMPLETED"}}),
     ]);sections.projects={active,completedCurrent:completed};
   })());
-  if(can(a,"tasks.read"))work.push((async()=>{
+  if(TASKS_ENABLED&&can(a,"tasks.read"))work.push((async()=>{
     const scope={organizationId:org,...taskScope(a)};
     const [open,overdue,completed]=await Promise.all([
       this.db.task.count({where:{...scope,status:{notIn:["DONE","CANCELLED"]}}}),
       this.db.task.count({where:{...scope,dueAt:{lt:new Date()},status:{notIn:["DONE","CANCELLED"]}}}),
-      this.db.task.count({where:{...scope,completedAt:{gte:start,lte:end},status:"DONE"}}),
+      this.db.task.count({where:{...scope,completedAt:timestampRange,status:"DONE"}}),
     ]);sections.tasks={open,overdue,completed};
   })());
   if(can(a,"content.read"))work.push((async()=>{
     const scope={organizationId:org,...contentScope(a)};
     const [scheduled,published,pending]=await Promise.all([
-      this.db.contentPost.count({where:{...scope,status:"SCHEDULED",publishAt:{gte:start,lte:end}}}),
-      this.db.contentPost.count({where:{...scope,status:"PUBLISHED",publishedAt:{gte:start,lte:end}}}),
+      this.db.contentPost.count({where:{...scope,status:"SCHEDULED",publishAt:timestampRange}}),
+      this.db.contentPost.count({where:{...scope,status:"PUBLISHED",publishedAt:timestampRange}}),
       this.db.contentPost.count({where:{...scope,status:"IN_REVIEW"}}),
     ]);sections.content={scheduled,published,pendingReview:pending};
   })());
@@ -145,7 +147,7 @@ export class InsightsService{
   await Promise.all(work);
   return {from,to,asOf:new Date().toISOString(),sections,
     definitions:{
-      period:"UTC dates, inclusive",
+      period:"Indian civil dates, inclusive; work cycles run from the 22nd to the next 22nd (exclusive)",
       leadConversion:"Approved leads with linked clients divided by all non-deleted leads created in the selected period; rejected leads are included in the denominator",
       overdue:"Current outstanding records, not a historical snapshot",
       payments:"Verified receipts are included in the posted cash ledger only; invoices are not revenue",

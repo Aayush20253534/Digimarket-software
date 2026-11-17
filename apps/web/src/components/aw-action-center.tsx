@@ -1,4 +1,5 @@
 "use client";
+import {TASKS_ENABLED} from "@digimarket/contracts";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -47,9 +48,9 @@ export function AWActionCenter() {
   const [clock,setClock]=useState(()=>Date.now());
   const [pendingVisible,setPendingVisible]=useState(8);
   const [overdueVisible,setOverdueVisible]=useState(8);
-  const canTasks=!!session?.identity.permissions.includes("tasks.read");
+  const canTasks=TASKS_ENABLED&&!!session?.identity.permissions.includes("tasks.read");
   const canProjects=!!session?.identity.permissions.includes("projects.read");
-  const canTeam=!!session?.identity.permissions.includes("tasks.manage");
+  const canTeam=TASKS_ENABLED&&!!session?.identity.permissions.includes("tasks.manage");
  const isAdmin=!!session?.identity.roles.some(r=>["ADMIN","SUPER_ADMIN","FOUNDER"].includes(r));
   const canContent=!!session?.identity.permissions.includes("content.read");
   const canInvoices=!!session?.identity.permissions.includes("invoices.read");
@@ -127,8 +128,8 @@ export function AWActionCenter() {
   return <section className="aw-action-center" aria-label="Action center" data-testid="dashboard-action-center">
     <div className="aw-action-center-heading">
       <div className="min-w-0">
-        <p className="aw-eyebrow">{isAdmin?"PRIORITIES & DEADLINES":"MY TASK STATUS"}</p>
-        <h2 className="aw-action-heading">{isAdmin?"What needs your attention":"Pending, completed & expired tasks"}</h2>
+        <p className="aw-eyebrow">{isAdmin||!canTasks?"PRIORITIES & DEADLINES":"MY TASK STATUS"}</p>
+        <h2 className="aw-action-heading">{isAdmin||!canTasks?"What needs your attention":"Pending, completed & expired tasks"}</h2>
         <p className="aw-panel-description">Live, permission-scoped task, project, content and invoice deadlines. Closed work and paid invoices are excluded.</p>
       </div>
       <button type="button" className="aw-dashboard-refresh" onClick={()=>{setClock(Date.now());setRun(v=>v+1);}} disabled={loading}
@@ -189,7 +190,7 @@ export function AWActionCenter() {
       </AWPanel>
     </div>
     {canTeam&&<p className="aw-action-footnote">Managers see organization-wide tasks. Other users see assigned or created tasks. Every overdue source respects existing API permissions and visibility rules.</p>}
-    {!isAdmin&&<div className="mt-4"><AWPanel title="Completed tasks" description="Work you have finished.">
+    {canTasks&&!isAdmin&&<div className="mt-4"><AWPanel title="Completed tasks" description="Work you have finished.">
        <div className="aw-action-total"><strong>{completed.length}</strong> completed tasks</div>
        {completed.length?<ol className="aw-action-items">{completed.slice(0,20).map(task=>
         <li key={task.id} className="aw-action-row"><span className="aw-action-number">✓</span>
