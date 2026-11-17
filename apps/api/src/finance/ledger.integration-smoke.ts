@@ -6,6 +6,8 @@ import type { Principal } from "../auth/service";
 import { FinanceService, type FinanceRegisterQuery } from "./service";
 import { FinanceLedgerService } from "./ledger-service";
 import { ApprovalService } from "../approvals/service";
+import { verifyTotalExpenses } from "./total-expenses.integration";
+import { TotalExpenseService } from "./total-expenses";
 
 if (process.env.NODE_ENV !== "test" || !process.env.DATABASE_URL?.includes("digimarket_ci"))
   throw new Error("Ledger integration requires an isolated digimarket_ci database");
@@ -26,6 +28,7 @@ const checkStatus = (status: number) => (e: unknown) =>
   (e as { status?: number }).status === status;
 const closed = (e: unknown) => String(e).includes("FINANCE_CYCLE_CLOSED");
 try {
+  await verifyTotalExpenses(db);
   const org = await db.organization.create({ data: { name: "Finance ledger CI " + randomUUID() } }),
     other = await db.organization.create({ data: { name: "Other ledger CI " + randomUUID() } });
   const [founder, admin, staff] = await Promise.all(
@@ -335,6 +338,10 @@ try {
   assert.equal(csv.split("\r\n").length, 5002);
   assert.ok(csv.includes("'=FORMULA()"));
   assert.ok(!csv.includes("Paid social campaigns"));
+  const completeExpenseCSV = await new TotalExpenseService(db).export(f, {
+    ...query, type: "OTHER", q: "Export pagination",
+  });
+  assert.equal(completeExpenseCSV.csv.split("\r\n").length, 5002, "total expense export has no 5,000-row cap");
   await assert.rejects(() => finance.register(employee, query), checkStatus(403));
   assert.equal((await finance.register(outsider, filter)).total, 0);
   assert.equal((await finance.register(f, { ...filter, q: "absent value" })).total, 0);
