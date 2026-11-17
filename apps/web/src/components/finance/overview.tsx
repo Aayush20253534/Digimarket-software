@@ -21,7 +21,6 @@ import type { TotalExpenseSummary } from "./total-expenses";
 type Totals = {
   postedIncome: string;
   postedExpense: string;
-  postedExpenseIncludingSalary: string;
   postedSalaryExpense: string;
   agencyOperatingNet: string;
   clientAdSpend?: { posted: string };
@@ -69,9 +68,9 @@ export function FinanceOverview() {
     },
     {
       title: "Expenses",
-      description: "Operating costs and salary subtotal",
+      description: "Operating expenses by category",
       href: "/app/finance/expenses",
-      amount: totals?.postedExpenseIncludingSalary,
+      amount: totals?.postedExpense,
       icon: ArrowUpRight,
     },
     {
@@ -200,7 +199,6 @@ export function FinanceCategorySummary({ kind }: { kind: "INCOME" | "EXPENSE" })
     { session, request } = useAuth();
   const [data, setData] = useState<{
       ordinary: string;
-      salary: string;
       total: string;
       items: {
         id: string;
@@ -245,28 +243,11 @@ export function FinanceCategorySummary({ kind }: { kind: "INCOME" | "EXPENSE" })
       ) : (
         data && (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-3" aria-label="Category totals">
               <Card>
                 <p>{kind === "INCOME" ? "Posted income" : "Operating expenses"}</p>
                 <strong>{money(data.ordinary)}</strong>
               </Card>
-              {kind === "EXPENSE" && (
-                <>
-                  <Card>
-                    <p>Salaries</p>
-                    <strong>{money(data.salary)}</strong>
-                    {session?.identity.roles.includes("FOUNDER") && (
-                      <Link className="block mt-2 text-violet-300" href={"/app/salary?" + w.query}>
-                        Open salary ledger
-                      </Link>
-                    )}
-                  </Card>
-                  <Card>
-                    <p>Total expenses including salary</p>
-                    <strong>{money(data.total)}</strong>
-                  </Card>
-                </>
-              )}
             </div>
             <nav
               className="grid grid-cols-2 gap-4 xl:grid-cols-3"

@@ -252,7 +252,15 @@ try {
   assert.equal(totals.postedExpense, "110.0000");
   assert.equal(totals.postedSalaryExpense, "200.0000");
   assert.equal(totals.agencyOperatingNet, "1690.0000");
-  assert.equal((await finance.categorySummary(f, "all", period, "EXPENSE")).total, "310.0000");
+  for (const view of ["mine", "all"] as const) {
+    const expenses = await finance.categorySummary(f, view, period, "EXPENSE");
+    assert.equal(expenses.ordinary, "110.0000");
+    assert.equal(expenses.total, "110.0000", "Expenses excludes salary");
+    const combined = await new TotalExpenseService(db).summary(f, { ...period, view });
+    assert.equal(combined.breakdown.SALARY, "200.0000");
+    assert.equal(combined.postedTotalExpense, "610.0000");
+    assert.equal(combined.netOperatingMoney, "1390.0000");
+  }
   let accounts = await ledger.balances(f, period);
   assert.equal(accounts.find((x) => x.id === bank.id)?.closing, "2290.0000");
   assert.equal(accounts.find((x) => x.id === clearing.id)?.closing, "0.0000");

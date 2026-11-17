@@ -57,6 +57,22 @@ async function workspace(page: Page, role = "FOUNDER") {
         pendingIncome: "0",
         pendingExpense: "0",
       };
+    else if (path === "/finance/category-summary")
+      data = {
+        kind: "EXPENSE",
+        ordinary: all ? "66" : "26",
+        total: all ? "66" : "26",
+        items: [
+          {
+            id: "travel",
+            name: "Travel",
+            posted: all ? "66" : "26",
+            pending: "0",
+            count: 1,
+            active: true,
+          },
+        ],
+      };
     else if (path === "/finance/total-expenses/summary") data = summary;
     else if (path === "/finance/total-expenses") {
       const rows = [
@@ -127,7 +143,14 @@ test("Total expense includes every type and drives the negative operating-money 
   const cycle = "from=2026-10-22&to=2026-11-21&view=mine";
   await page.goto("/app/finance?" + cycle);
   const cards = page.getByRole("navigation", { name: "Finance categories" });
-  await expect(cards.getByRole("link", { name: /^Expenses / })).toContainText("₹76.00");
+  await expect(cards.getByRole("link", { name: /^Expenses / })).toContainText("₹26.00");
+  await expect(cards.getByRole("link", { name: /^Salaries / })).toContainText("₹50.00");
+  await cards.getByRole("link", { name: /^Expenses / }).click();
+  await expect(page.getByLabel("Category totals")).toContainText("₹26.00");
+  await expect(page.getByLabel("Category totals")).not.toContainText("₹50.00");
+  await expect(page.getByText("Salaries", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Total expenses including salary", { exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: "← Finance overview", exact: true }).click();
   const totalCard = cards.getByRole("link", { name: /^Total expense / });
   await expect(totalCard).toContainText("₹176.00");
   await expect(page.getByLabel("Finance overview totals")).toContainText("Net operating money");
@@ -165,9 +188,13 @@ test("Total expense includes every type and drives the negative operating-money 
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(377);
   await page.getByRole("link", { name: "← Finance overview", exact: true }).click();
-  await expect(cards.getByRole("link", { name: /^Expenses / })).toContainText("₹166.00");
+  await expect(cards.getByRole("link", { name: /^Expenses / })).toContainText("₹66.00");
+  await expect(cards.getByRole("link", { name: /^Salaries / })).toContainText("₹100.00");
   await expect(cards.getByRole("link", { name: /^Total expense / })).toContainText("₹316.00");
   await expect(page.getByLabel("Finance overview totals")).toContainText("−₹16.00");
+  await cards.getByRole("link", { name: /^Expenses / }).click();
+  await expect(page.getByLabel("Category totals")).toContainText("₹66.00");
+  await expect(page.getByText("Salaries", { exact: true })).toHaveCount(0);
 });
 
 test("personal-only users cannot request agency expense totals from the page", async ({ page }) => {

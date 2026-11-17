@@ -683,7 +683,8 @@ export class FinanceService {
       this.db.financialTransaction.groupBy({by:["categoryId","status"],where,_sum:{amount:true},_count:{_all:true}}),
       this.db.financialCategory.findMany({where:{organizationId:actor.organizationId,kind},orderBy:{name:"asc"}}),this.totals(actor,view,period),
     ]);
-    return {kind,ordinary:kind==="EXPENSE"?totals.postedExpense:totals.postedIncome,salary:kind==="EXPENSE"?totals.postedSalaryExpense:"0.0000",total:kind==="EXPENSE"?totals.postedExpenseIncludingSalary:totals.postedIncome,
+    const total=kind==="EXPENSE"?totals.postedExpense:totals.postedIncome;
+    return {kind,ordinary:total,total,salary:kind==="EXPENSE"?totals.postedSalaryExpense:"0.0000",
       items:categories.filter(c=>c.purpose!=="SALARY").map(c=>{const posted=groups.find(g=>g.categoryId===c.id&&g.status==="POSTED"),pending=groups.find(g=>g.categoryId===c.id&&g.status==="PENDING");return {id:c.id,name:c.name,active:c.active,purpose:c.purpose,posted:(posted?._sum.amount??new Prisma.Decimal(0)).toFixed(4),pending:(pending?._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:posted?._count._all??0};})};
   }
 
