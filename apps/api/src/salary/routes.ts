@@ -233,6 +233,7 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
    const payment=await tx.salaryPayment.findFirst({where:{id,organizationId:a.organizationId},
     include:{allocations:true}});
    if(!payment)throw noFound();
+   if(payment.reversesId||await tx.salaryPayment.findFirst({where:{reversesId:payment.id}}))throw new AuthError(409,"ALREADY_REVERSED","Reversed salary records cannot be voided");
    const changed=await tx.salaryPayment.updateMany({where:{id,organizationId:a.organizationId,status:"PAID"},
     data:{status:"VOID",voidedAt:new Date(),voidedById:a.userId,voidReason:input.reason}});
    if(changed.count!==1)throw new AuthError(409,"ALREADY_VOID","Payment was already voided");

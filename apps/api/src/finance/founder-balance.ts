@@ -22,14 +22,14 @@ export async function founderLedgerBalances(db:LedgerDb,organizationId:string,fo
  if(!ids.length)return results;
  const [categories,posted,accounts]=await Promise.all([
   db.financialCategory.findMany({where:{organizationId,kind:"EXPENSE"},
-   select:{id:true,name:true}}),
+   select:{id:true,name:true,purpose:true}}),
   db.financialTransaction.groupBy({by:["enteredById","kind"],where:{
    organizationId,enteredById:{in:ids},clientId:null,status:"POSTED"
   },_sum:{amount:true}}),
   db.salaryFundingAccount.findMany({where:{organizationId,founderUserId:{in:ids}},
    select:{id:true,founderUserId:true}})
  ]);
- const metaIds=categories.filter(c=>isMetaAds(c.name)).map(c=>c.id);
+ const metaIds=categories.filter(c=>c.purpose?c.purpose==="META_ADS":isMetaAds(c.name)).map(c=>c.id);
  const [ads,allocations]=await Promise.all([
   metaIds.length?db.financialTransaction.groupBy({by:["enteredById"],where:{
    organizationId,enteredById:{in:ids},clientId:{not:null},status:"POSTED",

@@ -93,3 +93,6 @@ jobs:
 
       - name: Test salary funding and employee isolation against PostgreSQL
         run: pnpm --filter @digimarket/api exec tsx src/salary/integration-smoke.ts
+
+      - name: Test money accounts, client funds and cycle closing against PostgreSQL
+        run: pnpm --filter @digimarket/api exec tsx src/finance/ledger.integration-smoke.ts

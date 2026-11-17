@@ -28,7 +28,8 @@ async function mockWorkspace(page:Page,role="FOUNDER"){
    const rows=route.request().postDataJSON().leads as {id:string;version:number}[];
    deleted.push(rows.map(row=>row.id));leads=leads.filter(lead=>!rows.some(row=>row.id===lead.id));
    data={deletedCount:rows.length,ids:rows.map(row=>row.id)};
-  }else if(path==="/finance/summary")data=totals;
+  }else if(path==="/finance/register")data={items:[],total:0,page:1,limit:25};
+  else if(path==="/finance/summary")data=totals;
   else if(path==="/salary/summary")data={totalPaid:"50",founderFunding:[]};
   else if(path==="/finance/meta-ads-distribution")data={view:"mine",from:url.searchParams.get("from"),to:url.searchParams.get("to"),totalPosted:"100",totalPending:"0",total:"100",excludedAmount:"0",excludedCount:0,transactionCount:1,selfPosted:"0",selfPending:"0",clientPosted:"100",clientPending:"0",categories:[],individuals:[],daily:[],monthly:[]};
   await route.fulfill({json:{data}});
@@ -62,18 +63,26 @@ test("changing a lead filter clears bulk selection and cancel deletes nothing",a
  await expect(page.getByRole("button",{name:"Delete selected (0)",exact:true})).toBeDisabled();
 });
 
-test("finance cards, registers, payroll and ads request one shared work cycle",async({page})=>{
+test("finance overview cards keep details on separate pages and preserve the work cycle",async({page})=>{
  const {requests}=await mockWorkspace(page);
  await page.goto("/app/finance");
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
  await expect(page.getByLabel("Work cycle through")).toHaveValue("2026-11-21");
- await expect(page.getByText("Agency operating net",{exact:true})).toBeVisible();
- await expect.poll(()=>requests.some(row=>row.path==="/finance/meta-ads-distribution"&&row.from==="2026-10-22")).toBe(true);
- for(const path of ["/finance/entries","/finance/summary","/finance/meta-ads-distribution","/salary/summary"])
-  expect(requests.filter(row=>row.path===path).every(row=>row.from==="2026-10-22"&&row.to==="2026-11-21")).toBe(true);
+ await expect(page.getByText("Operating net",{exact:true})).toBeVisible();
+ await expect(page.getByRole("navigation",{name:"Finance categories"})).toBeVisible();
+ await expect(page.getByRole("heading",{name:"New income or expense"})).toHaveCount(0);
+ await expect(page.getByRole("region",{name:"Financial register",exact:true})).toHaveCount(0);
+ expect(requests.some(row=>row.path==="/finance/register"||row.path==="/finance/meta-ads-distribution")).toBe(false);
  await page.getByRole("button",{name:"Next cycle",exact:true}).click();
- for(const path of ["/finance/entries","/finance/summary","/finance/meta-ads-distribution","/salary/summary"])
+ await page.getByRole("link",{name:/Meta Ads Self and client/}).click();
+ await expect(page).toHaveURL(/finance\/ads/);
+ await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-11-22");
+ for(const path of ["/finance/register","/finance/meta-ads-distribution"])
   await expect.poll(()=>requests.some(row=>row.path===path&&row.from==="2026-11-22"&&row.to==="2026-12-21")).toBe(true);
+ await page.getByRole("link",{name:"← Finance overview"}).click();
+ await page.getByRole("link",{name:"New entry / register"}).click();
+ await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-11-22");
+ await expect.poll(()=>requests.some(row=>row.path==="/salary/summary"&&row.from==="2026-11-22")).toBe(true);
 });
 
 test("Tasks are hidden and preserved routes display the pause notice",async({page})=>{

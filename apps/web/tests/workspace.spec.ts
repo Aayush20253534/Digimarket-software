@@ -246,11 +246,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   );
   expect(mobileZoom,"Mobile/tablet touch scaling remains unmodified").toBe(1);
   await page.setViewportSize({width:1366,height:768});
-  const assigneeResponse=page.waitForResponse(response=>
-    response.url().includes("/api/v1/finance/assignees") && response.request().method()==="GET");
-  await visitWorkspace(page,"/app/finance");
-  expect((await assigneeResponse).status(),"Finance gateway must forward assignee lookups").toBe(200);
-  await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
+  await visitWorkspace(page,"/app/finance/categories");
+  await expect(page.getByRole("heading",{name:"Finance categories"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
   await page.getByRole("button",{name:"Add category"}).click();
@@ -269,15 +266,19 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   // and provide a direct path to correct the linked payer without altering data.
   await page.getByLabel("Type",{exact:true}).selectOption("EXPENSE");
   await page.getByLabel("Category name",{exact:true}).fill("Meta Ads");
+  await page.getByLabel("Category purpose").selectOption("META_ADS");
   await page.getByRole("button",{name:"Add category"}).click();
   await expect(page.getByText("Meta Ads",{exact:true}).last()).toBeVisible();
+  const assigneeResponse=page.waitForResponse(response=>response.url().includes("/api/v1/finance/assignees")&&response.request().method()==="GET");
+  await visitWorkspace(page,"/app/finance/ads");
+  expect((await assigneeResponse).status(),"Finance gateway must forward assignee lookups").toBe(200);
   const metaCategoryId=await page.locator("#finance-category option").filter({hasText:"Meta Ads"}).getAttribute("value");
   expect(metaCategoryId).toBeTruthy();
   const mockedMetaId="00000000-0000-4000-8000-000000000099";
   const mockedMetaDate=await page.getByLabel("Work cycle from").inputValue();
-  const metaRoute=(url:URL)=>url.pathname==="/api/v1/finance/entries"&&url.searchParams.get("view")==="all"&&url.searchParams.get("scope")==="meta_ads";
+  const metaRoute=(url:URL)=>url.pathname==="/api/v1/finance/register"&&url.searchParams.get("view")==="all"&&url.searchParams.get("scope")==="meta_ads";
   await page.route(metaRoute,async route=>route.fulfill({
-    status:200,contentType:"application/json",body:JSON.stringify({data:[{
+    status:200,contentType:"application/json",body:JSON.stringify({data:{total:new URL(route.request().url()).searchParams.get("funding")==="CLIENT"?0:1,page:1,limit:25,items:new URL(route.request().url()).searchParams.get("funding")==="CLIENT"?[]:[{
       id:mockedMetaId,kind:"EXPENSE",status:"POSTED",amount:"125.0000",currencyCode:"INR",
       occurredOn:mockedMetaDate,method:"UPI",description:"Isolated mock only",
       merchantOrSource:"Meta",createdAt:mockedMetaDate+"T08:00:00.000Z",
@@ -287,14 +288,14 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
       category:{id:metaCategoryId,name:"Meta Ads",active:true},
       enteredBy:{displayName:"CI Admin",loginId:"admin-e2e"},
       submittedBy:{displayName:"CI Admin"},
-    }]})
+    }]}})
   }));
   await page.getByRole("button",{name:"Refresh",exact:true}).click();
   const adFilters=page.getByRole("group",{name:"Meta Ads funding filter"});
   await expect(page.locator("#finance-meta-"+mockedMetaId)).toBeVisible();
   await adFilters.getByRole("button",{name:"Client",exact:true}).click();
-  await expect(page.getByText(/No Meta Ads entries are linked to a client/)).toBeVisible();
-  await page.getByRole("button",{name:"Review 1 Agency entry"}).click();
+  await expect(page.getByRole("heading",{name:"No matching Meta Ads expenses"})).toBeVisible();
+  await adFilters.getByRole("button",{name:"Agency",exact:true}).click();
   const adRow=page.locator("#finance-meta-"+mockedMetaId);
   await expect(adRow.getByRole("button",{name:/Assign client to Meta Ads entry/})).toBeVisible();
   await adRow.getByRole("button",{name:/Assign client to Meta Ads entry/}).click();
@@ -1141,12 +1142,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.locator('[data-testid="personal-completed"]')).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Team & accounts"})).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
-  await visitWorkspace(page,"/app/finance");
-  await expect(page.getByRole("heading",{name:"Income & expenses"})).toBeVisible();
-  await expect(page.getByRole("navigation",{name:"Finance page sections"})).toBeVisible();
+  await visitWorkspace(page,"/app/finance/entries");
+  await expect(page.getByRole("heading",{name:"Income & expense register"})).toBeVisible();
+  await expect(page.getByRole("link",{name:"← Finance overview"})).toBeVisible();
   await expect(page.getByRole("region",{name:"Posted income and expense comparison"})).toBeVisible();
-  await expect(page.getByRole("group",{name:"Meta Ads funding filter"})).toBeVisible();
-  await expect(page.getByLabel("Search loaded financial entries")).toBeVisible();
+  await expect(page.getByRole("group",{name:"Meta Ads funding filter"})).toHaveCount(0);
+  await expect(page.getByLabel("Search financial entries")).toBeVisible();
   await expect(page.getByLabel("Filter ledger by kind")).toHaveValue("ALL");
   const financeCategory=page.getByLabel("Category",{exact:true});
   // No Person field on new transactions; the server records the submitting user.
@@ -1195,7 +1196,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
       });
       expect(nav.contained,"Mobile navigation title must not collide with icons").toBe(true);
       expect(nav.right,"Mobile navigation actions must stay on-screen").toBe(true);
-      await visitWorkspace(page,"/app/finance");
+      await visitWorkspace(page,"/app/finance/entries");
       const grid=await page.locator(".aw-finance-summary-grid").evaluate(el=>{
         const cards=[...el.children].map(x=>x.getBoundingClientRect());
         return {columns:getComputedStyle(el).gridTemplateColumns.split(" ").length,
@@ -1214,29 +1215,20 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("button",{name:"Sign out"}).click();
   await login(page,"admin-e2e",UPDATED);
   await expect(page).toHaveURL(/\/app\/dashboard/);
-  await visitWorkspace(page,"/app/finance");
-  // Client-funded Meta Ads queries must retain their scope through the
-  // Next.js gateway. Prior to the fix, the proxy dropped scope=client_ads
-  // and returned the agency ledger despite the separate ad-spend summary.
+  await visitWorkspace(page,"/app/finance/entries");
+  // Register filters reach the API and keep agency records separate from client ads.
   await expect(page.getByRole("button",{name:"Agency totals & register"})).toHaveClass(/btn-primary/);
-  const clientScopedResponse=page.waitForResponse(response=>{
-    const u=new URL(response.url());
-    return u.pathname==="/api/v1/finance/entries"&&
-      u.searchParams.get("view")==="all"&&u.searchParams.get("scope")==="client_ads";
-  });
-  const agencyScopedResponse=page.waitForResponse(response=>{
-    const u=new URL(response.url());
-    return u.pathname==="/api/v1/finance/entries"&&
-      u.searchParams.get("view")==="all"&&!u.searchParams.has("scope");
-  });
+  const agencyScopedResponse=page.waitForResponse(response=>{const u=new URL(response.url());return u.pathname==="/api/v1/finance/register"&&u.searchParams.get("view")==="all"&&u.searchParams.get("scope")==="agency";});
   await page.getByRole("button",{name:"Refresh",exact:true}).click();
-  const [clientScoped,agencyScoped]=await Promise.all([clientScopedResponse,agencyScopedResponse]);
-  expect(clientScoped.status()).toBe(200);
+  const agencyScoped=await agencyScopedResponse;
   expect(agencyScoped.status()).toBe(200);
-  const clientPayload=await clientScoped.json() as {data:unknown[]};
-  const agencyPayload=await agencyScoped.json() as {data:unknown[]};
-  expect(clientPayload.data,"Client Meta Ads scope must not return agency expenses").toEqual([]);
-  expect(agencyPayload.data.length,"Agency register must still return existing entries").toBeGreaterThan(0);
+  const agencyPayload=await agencyScoped.json() as {data:{items:unknown[];total:number}};
+  expect(agencyPayload.data.total).toBeGreaterThan(0);
+  const clientScopedResponse=page.waitForResponse(response=>{const u=new URL(response.url());return u.pathname==="/api/v1/finance/register"&&u.searchParams.get("view")==="all"&&u.searchParams.get("scope")==="meta_ads"&&u.searchParams.get("funding")==="CLIENT";});
+  await visitWorkspace(page,"/app/finance/ads");
+  await page.getByRole("group",{name:"Meta Ads funding filter"}).getByRole("button",{name:"Client",exact:true}).click();
+  const clientScoped=await clientScopedResponse;expect(clientScoped.status()).toBe(200);
+  expect((await clientScoped.json()).data.items).toEqual([]);
   // Verify the actual upstream data, not only the browser URL. The gateway
   // once dropped view/from/to, silently showing My entries in Agency mode.
   await page.getByLabel("Work cycle from").fill("2026-11-01");
@@ -1262,7 +1254,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
 
   const metaExportResponse=page.waitForResponse(response=>{
     const u=new URL(response.url());
-    return u.pathname==="/api/v1/finance/export"&&
+    return u.pathname==="/api/v1/finance/register/export"&&
       u.searchParams.get("view")==="all"&&u.searchParams.get("scope")==="meta_ads";
   });
   await page.getByRole("button",{name:"Export Meta Ads CSV"}).click();
@@ -1271,6 +1263,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const metaExportPayload=await metaExport.json() as {data:{csv:string}};
   expect(metaExportPayload.data.csv).not.toContain("CI Revenue Category");
   expect(metaExportPayload.data.csv).not.toContain("CI Admin Category Updated");
+  await visitWorkspace(page,"/app/finance/entries?view=all");
   const incomeRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Revenue Category"});
   const expenseRow=page.locator(".aw-finance-register tbody tr").filter({hasText:"CI Admin Category Updated"});
   await expect(incomeRow.getByRole("button",{name:/Edit income/})).toBeVisible();

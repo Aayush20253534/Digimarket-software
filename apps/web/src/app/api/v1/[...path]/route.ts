@@ -35,6 +35,23 @@ const endpoints: Record<string, string[]> = {
   "users": ["GET", "POST"],
   "approval-policies": ["GET"],
   "approvals": ["GET", "POST"],
+  "finance/account-owners": ["GET"],
+  "finance/account-options": ["GET"],
+  "finance/accounts": ["GET","POST"],
+  "finance/account-corrections": ["POST"],
+  "finance/account-history": ["GET"],
+  "finance/unassigned": ["GET"],
+  "finance/account-links": ["POST"],
+  "finance/client-funds": ["GET","POST"],
+  "finance/client-funds/history": ["GET"],
+  "finance/transfers": ["GET","POST"],
+  "finance/reconciliations": ["POST"],
+  "finance/cycle-review": ["GET"],
+  "finance/cycle-close": ["POST"],
+  "finance/reversals": ["POST"],
+  "finance/category-summary": ["GET"],
+  "finance/register": ["GET"],
+  "finance/register/export": ["GET"],
   "finance/categories": ["GET", "POST"],
   "finance/internal-settlements/founders": ["GET"],
   // A founder must be able to read incoming and outgoing settlement history.
@@ -281,6 +298,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
+  if(["finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
+    for(const key of ["from","to","view","scope","funding","kind","status","categoryId","accountId","clientId","page","limit","q"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
+  }
   if(path==="service-deliveries"){
     for(const key of ["clientId","mine"]){const value=request.nextUrl.searchParams.get(key);if(value)url.searchParams.set(key,value);}
   }
