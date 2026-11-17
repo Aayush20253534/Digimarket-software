@@ -6,7 +6,8 @@ The Finance landing page now contains small totals and navigation cards. Income 
 
 | Figure | Source | Treatment |
 | --- | --- | --- |
-| Operating net | Posted agency income minus ordinary expenses minus paid salaries | Client advertising and transfers are excluded. |
+| Net operating money | Posted income minus Total expense | Includes ordinary expenses, self and client Meta Ads, and salaries once. Transfers and client fund movements are excluded. |
+| Total expense | Every posted expense plus paid salaries | Opens a combined register with search, type filters, pagination and matching CSV export. Reversals reduce totals in their recorded cycle. |
 | Consolidated expenses | Ordinary posted expenses plus salaries | Salary is counted once, with a separate subtotal and link to payroll. |
 | Client ad funds | Opening funds + actual top-ups − refunds − posted client ad spend + reversals | Deposits are not service revenue. A negative balance may be missing funding or an agency advance still owed by the client. |
 | Money account balance | Verified opening balance + signed source movements | Cash, bank, UPI and founder clearing accounts carry forward between cycles. |
@@ -15,6 +16,8 @@ The Finance landing page now contains small totals and navigation cards. Income 
 | Agreement projections | Contract rates overlapping selected dates | Forecasts only, excluded from posted cash and income. |
 
 ## Initial cleanup
+
+The existing **Expenses** card retains its previous subtotal (agency expenses, including self Meta Ads, plus salaries). **Total expense** adds client spending and is the figure subtracted from posted income on the overview. In My entries, salaries use only the founder's funded share; Agency counts each payment once regardless of funding splits. Non-founder finance readers see daily salary aggregates without individual recipients or notes. Search/type filters narrow the combined register and CSV, while its summary continues to show the full selected cycle.
 
 1. Create each real account once under **Accounts & transfers**. Use a verified balance immediately before its opening date's transactions. For the first cycle, opening on 22 October means the balance before 22 October's entries. Do not include those entries in the opening balance again.
 2. Open **Assign existing records** and link each posted transaction to the account actually used. Founders also assign the source of every salary funding allocation. The submitting user is not assumed to be the source account.

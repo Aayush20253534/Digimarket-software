@@ -50,6 +50,9 @@ const endpoints: Record<string, string[]> = {
   "finance/cycle-close": ["POST"],
   "finance/reversals": ["POST"],
   "finance/category-summary": ["GET"],
+  "finance/total-expenses": ["GET"],
+  "finance/total-expenses/summary": ["GET"],
+  "finance/total-expenses/export": ["GET"],
   "finance/register": ["GET"],
   "finance/register/export": ["GET"],
   "finance/categories": ["GET", "POST"],
@@ -298,8 +301,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
-  if(["finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
-    for(const key of ["from","to","view","scope","funding","kind","status","categoryId","accountId","clientId","page","limit","q"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
+  if(["finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
+    for(const key of ["from","to","view","scope","funding","kind","type","status","categoryId","accountId","clientId","page","limit","q"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
   if(path==="service-deliveries"){
     for(const key of ["clientId","mine"]){const value=request.nextUrl.searchParams.get(key);if(value)url.searchParams.set(key,value);}

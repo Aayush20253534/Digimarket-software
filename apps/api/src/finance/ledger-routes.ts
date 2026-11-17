@@ -5,6 +5,7 @@ import type { AuthService, Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { FinanceLedgerService } from "./ledger-service";
 import { FinanceService } from "./service";
+import { TotalExpenseService } from "./total-expenses";
 const amount = z.string().regex(/^(?:0|[1-9][0-9]{0,13})(?:\.[0-9]{1,4})?$/);
 const signedAmount = z.string().regex(/^-?(?:0|[1-9][0-9]{0,13})(?:\.[0-9]{1,4})?$/);
 const note = z.string().trim().min(4).max(500);
@@ -21,6 +22,10 @@ const registerQuery = pagination.extend({
   status: z.enum(["POSTED", "PENDING", "REJECTED", "CANCELLED"]).optional(),
   categoryId: z.uuid().optional(),
 });
+const totalExpenseQuery = pagination.extend({
+  view: z.enum(["mine", "all"]).default("mine"),
+  type: z.enum(["ALL", "OTHER", "SELF_ADS", "CLIENT_ADS", "SALARY"]).default("ALL"),
+});
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = schema.safeParse(value);
   if (!r.success) throw new AuthError(422, "VALIDATION_ERROR", "Invalid finance fields");
@@ -29,6 +34,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
   const ledger = new FinanceLedgerService(auth.database),
     finance = new FinanceService(auth.database),
+    totalExpenses = new TotalExpenseService(auth.database),
     root = "/api/v1/finance";
   const authenticate = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -62,6 +68,42 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
         else next(e);
       }
     };
+  app.get(
+    root + "/total-expenses/summary",
+    authenticate,
+    run(async (req, res) => {
+      res.json({
+        data: await totalExpenses.summary(actor(res), {
+          ...period(req),
+          view: parse(z.enum(["mine", "all"]).default("mine"), req.query.view),
+        }),
+      });
+    }),
+  );
+  app.get(
+    root + "/total-expenses",
+    authenticate,
+    run(async (req, res) => {
+      res.json({
+        data: await totalExpenses.records(actor(res), {
+          ...period(req),
+          ...parse(totalExpenseQuery, req.query),
+        }),
+      });
+    }),
+  );
+  app.get(
+    root + "/total-expenses/export",
+    authenticate,
+    run(async (req, res) => {
+      res.json({
+        data: await totalExpenses.export(actor(res), {
+          ...period(req),
+          ...parse(totalExpenseQuery, req.query),
+        }),
+      });
+    }),
+  );
   app.get(
     root + "/account-owners",
     authenticate,

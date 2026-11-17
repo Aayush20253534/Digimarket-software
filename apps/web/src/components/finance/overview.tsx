@@ -17,6 +17,7 @@ import {
 import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, Spinner } from "@/components/ui";
 import { FinanceFrame, money, useFinanceWindow } from "./shared";
+import type { TotalExpenseSummary } from "./total-expenses";
 type Totals = {
   postedIncome: string;
   postedExpense: string;
@@ -31,6 +32,7 @@ export function FinanceOverview() {
   const w = useFinanceWindow(),
     { session, request } = useAuth();
   const [totals, setTotals] = useState<Totals | null>(null),
+    [totalExpense, setTotalExpense] = useState<TotalExpenseSummary | null>(null),
     [error, setError] = useState("");
   const all = !!session?.identity.permissions.includes("finance.read.all"),
     founder = !!session?.identity.roles.includes("FOUNDER");
@@ -38,10 +40,17 @@ export function FinanceOverview() {
     if (!w.ready || !session) return;
     let active = true;
     setTotals(null);
+    setTotalExpense(null);
     setError("");
-    void request<Totals>("/finance/summary?" + w.query)
-      .then((r) => {
-        if (active) setTotals(r);
+    void Promise.all([
+      request<Totals>("/finance/summary?" + w.query),
+      request<TotalExpenseSummary>("/finance/total-expenses/summary?" + w.query),
+    ])
+      .then(([r, expense]) => {
+        if (active) {
+          setTotals(r);
+          setTotalExpense(expense);
+        }
       })
       .catch((e) => {
         if (active) setError(e.message);
@@ -55,7 +64,7 @@ export function FinanceOverview() {
       title: "Income",
       description: "Receipts by category",
       href: "/app/finance/income",
-      amount: totals?.postedIncome,
+      amount: totalExpense?.postedIncome,
       icon: ArrowDownLeft,
     },
     {
@@ -64,6 +73,13 @@ export function FinanceOverview() {
       href: "/app/finance/expenses",
       amount: totals?.postedExpenseIncludingSalary,
       icon: ArrowUpRight,
+    },
+    {
+      title: "Total expense",
+      description: "All expenses, Meta Ads and salaries",
+      href: "/app/finance/total-expenses",
+      amount: totalExpense?.postedTotalExpense,
+      icon: ReceiptText,
     },
     {
       title: "Meta Ads",
@@ -142,7 +158,7 @@ export function FinanceOverview() {
       {error && <Notice kind="error">{error}</Notice>}
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {[
-          ["Operating net", totals?.agencyOperatingNet],
+          ["Net operating money", totalExpense?.netOperatingMoney],
           ["Pending income", totals?.pendingIncome],
           ["Pending expenses", totals?.pendingExpense],
         ].map(([label, value]) => (
@@ -172,8 +188,9 @@ export function FinanceOverview() {
         ))}
       </nav>
       <p className="text-xs text-slate-400">
-        Operating net = posted agency income − operating expenses − salaries. Client ad funds and
-        transfers stay separate. Account balances require reconciliation.
+        Net operating money = posted income − Total expense. Total expense includes ordinary costs,
+        self and client Meta Ads, and salaries counted once. Transfers and client fund deposits are
+        separate.
       </p>
     </FinanceFrame>
   );

@@ -30,6 +30,7 @@ async function mockWorkspace(page:Page,role="FOUNDER"){
    data={deletedCount:rows.length,ids:rows.map(row=>row.id)};
   }else if(path==="/finance/register")data={items:[],total:0,page:1,limit:25};
   else if(path==="/finance/summary")data=totals;
+  else if(path==="/finance/total-expenses/summary")data={postedIncome:"1000",postedTotalExpense:"350",netOperatingMoney:"650",breakdown:{OTHER:"200",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}};
   else if(path==="/salary/summary")data={totalPaid:"50",founderFunding:[]};
   else if(path==="/finance/meta-ads-distribution")data={view:"mine",from:url.searchParams.get("from"),to:url.searchParams.get("to"),totalPosted:"100",totalPending:"0",total:"100",excludedAmount:"0",excludedCount:0,transactionCount:1,selfPosted:"0",selfPending:"0",clientPosted:"100",clientPending:"0",categories:[],individuals:[],daily:[],monthly:[]};
   await route.fulfill({json:{data}});
@@ -68,7 +69,7 @@ test("finance overview cards keep details on separate pages and preserve the wor
  await page.goto("/app/finance");
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
  await expect(page.getByLabel("Work cycle through")).toHaveValue("2026-11-21");
- await expect(page.getByText("Operating net",{exact:true})).toBeVisible();
+ await expect(page.getByText("Net operating money",{exact:true})).toBeVisible();
  await expect(page.getByRole("navigation",{name:"Finance categories"})).toBeVisible();
  await expect(page.getByRole("heading",{name:"New income or expense"})).toHaveCount(0);
  await expect(page.getByRole("region",{name:"Financial register",exact:true})).toHaveCount(0);
