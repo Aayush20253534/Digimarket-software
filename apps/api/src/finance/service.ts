@@ -395,11 +395,13 @@ export class FinanceService {
     return this.removeEntry(actor,id);
   }
 
-  async submit(actor:Principal,input:FinanceEntryInput){
+  async submit(actor:Principal,input:FinanceEntryInput,ownExpense=false){
     need(actor,"finance.entry.create");
     const founder=isFounder(actor);
     if(!founder)need(actor,"approvals.submit");
-    const enteredById=input.enteredById??actor.userId; // Legacy callers remain compatible.
+    if(ownExpense&&(input.kind!=="EXPENSE"||input.enteredById!=null||input.moneyAccountId!=null))
+      throw invalid("Direct expenses use your signed-in account automatically");
+    const enteredById=ownExpense?actor.userId:input.enteredById??actor.userId; // Legacy callers remain compatible.
     const canAssignOthers=founder||(
       actor.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&
       actor.permissions.has("finance.category.manage")&&actor.permissions.has("finance.read.all"));
@@ -436,6 +438,16 @@ export class FinanceService {
     }
     try{
       return await this.db.$transaction(async tx=>{
+        let moneyAccountId=input.moneyAccountId??null;
+        if(ownExpense){
+          const accounts=await tx.moneyAccount.findMany({where:{organizationId:actor.organizationId,
+            ownerUserId:actor.userId,kind:"FOUNDER",active:true,openingOn:{lte:new Date(input.occurredOn+"T00:00:00Z")}},
+            select:{id:true},take:2});
+          if(accounts.length!==1)throw invalid(accounts.length===0
+            ?"No personal founder account is open on this expense date. Set up your account in Finance > Accounts first."
+            :"Multiple personal founder accounts are open on this date. Use the regular register to select the correct account.");
+          moneyAccountId=accounts[0].id;
+        }
         const appliedPolicy=founder?await founderPolicy(tx,actor.organizationId,"FINANCE"):policy!;
         const now=new Date();
         const approval=await tx.approvalRequest.create({data:{
@@ -448,7 +460,7 @@ export class FinanceService {
         const entry=await tx.financialTransaction.create({data:{
           organizationId:actor.organizationId,enteredById,
           categoryId:category.id,approvalRequestId:approval.id,
-          clientId:input.clientId??null,moneyAccountId:input.moneyAccountId??null,
+          clientId:input.clientId??null,moneyAccountId,
           idempotencyKey:input.idempotencyKey,kind:input.kind,
           amount:amount.toFixed(4),currencyCode:organization.defaultCurrency,
           occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),

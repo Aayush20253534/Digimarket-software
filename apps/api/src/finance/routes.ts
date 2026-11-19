@@ -111,6 +111,9 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   app.post("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.status(201).json({data:await finance.submit(actor(res),parse(financeEntryInputSchema,req.body))});
   });
+  app.post("/api/v1/finance/expenses/mine",authenticate,async(req,res)=>{
+    res.status(201).json({data:await finance.submit(actor(res),parse(financeEntryInputSchema,req.body),true)});
+  });
   app.get("/api/v1/finance/recurring-income",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({data:await finance.recurringIncome(actor(res),parse(reportingPeriodQuerySchema,req.query))});

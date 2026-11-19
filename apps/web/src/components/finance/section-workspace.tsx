@@ -58,7 +58,7 @@ function money(value:string){
   return (negative?"−":"")+"₹"+integer+"."+(cents%100n).toString().padStart(2,"0");
 }
 function readable(error:unknown){return error instanceof ApiError?error.message:"Could not complete the finance operation.";}
-export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{section:"entries"|"ads"|"categories"|"settlements"|"agreements";categoryType?:Kind}){
+export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directExpense=false,onExpenseSaved}:{section:"entries"|"ads"|"categories"|"settlements"|"agreements";categoryType?:Kind;directExpense?:boolean;onExpenseSaved?:()=>void}){
   const windowState=useFinanceWindow();
   const {period,setPeriod,view,setView,ready}=windowState;
   const [page,setPage]=useState(1),[total,setTotal]=useState(0),[categoryFilter,setCategoryFilter]=useState("");
@@ -141,7 +141,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
   const filteredEntries=entries;
   const agencyMetaAdCount=metaAdEntries.filter(row=>!row.clientId).length;
   const clientMetaAdCount=metaAdEntries.length-agencyMetaAdCount;
-  useEffect(()=>{const query=new URLSearchParams(window.location.search);const filter=query.get("kind");if(filter==="INCOME"||filter==="EXPENSE"){setEntryKindFilter(filter);setKind(filter);}setCategoryFilter(query.get("categoryId")??"");},[]);
+  useEffect(()=>{const query=new URLSearchParams(window.location.search);const filter=query.get("kind");if(!directExpense&&(filter==="INCOME"||filter==="EXPENSE")){setEntryKindFilter(filter);setKind(filter);}if(!directExpense)setCategoryFilter(query.get("categoryId")??"");},[directExpense]);
   useEffect(()=>setPage(1),[periodQuery,view,entrySearch,entryKindFilter,entryStatusFilter,metaSearch,metaFundingFilter,categoryFilter]);
   const registerParams=new URLSearchParams({from:period.from,to:period.to,view:view==="all"&&canAll?"all":"mine",scope:section==="ads"?"meta_ads":"agency",page:String(page),limit:"25",q:section==="ads"?metaSearch:entrySearch});
   if(section==="ads")registerParams.set("funding",metaFundingFilter);
@@ -171,12 +171,12 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
     setLoading(true);setError("");
     const target=view==="all"&&canAll?"all":"mine";
     const [ledger,sums,cats,policies,settlements,accountOptions]=await Promise.allSettled([
-      forms?request<{items:Entry[];total:number}>("/finance/register?"+registerQuery):Promise.resolve({items:[],total:0}),
-      section==="entries"||section==="agreements"?request<Totals>("/finance/summary?view="+(section==="agreements"?"all":target)+"&"+periodQuery):Promise.resolve(zero),
+      forms&&!directExpense?request<{items:Entry[];total:number}>("/finance/register?"+registerQuery):Promise.resolve({items:[],total:0}),
+      !directExpense&&(section==="entries"||section==="agreements")?request<Totals>("/finance/summary?view="+(section==="agreements"?"all":target)+"&"+periodQuery):Promise.resolve(zero),
       forms||section==="categories"?request<Category[]>("/finance/categories"):Promise.resolve([] as Category[]),
       forms&&canCreate?request<FinancePolicy[]>("/approval-policies"):Promise.resolve([] as FinancePolicy[]),
       section==="settlements"&&isFounder&&canReadOwn?request<Entry[]>("/finance/internal-settlements/mine?"+periodQuery):Promise.resolve([] as Entry[]),
-      forms&&canCreate?request<{id:string;name:string}[]>("/finance/account-options"):Promise.resolve([] as {id:string;name:string}[]),
+      forms&&canCreate&&!directExpense?request<{id:string;name:string}[]>("/finance/account-options"):Promise.resolve([] as {id:string;name:string}[]),
     ]);
     if(sequence!==reloadSequence.current)return;
     if(ledger.status==="fulfilled"){setEntries(section==="entries"?ledger.value.items:[]);setMetaAdEntries(section==="ads"?ledger.value.items:[]);setTotal(ledger.value.total);setHasLoadedEntries(true);}
@@ -188,15 +188,15 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(p=>p.category==="FINANCE"&&p.active));
     const problems=[ledger,sums,cats,policies,accountOptions].flatMap(result=>result.status==="rejected"?[readable(result.reason)]:[]);
     setError(problems.join(" "));setLoading(false);setMetaDistributionRefresh(v=>v+1);
-  },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready]);
+  },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,directExpense]);
   useEffect(()=>{
-    if(!isFounder||section!=="entries"||!ready)return;
+    if(directExpense||!isFounder||section!=="entries"||!ready)return;
     let active=true;
     void request<SalaryFinanceSummary>("/salary/summary?"+periodQuery).then(summary=>{
       if(active){setSalarySummary(summary);setSalaryError("");}
     }).catch(e=>{if(active)setSalaryError(readable(e));});
     return()=>{active=false;};
-  },[isFounder,request,periodQuery,metaDistributionRefresh,section,ready]);
+  },[isFounder,request,periodQuery,metaDistributionRefresh,section,ready,directExpense]);
   useEffect(()=>{
     void reload();
     return()=>{reloadSequence.current+=1;};
@@ -210,7 +210,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
     return()=>{active=false;};
   },[isFounder,canReadOwn,request,section]);
   useEffect(()=>{
-    if(!adminFinance||!forms)return;
+    if(directExpense||!adminFinance||!forms)return;
     let active=true;
     void request<Assignee[]>("/finance/assignees").then(users=>{
       if(active){setAssignees(users);setAssigneesError("");}
@@ -218,7 +218,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
       if(active)setAssigneesError(readable(e));
     });
     return()=>{active=false;};
-  },[adminFinance,request,forms]);
+  },[adminFinance,request,forms,directExpense]);
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
     if(!id||![...entries,...metaAdEntries].some(entry=>entry.id===id))return;
@@ -291,9 +291,9 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
        receiptAssetId=proof.id;
       }
       setUploadStatus(isFounder?"Recording transaction…":"Submitting transaction for approval…");
-      const saved=await request<{status:string}>("/finance/entries",{method:"POST",body:{
+      const saved=await request<{status:string}>(directExpense?"/finance/expenses/mine":"/finance/entries",{method:"POST",body:{
         kind,categoryId,clientId:metaAdsSelected&&adFunding==="CLIENT"?clientId:null,
-        amount:amount.trim(),occurredOn,method,...(moneyAccountId?{moneyAccountId}:{}),
+        amount:amount.trim(),occurredOn,method,...(!directExpense&&moneyAccountId?{moneyAccountId}:{}),
         merchantOrSource:source.trim(),description:description.trim(),
         idempotencyKey:crypto.randomUUID(),receiptAssetId,
       }});
@@ -302,6 +302,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
         :(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals."));
       setAmount("");setSource("");setDescription("");setReceipt(null);
       setCategoryId("");setAdFunding("SELF");setClientId("");
+      onExpenseSaved?.();
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
   }
@@ -444,8 +445,64 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
       }});
     return()=>{active=false;};
   },[request,view,canReadOwn,canAll,metaFrom,metaTo,metaDistributionRefresh,section,ready]);
+  const entryForm=forms&&canCreate&&<Card title={directExpense?"Add expense":"New income or expense"} description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
+        <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
+          <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" disabled={directExpense} value={kind} onChange={e=>{setKind(e.target.value as Kind);setCategoryId("");}}>
+            <option value="EXPENSE">Expense</option>{!directExpense&&section!=="ads"&&<option value="INCOME">Income</option>}</select></FormField>
+          <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>{setCategoryId(e.target.value);setAdFunding("SELF");setClientId("");}}>
+            <option value="">{selected.length?"Select a category":"Create a category first"}</option>
+            {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            {!directExpense&&section!=="ads"&&kind==="EXPENSE"&&isFounder&&<option value={SALARY_OPTION}>Salary (linked payroll entry)</option>}
+          </select></FormField>
+          {salarySelected&&<div className="sm:col-span-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-2" role="status">
+            <p className="font-semibold">Salary expense</p>
+            <p className="text-sm">Record a payment in Salary and split its funding among founders. Each share appears here automatically with a Salary tag. Recording it twice would count the same expense twice.</p>
+            <Link href="/app/salary" className="btn-primary inline-flex"><Plus size={16}/>Record in Salary</Link>
+          </div>}
+          {metaAdsSelected&&<>
+            <FormField id="finance-meta-funding" label="Meta Ads paid by">
+              <select id="finance-meta-funding" className="field" value={adFunding} onChange={e=>{setAdFunding(e.target.value as "SELF"|"CLIENT");setClientId("");}}>
+                <option value="SELF">Self (agency expense)</option>
+                <option value="CLIENT">Client (separate ad spend)</option>
+              </select>
+            </FormField>
+            {adFunding==="CLIENT"&&<FormField id="finance-meta-client" label="Client">
+              <select id="finance-meta-client" className="field" required value={clientId} onChange={e=>setClientId(e.target.value)}>
+                <option value="">Select paying client</option>
+                {metaAdClients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}
+              </select>
+              {metaAdClientsError&&<p className="mt-2 text-sm text-red-400" role="alert">{metaAdClientsError}</p>}
+              {!metaAdClientsError&&!metaAdClients.length&&<p className="mt-2 text-xs text-slate-400">No active clients available in this workspace.</p>}
+            </FormField>}
+            <p className="sm:col-span-2 text-xs text-slate-500">Client Meta Ads spend stays separate from agency expenses. Once posted, it reduces Net posted.</p>
+          </>}
+          <FormField id="finance-amount" label="Amount (INR)"><input id="finance-amount" className="field" inputMode="decimal" required
+            pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" placeholder="1250.00"
+            value={amount} onChange={e=>setAmount(e.target.value)}/></FormField>
+          <FormField id="finance-date" label="Transaction date"><input id="finance-date" className="field" required type="date" value={occurredOn}
+            onChange={e=>setOccurredOn(e.target.value)}/></FormField>
+          <FormField id="finance-method" label="Payment method"><select id="finance-method" className="field" value={method} onChange={e=>setMethod(e.target.value as typeof method)}>
+            {modes.map(m=><option key={m} value={m}>{m.replaceAll("_"," ")}</option>)}</select></FormField>
+          {directExpense?<div className="space-y-1"><p className="text-sm font-medium">Money account</p><p className="text-sm text-slate-400">Your signed-in founder account (automatic)</p></div>:<FormField id="finance-money-account" label="Money account" help="Choose the bank, cash or founder account actually used. Unassigned entries must be linked before closing a cycle."><select id="finance-money-account" className="field" value={moneyAccountId} onChange={e=>setMoneyAccountId(e.target.value)}><option value="">Unassigned — reconcile later</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></FormField>}
+          <FormField id="finance-source" label={kind==="EXPENSE"?"Merchant / payee":"Income source"}><input id="finance-source" className="field" maxLength={160}
+            value={source} onChange={e=>setSource(e.target.value)} placeholder={kind==="EXPENSE"?"Rapido":"Agency service"}/></FormField>
+          <div className="sm:col-span-2"><FormField id="finance-description" label="Notes (optional)"><textarea id="finance-description" className="field min-h-20" maxLength={2000}
+            value={description} onChange={e=>setDescription(e.target.value)}/></FormField></div>
+          <div className="sm:col-span-2"><FormField id="finance-receipt" label="Receipt image or payment proof (optional)">
+             <input id="finance-receipt" className="field" type="file"
+               accept="image/jpeg,image/png,image/gif,image/webp,image/avif,image/bmp,image/tiff,image/heic,image/heif,application/pdf,.jpg,.jfif,.jpeg,.gif,.png,.tif,.tiff"
+               onChange={e=>setReceipt(e.target.files?.[0]??null)}/>
+            </FormField>
+            {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
+            {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
+          </div>
+          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||salarySelected||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
+            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?(directExpense?"Save expense":"Save entry"):"Submit for approval"}</button></div>
+        </form>
+      </Card>;
   if(!session)return <Spinner label="Checking finance access…"/>;
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
+  if(directExpense)return <div className="space-y-3">{error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}{entryForm}</div>;
   return <div className="aw-finance-page aw-v5-finance-page space-y-7" data-aw-module="finance">
     <BusinessWorkspaceNav/>
     <Link className="inline-flex text-sm text-violet-300 underline" href={"/app/finance?"+windowState.query}>← Finance overview</Link>
@@ -580,61 +637,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE"}:{sectio
       </div>:<p className="text-sm">Recurring agreement projection is unavailable.</p>}
     </Card></div>}
     <div id="finance-entry" className="aw-finance-panels grid gap-5">
-      {forms&&canCreate&&<Card title="New income or expense" description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
-        <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
-          <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" value={kind} onChange={e=>{setKind(e.target.value as Kind);setCategoryId("");}}>
-            <option value="EXPENSE">Expense</option>{section!=="ads"&&<option value="INCOME">Income</option>}</select></FormField>
-          <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>{setCategoryId(e.target.value);setAdFunding("SELF");setClientId("");}}>
-            <option value="">{selected.length?"Select a category":"Create a category first"}</option>
-            {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            {section!=="ads"&&kind==="EXPENSE"&&isFounder&&<option value={SALARY_OPTION}>Salary (linked payroll entry)</option>}
-          </select></FormField>
-          {salarySelected&&<div className="sm:col-span-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-2" role="status">
-            <p className="font-semibold">Salary expense</p>
-            <p className="text-sm">Record a payment in Salary and split its funding among founders. Each share appears here automatically with a Salary tag. Recording it twice would count the same expense twice.</p>
-            <Link href="/app/salary" className="btn-primary inline-flex"><Plus size={16}/>Record in Salary</Link>
-          </div>}
-          {metaAdsSelected&&<>
-            <FormField id="finance-meta-funding" label="Meta Ads paid by">
-              <select id="finance-meta-funding" className="field" value={adFunding} onChange={e=>{setAdFunding(e.target.value as "SELF"|"CLIENT");setClientId("");}}>
-                <option value="SELF">Self (agency expense)</option>
-                <option value="CLIENT">Client (separate ad spend)</option>
-              </select>
-            </FormField>
-            {adFunding==="CLIENT"&&<FormField id="finance-meta-client" label="Client">
-              <select id="finance-meta-client" className="field" required value={clientId} onChange={e=>setClientId(e.target.value)}>
-                <option value="">Select paying client</option>
-                {metaAdClients.map(c=><option key={c.id} value={c.id}>{c.businessName}</option>)}
-              </select>
-              {metaAdClientsError&&<p className="mt-2 text-sm text-red-400" role="alert">{metaAdClientsError}</p>}
-              {!metaAdClientsError&&!metaAdClients.length&&<p className="mt-2 text-xs text-slate-400">No active clients available in this workspace.</p>}
-            </FormField>}
-            <p className="sm:col-span-2 text-xs text-slate-500">Client Meta Ads spend stays separate from agency expenses. Once posted, it reduces Net posted.</p>
-          </>}
-          <FormField id="finance-amount" label="Amount (INR)"><input id="finance-amount" className="field" inputMode="decimal" required
-            pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?" placeholder="1250.00"
-            value={amount} onChange={e=>setAmount(e.target.value)}/></FormField>
-          <FormField id="finance-date" label="Transaction date"><input id="finance-date" className="field" required type="date" value={occurredOn}
-            onChange={e=>setOccurredOn(e.target.value)}/></FormField>
-          <FormField id="finance-method" label="Payment method"><select id="finance-method" className="field" value={method} onChange={e=>setMethod(e.target.value as typeof method)}>
-            {modes.map(m=><option key={m} value={m}>{m.replaceAll("_"," ")}</option>)}</select></FormField>
-          <FormField id="finance-money-account" label="Money account" help="Choose the bank, cash or founder account actually used. Unassigned entries must be linked before closing a cycle."><select id="finance-money-account" className="field" value={moneyAccountId} onChange={e=>setMoneyAccountId(e.target.value)}><option value="">Unassigned — reconcile later</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></FormField>
-          <FormField id="finance-source" label={kind==="EXPENSE"?"Merchant / payee":"Income source"}><input id="finance-source" className="field" maxLength={160}
-            value={source} onChange={e=>setSource(e.target.value)} placeholder={kind==="EXPENSE"?"Rapido":"Agency service"}/></FormField>
-          <div className="sm:col-span-2"><FormField id="finance-description" label="Notes (optional)"><textarea id="finance-description" className="field min-h-20" maxLength={2000}
-            value={description} onChange={e=>setDescription(e.target.value)}/></FormField></div>
-          <div className="sm:col-span-2"><FormField id="finance-receipt" label="Receipt image or payment proof (optional)">
-             <input id="finance-receipt" className="field" type="file"
-               accept="image/jpeg,image/png,image/gif,image/webp,image/avif,image/bmp,image/tiff,image/heic,image/heif,application/pdf,.jpg,.jfif,.jpeg,.gif,.png,.tif,.tiff"
-               onChange={e=>setReceipt(e.target.files?.[0]??null)}/>
-            </FormField>
-            {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
-            {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
-          </div>
-          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||salarySelected||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
-            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?"Save entry":"Submit for approval"}</button></div>
-        </form>
-      </Card>}
+      {entryForm}
       {section==="categories"&&<Card title={categoryKind==="INCOME"?"Manage income categories":"Manage expense categories"} description="Only this category type is shown. Old entries retain their category when it is deactivated.">
         {canManage&&<form className="flex flex-wrap items-end gap-3" onSubmit={addCategory}>
           <FormField id="new-category-name" label="Category name"><input id="new-category-name" className="field" required minLength={2}

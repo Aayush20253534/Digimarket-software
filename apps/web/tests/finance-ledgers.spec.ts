@@ -68,6 +68,7 @@ async function workspace(page: Page, role = "FOUNDER") {
         pendingExpense: "0",
         groups: [],
       };
+    else if (path === "/finance/expenses/mine" && req.method() === "POST") data = { status: "POSTED" };
     else if (path === "/finance/category-summary")
       data = {
         ordinary: "26",
@@ -272,4 +273,23 @@ test("employee direct access does not request agency money ledgers", async ({ pa
   await page.goto("/app/finance/accounts");
   await expect(page.getByText("Finance access is not available for this account.")).toBeVisible();
   expect(calls.some((c) => c.path === "/finance/accounts")).toBe(false);
+});
+
+test("founder adds an expense from its category page with automatic account attribution", async ({ page }) => {
+  const calls = await workspace(page);
+  await page.goto("/app/finance/expenses?" + cycle);
+  await page.getByRole("button", {name: "+ Add Expense"}).click();
+  await expect(page.getByLabel("Entry type")).toBeDisabled();
+  await expect(page.getByText("Your signed-in founder account (automatic)")).toBeVisible();
+  await expect(page.locator("#finance-money-account")).toHaveCount(0);
+  await page.getByLabel("Category", {exact:true}).selectOption(categoryId);
+  await page.getByLabel("Amount (INR)").fill("12");
+  await page.getByLabel("Transaction date").fill("2026-11-15");
+  await page.getByRole("button", {name:"Save expense"}).click();
+  await expect(page.getByText("Entry saved and included in posted totals.")).toBeVisible();
+  const body=calls.find(c=>c.path==="/finance/expenses/mine")?.body;
+  expect(body).toMatchObject({kind:"EXPENSE",categoryId,amount:"12",occurredOn:"2026-11-15"});
+  expect(body).not.toHaveProperty("enteredById");
+  expect(body).not.toHaveProperty("moneyAccountId");
+  await expect(page).toHaveURL(/finance\/expenses/);
 });

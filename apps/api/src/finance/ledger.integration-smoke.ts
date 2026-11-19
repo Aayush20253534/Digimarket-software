@@ -541,6 +541,15 @@ try {
     new Prisma.Decimal((await ledger.clientBalances(f, next))[0].opening).toFixed(4),
     "600.0000",
   );
+  const directInput = {kind: "EXPENSE" as const, categoryId: expense.id, amount: "12", occurredOn: "2026-11-25", method: "UPI" as const, idempotencyKey: randomUUID()};
+  await assert.rejects(() => finance.submit(f, {...directInput, moneyAccountId: bank.id}, true), checkStatus(422));
+  await assert.rejects(() => finance.submit(f, {...directInput, enteredById: admin.id}, true), checkStatus(422));
+  await assert.rejects(() => finance.submit(f, {...directInput, occurredOn: "2026-10-21"}, true), checkStatus(422));
+  const direct = await finance.submit(f, directInput, true);
+  const directRecord = await db.financialTransaction.findUniqueOrThrow({where:{id:direct.id}});
+  assert.equal(directRecord.moneyAccountId, clearing.id);
+  assert.equal(directRecord.enteredById, founder.id);
+  assert.equal(directRecord.status, "POSTED");
   console.info(
     "Finance ledger integration passed: balances, tenant/role isolation, stable categories, 5,001-row export, close/write race, immutable history and four reversal sources.",
   );

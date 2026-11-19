@@ -18,6 +18,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, Spinner } from "@/components/ui";
 import { FinanceFrame, money, useFinanceWindow } from "./shared";
 import type { TotalExpenseSummary } from "./total-expenses";
+import { FinanceSectionWorkspace } from "./section-workspace";
 type Totals = {
   postedIncome: string;
   postedExpense: string;
@@ -197,6 +198,10 @@ export function FinanceOverview() {
 export function FinanceCategorySummary({ kind }: { kind: "INCOME" | "EXPENSE" }) {
   const w = useFinanceWindow(),
     { session, request } = useAuth();
+  const [addingExpense, setAddingExpense] = useState(false);
+  const [expenseRefresh, setExpenseRefresh] = useState(0);
+  const canAddExpense = kind === "EXPENSE" && !!session?.identity.roles.includes("FOUNDER") &&
+    !!session?.identity.permissions.includes("finance.entry.create");
   const [data, setData] = useState<{
       ordinary: string;
       total: string;
@@ -225,19 +230,25 @@ export function FinanceCategorySummary({ kind }: { kind: "INCOME" | "EXPENSE" })
     return () => {
       active = false;
     };
-  }, [w.ready, w.query, request, session, kind]);
+  }, [w.ready, w.query, request, session, kind, expenseRefresh]);
   return (
     <FinanceFrame
       title={kind === "INCOME" ? "Income categories" : "Expense categories"}
       description="Open a category to view, search and export its transactions."
       window={w}
       actions={
-        <Link className="btn-primary" href={"/app/finance/entries?" + w.query + "&kind=" + kind}>
-          New entry / all records
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {canAddExpense && <button type="button" className="btn-primary" aria-expanded={addingExpense}
+            onClick={() => setAddingExpense(value => !value)}>{addingExpense ? "Close expense form" : "+ Add Expense"}</button>}
+          <Link className={canAddExpense ? "btn-secondary" : "btn-primary"} href={"/app/finance/entries?" + w.query + "&kind=" + kind}>
+            New entry / all records
+          </Link>
+        </div>
       }
     >
       {error && <Notice kind="error">{error}</Notice>}
+      {canAddExpense && addingExpense && <FinanceSectionWorkspace section="entries" directExpense
+        onExpenseSaved={() => setExpenseRefresh(value => value + 1)} />}
       {!data && !error ? (
         <Spinner label="Loading category balances…" />
       ) : (
