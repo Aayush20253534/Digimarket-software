@@ -191,6 +191,11 @@ async function workspace(page: Page, role = "FOUNDER") {
 const cycle = "from=2026-10-22&to=2026-11-21&view=all";
 test("category cards drill into paginated search and export the same filters", async ({ page }) => {
   const calls = await workspace(page);
+  const browserExceptions:string[]=[];
+  page.on("pageerror",error=>browserExceptions.push(error.stack??error.message));
+  page.on("console",message=>{
+    if(message.type()==="error")browserExceptions.push(message.text());
+  });
   await page.goto("/app/finance/expenses?" + cycle);
   await page.getByRole("link", { name: /Travel/ }).click();
   await expect(page).toHaveURL(new RegExp("categoryId=" + categoryId));
@@ -206,7 +211,8 @@ test("category cards drill into paginated search and export the same filters", a
       url:page.url(),
       registerCalls:calls.filter(c=>c.path.includes("/finance/register"))
         .map(c=>({path:c.path,query:c.query.toString()})),
-      pageContent:body
+      pageContent:body,
+      browserExceptions:browserExceptions.slice(-15)
     }));
     throw error;
   }
@@ -292,6 +298,11 @@ test("employee direct access does not request agency money ledgers", async ({ pa
 
 test("founder adds an expense automatically attributed to signed-in user", async ({ page }) => {
   const calls = await workspace(page);
+  const browserExceptions:string[]=[];
+  page.on("pageerror",error=>browserExceptions.push(error.stack??error.message));
+  page.on("console",message=>{
+    if(message.type()==="error")browserExceptions.push(message.text());
+  });
   await page.goto("/app/finance/expenses?" + cycle);
   await page.getByRole("button", {name: "+ Add Expense"}).click();
   await expect(page.getByLabel("Entry type")).toBeDisabled();
