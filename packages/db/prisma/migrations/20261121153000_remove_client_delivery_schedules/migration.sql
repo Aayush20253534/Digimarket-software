@@ -6,7 +6,7 @@ BEGIN;
 SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = '60s';
 CREATE SCHEMA IF NOT EXISTS client_delivery_archive_20261121;
-REVOKE ALL ON SCHEMA client_delivery_archive_20261121 FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON SCHEMA client_delivery_archive_20261121 FROM PUBLIC;
 
 DO $$
 DECLARE n_schedules bigint; n_occurrences bigint;
@@ -31,7 +31,19 @@ BEGIN
   END IF;
 END $$;
 
-REVOKE ALL ON ALL TABLES IN SCHEMA client_delivery_archive_20261121
-  FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON ALL TABLES IN SCHEMA client_delivery_archive_20261121 FROM PUBLIC;
+-- A vanilla PostgreSQL instance (including the GitHub CI service) does not
+-- have Supabase's anon/authenticated/service_role roles. Revoke those grants
+-- only where the roles actually exist, while preserving a private archive.
+DO $
+DECLARE role_name text;
+BEGIN
+  FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
+      EXECUTE format('REVOKE ALL ON SCHEMA client_delivery_archive_20261121 FROM %I', role_name);
+      EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA client_delivery_archive_20261121 FROM %I', role_name);
+    END IF;
+  END LOOP;
+END $;
 DROP TYPE IF EXISTS public."ServiceOccurrenceStatus";
 COMMIT;
