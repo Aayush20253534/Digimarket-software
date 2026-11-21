@@ -1089,7 +1089,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
         const columns=await page.locator(".aw-personal-quick-grid").evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(" ").length);
         expect(columns,"Personal quick access should use two columns on phones").toBe(2);
       }
-      const headingSize=await page.locator(".aw-dashboard-title").evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+      // Admin and member dashboards use different hero headings. Check whichever
+      // is actually rendered for the logged-in role instead of waiting forever
+      // for the admin-only heading while testing an employee session.
+      const mobileHeading=page.locator(
+        '[data-dashboard-role="admin"] .aw-dashboard-title, '+
+        '[data-dashboard-role="member"] .aw-v3-page-hero h1, '+
+        '[data-dashboard-role="founder"] .aw-v3-page-hero h1'
+      );
+      await expect(mobileHeading,"Authenticated mobile dashboard heading").toBeVisible();
+      const headingSize=await mobileHeading.evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
       expect(headingSize,"Mobile Overview heading must not dominate the screen").toBeLessThanOrEqual(30);
     }
     if(width<=390){
