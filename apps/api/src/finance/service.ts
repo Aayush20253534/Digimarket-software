@@ -293,6 +293,24 @@ export class FinanceService {
     });
   }
 
+  async editDetails(actor:Principal,id:string){
+    this.administrator(actor);
+    const row=await this.db.financialTransaction.findFirst({
+      where:{id,organizationId:actor.organizationId,kind:"EXPENSE"},
+      include:{verifiedPayment:{select:{id:true}},reversedBy:{select:{id:true}}},
+    });
+    if(!row)throw new AuthError(404,"NOT_FOUND","Expense not found");
+    if(row.status!=="POSTED"||row.verifiedPayment||row.reversesId||row.reversedBy)
+      throw new AuthError(409,"FINANCE_IMMUTABLE","This expense cannot be edited. Use the appropriate reversal or correction workflow.");
+    return {
+      id:row.id,kind:row.kind,status:row.status,categoryId:row.categoryId,
+      enteredById:row.enteredById,clientId:row.clientId,
+      amount:row.amount.toFixed(4),occurredOn:row.occurredOn.toISOString().slice(0,10),
+      method:row.method,merchantOrSource:row.merchantOrSource??"",
+      description:row.description??"",
+    };
+  }
+
   async editEntry(actor:Principal,id:string,input:FinanceEntryAdminEdit){
     this.administrator(actor);
     const amount=new Prisma.Decimal(input.amount);
