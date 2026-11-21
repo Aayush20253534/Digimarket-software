@@ -34,7 +34,7 @@ type FinanceCard = {
 function sumMoney(values:string[]):string {
   let total=0n;
   for(const value of values){
-    const parts=/^(-?)(\\d+)(?:\\.(\\d{1,4}))?$/.exec(value);
+    const parts=/^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value);
     if(!parts)throw new Error("Invalid finance amount");
     const amount=BigInt(parts[2])*10000n+BigInt((parts[3]??"").padEnd(4,"0"));
     total+=parts[1]==="-"?-amount:amount;
