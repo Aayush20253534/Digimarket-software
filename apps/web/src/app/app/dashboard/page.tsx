@@ -4,14 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity, ArrowRight, ArrowUpRight, BadgeCheck, BriefcaseBusiness, CheckCircle2,
-  CircleHelp, FileStack, FolderKanban, KeyRound, Layers, RefreshCw, ShieldCheck,
+  CircleHelp, FileStack, KeyRound, Layers, RefreshCw, ShieldCheck,
   Sparkles, Users, Wallet, Workflow
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { AWBadge, AWEmptyState, AWNotice, AWStatusBadge } from "@/components/aw-ui";
 import { AWDataToolbar, AWLocalPagination, AWPanel, AWSortButton, AWStat } from "@/components/aw-data-patterns";
 import { permittedGroups } from "@/components/workspace-navigation";
-import { AWClientDeliveries } from "@/components/aw-client-deliveries";
 import { AWBusinessInsights } from "@/components/aw-business-insights";
 import { AWTodayFollowUps } from "@/components/aw-today-followups";
 import { AWTodayMeetings } from "@/components/aw-today-meetings";
@@ -34,8 +33,7 @@ const choices = [
 ];
 const topics = [
   {label:"Leads CRM",permits:["leads.read"],href:"/app/leads",icon:BriefcaseBusiness,detail:"Pipeline, follow-ups, and conversions"},
-  {label:"Clients",permits:["clients.read"],href:"/app/clients",icon:Users,detail:"Client contacts and service delivery"},
-  {label:"Client Deliveries",permits:["clients.read"],href:"/app/deliveries",icon:FolderKanban,detail:"Agreements, projects, milestones and service targets"},
+  {label:"Clients",permits:["clients.read"],href:"/app/clients",icon:Users,detail:"Client profiles and agreements"},
 // Tasks paused:   {label:"Tasks",permits:["tasks.read"],href:"/app/tasks",icon:CheckCircle2,detail:"Assignments and recurring work"},
     {label:"Income & expenses",permits:["finance.entry.read.own","finance.read.all"],href:"/app/finance",icon:Wallet,detail:"Your permitted financial records"},
   {label:"Approval workflows",permits:["approvals.read"],href:"/app/approvals",icon:Workflow,detail:"Reviews and decisions"},
@@ -114,7 +112,6 @@ export default function Dashboard() {
     {label:"Meetings",href:"/app/meetings",description:"Track upcoming meetings",icon:Workflow,allowed:permitted.has("leads.read")},
     {label:"Clients",href:"/app/clients",description:"Accounts and agreements",icon:Users,allowed:permitted.has("clients.read")},
 // Tasks paused:     {label:"Tasks",href:"/app/tasks",description:"Assigned work",icon:CheckCircle2,allowed:permitted.has("tasks.read")},
-    {label:"Deliveries",href:"/app/deliveries",description:"Client commitments",icon:FolderKanban,allowed:permitted.has("clients.read")},
    ].filter(link=>link.allowed);
    return <div className="aw-dashboard aw-v3-dashboard space-y-6" data-dashboard-role={founder?"founder":"member"}>
     <header className="aw-v3-page-hero">
@@ -130,7 +127,7 @@ export default function Dashboard() {
       <ArrowUpRight size={16} aria-hidden="true"/>
      </Link>)}
     </nav>
-    <AWBusinessInsights/><PWAInstallCard/><AWTodayMeetings/><AWTodayFollowUps/><AWClientDeliveries/>
+    <AWBusinessInsights/><PWAInstallCard/><AWTodayMeetings/><AWTodayFollowUps/>
    </div>;
   }
   const groupCounts:Record<Source,number>={Clients:0,Leads:0,Projects:0};
@@ -157,7 +154,6 @@ export default function Dashboard() {
     <PWAInstallCard/>
     <AWTodayMeetings/>
     <AWTodayFollowUps/>
-    <AWClientDeliveries/>
 
     {leadership&&<div className="aw-stat-grid" data-testid="dashboard-kpis">
       <AWStat label="Your session" value="Authenticated" description="Verified against the active API session"
