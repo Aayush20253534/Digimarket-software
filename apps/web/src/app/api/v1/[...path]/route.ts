@@ -46,6 +46,7 @@ const endpoints: Record<string, string[]> = {
   "finance/client-funds/history": ["GET"],
   "finance/transfers": ["GET","POST"],
   "finance/reconciliations": ["POST"],
+  "finance/cycle-balance": ["GET"],
   "finance/cycle-review": ["GET"],
   "finance/cycle-close": ["POST"],
   "finance/reversals": ["POST"],
