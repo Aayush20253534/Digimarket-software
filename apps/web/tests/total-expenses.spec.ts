@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function workspace(page: Page, role = "FOUNDER", closed=false) {
-  let updated=false;
+  let updated=false, deleted=false;
   const calls: { path: string; query: URLSearchParams; method: string; body?: Record<string,unknown> }[] = [];
   await page.clock.setFixedTime(new Date("2026-11-17T12:00:00Z"));
   await page.route("**/api/v1/**", async (route) => {
@@ -13,7 +13,7 @@ async function workspace(page: Page, role = "FOUNDER", closed=false) {
     const all = q.get("view") === "all";
     const summary = {
       postedIncome: all ? "300" : "100",
-      postedTotalExpense: all ? "316" : "176",
+      postedTotalExpense: deleted ? (all ? "315" : "175.50") : all ? "316" : "176",
       netOperatingMoney: all ? "-16" : "-76",
       breakdown: {
         OTHER: all ? "46" : "16",
@@ -89,10 +89,11 @@ async function workspace(page: Page, role = "FOUNDER", closed=false) {
     else if (path === "/finance/cycle-state") data = closed ? {current:{from:"2026-11-22",to:"2026-12-21"},history:[{from:"2026-10-22",to:"2026-11-21",closedAt:"2026-11-22"}],plannedThrough:"2026-12-21",canClose:false} : {current:{from:"2026-10-22",to:"2026-11-21"},history:[],plannedThrough:"2026-11-21",canClose:false};
     else if (path === "/finance/entries/expense-0/edit") data = {id:"expense-0",categoryId:"travel",enteredById:"founder",clientId:null,amount:"1.0000",occurredOn:"2026-11-15",method:"UPI",merchantOrSource:"",description:"Journey 0"};
     else if (path === "/finance/entries/expense-0" && route.request().method()==="PUT") {updated=true;data={id:"expense-0"};}
+    else if (path === "/finance/entries/expense-0" && route.request().method()==="DELETE") {deleted=true;data={id:"expense-0",status:"CANCELLED"};}
     else if (path === "/finance/cycle-balance") data = {opening:"0",movement:"0",remaining:"0"};
     else if (path === "/finance/register") data = {
       items: [{
-        id:"expense-0",kind:"EXPENSE",status:"POSTED",category:{id:"travel",name:"Travel"},enteredBy:{displayName:updated?"Dev Raj":"Test Founder"},enteredById:"founder",clientId:null,
+        id:"expense-0",kind:"EXPENSE",status:deleted?"CANCELLED":"POSTED",category:{id:"travel",name:"Travel"},enteredBy:{displayName:updated?"Dev Raj":"Test Founder"},enteredById:"founder",clientId:null,
         amount:"0.5000",occurredOn:"2026-11-15",method:"UPI",
         merchantOrSource:"",description:"Journey 0",
       }], total:1, page:1, limit:100,
@@ -138,6 +139,7 @@ async function workspace(page: Page, role = "FOUNDER", closed=false) {
         },
       ].filter(
         (r) =>
+          (!deleted || r.id!=="finance:expense-0") &&
           (!q.get("type") || q.get("type") === "ALL" || r.type === q.get("type")) &&
           (!q.get("q") ||
             (r.description + " " + r.client).toLowerCase().includes(q.get("q")!.toLowerCase())),
@@ -296,4 +298,33 @@ test("closed cycle posted expenses can be corrected without reopening the cycle"
   await expect(rows.getByRole("row").filter({hasText:"Journey 0"})).toContainText("₹25.00");
   expect(calls.some(c=>c.path==="/finance/entries/expense-0"&&c.method==="PUT")).toBe(true);
   expect(calls.some(c=>c.path.startsWith("/finance/cycle-close")&&c.method==="POST")).toBe(false);
+});
+
+for(const closed of [false,true]){
+  test(`administrator deletes expense from ${closed?"closed":"current"} cycle and refreshes totals`,async({page})=>{
+    const calls=await workspace(page,"SUPER_ADMIN",closed);
+    await page.goto("/app/finance/cycles?from=2026-10-22&to=2026-11-21&view=all");
+    const rows=page.getByRole("region",{name:"Cycle expense details"});
+    const summary=page.getByRole("region",{name:"Cycle financial summary"});
+    const row=rows.getByRole("row").filter({hasText:"Journey 0"});
+    await expect(summary).toContainText("₹316.00");
+    page.once("dialog",d=>d.dismiss());
+    await row.getByRole("button",{name:"Delete expense"}).click();
+    expect(calls.filter(c=>c.method==="DELETE")).toHaveLength(0);
+    page.once("dialog",d=>d.accept());
+    await row.getByRole("button",{name:"Delete expense"}).click();
+    await expect(row).toHaveCount(0);
+    await expect(summary).toContainText("₹315.00");
+    const register=page.getByRole("region",{name:"Cycle income and expense transactions"}).getByRole("row").filter({hasText:"Journey 0"});
+    await expect(register).toContainText("CANCELLED");
+    await expect(register.getByRole("button",{name:"Delete expense"})).toHaveCount(0);
+    expect(calls.filter(c=>c.path==="/finance/entries/expense-0"&&c.method==="DELETE")).toHaveLength(1);
+    expect(calls.some(c=>c.path.startsWith("/finance/cycle-close")&&c.method==="POST")).toBe(false);
+  });
+}
+test("founders cannot delete expenses from cycle history",async({page})=>{
+  await workspace(page,"FOUNDER",true);
+  await page.goto("/app/finance/cycles?from=2026-10-22&to=2026-11-21&view=all");
+  await expect(page.getByRole("region",{name:"Cycle expense details"}).getByText("Journey 0",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Delete expense"})).toHaveCount(0);
 });

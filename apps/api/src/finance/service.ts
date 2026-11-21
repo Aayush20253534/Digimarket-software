@@ -453,9 +453,19 @@ export class FinanceService {
         include:{verifiedPayment:{select:{id:true}},reversedBy:{select:{id:true}}},
       });
       if(!entry)throw new AuthError(404,"NOT_FOUND","Financial entry not found");
-      await openPeriod(tx,actor.organizationId,entry.occurredOn.toISOString().slice(0,10));
       if(entry.status==="CANCELLED")throw new AuthError(409,"ALREADY_CANCELLED","Financial entry already cancelled");
       if(entry.verifiedPayment||entry.reversesId||entry.reversedBy)throw new AuthError(409,"FINANCE_IMMUTABLE","Reconciled entries cannot be cancelled");
+      const closedCycle=await tx.financePeriodClose.findFirst({
+        where:{organizationId:actor.organizationId,from:{lte:entry.occurredOn},to:{gte:entry.occurredOn}},
+        select:{id:true},
+      });
+      if(closedCycle){
+        if(entry.kind!=="EXPENSE"||entry.status!=="POSTED")
+          throw new AuthError(409,"FINANCE_CYCLE_CLOSED","Only posted expenses can be cancelled in a closed cycle.");
+        await tx.$queryRaw`SELECT set_config('digimarket.closed_expense_cancel',${actor.organizationId+":"+id},true)`;
+      }else{
+        await openPeriod(tx,actor.organizationId,entry.occurredOn.toISOString().slice(0,10));
+      }
       await tx.financialTransaction.update({
         where:{id},data:{status:"CANCELLED",postedAt:null},
       });
@@ -466,10 +476,10 @@ export class FinanceService {
       });
       await tx.auditLog.create({data:{
         organizationId:actor.organizationId,actorId:actor.userId,
-        action:entry.kind==="INCOME"?"finance.income_cancelled":"finance.expense_cancelled",
+        action:closedCycle?"finance.closed_expense_cancelled":entry.kind==="INCOME"?"finance.income_cancelled":"finance.expense_cancelled",
         entityType:"FinancialTransaction",entityId:id,
-        beforeRedacted:{kind:entry.kind,status:entry.status,amount:entry.amount.toFixed(4)},
-        afterRedacted:{kind:entry.kind,status:"CANCELLED"},
+        beforeRedacted:{kind:entry.kind,status:entry.status,amount:entry.amount.toFixed(4),closedCycleId:closedCycle?.id??null},
+        afterRedacted:{kind:entry.kind,status:"CANCELLED",closedCycleId:closedCycle?.id??null},
       }});
       return {id,kind:entry.kind,status:"CANCELLED" as const};
     });

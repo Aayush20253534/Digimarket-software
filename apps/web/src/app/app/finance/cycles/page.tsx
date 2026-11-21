@@ -12,7 +12,7 @@ import {ExpenseEditDialog,type EditableExpense,type EditOptions} from "@/compone
 type Summary={postedIncome:string;postedExpense:string;postedSalaryExpense:string;postedExpenseIncludingSalary:string;postedNet:string;clientAdSpend?:{posted:string};pendingIncome:string;pendingExpense:string};
 type ExpenseSummary={postedTotalExpense:string;breakdown:{OTHER:string;SELF_ADS:string;CLIENT_ADS:string;SALARY:string}};
 type Balance={opening:string;movement:string;remaining:string};
-type FinanceRow={id:string;occurredOn:string;kind:string;status:string;amount:string;category:{name:string};description:string|null;merchantOrSource:string|null;enteredBy?:{displayName:string}};
+type FinanceRow={id:string;occurredOn:string;kind:string;status:string;amount:string;reversesId?:string|null;reversedBy?:string|null;category:{name:string};description:string|null;merchantOrSource:string|null;enteredBy?:{displayName:string}};
 type ExpensesRow={id:string;date:string;type:string;category:string;person:string;client:string;description:string;amount:string;reversal:boolean};
 type Register<T>={items:T[];total:number;page:number;limit:number};
 type Settlement={id:string;occurredOn:string;status:string;settlementDirection:"OUTGOING"|"INCOMING";amount:string;merchantOrSource:string;description:string};
@@ -62,8 +62,24 @@ export default function FinanceCyclesPage(){
   }catch(e){setEditError(e instanceof Error?e.message:"Unable to save expense.");}
   finally{setEditSaving(false);}
  }
- const editButton=(id:string,date:string)=><button type="button" className="btn-secondary text-xs whitespace-nowrap"
-  disabled={!!editLoading||editSaving} onClick={()=>void beginEdit(id,date)}>{editLoading===id?"Opening…":"Edit expense"}</button>;
+ async function deleteExpense(id:string,date:string,amount:string){
+  if(!canEdit||!isEditableDate(date)||editLoading||editSaving||editing)return;
+  const historical=!!w.cycleState?.history.some(c=>date.slice(0,10)>=c.from&&date.slice(0,10)<=c.to);
+  if(!window.confirm("Delete this expense of "+money(amount)+"? It will be removed from financial totals. The cancelled record and audit history will be retained."+ (historical?" The historical cycle will stay closed and carry-forward balances will be recalculated.":"")))return;
+  setEditSaving(true);setEditError("");setNotice("");
+  try{
+   await request("/finance/entries/"+encodeURIComponent(id),{method:"DELETE"});
+   setNotice(historical?"Closed-cycle expense deleted. The cycle remains closed; totals and carry-forward reflect the cancellation.":"Expense deleted. Cycle totals and assigned user refreshed.");
+   setPage(1);setExpensePage(1);setRefresh(v=>v+1);
+  }catch(e){setEditError(e instanceof Error?e.message:"Unable to delete expense.");}
+  finally{setEditSaving(false);}
+ }
+ const expenseActions=(id:string,date:string,amount:string)=><div className="flex flex-wrap gap-1">
+  <button type="button" className="btn-secondary text-xs whitespace-nowrap"
+   disabled={!!editLoading||editSaving||!!editing} onClick={()=>void beginEdit(id,date)}>{editLoading===id?"Opening…":"Edit expense"}</button>
+  <button type="button" className="btn-secondary text-xs text-red-400 whitespace-nowrap"
+   disabled={!!editLoading||editSaving||!!editing} onClick={()=>void deleteExpense(id,date,amount)}>Delete expense</button>
+ </div>;
  const cycles=(w.cycleState?[w.cycleState.current,...w.cycleState.history]:[]).map(c=>({...c,key:businessCycle(c.from).key}));
  const selected=cycles.find(c=>c.from===w.period.from&&c.to===w.period.to);
  useEffect(()=>{setPage(1);setExpensePage(1);},[w.period.from,w.period.to,w.view]);
@@ -99,7 +115,7 @@ export default function FinanceCyclesPage(){
   {error&&<Notice kind="error">{error}</Notice>}
   {editError&&!editing&&<Notice kind="error">{editError}</Notice>}
   {notice&&<Notice kind="success">{notice}</Notice>}
-  {canEdit&&selected&&w.cycleState?.history.some(c=>c.from===selected.from)&&<Notice>Closed cycle: administrators can correct posted expenses within this cycle. Its closing date and original confirmation remain unchanged.</Notice>}
+  {canEdit&&selected&&w.cycleState?.history.some(c=>c.from===selected.from)&&<Notice>Closed cycle: administrators can edit or delete posted expenses within this cycle. Its closing date and original confirmation remain unchanged.</Notice>}
   {loading&&!summary&&<Spinner label="Loading cycle records…"/>}
   <section aria-label="Cycle financial summary" className="space-y-3">
    <h2 className="text-lg font-semibold">{selected?selected.from+" – "+selected.to:w.period.from+" to "+w.period.to} · {w.view==="mine"?"My entries":"Company entries"}</h2>
@@ -134,7 +150,7 @@ export default function FinanceCyclesPage(){
     {["Date","Type","Status","Category","Assigned to","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{register?.items.map(x=><tr key={x.id}><td>{x.occurredOn.slice(0,10)}</td><td>{x.kind}</td><td>{x.status}</td>
      <td>{x.category.name}</td><td>{x.enteredBy?.displayName??""}</td><td>{money(x.amount)}</td>
-     <td>{x.description||x.merchantOrSource||""}</td>{canEdit&&<td>{x.kind==="EXPENSE"&&x.status==="POSTED"&&isEditableDate(x.occurredOn)?editButton(x.id,x.occurredOn):"—"}</td>}</tr>)}</tbody>
+     <td>{x.description||x.merchantOrSource||""}</td>{canEdit&&<td>{x.kind==="EXPENSE"&&x.status==="POSTED"&&!x.reversesId&&!x.reversedBy&&isEditableDate(x.occurredOn)?expenseActions(x.id,x.occurredOn,x.amount):"—"}</td>}</tr>)}</tbody>
    </table></div>
    {!register?.total&&!loading&&<p className="text-sm text-slate-400">No income or expense transactions in this cycle.</p>}
    {register&&<FinancePager page={page} total={register.total} limit={25} onChange={setPage}/>}
@@ -145,7 +161,7 @@ export default function FinanceCyclesPage(){
    <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr>
     {["Date","Type","Category","Person","Client","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{expenses?.items.map(x=><tr key={x.id}><td>{x.date.slice(0,10)}</td><td>{x.type}</td><td>{x.category}</td>
-     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td>{canEdit&&<td>{x.id.startsWith("finance:")&&!x.reversal&&isEditableDate(x.date)?editButton(x.id.slice("finance:".length),x.date):x.type==="SALARY"?<Link href="/app/salary" className="text-violet-300 underline">View salary</Link>:"—"}</td>}</tr>)}</tbody>
+     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td>{canEdit&&<td>{x.id.startsWith("finance:")&&!x.reversal&&isEditableDate(x.date)?expenseActions(x.id.slice("finance:".length),x.date,x.amount):x.type==="SALARY"?<Link href="/app/salary" className="text-violet-300 underline">View salary</Link>:"—"}</td>}</tr>)}</tbody>
    </table></div>
    {!expenses?.total&&!loading&&<p className="text-sm text-slate-400">No recorded expenses for this cycle.</p>}
    {expenses&&<FinancePager page={expensePage} total={expenses.total} limit={25} onChange={setExpensePage}/>}

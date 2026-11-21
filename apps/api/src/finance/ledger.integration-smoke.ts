@@ -573,6 +573,18 @@ try {
   assert.equal((await ledger.balances(f,next)).find(x=>x.id===bank.id)!.opening,new Prisma.Decimal(originalNextOpening).minus(25).toFixed(4));
   assert.deepEqual(await db.financePeriodClose.findUniqueOrThrow({where:{id:originalClose.id}}),originalClose);
   await assert.rejects(()=>db.financialTransaction.update({where:{id:historicalAd.id},data:{amount:"350"}}),closed);
+  // Only the authorized cancellation can remove a historical expense from live totals.
+  await assert.rejects(()=>db.financialTransaction.update({where:{id:historicalAd.id},data:{status:"CANCELLED",postedAt:null}}),closed);
+  await assert.rejects(()=>finance.removeEntry(f,historicalAd.id),checkStatus(403));
+  await assert.rejects(()=>finance.removeEntry(a,ownExpense.id),checkStatus(409));
+  const beforeCancellation=(await ledger.balances(f,next)).find(x=>x.id===bank.id)!.opening;
+  assert.equal((await finance.removeEntry(a,historicalAd.id)).status,"CANCELLED");
+  assert.equal((await finance.totals(f,"all",period)).clientAdSpend.posted,new Prisma.Decimal(originalHistoricalSpend).minus(300).toFixed(4));
+  assert.equal((await ledger.balances(f,next)).find(x=>x.id===bank.id)!.opening,new Prisma.Decimal(beforeCancellation).add(325).toFixed(4));
+  assert.equal((await db.financialTransaction.findUniqueOrThrow({where:{id:historicalAd.id}})).status,"CANCELLED");
+  assert.equal(await db.auditLog.count({where:{organizationId:org.id,actorId:admin.id,entityId:historicalAd.id,action:"finance.closed_expense_cancelled"}}),1);
+  assert.deepEqual(await db.financePeriodClose.findUniqueOrThrow({where:{id:originalClose.id}}),originalClose);
+  await assert.rejects(()=>finance.removeEntry(a,historicalAd.id),checkStatus(409));
   console.info(
     "Finance ledger integration passed: balances, tenant/role isolation, stable categories, 5,001-row export, close/write race, immutable history and four reversal sources.",
   );
