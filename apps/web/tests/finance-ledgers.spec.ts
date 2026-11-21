@@ -194,7 +194,22 @@ test("category cards drill into paginated search and export the same filters", a
   await page.goto("/app/finance/expenses?" + cycle);
   await page.getByRole("link", { name: /Travel/ }).click();
   await expect(page).toHaveURL(new RegExp("categoryId=" + categoryId));
-  await expect(page.getByText("Page 1 of 2 · 26 records")).toBeVisible();
+  // Wait for the paginated data view, not merely a client-side URL transition.
+  // Expose actionable diagnostics if an API or rendering regression blocks it.
+  const pageSummary=page.getByRole("navigation",{name:"Finance pagination"})
+    .getByText("Page 1 of 2 · 26 records",{exact:true});
+  try {
+    await expect(pageSummary).toBeVisible({timeout:15000});
+  } catch (error) {
+    const body=(await page.locator("body").innerText().catch(() => "")).slice(-5000);
+    console.error("Finance category drilldown failed",JSON.stringify({
+      url:page.url(),
+      registerCalls:calls.filter(c=>c.path.includes("/finance/register"))
+        .map(c=>({path:c.path,query:c.query.toString()})),
+      pageContent:body
+    }));
+    throw error;
+  }
   await page.getByRole("button", { name: "Next page", exact: true }).click();
   await expect(
     page
