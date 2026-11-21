@@ -367,11 +367,11 @@ try{
   assert.equal(assigned.enteredById,founderUser.id);
   const totalBefore=await finance.totals(founder,"all");
   const directAdmin=principal(founderUser.id,directOrg.id,["ADMIN"],adminKeys);
-  const moved=await finance.editEntry(directAdmin,assigned.id,{
+  const directReassignment=await finance.editEntry(directAdmin,assigned.id,{
     categoryId:fExpense.id,amount:"7.0000",occurredOn:"2026-11-01",
     method:"CASH",merchantOrSource:"",description:"",enteredById:newStaff.id,
   });
-  assert.equal(moved.enteredById,newStaff.id);
+  assert.equal(directReassignment.enteredById,newStaff.id);
   const movedEntry=await db.financialTransaction.findUniqueOrThrow({where:{id:assigned.id}});
   const movedAccount=await db.moneyAccount.findUniqueOrThrow({where:{id:movedEntry.moneyAccountId!}});
   assert.equal(movedAccount.ownerUserId,newStaff.id);
