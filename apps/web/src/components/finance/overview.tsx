@@ -18,6 +18,7 @@ import { Card, Notice, Spinner } from "@/components/ui";
 import { FinanceFrame, money, useFinanceWindow } from "./shared";
 import type { TotalExpenseSummary } from "./total-expenses";
 import { FinanceSectionWorkspace } from "./section-workspace";
+import { PreviousCycleNetPosted } from "./previous-cycle-carry";
 type Balance = {opening:string;movement:string;remaining:string};
 type Totals = {
   postedIncome: string;
@@ -260,9 +261,12 @@ export function FinanceCategorySummary({ kind }: { kind: "INCOME" | "EXPENSE" })
       ) : (
         data && (
           <>
+            {kind === "INCOME" && <section aria-label="Previous cycle net posted shown in income">
+              <PreviousCycleNetPosted period={w.period} view={w.view} />
+            </section>}
             <div className="grid gap-3 sm:grid-cols-3" aria-label="Category totals">
               <Card>
-                <p>{kind === "INCOME" ? "Posted income" : "Operating expenses"}</p>
+                <p>{kind === "INCOME" ? "New income this cycle" : "Operating expenses"}</p>
                 <strong>{money(data.ordinary)}</strong>
               </Card>
             </div>
