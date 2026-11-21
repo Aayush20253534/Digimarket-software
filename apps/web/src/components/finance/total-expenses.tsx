@@ -96,18 +96,44 @@ export function TotalExpenses() {
     };
   }, [w.ready, permitted, query, request, refresh]);
 
-  async function beginEdit(rowId: string) {
-    if (!canEdit || !rowId.startsWith("finance:")) return;
-    setError(""); setNotice(""); setEditLoading(rowId);
+  async function beginEdit(row: Records["items"][number]) {
+    if (!canEdit || !row.id.startsWith("finance:") || row.reversal) return;
+    setError(""); setNotice(""); setEditLoading(row.id);
     try {
-      const id = rowId.slice("finance:".length);
-      const [record, categories, people, clients] = await Promise.all([
-        request<EditableExpense>("/finance/entries/" + encodeURIComponent(id) + "/edit"),
+      const id = row.id.slice("finance:".length);
+      // Reuse the existing, paginated finance register. A new GET /entries/:id/edit
+      // endpoint is not required, so frontend and backend deployments cannot skew.
+      const params = new URLSearchParams({
+        from: row.date, to: row.date, view: "all",
+        scope: row.type === "CLIENT_ADS" ? "meta_ads" : "agency",
+        kind: "EXPENSE", status: "POSTED", page: "1", limit: "100",
+      });
+      type RegisterRow = {
+        id: string; category: {id: string}; enteredById: string;
+        clientId: string | null; amount: string; occurredOn: string;
+        method: string; merchantOrSource: string | null; description: string | null;
+      };
+      let found: RegisterRow | undefined;
+      let total = 0;
+      for (let number = 1; number <= 1000; number++) {
+        params.set("page", String(number));
+        const result = await request<{items: RegisterRow[]; total: number}>("/finance/register?" + params.toString());
+        found = result.items.find(entry => entry.id === id);
+        total = result.total;
+        if (found || number * 100 >= total || result.items.length === 0) break;
+      }
+      if (!found) throw new Error("Expense could not be found in the finance register. Refresh this page and try again.");
+      const [categories, people, clients] = await Promise.all([
         request<EditOptions["categories"]>("/finance/categories"),
         request<EditOptions["people"]>("/finance/assignees"),
         request<EditOptions["clients"]>("/finance/meta-ad-clients"),
       ]);
-      setEditing(record);
+      setEditing({
+        id: found.id, categoryId: found.category.id, enteredById: found.enteredById,
+        clientId: found.clientId, amount: found.amount, occurredOn: found.occurredOn,
+        method: found.method, merchantOrSource: found.merchantOrSource ?? "",
+        description: found.description ?? "",
+      });
       setEditOptions({categories, people, clients});
     } catch(e) {
       setError(e instanceof Error ? e.message : "Unable to edit this entry.");
@@ -275,7 +301,7 @@ export function TotalExpenses() {
                     {row.reversal && <p className="text-xs text-amber-300">Reversal</p>}
                     {canEdit && row.id.startsWith("finance:") && !row.reversal &&
                       <button type="button" className="btn-secondary text-xs" disabled={!!editLoading || editSaving}
-                        onClick={() => void beginEdit(row.id)}>
+                        onClick={() => void beginEdit(row)}>
                         {editLoading === row.id ? "Opening…" : "Edit expense"}
                       </button>}
                     {canEdit && row.type === "SALARY" && <Link href="/app/salary" className="text-sm underline text-violet-300">View salary workflow</Link>}
@@ -315,7 +341,7 @@ export function TotalExpenses() {
                         {canEdit && <td className="p-3">
                           {row.id.startsWith("finance:") && !row.reversal ?
                             <button type="button" className="btn-secondary text-xs" disabled={!!editLoading || editSaving}
-                              onClick={() => void beginEdit(row.id)}>
+                              onClick={() => void beginEdit(row)}>
                               {editLoading === row.id ? "Opening…" : "Edit"}
                             </button> :
                             row.type === "SALARY" ? <Link href="/app/salary" className="underline text-violet-300">View salary</Link> : "—"}
