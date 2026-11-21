@@ -71,6 +71,34 @@ export class FinanceService {
   }
 
 
+  /**
+   * Client Meta Ads paid from the logged-in person's clearing account.
+   * Ownership comes from MoneyAccount.ownerUserId, not enteredById: an
+   * administrative entry may be recorded by a different founder.
+   * This is actual posted outflow (net of reversals), not client fund balance.
+   */
+  async clientAdAccountSpend(actor:Principal,period:ReportingPeriod){
+    need(actor,"finance.entry.read.own");
+    const categories=await this.db.financialCategory.findMany({
+      where:{organizationId:actor.organizationId,kind:"EXPENSE"},
+      select:{id:true,name:true,purpose:true},
+    });
+    const metaCategoryIds=categories.filter(isMetaAds).map(category=>category.id);
+    const result=await this.db.financialTransaction.aggregate({
+      where:{
+        organizationId:actor.organizationId,
+        kind:"EXPENSE",status:"POSTED",clientId:{not:null},
+        occurredOn:dateOnlyRange(period),
+        categoryId:{in:metaCategoryIds},
+        moneyAccount:{is:{organizationId:actor.organizationId,ownerUserId:actor.userId}},
+      },
+      _sum:{amount:true},_count:{_all:true}
+    });
+    return {from:period.from,to:period.to,currency:"INR",
+      posted:(result._sum.amount??new Prisma.Decimal(0)).toFixed(4),
+      entries:result._count._all};
+  }
+
   // All views use the exact same filtered, database-wide grouping. Finance
   // entries() intentionally paginates to 200 and must not drive these totals.
   async metaAdsDistribution(actor:Principal,view:View,from?:string,to?:string){
