@@ -275,12 +275,12 @@ test("employee direct access does not request agency money ledgers", async ({ pa
   expect(calls.some((c) => c.path === "/finance/accounts")).toBe(false);
 });
 
-test("founder adds an expense from its category page with automatic account attribution", async ({ page }) => {
+test("founder adds an expense automatically attributed to signed-in user", async ({ page }) => {
   const calls = await workspace(page);
   await page.goto("/app/finance/expenses?" + cycle);
   await page.getByRole("button", {name: "+ Add Expense"}).click();
   await expect(page.getByLabel("Entry type")).toBeDisabled();
-  await expect(page.getByText("Your signed-in founder account (automatic)")).toBeVisible();
+  await expect(page.getByTestId("finance-owner-notice")).toContainText("signed-in user");
   await expect(page.locator("#finance-money-account")).toHaveCount(0);
   await page.getByLabel("Category", {exact:true}).selectOption(categoryId);
   await page.getByLabel("Amount (INR)").fill("12");
