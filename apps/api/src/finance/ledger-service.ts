@@ -153,10 +153,15 @@ export class FinanceLedgerService {
             id: input.ownerUserId,
             organizationId: a.organizationId,
             status: "ACTIVE",
+            ...(input.kind === "FOUNDER"
+              ? { roles: { some: { role: { key: "FOUNDER" } } } }
+              : {}),
           },
         }))
       )
-        throw invalid("Select an active user in this workspace");
+        throw invalid(input.kind === "FOUNDER"
+          ? "Select an active founder in this workspace"
+          : "Select an active user in this workspace");
       const row = await tx.moneyAccount.create({
         data: {
           ...input,
