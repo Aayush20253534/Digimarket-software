@@ -44,6 +44,18 @@ if(!gateway.includes('"finance/internal-settlements/mine": ["GET"]')){
   process.exitCode=1;
 }
 
+// The cycle-balance endpoint needs both the Next.js gateway allowlist and the
+// original date/visibility parameters. A missing route silently hid balances.
+if(!gateway.includes('"finance/cycle-balance": ["GET"]')||
+   !gateway.includes('"finance/cycle-balance","finance/summary","finance/internal-settlements/mine"')){
+  process.stderr.write("Finance cycle balance, summary and settlement history must forward authenticated requests with from/to/view.\n");
+  process.exitCode=1;
+}
+if(!gateway.includes('|| path==="finance/cycle-balance"')){
+  process.stderr.write("The Finance proxy must report outdated backend cycle routes explicitly.\n");
+  process.exitCode=1;
+}
+
 const appDir=fileURLToPath(new URL("../src/app/app/",import.meta.url));
 const missing=[];
 for(const segment of phase0Routes){
