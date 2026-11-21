@@ -81,6 +81,14 @@ try{
   const after=await finance.entries(manager,"all");
   assert.equal(after[0].status,"POSTED");
   assert.equal((await db.approvalDecision.count({where:{requestId:pending.approvalRequestId}})),1);
+  // Total Expense inline editing must only expose details to permitted admins.
+  const editableExpense=await finance.editDetails(manager,pending.id);
+  assert.equal(editableExpense.enteredById,employee.id);
+  assert.equal(editableExpense.amount,"150.2545");
+  await assert.rejects(()=>finance.editDetails(staff,pending.id),
+    (e:{status?:number})=>e.status===403);
+  await assert.rejects(()=>finance.editDetails(stranger,pending.id),
+    (e:{status?:number})=>e.status===404);
   assert.equal((await finance.totals(manager,"all")).postedExpense,"150.2545");
   const income=await finance.submit(staff,{kind:"INCOME",categoryId:inc.id,amount:"1000.0000",occurredOn:"2026-10-19",
     method:"BANK_TRANSFER",merchantOrSource:"Client payment",idempotencyKey:randomUUID()});
