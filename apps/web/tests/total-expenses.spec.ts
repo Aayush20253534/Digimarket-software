@@ -85,10 +85,12 @@ async function workspace(page: Page, role = "FOUNDER") {
     else if (path === "/finance/meta-ad-clients") data = [
       {id:"cafe",businessName:"Test Cafe"},
     ];
-    else if (path === "/finance/entries/expense-0/edit") data = {
-      id:"expense-0",categoryId:"travel",enteredById:"founder",clientId:null,
-      amount:"0.5000",occurredOn:"2026-11-15",method:"UPI",
-      merchantOrSource:"",description:"Journey 0",
+    else if (path === "/finance/register") data = {
+      items: [{
+        id:"expense-0",category:{id:"travel"},enteredById:"founder",clientId:null,
+        amount:"0.5000",occurredOn:"2026-11-15",method:"UPI",
+        merchantOrSource:"",description:"Journey 0",
+      }], total:1, page:1, limit:100,
     };
     else if (path === "/finance/total-expenses/summary") data = summary;
     else if (path === "/finance/total-expenses") {
@@ -244,6 +246,8 @@ test("super admin edits expense owner directly from mobile Total Expense, salari
   await modal.getByRole("button",{name:"Save changes"}).click();
   await expect(modal).toHaveCount(0);
   await expect(page.getByText(/User-wise totals reflect the assigned user/)).toBeVisible();
+  expect(calls.some(call=>call.path==="/finance/entries/expense-0/edit")).toBe(false);
+  expect(calls.some(call=>call.path==="/finance/register")).toBe(true);
   const updated=calls.find(call=>call.path==="/finance/entries/expense-0" && call.method==="PUT");
   expect(updated?.body).toMatchObject({enteredById:"dev",amount:"0.5000",categoryId:"travel"});
   await page.getByRole("combobox",{name:"Expense type"}).selectOption("SALARY");
