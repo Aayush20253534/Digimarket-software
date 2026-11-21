@@ -112,6 +112,41 @@ export class InternalSettlementService{
    return {id,status:"VOID" as const};
   });
  }
+ /**
+  * Agency-wide history, including voided records, paginated without truncation.
+  * Each live settlement counts once as money transferred. Both account sides
+  * appear in the ledger but their combined effect on company funds is zero.
+  */
+ async projectAll(actor:Principal,period:ReportingPeriod,page=1,limit=50){
+  if(!actor.permissions.has("finance.read.all"))throw forbidden();
+  const where:Prisma.InternalSettlementWhereInput={
+   organizationId:actor.organizationId,occurredOn:dateOnlyRange(period)
+  };
+  const [rows,total,posted,voided]=await Promise.all([
+   this.db.internalSettlement.findMany({
+    where,
+    include:{sender:{select:{displayName:true}},recipient:{select:{displayName:true}}},
+    orderBy:[{occurredOn:"desc"},{createdAt:"desc"},{id:"desc"}],
+    skip:(page-1)*limit,take:limit
+   }),
+   this.db.internalSettlement.count({where}),
+   this.db.internalSettlement.aggregate({where:{...where,voidedAt:null},
+    _sum:{amount:true},_count:{_all:true}}),
+   this.db.internalSettlement.count({where:{...where,voidedAt:{not:null}}})
+  ]);
+  return {from:period.from,to:period.to,page,limit,total,
+   postedCount:posted._count._all,voidedCount:voided,
+   postedTotal:(posted._sum.amount??new Prisma.Decimal(0)).toFixed(4),
+   items:rows.map(row=>({
+    id:row.id,occurredOn:row.occurredOn.toISOString().slice(0,10),
+    senderName:row.sender.displayName,recipientName:row.recipient.displayName,
+    amount:row.amount.toFixed(4),method:row.method,
+    status:row.voidedAt?"CANCELLED" as const:"POSTED" as const,
+    note:row.note,voidReason:row.voidReason
+   }))
+  };
+ }
+
  async projectMine(actor:Principal,take=200,period?:ReportingPeriod){
   founder(actor);
   const rows=await this.db.internalSettlement.findMany({
