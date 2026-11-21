@@ -35,7 +35,7 @@ REVOKE ALL ON ALL TABLES IN SCHEMA client_delivery_archive_20261121 FROM PUBLIC;
 -- A vanilla PostgreSQL instance (including the GitHub CI service) does not
 -- have Supabase's anon/authenticated/service_role roles. Revoke those grants
 -- only where the roles actually exist, while preserving a private archive.
-DO $
+DO $$
 DECLARE role_name text;
 BEGIN
   FOREACH role_name IN ARRAY ARRAY['anon', 'authenticated', 'service_role'] LOOP
@@ -44,6 +44,6 @@ BEGIN
       EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA client_delivery_archive_20261121 FROM %I', role_name);
     END IF;
   END LOOP;
-END $;
+END $$;
 DROP TYPE IF EXISTS public."ServiceOccurrenceStatus";
 COMMIT;
