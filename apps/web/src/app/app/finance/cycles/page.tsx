@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState} from "react";
+import {useEffect,useState,type FormEvent} from "react";
 import Link from "next/link";
 import {businessCycle} from "@digimarket/contracts";
 import {useAuth} from "@/components/auth-provider";
@@ -7,12 +7,13 @@ import {Card,Notice,Spinner} from "@/components/ui";
 import {FinanceFrame,FinancePager,money,useFinanceWindow} from "@/components/finance/shared";
 import {PreviousCycleNetPosted} from "@/components/finance/previous-cycle-carry";
 import {PersonalNetAfterSettlements} from "@/components/finance/personal-net-after-settlements";
+import {ExpenseEditDialog,type EditableExpense,type EditOptions} from "@/components/finance/expense-edit-dialog";
 
 type Summary={postedIncome:string;postedExpense:string;postedSalaryExpense:string;postedExpenseIncludingSalary:string;postedNet:string;clientAdSpend?:{posted:string};pendingIncome:string;pendingExpense:string};
 type ExpenseSummary={postedTotalExpense:string;breakdown:{OTHER:string;SELF_ADS:string;CLIENT_ADS:string;SALARY:string}};
 type Balance={opening:string;movement:string;remaining:string};
 type FinanceRow={id:string;occurredOn:string;kind:string;status:string;amount:string;category:{name:string};description:string|null;merchantOrSource:string|null;enteredBy?:{displayName:string}};
-type ExpensesRow={id:string;date:string;type:string;category:string;person:string;client:string;description:string;amount:string};
+type ExpensesRow={id:string;date:string;type:string;category:string;person:string;client:string;description:string;amount:string;reversal:boolean};
 type Register<T>={items:T[];total:number;page:number;limit:number};
 type Settlement={id:string;occurredOn:string;status:string;settlementDirection:"OUTGOING"|"INCOMING";amount:string;merchantOrSource:string;description:string};
 
@@ -25,6 +26,41 @@ export default function FinanceCyclesPage(){
  const [expenses,setExpenses]=useState<Register<ExpensesRow>|null>(null),[settlements,setSettlements]=useState<Settlement[]>([]);
  const [error,setError]=useState(""),[loading,setLoading]=useState(false);
  const founder=!!session?.identity.roles.includes("FOUNDER");
+ const canEdit=!!session&&session.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN")
+  &&session.identity.permissions.includes("finance.category.manage")&&session.identity.permissions.includes("finance.read.all");
+ const [refresh,setRefresh]=useState(0),[notice,setNotice]=useState("");
+ const [editing,setEditing]=useState<EditableExpense|null>(null),[editOptions,setEditOptions]=useState<EditOptions|null>(null);
+ const [editLoading,setEditLoading]=useState<string|null>(null),[editSaving,setEditSaving]=useState(false),[editError,setEditError]=useState("");
+ const isOpenDate=(date:string)=>!!w.cycleState&&date.slice(0,10)>=w.cycleState.current.from
+  &&date.slice(0,10)<=w.cycleState.current.to;
+ async function beginEdit(id:string,date:string){
+  if(!canEdit||!isOpenDate(date)||editLoading||editSaving)return;
+  setEditLoading(id);setEditError("");setNotice("");
+  try{
+   const [entry,categories,people,clients]=await Promise.all([
+    request<EditableExpense>("/finance/entries/"+encodeURIComponent(id)+"/edit"),
+    request<EditOptions["categories"]>("/finance/categories"),
+    request<EditOptions["people"]>("/finance/assignees"),
+    request<EditOptions["clients"]>("/finance/meta-ad-clients")
+   ]);
+   setEditing(entry);setEditOptions({categories,people,clients});
+  }catch(e){setEditError(e instanceof Error?e.message:"Unable to open expense.");}
+  finally{setEditLoading(null);}
+ }
+ async function saveEdit(e:FormEvent<HTMLFormElement>){
+  e.preventDefault();
+  if(!canEdit||!editing||editSaving)return;
+  if(!isOpenDate(editing.occurredOn)){setEditError("Select a date within the current open cycle.");return;}
+  setEditSaving(true);setEditError("");
+  try{
+   const {id,categoryId,enteredById,clientId,amount,occurredOn,method,merchantOrSource,description}=editing;
+   await request("/finance/entries/"+encodeURIComponent(id),{method:"PUT",body:{categoryId,enteredById,clientId,amount,occurredOn,method,merchantOrSource,description}});
+   setEditing(null);setEditOptions(null);setNotice("Expense updated. Cycle totals and assigned user refreshed.");setRefresh(v=>v+1);
+  }catch(e){setEditError(e instanceof Error?e.message:"Unable to save expense.");}
+  finally{setEditSaving(false);}
+ }
+ const editButton=(id:string,date:string)=><button type="button" className="btn-secondary text-xs whitespace-nowrap"
+  disabled={!!editLoading||editSaving} onClick={()=>void beginEdit(id,date)}>{editLoading===id?"Opening…":"Edit expense"}</button>;
  const cycles=(w.cycleState?[w.cycleState.current,...w.cycleState.history]:[]).map(c=>({...c,key:businessCycle(c.from).key}));
  const selected=cycles.find(c=>c.from===w.period.from&&c.to===w.period.to);
  useEffect(()=>{setPage(1);setExpensePage(1);},[w.period.from,w.period.to,w.view]);
@@ -43,7 +79,7 @@ export default function FinanceCyclesPage(){
    .catch(e=>{if(active)setError(e instanceof Error?e.message:"Unable to read cycle history.");})
    .finally(()=>{if(active)setLoading(false);});
   return()=>{active=false};
- },[w.ready,w.query,w.view,w.period.from,w.period.to,session,request,page,expensePage,founder]);
+ },[w.ready,w.query,w.view,w.period.from,w.period.to,session,request,page,expensePage,founder,refresh]);
  return <FinanceFrame title="Cycles" window={w}
   description="Current open and manually closed agency work cycles. Each cycle keeps its full financial history, while the remaining bookkeeping balance carries forward.">
   <section aria-label="Choose a financial cycle" className="space-y-3">
@@ -58,6 +94,8 @@ export default function FinanceCyclesPage(){
    </div>
   </section>
   {error&&<Notice kind="error">{error}</Notice>}
+  {editError&&!editing&&<Notice kind="error">{editError}</Notice>}
+  {notice&&<Notice kind="success">{notice}</Notice>}
   {loading&&!summary&&<Spinner label="Loading cycle records…"/>}
   <section aria-label="Cycle financial summary" className="space-y-3">
    <h2 className="text-lg font-semibold">{selected?selected.from+" – "+selected.to:w.period.from+" to "+w.period.to} · {w.view==="mine"?"My entries":"Company entries"}</h2>
@@ -89,10 +127,10 @@ export default function FinanceCyclesPage(){
    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">Income and expense register</h2>
     <Link className="btn-secondary" href={"/app/finance/entries?"+w.query}>Open register and exports</Link></div>
    <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr>
-    {["Date","Type","Status","Category","Assigned to","Amount","Description"].map(x=><th key={x}>{x}</th>)}</tr></thead>
+    {["Date","Type","Status","Category","Assigned to","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{register?.items.map(x=><tr key={x.id}><td>{x.occurredOn.slice(0,10)}</td><td>{x.kind}</td><td>{x.status}</td>
      <td>{x.category.name}</td><td>{x.enteredBy?.displayName??""}</td><td>{money(x.amount)}</td>
-     <td>{x.description||x.merchantOrSource||""}</td></tr>)}</tbody>
+     <td>{x.description||x.merchantOrSource||""}</td>{canEdit&&<td>{x.kind==="EXPENSE"&&x.status==="POSTED"&&isOpenDate(x.occurredOn)?editButton(x.id,x.occurredOn):"—"}</td>}</tr>)}</tbody>
    </table></div>
    {!register?.total&&!loading&&<p className="text-sm text-slate-400">No income or expense transactions in this cycle.</p>}
    {register&&<FinancePager page={page} total={register.total} limit={25} onChange={setPage}/>}
@@ -101,9 +139,9 @@ export default function FinanceCyclesPage(){
    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">All expenses, salaries and client ads</h2>
     <Link className="btn-secondary" href={"/app/finance/total-expenses?"+w.query}>Detailed expense report and CSV</Link></div>
    <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr>
-    {["Date","Type","Category","Person","Client","Amount","Description"].map(x=><th key={x}>{x}</th>)}</tr></thead>
+    {["Date","Type","Category","Person","Client","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{expenses?.items.map(x=><tr key={x.id}><td>{x.date.slice(0,10)}</td><td>{x.type}</td><td>{x.category}</td>
-     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td></tr>)}</tbody>
+     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td>{canEdit&&<td>{x.id.startsWith("finance:")&&!x.reversal&&isOpenDate(x.date)?editButton(x.id.slice("finance:".length),x.date):x.type==="SALARY"?<Link href="/app/salary" className="text-violet-300 underline">View salary</Link>:"—"}</td>}</tr>)}</tbody>
    </table></div>
    {!expenses?.total&&!loading&&<p className="text-sm text-slate-400">No recorded expenses for this cycle.</p>}
    {expenses&&<FinancePager page={expensePage} total={expenses.total} limit={25} onChange={setExpensePage}/>}
@@ -117,5 +155,6 @@ export default function FinanceCyclesPage(){
     <strong>{s.settlementDirection==="OUTGOING"?"−":"+"}{money(s.amount)}</strong></div>)}
    {!settlements.length&&!loading&&<p className="text-sm text-slate-400">No settlements in this cycle.</p>}
   </section>}
+ {editing&&editOptions&&canEdit&&<ExpenseEditDialog editing={editing} editOptions={editOptions} setEditing={setEditing} editSaving={editSaving} error={editError} saveEdit={saveEdit} onCancel={()=>{setEditing(null);setEditOptions(null);setEditError("");}}/>}
  </FinanceFrame>;
 }

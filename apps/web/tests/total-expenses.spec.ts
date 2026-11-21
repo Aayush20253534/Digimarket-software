@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function workspace(page: Page, role = "FOUNDER") {
+async function workspace(page: Page, role = "FOUNDER", closed=false) {
+  let updated=false;
   const calls: { path: string; query: URLSearchParams; method: string; body?: Record<string,unknown> }[] = [];
   await page.clock.setFixedTime(new Date("2026-11-17T12:00:00Z"));
   await page.route("**/api/v1/**", async (route) => {
@@ -85,9 +86,13 @@ async function workspace(page: Page, role = "FOUNDER") {
     else if (path === "/finance/meta-ad-clients") data = [
       {id:"cafe",businessName:"Test Cafe"},
     ];
+    else if (path === "/finance/cycle-state") data = closed ? {current:{from:"2026-11-22",to:"2026-12-21"},history:[{from:"2026-10-22",to:"2026-11-21",closedAt:"2026-11-22"}],plannedThrough:"2026-12-21",canClose:false} : {current:{from:"2026-10-22",to:"2026-11-21"},history:[],plannedThrough:"2026-11-21",canClose:false};
+    else if (path === "/finance/entries/expense-0/edit") data = {id:"expense-0",categoryId:"travel",enteredById:"founder",clientId:null,amount:"1.0000",occurredOn:"2026-11-15",method:"UPI",merchantOrSource:"",description:"Journey 0"};
+    else if (path === "/finance/entries/expense-0" && route.request().method()==="PUT") {updated=true;data={id:"expense-0"};}
+    else if (path === "/finance/cycle-balance") data = {opening:"0",movement:"0",remaining:"0"};
     else if (path === "/finance/register") data = {
       items: [{
-        id:"expense-0",category:{id:"travel"},enteredById:"founder",clientId:null,
+        id:"expense-0",kind:"EXPENSE",status:"POSTED",category:{id:"travel",name:"Travel"},enteredBy:{displayName:updated?"Dev Raj":"Test Founder"},enteredById:"founder",clientId:null,
         amount:"0.5000",occurredOn:"2026-11-15",method:"UPI",
         merchantOrSource:"",description:"Journey 0",
       }], total:1, page:1, limit:100,
@@ -99,9 +104,9 @@ async function workspace(page: Page, role = "FOUNDER") {
           id: "finance:expense-" + i,
           type: "OTHER",
           category: "Travel",
-          amount: all ? "1" : "0.50",
+          amount: updated&&i===0 ? "25" : all ? "1" : "0.50",
           description: "Journey " + i,
-          person: "Test Founder",
+          person: updated&&i===0 ? "Dev Raj" : "Test Founder",
           client: "",
         })),
         {
@@ -260,4 +265,28 @@ test("non-admin cannot edit Total Expense rows", async ({page}) => {
   await page.goto("/app/finance/total-expenses?from=2026-10-22&to=2026-11-21&view=mine");
   await expect(page.getByRole("button",{name:"Edit expense"})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Edit",exact:true})).toHaveCount(0);
+});
+
+test("cycle expense editing saves a real entry id and refreshes the cycle register",async({page})=>{
+  const calls=await workspace(page,"SUPER_ADMIN");
+  await page.goto("/app/finance/cycles?from=2026-10-22&to=2026-11-21&view=all");
+  const rows=page.getByRole("region",{name:"Cycle expense details"});
+  const row=rows.getByRole("row").filter({hasText:"Journey 0"});
+  await row.getByRole("button",{name:"Edit expense"}).click();
+  const editor=page.getByRole("dialog",{name:"Edit expense"});
+  await editor.getByLabel("Amount (INR)").fill("25");
+  await editor.getByLabel("Assigned user").selectOption("dev");
+  await editor.getByRole("button",{name:"Save changes"}).click();
+  await expect(editor).toHaveCount(0);
+  await expect(row).toContainText("₹25.00");
+  await expect(row).toContainText("Dev Raj");
+  expect(calls.find(c=>c.path==="/finance/entries/expense-0"&&c.method==="PUT")?.body).toMatchObject({amount:"25",enteredById:"dev"});
+  expect(calls.filter(c=>c.path==="/finance/total-expenses/summary").length).toBeGreaterThan(1);
+});
+test("closed cycle rows cannot be edited by an administrator",async({page})=>{
+  await workspace(page,"SUPER_ADMIN",true);
+  await page.goto("/app/finance/cycles?from=2026-10-22&to=2026-11-21&view=all");
+  const rows=page.getByRole("region",{name:"Cycle expense details"});
+  await expect(rows.getByText("Journey 0",{exact:true})).toBeVisible();
+  await expect(rows.getByRole("button",{name:"Edit expense"})).toHaveCount(0);
 });
