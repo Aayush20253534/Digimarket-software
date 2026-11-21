@@ -4,7 +4,7 @@ import {useEffect,useState} from "react";
 import type {LucideIcon} from "lucide-react";
 import {
  BriefcaseBusiness,CalendarDays,CalendarClock,ChartNoAxesCombined,ChevronDown,
- FileStack,FolderKanban,LayoutDashboard,MessageCircle,
+ FileStack,LayoutDashboard,MessageCircle,
  Settings2,Users,Wallet,QrCode,Banknote
 } from "lucide-react";
 
@@ -20,10 +20,6 @@ const sections:readonly NavGroup[]=[
   {label:"Meetings",href:"/app/meetings",icon:CalendarDays,permits:["leads.read"]},
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]},
   {label:"AI Review Cards",href:"/app/ai-review-cards",icon:QrCode,permits:["clients.read"]}
- ]},
- {title:"Operations",items:[
-  {label:"Client Deliveries",href:"/app/deliveries",icon:FolderKanban,permits:["clients.read"]},
-// Tasks paused:   {label:"Tasks",href:"/app/tasks",icon:CheckSquare2,permits:["tasks.read"]}
  ]},
  {title:"Business",items:[
   {label:"Finance",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]},
