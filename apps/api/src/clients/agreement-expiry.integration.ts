@@ -172,7 +172,7 @@ export async function verifyAgreementExpiry(db: PrismaClient) {
     "posted income is unaffected",
   );
   assert.equal(
-    (await clients.list(actor, {section:"active",limit:30})).items.some((c) => c.id === active.id),
+    (await clients.list(actor, {section:"current",limit:30})).items.some((c) => c.id === active.id),
     false,
   );
   assert.equal(
