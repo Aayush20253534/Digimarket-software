@@ -4,6 +4,7 @@ import {BusinessPeriodPicker} from "@/components/business-period-picker";
 import {FinancePager,useFinanceWindow} from "./shared";
 import {ReversalButton} from "./reversal";
 import {PreviousCycleNetPosted} from "./previous-cycle-carry";
+import {PersonalNetAfterSettlements} from "./personal-net-after-settlements";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -567,6 +568,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       <Link className="btn-secondary" href={"/app/finance/cycles?"+windowState.query}>Cycles · View previous entries</Link>
     </div>
     <PreviousCycleNetPosted period={period} view={view==="all"&&canAll?"all":"mine"}/>
+    {isFounder&&view==="mine"&&<PersonalNetAfterSettlements period={period}/>}
     {balance&&<Card>
       <p className="text-sm font-semibold">Net balance remaining · {view==="mine"?"My account":"Company accounts"}</p>
       <strong className="mt-2 block text-2xl">{money(balance.remaining)}</strong>
@@ -577,14 +579,14 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
         ["Posted income",totals.postedIncome],
         ["Posted expenses",totals.postedExpense],
         ["Expenses incl. salary",totals.postedExpenseIncludingSalary??totals.postedExpense],
-        ["Net after ad outflows",totals.postedNet],
+        ["Operating net after ad outflows (excl. settlements)",totals.postedNet],
         ["Agency operating net",totals.agencyOperatingNet??"0"],
         ["Pending income",totals.pendingIncome],
         ["Pending expenses",totals.pendingExpense],
       ] as const).map(([label,value])=><Card key={label}>
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
         <p className="mt-2 break-words text-xl font-bold">{loading?"…":summaryAvailable?money(value):"Unavailable"}</p>
-        <p className="mt-2 text-xs text-slate-500">{label==="Net after ad outflows"
+        <p className="mt-2 text-xs text-slate-500">{label==="Operating net after ad outflows (excl. settlements)"
           ?(view==="mine"&&isFounder?"Income − current-cycle expenses − client Meta Ads − salary funded":"Income − agency expenses − posted client Meta Ads − salary funded")
           :view==="mine"&&isFounder&&totals.personalSettlementResetAt
             ?"Since latest internal settlement · "+totals.currency
