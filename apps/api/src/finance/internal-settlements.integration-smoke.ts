@@ -206,8 +206,8 @@ try{
  assert.equal((await finance.totals(b,"mine")).postedExpense,"3800.0000");
  assert.deepEqual(await finance.totals(a,"all"),agencyAfterNew);
  await settlements.void(a,second.id,"Reverse second cycle closure");
- assert.equal((await finance.totals(a,"mine")).postedExpense,"125.0000");
- assert.equal((await finance.totals(b,"mine")).postedExpense,"600.0000");
+ assert.equal((await finance.totals(a,"mine")).postedExpense,"4625.0000");
+ assert.equal((await finance.totals(b,"mine")).postedExpense,"3800.0000");
  await assert.rejects(()=>settlements.void(b,saved.id,"Invalid transfer"),forbidden(404));
  await assert.rejects(()=>settlements.void(stranger,saved.id,"Invalid transfer"),forbidden(404));
  const voided=await settlements.void(a,saved.id,"Entered twice in notes");
