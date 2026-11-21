@@ -392,23 +392,19 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await finishPasswordRotation(page,founderPassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
-  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await expect(page.getByTestId("client-deliveries-overview")).toHaveCount(0);
   await capturePhase0Role(page,"founder");
   await expect(page.locator('[data-dashboard-role="founder"]')).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace quick actions"}).getByRole("link",{name:/Follow-ups/})).toBeVisible();
-  // Authenticated delivery summary must reach the API gateway (regression for 404).
-  const deliverySummaryResponse=page.waitForResponse(res=>
-    res.url().includes("/api/v1/clients/deliveries")&&res.request().method()==="GET");
   await page.reload();
-  expect((await deliverySummaryResponse).status(),"Client deliveries gateway must reach the API").toBe(200);
   // Phase 2: grouped sidebar, single Documents destination and hidden Notes.
   const founderNav=page.getByRole("navigation",{name:"Workspace navigation"});
   await expect(founderNav.getByRole("link",{name:"Finance",exact:true})).toBeVisible();
   await expect(founderNav.getByRole("link",{name:"Documents",exact:true})).toBeVisible();
   const founderSections=await founderNav.locator(".aw-nav-group").allTextContents();
-  expect(founderSections).toEqual(["Workspace","Sales & CRM","Operations","Business","Communication","Administration"]);
+  expect(founderSections).toEqual(["Workspace","Sales & CRM","Business","Communication","Administration"]);
   await expect(founderNav.getByRole("link",{name:"Clients",exact:true})).toHaveCount(1);
-  await expect(founderNav.getByRole("link",{name:"Client Deliveries",exact:true})).toHaveCount(1);
+  await expect(founderNav.getByRole("link",{name:"Client Deliveries",exact:true})).toHaveCount(0);
   for(const label of ["My notes","Content calendar","Quotations","Agreements","Task history","Approvals","Founders & responsibilities"])
    await expect(founderNav.getByRole("link",{name:label,exact:true})).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Open saved notes"})).toHaveCount(0);
@@ -505,7 +501,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"My profile"})).toBeVisible();
   await expect(page.locator('input[aria-label="Upload profile photo"]')).toHaveAttribute("type","file");
   await visitWorkspace(page,"/app/dashboard");
-  await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Client Deliveries"})).toHaveCount(0);
   await visitWorkspace(page,"/app/notes");
   // The studio still reaches the viewport edge at the normal desktop zoom.
   const notesBottom=await page.locator(".aw-studio").evaluate(el=>el.getBoundingClientRect().bottom);
@@ -923,99 +919,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const workspace=page.getByTestId("client-workspace-page");
   await expect(workspace).toBeVisible();
   const clientTabs=workspace.getByRole("tablist",{name:"Client workspace sections"});
-  await expect(clientTabs.getByRole("tab",{name:"Delivery"})).toHaveAttribute("aria-selected","true");
-  await expect(workspace.getByRole("heading",{name:"Client deliveries"})).toBeVisible();
-  const createDelivery=workspace.getByRole("button",{name:"Schedule service delivery"});
-  await expect(createDelivery).toBeVisible();
-  await createDelivery.click();
-  const deliveryForm=workspace.getByRole("form",{name:"Service delivery schedule form"});
-  await expect(deliveryForm).toBeVisible();
-  await expect(deliveryForm.getByLabel("Delivery service name")).toHaveValue("Video shooting");
-  await deliveryForm.getByLabel("Delivery service name").fill("CI Thursday shoot");
-  // Newly provisioned accounts are INVITED until their first login. Assign an ACTIVE user.
-  const deliveryAssignee=deliveryForm.getByLabel("Delivery assigned employee");
-  await expect.poll(()=>deliveryAssignee.locator("option").count()).toBeGreaterThan(1);
-  await deliveryAssignee.selectOption({index:1});
-  await deliveryForm.getByLabel("Repeat this service").check();
-  await deliveryForm.getByLabel("Start date").fill("2025-10-28");
-  await deliveryForm.getByLabel("End date").fill("2025-11-28");
-  await deliveryForm.getByText("Thu",{exact:true}).click();
-  await expect(deliveryForm.getByText(/5 service dates in this exact period/)).toBeVisible();
-  await deliveryForm.getByRole("button",{name:"Create dated checklist"}).click();
-  await expect(workspace.getByText("Service delivery scheduled.")).toBeVisible();
-  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toBeVisible();
-  const firstShoot=workspace.getByRole("checkbox",{name:/CI Thursday shoot.*completed/}).first();
-  await firstShoot.check();
-  await expect(firstShoot).toBeChecked();
-  await expect(workspace.getByText("1/5 completed")).toBeVisible();
-  await expect(workspace.getByRole("region",{name:"Delivery counts in loaded schedules"})).toBeVisible();
-  await expect(workspace.getByRole("progressbar",{name:"CI Thursday shoot completion"})).toHaveAttribute("aria-valuenow","1");
-  const deliveryFilters=workspace.getByRole("group",{name:"Delivery schedule filters"});
-  await deliveryFilters.getByRole("button",{name:"Completed",exact:true}).click();
-  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toHaveCount(0);
-  await deliveryFilters.getByRole("button",{name:"All",exact:true}).click();
-  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toBeVisible();
-  await workspace.getByLabel("Search loaded delivery schedules").fill("does not match");
-  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toHaveCount(0);
-  await workspace.getByLabel("Search loaded delivery schedules").fill("");
-  await expect(workspace.getByRole("heading",{name:"CI Thursday shoot"})).toBeVisible();
-  await expect(workspace.getByRole("button",{name:"Previous week for CI Thursday shoot"})).toBeVisible();
-  await expect(workspace.getByRole("button",{name:"Edit schedule / reassign"})).toBeVisible();
-  await createDelivery.click();
-  await expect(deliveryForm.getByLabel("Repeat this service")).not.toBeChecked();
-  await expect(deliveryForm.getByLabel("End date")).toHaveCount(0);
-  await deliveryForm.getByLabel("Delivery service name").fill("CI one-time website");
-  await deliveryForm.getByLabel("Delivery assigned employee").selectOption({index:1});
-  await deliveryForm.getByLabel("Service date").fill("2025-11-07");
-  await expect(deliveryForm.getByText(/1 service date in this exact period/)).toBeVisible();
-  await deliveryForm.getByRole("button",{name:"Create one-time delivery"}).click();
-  await expect(workspace.getByRole("heading",{name:"CI one-time website"})).toBeVisible();
-  await expect(workspace.getByRole("checkbox",{name:/CI one-time website.*completed/})).toHaveCount(1);
-  await createDelivery.click();
-  await deliveryForm.getByLabel("Delivery service name").fill("CI three-day interval");
-  await deliveryForm.getByLabel("Delivery assigned employee").selectOption({index:1});
-  await deliveryForm.getByLabel("Repeat this service").check();
-  await deliveryForm.getByLabel("Repeat pattern").selectOption("interval");
-  await deliveryForm.getByLabel("Repeat every").selectOption("3");
-  await deliveryForm.getByLabel("Start date").fill("2025-10-28");
-  await deliveryForm.getByLabel("End date").fill("2025-11-08");
-  await expect(deliveryForm.getByText(/4 service dates in this exact period/)).toBeVisible();
-  await deliveryForm.getByRole("button",{name:"Create dated checklist"}).click();
-  await expect(workspace.getByRole("heading",{name:"CI three-day interval"})).toBeVisible();
-  await expect(workspace.getByText("Every 3 days")).toBeVisible();
-  // Oct 28–Nov 3 is the first week (three deliveries), Nov 4–8 the second (one).
-  // Navigate to week one regardless of the CI runner's current calendar date.
-  const previousIntervalWeek=workspace.getByRole("button",{name:"Previous week for CI three-day interval"});
-  if(await previousIntervalWeek.isEnabled())await previousIntervalWeek.click();
-  await expect(previousIntervalWeek).toBeDisabled();
-  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(3);
-  await workspace.getByRole("button",{name:"Next week for CI three-day interval"}).click();
-  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(1);
-  await previousIntervalWeek.click();
-  await expect(workspace.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(3);
-  await workspace.getByRole("button",{name:"Edit schedule / reassign"}).first().click();
-  await expect(deliveryForm.getByLabel("Repeat pattern")).toHaveValue("interval");
-  await expect(deliveryForm.getByLabel("Repeat every")).toHaveValue("3");
-  await deliveryForm.getByRole("button",{name:"Cancel"}).click();
-  // Rescheduling into the future keeps old pending dates for audit history,
-  // but neither the checklist nor the progress/overdue totals may include them.
-  const intervalCard=workspace.locator(".aw-delivery-schedule").filter({hasText:"CI three-day interval"});
-  await intervalCard.getByRole("button",{name:"Edit schedule / reassign"}).click();
-  const futureYear=new Date().getUTCFullYear()+1;
-  await deliveryForm.getByLabel("Start date").fill(futureYear+"-11-13");
-  await deliveryForm.getByLabel("End date").fill(futureYear+"-12-04");
-  await deliveryForm.getByLabel("Repeat every").selectOption("2");
-  await deliveryForm.getByRole("button",{name:"Save schedule changes"}).click();
-  await expect(workspace.getByText("Delivery schedule updated. Completed dates were preserved.")).toBeVisible();
-  await expect(intervalCard.getByText("0/11 completed")).toBeVisible();
-  await expect(intervalCard.getByText("0 overdue")).toBeVisible();
-  await expect(intervalCard.getByText(new RegExp("Week:.*13 Nov.*"+futureYear+".*19 Nov.*"+futureYear))).toBeVisible();
-  await expect(intervalCard.getByRole("button",{name:"Previous week for CI three-day interval"})).toBeDisabled();
-  await expect(intervalCard.getByRole("checkbox",{name:/CI three-day interval.*2025.*completed/})).toHaveCount(0);
-  await expect(intervalCard.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(4);
-  await intervalCard.getByRole("button",{name:"Next week for CI three-day interval"}).click();
-  await expect(intervalCard.getByText(new RegExp("Week:.*20 Nov.*"+futureYear+".*26 Nov.*"+futureYear))).toBeVisible();
-  await expect(intervalCard.getByRole("checkbox",{name:/CI three-day interval.*completed/})).toHaveCount(3);
+  await expect(clientTabs.getByRole("tab",{name:"Services"})).toHaveAttribute("aria-selected","true");
+  await expect(clientTabs.getByRole("tab",{name:"Delivery"})).toHaveCount(0);
   await clientTabs.getByRole("tab",{name:"Agreement"}).click();
   await expect(workspace.getByRole("heading",{name:"Client profile & agreement"})).toBeVisible();
   await expect(workspace.getByRole("heading",{name:"Client deliveries"})).toHaveCount(0);
@@ -1035,10 +940,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("dialog",{name:"Client details"})).toHaveCount(0);
   const clientUrl=page.url();
   await visitWorkspace(page,"/app/dashboard");
-  const pendingCard=page.getByTestId("client-deliveries-list").locator("article").filter({hasText:"Founder CI Lead"});
-  await expect(pendingCard).toHaveClass(/aw-client-delivery-card--pending/);
-  await expect(pendingCard.getByText("Completed service dates")).toHaveCount(0);
-  await expect(pendingCard.getByText(/Target [0-9]/)).toHaveCount(0);
+  await expect(page.getByTestId("client-deliveries-overview")).toHaveCount(0);
   await page.goto(clientUrl);
   await clientTabs.getByRole("tab",{name:"Contacts"}).click();
   await expect(workspace.getByRole("heading",{name:"Contacts"})).toBeVisible();
@@ -1065,7 +967,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const employeePassword="CI-Employee-"+Date.now().toString(36)+"#2026";
   await finishPasswordRotation(page,employeePassword);
   await expect(page).toHaveURL(/\/app\/dashboard/);
-  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await expect(page.getByTestId("client-deliveries-overview")).toHaveCount(0);
   await capturePhase0Role(page,"employee");
   // Phase 7: a slow search response cannot replace newer results. This uses
   // only the isolated CI account, and mocks reads without mutating records.
@@ -1100,7 +1002,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.unroute(pattern);
   await visitWorkspace(page,"/app/dashboard");
   await expect(page.locator('[data-dashboard-role="member"]')).toBeVisible();
-  await expect(page.getByRole("heading",{name:"Client Deliveries"})).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Client Deliveries"})).toHaveCount(0);
   if(TASKS_ENABLED){
   await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Tasks",exact:true})).toBeVisible();
   await visitWorkspace(page,"/app/task-history");
@@ -1113,11 +1015,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     await expect(page.getByRole("heading",{name:"Tasks are paused"})).toBeVisible();
   }
   await visitWorkspace(page,"/app/dashboard");
-  // Overview is now client-delivery based. Task-status cards remain only in the delivery module.
+  // The retired Client Deliveries feature must remain absent.
   await page.setViewportSize({width:1366,height:812});
-  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await expect(page.getByTestId("client-deliveries-overview")).toHaveCount(0);
   await expect(page.locator('[data-testid="personal-pending"]')).toHaveCount(0);
-  await expect(page.getByRole("link",{name:"All clients"})).toBeVisible();
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Clients",exact:true})).toBeVisible();
   if(TASKS_ENABLED){
   // Non-admin Task Register rows share neutral surfaces, using semantic status pills.
   await visitWorkspace(page,"/app/tasks");
@@ -1141,7 +1043,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   ]);
   }
   await visitWorkspace(page,"/app/dashboard");
-  await expect(page.getByTestId("client-deliveries-overview")).toBeVisible();
+  await expect(page.getByTestId("client-deliveries-overview")).toHaveCount(0);
   await expect(page.locator('[data-testid="personal-completed"]')).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Team & accounts"})).toHaveCount(0);
   await expect(page.getByRole("link",{name:"Files & assets"})).toHaveCount(0);
