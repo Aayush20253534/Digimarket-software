@@ -9,7 +9,7 @@ assert.ok(vercel.buildCommand.includes("@digimarket/contracts build"));
 assert.ok(vercel.buildCommand.includes("@digimarket/web build"));
 assert.ok(render.includes("name: digimarket-api")&&render.includes("plan: free"));
 assert.ok(!render.includes("name: digimarket-worker"),"Paid worker must not be provisioned by free Blueprint");
-assert.ok(render.includes("autoDeployTrigger: off"));
+assert.ok(render.includes("autoDeployTrigger: commit"),"Render must redeploy the API on main so new finance endpoints are not left behind");
 assert.ok(!render.includes("preDeployCommand:"),"Render Free cannot run pre-deploy hook");
 assert.ok(render.includes("startCommand:")&&render.includes("db:migrate:deploy")&&render.includes("seed.ts")&&render.includes("@digimarket/api start"));
 assert.ok(render.includes("healthCheckPath: /api/v1/ready"));
