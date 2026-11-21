@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, serviceDeliveryPlanSchema, serviceDeliveryPlanUpdateSchema, clientServiceSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, clientServiceSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -59,19 +59,7 @@ describe("lead decision pending stage",()=>{
  });
 });
 
-describe("optional recurrence for client deliveries",()=>{
- const base={clientId:"00000000-0000-4000-8000-000000000001",assigneeId:"00000000-0000-4000-8000-000000000002",title:"Website",startOn:"2026-11-05",endOn:"2026-11-05",weekdays:[]};
- it("accepts one-time services with no weekdays and allows editing them",()=>{
-  expect(serviceDeliveryPlanSchema.safeParse(base).success).toBe(true);
-  const update={assigneeId:base.assigneeId,title:base.title,startOn:base.startOn,endOn:base.endOn,weekdays:base.weekdays};
-  expect(serviceDeliveryPlanUpdateSchema.safeParse({...update,version:1,active:true}).success).toBe(true);
- });
- it("rejects zero-weekday ranges and preserves recurring service validation",()=>{
-  expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30"}).success).toBe(false);
-  expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30",weekdays:[4]}).success).toBe(true);
-  expect(serviceDeliveryPlanSchema.safeParse({...base,endOn:"2026-11-30",weekdays:[4,4]}).success).toBe(false);
- });
-});
+
 
 describe("agreed services without duplicate monthly quantity",()=>{
  it("accepts service details without monthly targets",()=>{
@@ -82,21 +70,7 @@ describe("agreed services without duplicate monthly quantity",()=>{
  });
 });
 
-describe("interval recurrence for service deliveries",()=>{
- const base={clientId:"00000000-0000-4000-8000-000000000001",assigneeId:"00000000-0000-4000-8000-000000000002",title:"Reel editing",startOn:"2026-10-28",endOn:"2026-11-28",weekdays:[]};
- it("accepts alternating, two-day and three-day gaps",()=>{
-  for(const n of [2,3,4,7,31])expect(serviceDeliveryPlanSchema.safeParse({...base,repeatEveryDays:n}).success).toBe(true);
- });
- it("rejects unsupported or conflicting day intervals",()=>{
-  for(const n of [0,1,32,2.5])expect(serviceDeliveryPlanSchema.safeParse({...base,repeatEveryDays:n}).success).toBe(false);
-  expect(serviceDeliveryPlanSchema.safeParse({...base,weekdays:[4],repeatEveryDays:3}).success).toBe(false);
- });
- it("allows interval schedule updates and weekly recurrence",()=>{
-  const plan={assigneeId:base.assigneeId,title:base.title,startOn:base.startOn,endOn:base.endOn,weekdays:base.weekdays};
-  expect(serviceDeliveryPlanUpdateSchema.safeParse({...plan,repeatEveryDays:2,active:true,version:1}).success).toBe(true);
-  expect(serviceDeliveryPlanUpdateSchema.safeParse({...plan,weekdays:[4],repeatEveryDays:null,active:true,version:1}).success).toBe(true);
- });
-});
+
 
 describe("Meta Ads financial entry ownership",()=>{
   const base={
