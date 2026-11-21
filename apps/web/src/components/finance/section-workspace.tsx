@@ -136,8 +136,9 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   useEffect(()=>{setCategoryName("");setEditingCategory(null);setCategoryPurpose("GENERAL");setError("");setSuccess("");},[categoryKind]);
   const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind&&c.purpose!=="SALARY"&&!isSalaryCategory(c.name)&&(section!=="ads"||isMetaAdsCategory(c))),[categories,kind,section]);
   useEffect(()=>{
-    if(moneyAccountId||!session?.identity.userId)return;
-    const personal=accounts.find(a=>a.ownerUserId===session.identity.userId);
+    const currentUserId=session?.identity.userId;
+    if(moneyAccountId||!currentUserId)return;
+    const personal=accounts.find(a=>a.ownerUserId===currentUserId);
     if(personal)setMoneyAccountId(personal.id);
   },[accounts,moneyAccountId,session?.identity.userId]);
   const salarySelected=kind==="EXPENSE"&&categoryId===SALARY_OPTION;
@@ -951,7 +952,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       {loading&&!hasLoadedEntries?<Spinner label="Loading financial entries…"/>:
         !entries.length&&!error?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
         !entries.length?<Notice kind="error">The financial register could not be loaded. Saved entries have not been deleted. Retry Refresh.</Notice>:
-        <div className="space-y-3 md:hidden" role="region" aria-label="Financial entries mobile view">
+        <><div className="space-y-3 md:hidden" role="region" aria-label="Financial entries mobile view">
           {filteredEntries.map(row=><article key={row.id} className="rounded-xl border border-white/10 p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <strong>{money(row.amount)}</strong>
@@ -1023,7 +1024,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
                 row.approvalRequestId?<Link href={"/app/approvals?focus="+encodeURIComponent(row.approvalRequestId)} className="aw-finance-approval-link">View approval</Link>:null}
 
             </div></td>
-          </tr>)}</tbody></table></div>}
+          </tr>)}</tbody></table></div></>}
       {entries.length>0&&!filteredEntries.length&&<p className="aw-v5-no-matches" role="status">
        No transactions match these filters.
        <button type="button" onClick={()=>{setEntrySearch("");setEntryKindFilter("ALL");setEntryStatusFilter("ALL");}}>Clear filters</button>
