@@ -12,12 +12,11 @@ export function OperationsWorkspaceNav(){
  const {session}=useAuth();
  const path=usePathname();
  if(!session)return null;
- const granted=new Set(session.identity.permissions);
  const links=[
 // Tasks paused:   {label:"Tasks",href:"/app/tasks",icon:ClipboardCheck,allowed:granted.has("tasks.read")},
   {label:"Approvals",href:"/app/approvals",icon:ShieldCheck,allowed:granted.has("approvals.read")},
  ].filter(link=>link.allowed);
- if(links.length<2)return null;
+ if(links.length===0)return null;
  return <nav aria-label="Operations workspace sections" className="aw-v4-operations-nav">
   {links.map(({label,href,icon:Icon})=>{
    const active=path===href||(href==="/app/tasks"&&path==="/app/task-history");
