@@ -69,6 +69,7 @@ const endpoints: Record<string, string[]> = {
   "salary/payments": ["GET","POST"],
   "salary/summary": ["GET"],
   "finance/entries": ["GET", "POST"],
+  "finance/expenses/mine": ["POST"],
   "finance/assignees": ["GET"],
   "finance/meta-ad-clients": ["GET"],
   "finance/meta-ads-distribution": ["GET"],
@@ -497,7 +498,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     // includes meta.requestId, unlike an actual missing note. Report the
     // deployment mismatch instead of misleading users with "Route not found".
     if (response.status===404 && (path==="notes" || noteDetailPattern.test(path)
-      || path==="finance/assignees" || path==="finance/cycle-balance" || path==="finance/internal-settlements/mine" || path==="finance/internal-settlements/all" || path==="finance/client-ad-spend/mine"
+      || path==="finance/assignees" || path==="finance/cycle-balance" || path==="finance/internal-settlements/mine" || path==="finance/internal-settlements/all" || path==="finance/client-ad-spend/mine" || path==="finance/expenses/mine"
       || financeEntryDetailPattern.test(path))) {
       const payload=await response.clone().json().catch(()=>null) as
         {error?:{code?:string;message?:string};meta?:{requestId?:string}} | null;
