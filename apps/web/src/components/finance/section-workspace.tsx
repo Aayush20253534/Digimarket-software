@@ -604,7 +604,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
           </div>
          </div>)}
       </div>
-      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Internal settlements do not restart the selected work cycle or change agency totals.</p>
+      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Internal settlements reset My entries summaries within the selected work cycle, without changing the agency totals or historical records.</p>
     </section>
     {isFounder&&<section id="finance-salary" className="rounded-xl border border-white/10 p-5 space-y-3" aria-label="Separate founder salary funding expenses">
       <div className="flex flex-wrap justify-between gap-2"><div><h2 className="font-semibold text-lg">Founder-funded salary expenses</h2>
