@@ -60,6 +60,8 @@ const endpoints: Record<string, string[]> = {
   "finance/internal-settlements/founders": ["GET"],
   // A founder must be able to read incoming and outgoing settlement history.
   "finance/internal-settlements/mine": ["GET"],
+  "finance/internal-settlements/all": ["GET"],
+  "finance/client-ad-spend/mine": ["GET"],
   "finance/internal-settlements": ["POST"],
   "salary/people": ["GET"],
   "salary/accounts": ["GET","POST"],
@@ -304,7 +306,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
-  if(["finance/cycle-balance","finance/summary","finance/internal-settlements/mine","finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
+  if(["finance/cycle-balance","finance/summary","finance/internal-settlements/mine","finance/internal-settlements/all","finance/client-ad-spend/mine","finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
     for(const key of ["from","to","view","scope","funding","kind","type","status","categoryId","accountId","clientId","page","limit","q"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
   if(path==="service-deliveries"){
@@ -495,7 +497,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     // includes meta.requestId, unlike an actual missing note. Report the
     // deployment mismatch instead of misleading users with "Route not found".
     if (response.status===404 && (path==="notes" || noteDetailPattern.test(path)
-      || path==="finance/assignees" || path==="finance/cycle-balance" || path==="finance/internal-settlements/mine"
+      || path==="finance/assignees" || path==="finance/cycle-balance" || path==="finance/internal-settlements/mine" || path==="finance/internal-settlements/all" || path==="finance/client-ad-spend/mine"
       || financeEntryDetailPattern.test(path))) {
       const payload=await response.clone().json().catch(()=>null) as
         {error?:{code?:string;message?:string};meta?:{requestId?:string}} | null;
