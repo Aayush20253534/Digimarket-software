@@ -26,7 +26,7 @@ export function cycleLabel(key: string): string {
   const format = (date: string) => new Date(date + "T00:00:00Z").toLocaleDateString("en-IN", {
     timeZone: "UTC", day: "numeric", month: "short", year: "numeric",
   });
-  return format(cycle.from) + " – " + format(cycle.endExclusive);
+  return format(cycle.from) + " – " + format(cycle.to);
 }
 
 export function reportingPreset(kind: "current" | "previous" | "three" | "year" | "all", now = new Date()): ReportingPeriod {

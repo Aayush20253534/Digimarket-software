@@ -3,9 +3,10 @@ import {Prisma, type PrismaClient} from "@digimarket/db";
 // Finance is the authoritative founder pool. Each founder's spendable amount is
 // their POSTED agency income minus POSTED agency expenses, client-funded Meta
 // Ads recorded under that founder, and PAID salary allocations funded by them.
+// Active internal settlements redistribute the spendable personal balance.
 // This is an attributed bookkeeping balance, not an actual bank account balance.
 type LedgerDb=Pick<PrismaClient,
- "financialTransaction"|"financialCategory"|"salaryFundingAllocation"|"salaryFundingAccount">;
+ "financialTransaction"|"financialCategory"|"salaryFundingAllocation"|"salaryFundingAccount"|"internalSettlement">;
 
 const isMetaAds=(name:string)=>/^meta[\s_-]*(?:ads?|advertising|advertisements?)$/i.test(name.trim());
 const zero=()=>new Prisma.Decimal(0);
@@ -20,14 +21,16 @@ export async function founderLedgerBalances(db:LedgerDb,organizationId:string,fo
  const ids=[...new Set(founderIds)];
  const results=new Map<string,FounderBalance>();
  if(!ids.length)return results;
- const [categories,posted,accounts]=await Promise.all([
+ const [categories,posted,accounts,settlements]=await Promise.all([
   db.financialCategory.findMany({where:{organizationId,kind:"EXPENSE"},
    select:{id:true,name:true,purpose:true}}),
   db.financialTransaction.groupBy({by:["enteredById","kind"],where:{
    organizationId,enteredById:{in:ids},clientId:null,status:"POSTED"
   },_sum:{amount:true}}),
   db.salaryFundingAccount.findMany({where:{organizationId,founderUserId:{in:ids}},
-   select:{id:true,founderUserId:true}})
+   select:{id:true,founderUserId:true}}),
+  db.internalSettlement.findMany({where:{organizationId,voidedAt:null,
+   OR:[{senderId:{in:ids}},{recipientId:{in:ids}}]},select:{senderId:true,recipientId:true,amount:true}})
  ]);
  const metaIds=categories.filter(c=>c.purpose?c.purpose==="META_ADS":isMetaAds(c.name)).map(c=>c.id);
  const [ads,allocations]=await Promise.all([
@@ -55,12 +58,17 @@ export async function founderLedgerBalances(db:LedgerDb,organizationId:string,fo
   const id=byAccount.get(row.accountId);if(!id)continue;
   salary.set(id,(salary.get(id)??zero()).plus(row._sum.amount??0));
  }
+ const settlementNet=new Map<string,Prisma.Decimal>();
+ for(const movement of settlements){
+  settlementNet.set(movement.senderId,(settlementNet.get(movement.senderId)??zero()).minus(movement.amount));
+  settlementNet.set(movement.recipientId,(settlementNet.get(movement.recipientId)??zero()).plus(movement.amount));
+ }
  for(const id of ids){
   const financeNetBeforeSalary=(income.get(id)??zero()).minus(expense.get(id)??zero())
    .minus(clientAds.get(id)??zero());
   const salaryFunded=salary.get(id)??zero();
   results.set(id,{founderUserId:id,financeNetBeforeSalary,salaryFunded,
-   remaining:financeNetBeforeSalary.minus(salaryFunded)});
+   remaining:financeNetBeforeSalary.minus(salaryFunded).plus(settlementNet.get(id)??zero())});
  }
  return results;
 }

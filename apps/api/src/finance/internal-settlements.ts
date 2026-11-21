@@ -2,6 +2,7 @@ import {dateOnlyRange,type ReportingPeriod} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
+import {financeLock,openPeriod,ensurePersonalMoneyAccount} from "./ledger-service";
 
 const missing=()=>new AuthError(404,"NOT_FOUND","Internal settlement not found");
 const founder=(actor:Principal)=>{
@@ -13,11 +14,36 @@ export type SettlementInput={
  note?:string;idempotencyKey:string
 };
 
-/**
- * An informational, founder-to-founder mirror. NEVER create FinancialTransaction
- * entries for these memos: they are intentionally excluded from company finances.
- */
+/** One settlement creates two opposite personal clearing-account movements.
+ * Agency income and expense totals remain unchanged. */
 export class InternalSettlementService{
+ async cycleBalance(actor:Principal,view:"mine"|"all",period:ReportingPeriod){
+  if(view==="mine"){
+   if(!actor.permissions.has("finance.entry.read.own"))throw forbidden();
+  }else if(!actor.permissions.has("finance.read.all"))throw forbidden();
+  const from=new Date(period.from+"T00:00:00.000Z"),to=new Date(period.to+"T00:00:00.000Z");
+  const own=view==="mine"?Prisma.sql`AND a."ownerUserId"=${actor.userId}::uuid`:Prisma.empty;
+  const [balance]=await this.db.$queryRaw<{opening:string;movement:string;remaining:string}[]>(Prisma.sql`
+   WITH account_balances AS (
+    SELECT a."id",
+      (CASE WHEN a."openingOn"<${from} THEN a."openingBalance" ELSE 0 END
+       + COALESCE(SUM(m."amount") FILTER(WHERE m."occurredOn"<${from}),0)) AS opening,
+      (CASE WHEN a."openingOn"<=${to} THEN a."openingBalance" ELSE 0 END
+       + COALESCE(SUM(m."amount"),0)) AS closing
+    FROM "MoneyAccount" a LEFT JOIN "FinanceMoneyMovement" m
+      ON m."moneyAccountId"=a."id" AND m."organizationId"=a."organizationId"
+      AND m."occurredOn">=a."openingOn" AND m."occurredOn"<=${to}
+    WHERE a."organizationId"=${actor.organizationId}::uuid AND a."openingOn"<=${to} ${own}
+    GROUP BY a."id"
+   ) SELECT COALESCE(SUM(opening),0)::text AS opening,
+    COALESCE(SUM(closing-opening),0)::text AS movement,
+    COALESCE(SUM(closing),0)::text AS remaining FROM account_balances`);
+  return {from:period.from,to:period.to,view,currency:"INR",
+   opening:new Prisma.Decimal(balance.opening).toFixed(4),
+   movement:new Prisma.Decimal(balance.movement).toFixed(4),
+   remaining:new Prisma.Decimal(balance.remaining).toFixed(4)};
+ }
+
  constructor(private readonly db:PrismaClient){}
  async founders(actor:Principal){
   founder(actor);
@@ -42,6 +68,10 @@ export class InternalSettlementService{
   if(!recipient)throw new AuthError(422,"INVALID_RECIPIENT","Select an active founder from your organization");
   try{
    const settlement=await this.db.$transaction(async tx=>{
+    await financeLock(tx,actor.organizationId);
+    await openPeriod(tx,actor.organizationId,input.occurredOn);
+    await ensurePersonalMoneyAccount(tx,actor.organizationId,actor.userId);
+    await ensurePersonalMoneyAccount(tx,actor.organizationId,input.recipientId);
     const row=await tx.internalSettlement.create({data:{
      organizationId:actor.organizationId,senderId:actor.userId,
      recipientId:input.recipientId,idempotencyKey:input.idempotencyKey,
@@ -65,10 +95,12 @@ export class InternalSettlementService{
   founder(actor);
   if(!actor.permissions.has("finance.entry.create"))throw forbidden();
   return this.db.$transaction(async tx=>{
+   await financeLock(tx,actor.organizationId);
    const row=await tx.internalSettlement.findFirst({where:{id,organizationId:actor.organizationId,senderId:actor.userId},
-    select:{id:true,voidedAt:true}});
+    select:{id:true,voidedAt:true,occurredOn:true}});
    if(!row)throw missing();
    if(row.voidedAt)throw new AuthError(409,"ALREADY_VOID","Settlement was already voided");
+   await openPeriod(tx,actor.organizationId,row.occurredOn.toISOString().slice(0,10));
    const updated=await tx.internalSettlement.updateMany({
     where:{id,organizationId:actor.organizationId,senderId:actor.userId,voidedAt:null},
     data:{voidedAt:new Date(),voidedById:actor.userId,voidReason:reason.trim()}

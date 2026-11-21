@@ -759,83 +759,35 @@ export class FinanceService {
     return {filename:"finance-"+q.from+"-"+q.to+".csv",csv};
   }
 
+  // Settlements transfer personal balances; only work-cycle dates control resets.
   async totals(actor:Principal,view:View,period?:ReportingPeriod){
     const occurredOn=period?{occurredOn:dateOnlyRange(period)}:{};
     const paidOn=period?{paidOn:dateOnlyRange(period)}:{};
     const clientAdWhere=await this.metaAdsWhere(actor,view,"client_ads");
-    // A founder's latest active internal settlement (incoming OR outgoing)
-    // starts a new personal summary reporting cycle. The agency ledger never
-    // resets. Use the actual record timestamp, not an editable occurredOn.
-    // The UI always sends an explicit reporting period. A settlement inside
-    // that period must still reset My Entries, while later settlements must
-    // not rewrite a previously selected historical period.
-    const endExclusive=period
-      ?new Date(Date.parse(period.to+"T00:00:00+05:30")+86_400_000):null;
-    const checkpoint=view==="mine"&&isFounder(actor)
-      ?await this.db.internalSettlement.findFirst({
-        where:{organizationId:actor.organizationId,voidedAt:null,
-          ...(endExclusive?{createdAt:{lt:endExclusive}}:{}),
-          OR:[{senderId:actor.userId},{recipientId:actor.userId}]},
-        orderBy:[{createdAt:"desc"},{id:"desc"}],
-        select:{createdAt:true}
-      }):null;
-    const resetAt=checkpoint?.createdAt??null;
-    // Approvals posted after a settlement belong to the new cycle even if
-    // submitted earlier. Pending records use their original creation time.
-    const sinceReset:Prisma.FinancialTransactionWhereInput=resetAt?{OR:[
-      {status:"POSTED",OR:[{postedAt:{gt:resetAt}},{postedAt:null,createdAt:{gt:resetAt}}]},
-      {status:{not:"POSTED"},createdAt:{gt:resetAt}}
-    ]}:{};
-    const [allGrouped,currentCycleGroups,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
-      this.db.financialTransaction.groupBy({
-        by:["kind","status"],where:{...this.scope(actor,view),...occurredOn},
-        _sum:{amount:true},_count:{_all:true},
-      }),
-      resetAt?this.db.financialTransaction.groupBy({
-        by:["kind","status"],where:{...this.scope(actor,view),...occurredOn,...sinceReset},
-        _sum:{amount:true},_count:{_all:true},
-      }):Promise.resolve(null),
-      this.db.financialTransaction.groupBy({
-        by:["status"],where:{...clientAdWhere,...sinceReset,...occurredOn},
-        _sum:{amount:true},_count:{_all:true},
-      }),
-      view==="all"?this.db.salaryPayment.aggregate({
-        where:{organizationId:actor.organizationId,status:"PAID",...paidOn},_sum:{amount:true}
-      }):this.db.salaryFundingAllocation.aggregate({
-        where:{payment:{organizationId:actor.organizationId,status:"PAID",...paidOn,
-          ...(resetAt?{createdAt:{gt:resetAt}}:{})},
-         account:{organizationId:actor.organizationId,founderUserId:actor.userId}},_sum:{amount:true}
-      }),
-      // Amount is a personal memo, not a subtraction from expense accounts.
-      view==="mine"&&isFounder(actor)
-        ?this.db.internalSettlement.aggregate({
-          where:{organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null,...occurredOn},
-          _sum:{amount:true}
-        }):Promise.resolve(null),
+    const [grouped,clientGroups,salaryExpense,receivedSettlements]=await Promise.all([
+      this.db.financialTransaction.groupBy({by:["kind","status"],where:{...this.scope(actor,view),...occurredOn},_sum:{amount:true},_count:{_all:true}}),
+      this.db.financialTransaction.groupBy({by:["status"],where:{...clientAdWhere,...occurredOn},_sum:{amount:true},_count:{_all:true}}),
+      view==="all"?this.db.salaryPayment.aggregate({where:{organizationId:actor.organizationId,status:"PAID",...paidOn},_sum:{amount:true}}):
+       this.db.salaryFundingAllocation.aggregate({where:{payment:{organizationId:actor.organizationId,status:"PAID",...paidOn},
+        account:{organizationId:actor.organizationId,founderUserId:actor.userId}},_sum:{amount:true}}),
+      view==="mine"&&isFounder(actor)?this.db.internalSettlement.aggregate({where:{organizationId:actor.organizationId,recipientId:actor.userId,voidedAt:null,...occurredOn},_sum:{amount:true}}):Promise.resolve(null),
     ]);
-    // Every My Entries card must use the same checkpoint, including posted
-    // and pending income. Lifetime amounts are retained only for reconciliation.
-    const grouped=resetAt?(currentCycleGroups??[]):allGrouped;
-    const entries=grouped.map(g=>({kind:g.kind,status:g.status,
-      amount:(g._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:g._count._all}));
-    const sumFrom=(rows:typeof allGrouped,kind:FinanceKind,status:"POSTED"|"PENDING")=>rows
-      .filter(g=>g.kind===kind&&g.status===status)
-      .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
-    const sum=(kind:FinanceKind,status:"POSTED"|"PENDING")=>sumFrom(grouped,kind,status);
-    const income=sum("INCOME","POSTED"),expense=sum("EXPENSE","POSTED");
+    const entries=grouped.map(g=>({kind:g.kind,status:g.status,amount:(g._sum.amount??new Prisma.Decimal(0)).toFixed(4),count:g._count._all}));
+    const sum=(kind:FinanceKind,status:"POSTED"|"PENDING")=>grouped
+     .filter(g=>g.kind===kind&&g.status===status)
+     .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
     const clientSum=(status:"POSTED"|"PENDING")=>clientGroups
-      .filter(g=>g.status===status)
-      .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
+     .filter(g=>g.status===status)
+     .reduce((acc,g)=>acc.plus(g._sum.amount??new Prisma.Decimal(0)),new Prisma.Decimal(0));
+    const income=sum("INCOME","POSTED"),expense=sum("EXPENSE","POSTED");
     const postedClientAds=clientSum("POSTED");
     const postedSalaryExpense=salaryExpense._sum.amount??new Prisma.Decimal(0);
-    const receivedSettlementCredit=receivedSettlements?._sum.amount??new Prisma.Decimal(0);
     const beforeSalary=income.minus(expense).minus(postedClientAds);
     return {currency:"INR",...(period??{}),postedIncome:income.toFixed(4),
       agencyOperatingNet:income.minus(expense).minus(postedSalaryExpense).toFixed(4),
-      postedExpense:expense.toFixed(4),
-      postedExpenseBeforeSettlement:sumFrom(allGrouped,"EXPENSE","POSTED").toFixed(4),
-      receivedInternalSettlement:receivedSettlementCredit.toFixed(4),
-      personalSettlementResetAt:resetAt?.toISOString()??null,
+      postedExpense:expense.toFixed(4),postedExpenseBeforeSettlement:expense.toFixed(4),
+      receivedInternalSettlement:(receivedSettlements?._sum.amount??new Prisma.Decimal(0)).toFixed(4),
+      personalSettlementResetAt:null,
       postedSalaryExpense:postedSalaryExpense.toFixed(4),
       postedExpenseIncludingSalary:expense.plus(postedSalaryExpense).toFixed(4),
       postedNetBeforeSalary:beforeSalary.toFixed(4),
@@ -843,8 +795,8 @@ export class FinanceService {
       pendingIncome:sum("INCOME","PENDING").toFixed(4),
       pendingExpense:sum("EXPENSE","PENDING").toFixed(4),groups:entries,
       clientAdSpend:{posted:postedClientAds.toFixed(4),pending:clientSum("PENDING").toFixed(4),
-        count:clientGroups.filter(g=>g.status!=="CANCELLED").reduce((n,g)=>n+g._count._all,0)},
-       ...(view==="all"?{recurringIncome:await this.recurringIncome(actor,period)}:{})};
+       count:clientGroups.filter(g=>g.status!=="CANCELLED").reduce((n,g)=>n+g._count._all,0)},
+      ...(view==="all"?{recurringIncome:await this.recurringIncome(actor,period)}:{})};
   }
 
   async exportCsv(actor:Principal,view:View,scope:"agency"|"client_ads"|"meta_ads"="agency",period?:ReportingPeriod){

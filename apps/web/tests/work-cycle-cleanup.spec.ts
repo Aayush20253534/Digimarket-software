@@ -29,7 +29,10 @@ async function mockWorkspace(page:Page,role="FOUNDER"){
    deleted.push(rows.map(row=>row.id));leads=leads.filter(lead=>!rows.some(row=>row.id===lead.id));
    data={deletedCount:rows.length,ids:rows.map(row=>row.id)};
   }else if(path==="/finance/register")data={items:[],total:0,page:1,limit:25};
-  else if(path==="/finance/summary")data=totals;
+  else if(path==="/finance/summary")data=url.searchParams.get("from")==="2026-11-22"
+    ? {...totals,postedIncome:"0",postedExpense:"0",postedNet:"0"}:totals;
+  else if(path==="/finance/cycle-balance")data={opening:"650",movement:"0",remaining:"650"};
+  else if(path==="/finance/category-summary")data={ordinary:"0",total:"0",items:[]};
   else if(path==="/finance/total-expenses/summary")data={postedIncome:"1000",postedTotalExpense:"350",netOperatingMoney:"650",breakdown:{OTHER:"200",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}};
   else if(path==="/salary/summary")data={totalPaid:"50",founderFunding:[]};
   else if(path==="/finance/meta-ads-distribution")data={view:"mine",from:url.searchParams.get("from"),to:url.searchParams.get("to"),totalPosted:"100",totalPending:"0",total:"100",excludedAmount:"0",excludedCount:0,transactionCount:1,selfPosted:"0",selfPending:"0",clientPosted:"100",clientPending:"0",categories:[],individuals:[],daily:[],monthly:[]};
@@ -84,6 +87,17 @@ test("finance overview cards keep details on separate pages and preserve the wor
  await page.getByRole("link",{name:"New entry / register"}).click();
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-11-22");
  await expect.poll(()=>requests.some(row=>row.path==="/salary/summary"&&row.from==="2026-11-22")).toBe(true);
+});
+
+test("next-cycle Income identifies previous cycle net without double counting new income",async({page})=>{
+ const {requests}=await mockWorkspace(page);
+ await page.goto("/app/finance/income?view=mine&from=2026-11-22&to=2026-12-21");
+ await expect(page.getByText("Previous cycle net posted",{exact:true})).toBeVisible();
+ await expect(page.getByText("₹650.00",{exact:true})).toBeVisible();
+ await expect(page.getByText("New income this cycle",{exact:true})).toBeVisible();
+ await expect(page.getByText("₹0.00",{exact:true})).toBeVisible();
+ await expect(page.getByRole("link",{name:"View source cycle"})).toHaveAttribute("href",/from=2026-10-22.*to=2026-11-21/);
+ expect(requests.some(x=>x.path==="/finance/summary"&&x.from==="2026-10-22"&&x.to==="2026-11-21")).toBe(true);
 });
 
 test("Tasks are hidden and preserved routes display the pause notice",async({page})=>{

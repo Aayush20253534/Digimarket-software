@@ -3,6 +3,7 @@ import {agencyToday,cycleLabel} from "@digimarket/contracts";
 import {BusinessPeriodPicker} from "@/components/business-period-picker";
 import {FinancePager,useFinanceWindow} from "./shared";
 import {ReversalButton} from "./reversal";
+import {PreviousCycleNetPosted} from "./previous-cycle-carry";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -97,6 +98,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [metaAdClients,setMetaAdClients]=useState<MetaAdClient[]>([]);
   const [metaAdClientsError,setMetaAdClientsError]=useState("");
   const [totals,setTotals]=useState<Totals>(zero);
+  const [balance,setBalance]=useState<{opening:string;movement:string;remaining:string}|null>(null);
   const [summaryAvailable,setSummaryAvailable]=useState(false);
   const [financeReady,setFinanceReady]=useState(false);
   const [recurring,setRecurring]=useState<RecurringIncome|null>(null);
@@ -186,6 +188,14 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     const problems=[ledger,sums,cats,policies].flatMap(result=>result.status==="rejected"?[readable(result.reason)]:[]);
     setError(problems.join(" "));setLoading(false);setMetaDistributionRefresh(v=>v+1);
   },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,directExpense]);
+  useEffect(()=>{
+    if(directExpense||section!=="entries"||!ready||!session)return;
+    let active=true;
+    const scope=view==="all"&&canAll?"all":"mine";
+    void request<{opening:string;movement:string;remaining:string}>("/finance/cycle-balance?view="+scope+"&"+periodQuery)
+      .then(result=>{if(active)setBalance(result)}).catch(()=>{if(active)setBalance(null)});
+    return()=>{active=false};
+  },[directExpense,section,ready,session,request,view,canAll,periodQuery,metaDistributionRefresh]);
   useEffect(()=>{
     if(directExpense||!isFounder||section!=="entries"||!ready)return;
     let active=true;
@@ -523,7 +533,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     {section==="settlements"&&isFounder&&canReadOwn&&
       <section id="finance-settlement-history" aria-label="My internal settlements">
         <Card title="Internal settlements received & sent"
-          description="The recipient sees Settlement In and the sender sees Settlement Out. These are private, informational records that do not change company finances.">
+          description="The recipient sees Settlement In and the sender sees Settlement Out. Both personal account balances change; company income and expense totals stay unchanged.">
           {settlementHistoryError&&<p role="status" className="text-sm text-amber-400">{settlementHistoryError}</p>}
           {loading&&!settlementHistory.length?<Spinner label="Loading settlement history…"/>:
            !settlementHistory.length?<p className="text-sm text-slate-400">
@@ -553,6 +563,15 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
         </Card>
       </section>}
     {section==="entries"&&<>
+    <div className="flex flex-wrap items-center gap-3">
+      <Link className="btn-secondary" href={"/app/finance/cycles?"+windowState.query}>Cycles · View previous entries</Link>
+    </div>
+    <PreviousCycleNetPosted period={period} view={view==="all"&&canAll?"all":"mine"}/>
+    {balance&&<Card>
+      <p className="text-sm font-semibold">Net balance remaining · {view==="mine"?"My account":"Company accounts"}</p>
+      <strong className="mt-2 block text-2xl">{money(balance.remaining)}</strong>
+      <p className="mt-1 text-sm text-slate-400">Carried forward: {money(balance.opening)} · Movement this cycle: {money(balance.movement)}. Bookkeeping balances, not verified bank funds.</p>
+    </Card>}
     <div id="finance-summary" className="aw-finance-summary-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" aria-label="Financial totals">
       {([
         ["Posted income",totals.postedIncome],
@@ -590,7 +609,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     <section className="aw-v5-finance-visuals" aria-label="Posted income and expense comparison">
       <header><div><span className="aw-v5-eyebrow">LEDGER COMPARISON</span>
         <h2>{view==="mine"?"Personal current-cycle income and expenses":"Posted agency income and expenses"}</h2>
-        <p>{view==="mine"?"All figures use the selected work cycle. Internal settlements remain separate informational records.":"Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income."}</p>
+        <p>{view==="mine"?"All figures use the selected work cycle. Internal settlements move personal balances without changing these income and expense totals.":"Agency ledger totals are kept separate from salaries funded by founders. Salary receipts never increase income."}</p>
        </div><Scale size={20} aria-hidden="true"/></header>
       <div className="aw-v5-finance-compare">
        {([["Income",totals.postedIncome,postedIncomeValue],
@@ -604,7 +623,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
           </div>
          </div>)}
       </div>
-      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Internal settlements reset My entries summaries within the selected work cycle, without changing the agency totals or historical records.</p>
+      <p className="aw-v5-finance-notice">Pending transactions and projected recurring fees are not included. Internal settlements move balances between founders. Only a new work cycle restarts income and expense totals; historical records stay available in Cycles.</p>
     </section>
     {isFounder&&<section id="finance-salary" className="rounded-xl border border-white/10 p-5 space-y-3" aria-label="Separate founder salary funding expenses">
       <div className="flex flex-wrap justify-between gap-2"><div><h2 className="font-semibold text-lg">Founder-funded salary expenses</h2>
@@ -654,7 +673,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     </div>
     {section==="settlements"&&isFounder&&canCreate&&canReadOwn&&
       <section id="finance-internal-settlement" aria-label="Record internal settlement">
-       <Card title="Internal Settlement" description="Private settlement records between founders. Use Accounts & transfers for actual reimbursements and reconciled balances.">
+       <Card title="Internal Settlement" description="Record money sent between founders. The sender balance decreases and recipient balance increases; this does not create company income or expenses.">
         {settlementError&&<Notice kind="error">{settlementError}</Notice>}
         <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={e=>void recordSettlement(e)}>
          <FormField id="settlement-recipient" label="Receiving founder">
@@ -993,7 +1012,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
             <td className="py-3 pr-4"><div className="min-w-40 max-w-80 whitespace-pre-wrap break-words text-sm" title={row.description??undefined}>{row.description?.trim()||"—"}</div></td>
             <td className={row.sourceType==="SETTLEMENT"?"aw-finance-amount text-slate-300":"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>
               {row.sourceType==="SETTLEMENT"?(row.settlementDirection==="OUTGOING"?"−":"+"):""}{money(row.amount)}
-              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">{"Resets both founders' personal expense cycles"}</small>}
+              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">{"Debits sender and credits recipient accounts"}</small>}
             </td>
             <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
             <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
@@ -1004,7 +1023,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
               {row.sourceType==="SETTLEMENT"?<>
-                <span className="text-xs text-slate-500">Informational only</span>
+                <span className="text-xs text-slate-500">Personal balance transfer; excluded from company income and expenses</span>
                 {row.settlementDirection==="OUTGOING"&&row.status!=="CANCELLED"&&
                   <button type="button" className="btn-secondary text-xs" disabled={busy}
                     onClick={()=>void voidSettlement(row)}>Void settlement</button>}

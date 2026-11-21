@@ -96,37 +96,29 @@ try{
  const senderTotals=await finance.totals(a,"mine");
  const recipientTotals=await finance.totals(b,"mine");
  for(const [current,previous] of [[senderTotals,beforeA],[recipientTotals,beforeB]]){
-  assert.ok(current.personalSettlementResetAt);
-  assert.equal(current.postedExpense,"0.0000");
-  assert.equal(current.postedSalaryExpense,"0.0000");
-  assert.equal(current.postedExpenseIncludingSalary,"0.0000");
-  assert.equal(current.pendingExpense,"0.0000");
-  assert.equal(current.clientAdSpend.posted,"0.0000");
-  assert.equal(current.postedExpenseBeforeSettlement,previous.postedExpense);
-  assert.equal(current.postedIncome,"0.0000");
-  assert.equal(current.pendingIncome,"0.0000");
-  assert.deepEqual(current.groups,[]);
-  assert.ok(Number(previous.postedExpenseBeforeSettlement)>=0);
+  assert.equal(current.personalSettlementResetAt,null);
+  for(const field of ["postedIncome","postedExpense","postedSalaryExpense","postedExpenseIncludingSalary","postedNet","pendingIncome","pendingExpense"] as const)
+   assert.equal(current[field],previous[field]);
+  assert.deepEqual(current.groups,previous.groups);
  }
  assert.equal(senderTotals.receivedInternalSettlement,"0.0000");
  assert.equal(recipientTotals.receivedInternalSettlement,"2000.0000");
- assert.equal(senderTotals.postedNet,"0.0000");
- assert.equal(recipientTotals.postedNet,"0.0000");
- // The frontend always sends from/to. Both summaries must obey a settlement
- // checkpoint while keeping historical expense rows available.
+ assert.equal(senderTotals.postedNet,beforeA.postedNet);
+ assert.equal(recipientTotals.postedNet,beforeB.postedNet);
+ // Date-selected summaries retain all transactions, even after settlement.
  const activeWindow={from:"2026-01-01",to:new Date(Date.now()+86_400_000).toISOString().slice(0,10)};
  const expenseReport=new TotalExpenseService(db);
  for(const founder of [a,b]){
+  const prior=founder===a?beforeA:beforeB;
   const scoped=await finance.totals(founder,"mine",activeWindow);
   const combined=await expenseReport.summary(founder,{...activeWindow,view:"mine"});
-  assert.equal(scoped.postedIncome,"0.0000");
-  assert.equal(scoped.postedExpense,"0.0000");
-  assert.equal(scoped.postedSalaryExpense,"0.0000");
-  assert.equal(scoped.postedNet,"0.0000");
-  assert.equal(combined.postedIncome,"0.0000");
-  assert.equal(combined.postedTotalExpense,"0.0000");
-  assert.equal(combined.netOperatingMoney,"0.0000");
-  assert.ok(combined.personalSettlementResetAt);
+  assert.equal(scoped.postedIncome,prior.postedIncome);
+  assert.equal(scoped.postedExpense,prior.postedExpense);
+  assert.equal(scoped.postedSalaryExpense,prior.postedSalaryExpense);
+  assert.equal(scoped.postedNet,prior.postedNet);
+  assert.equal(combined.postedIncome,prior.postedIncome);
+  assert.equal(combined.postedTotalExpense,prior.postedExpenseIncludingSalary);
+  assert.equal(combined.personalSettlementResetAt,null);
  }
  // Historical work cycles ending before settlement keep their original balances.
  const historyWindow={from:"2026-11-01",to:"2026-11-07"};
@@ -140,9 +132,11 @@ try{
  assert.equal((await expenseReport.summary(a,{...activeWindow,view:"all"})).postedTotalExpense,
    (await expenseReport.summary(a,{...historyWindow,view:"all"})).postedTotalExpense);
  const afterBalance=await founderLedgerBalances(db,organization.id,[a.userId,b.userId]);
- for(const id of [a.userId,b.userId]){
-  assert.equal(afterBalance.get(id)?.remaining.toFixed(4),beforeBalance.get(id)?.remaining.toFixed(4));
- }
+ assert.equal(afterBalance.get(a.userId)?.remaining.toFixed(4),beforeBalance.get(a.userId)?.remaining.minus(2000).toFixed(4));
+ assert.equal(afterBalance.get(b.userId)?.remaining.toFixed(4),beforeBalance.get(b.userId)?.remaining.plus(2000).toFixed(4));
+ const afterA=await settlements.cycleBalance(a,"mine",{from:"2026-10-22",to:"2026-11-21"});
+ const afterB=await settlements.cycleBalance(b,"mine",{from:"2026-10-22",to:"2026-11-21"});
+ assert.equal(Number(afterA.remaining)+Number(afterB.remaining),2300);
  const outgoing=(await finance.entries(a,"mine")).filter(x=>x.sourceType==="SETTLEMENT");
  const incoming=(await finance.entries(b,"mine")).filter(x=>x.sourceType==="SETTLEMENT");
  assert.equal(outgoing.length,1);
@@ -192,14 +186,14 @@ try{
  const newB=await finance.submit(b,{kind:"EXPENSE",categoryId:expenseCategory.id,amount:"600.00",
   occurredOn:"2026-10-01",method:"UPI",idempotencyKey:randomUUID()});
  assert.equal(newA.status,"POSTED");assert.equal(newB.status,"POSTED");
- assert.equal((await finance.totals(a,"mine")).postedExpense,"125.0000");
- assert.equal((await finance.totals(b,"mine")).postedExpense,"600.0000");
+ assert.equal((await finance.totals(a,"mine")).postedExpense,"4625.0000");
+ assert.equal((await finance.totals(b,"mine")).postedExpense,"3800.0000");
  const newIncome=await finance.submit(a,{kind:"INCOME",categoryId:category.id,amount:"300.00",
   occurredOn:"2026-10-01",method:"UPI",idempotencyKey:randomUUID()});
  assert.equal(newIncome.status,"POSTED");
- assert.equal((await finance.totals(a,"mine")).postedIncome,"300.0000");
+ assert.equal((await finance.totals(a,"mine")).postedIncome,"10300.0000");
  assert.equal((await finance.totals(b,"mine")).postedIncome,"0.0000");
- assert.equal((await finance.totals(a,"mine")).postedNet,"175.0000");
+ assert.equal((await finance.totals(a,"mine")).postedNet,"4875.0000");
  const agencyAfterNew=await finance.totals(a,"all");
  assert.equal(agencyAfterNew.postedIncome,
   (Number(beforeAll.postedIncome)+300).toFixed(4));
@@ -208,12 +202,12 @@ try{
  assert.equal(agencyAfterNew.postedSalaryExpense,beforeAll.postedSalaryExpense);
  const second=await settlements.record(a,{recipientId:bob.id,amount:"250.00",
   occurredOn:"2026-11-06",method:"UPI",idempotencyKey:randomUUID()});
- assert.equal((await finance.totals(a,"mine")).postedExpense,"0.0000");
- assert.equal((await finance.totals(b,"mine")).postedExpense,"0.0000");
+ assert.equal((await finance.totals(a,"mine")).postedExpense,"4625.0000");
+ assert.equal((await finance.totals(b,"mine")).postedExpense,"3800.0000");
  assert.deepEqual(await finance.totals(a,"all"),agencyAfterNew);
  await settlements.void(a,second.id,"Reverse second cycle closure");
- assert.equal((await finance.totals(a,"mine")).postedExpense,"125.0000");
- assert.equal((await finance.totals(b,"mine")).postedExpense,"600.0000");
+ assert.equal((await finance.totals(a,"mine")).postedExpense,"4625.0000");
+ assert.equal((await finance.totals(b,"mine")).postedExpense,"3800.0000");
  await assert.rejects(()=>settlements.void(b,saved.id,"Invalid transfer"),forbidden(404));
  await assert.rejects(()=>settlements.void(stranger,saved.id,"Invalid transfer"),forbidden(404));
  const voided=await settlements.void(a,saved.id,"Entered twice in notes");
@@ -234,5 +228,5 @@ try{
  assert.equal(await db.financialTransaction.count({where:{organizationId:organization.id}}),transactions+3);
  assert.equal(await db.auditLog.count({where:{organizationId:organization.id,
   entityType:"InternalSettlement",entityId:saved.id}}),2);
- console.info("Internal Settlement PASS: both personal cycles reset, new spend accrues, agency ledger untouched, void restores history, privacy and CSV.");
+ console.info("Internal Settlement PASS: balanced founder movements, no ledger reset, agency ledger untouched, void restores balances, privacy and CSV.");
 }finally{await db.$disconnect();}
