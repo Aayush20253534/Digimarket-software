@@ -474,6 +474,9 @@ export class FinanceService {
 
   async submit(actor:Principal,input:FinanceEntryInput,ownExpense=false){
     need(actor,"finance.entry.create");
+    // Preserve legacy records but never create unassigned pre-bookkeeping entries.
+    if(input.occurredOn<AGENCY_START_DATE)
+      throw invalid("New entries must be dated on or after the bookkeeping start (22 October 2026)");
     const founder=isFounder(actor);
     if(!founder)need(actor,"approvals.submit");
     if(ownExpense&&(input.kind!=="EXPENSE"||input.enteredById!=null||input.moneyAccountId!=null))
