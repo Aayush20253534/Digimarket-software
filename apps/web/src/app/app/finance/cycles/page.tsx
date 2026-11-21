@@ -6,6 +6,7 @@ import {useAuth} from "@/components/auth-provider";
 import {Card,Notice,Spinner} from "@/components/ui";
 import {FinanceFrame,FinancePager,money,useFinanceWindow} from "@/components/finance/shared";
 import {PreviousCycleNetPosted} from "@/components/finance/previous-cycle-carry";
+import {PersonalNetAfterSettlements} from "@/components/finance/personal-net-after-settlements";
 
 type Summary={postedIncome:string;postedExpense:string;postedSalaryExpense:string;postedExpenseIncludingSalary:string;postedNet:string;clientAdSpend?:{posted:string};pendingIncome:string;pendingExpense:string};
 type ExpenseSummary={postedTotalExpense:string;breakdown:{OTHER:string;SELF_ADS:string;CLIENT_ADS:string;SALARY:string}};
@@ -60,6 +61,7 @@ export default function FinanceCyclesPage(){
   <section aria-label="Cycle financial summary" className="space-y-3">
    <h2 className="text-lg font-semibold">{selected?cycleLabel(selected.key):w.period.from+" to "+w.period.to} · {w.view==="mine"?"My entries":"Company entries"}</h2>
    <PreviousCycleNetPosted period={w.period} view={w.view} />
+   {w.view==="mine"&&<PersonalNetAfterSettlements period={w.period}/>}
    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     {([
      ["Opening balance (carried forward)",balance?.opening],
