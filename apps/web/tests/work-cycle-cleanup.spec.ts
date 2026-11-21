@@ -9,7 +9,7 @@ async function mockWorkspace(page:Page,role="FOUNDER"){
  const deleted:string[][]=[];
  const permissions=["leads.read","clients.read","tasks.read","finance.entry.read.own","finance.read.all","reports.business.read"];
  const totals={currency:"INR",postedIncome:"1000",postedExpense:"200",postedSalaryExpense:"50",postedExpenseIncludingSalary:"250",
-  agencyOperatingNet:"750",postedNet:"650",pendingIncome:"0",pendingExpense:"0",groups:[],clientAdSpend:{posted:"100",pending:"0",count:1}};
+  agencyOperatingNet:"750",postedNet:"650",pendingIncome:"0",pendingExpense:"0",groups:[],clientAdSpend:{posted:"100",pending:"0",count:1},recurringIncome:{monthlyCombinedTotal:"5000.0000"}};
  await page.clock.setFixedTime(new Date("2026-11-17T12:00:00Z"));
  await page.route("**/api/v1/**",async route=>{
   const url=new URL(route.request().url()),path=url.pathname.slice("/api/v1".length);
@@ -32,6 +32,14 @@ async function mockWorkspace(page:Page,role="FOUNDER"){
   else if(path==="/finance/summary")data=url.searchParams.get("from")==="2026-11-22"
     ? {...totals,postedIncome:"0",postedExpense:"0",postedNet:"0"}:totals;
   else if(path==="/finance/cycle-balance")data={opening:"650",movement:"0",remaining:"650"};
+  else if(path==="/finance/client-funds")data=[
+    {id:"first",closing:"300.5000"},{id:"second",closing:"-100.2500"}
+  ];
+  else if(path==="/finance/internal-settlements/mine")data=[
+    {amount:"2234.0000",status:"POSTED",settlementDirection:"INCOMING"},
+    {amount:"234.0000",status:"POSTED",settlementDirection:"OUTGOING"},
+    {amount:"500.0000",status:"CANCELLED",settlementDirection:"INCOMING"}
+  ];
   else if(path==="/finance/category-summary")data={ordinary:"0",total:"0",items:[]};
   else if(path==="/finance/total-expenses/summary")data={postedIncome:"1000",postedTotalExpense:"350",netOperatingMoney:"650",breakdown:{OTHER:"200",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}};
   else if(path==="/salary/summary")data={totalPaid:"50",founderFunding:[]};
@@ -105,6 +113,35 @@ test("a founder's received settlement reduces personal deficit but never creates
  await expect(card).toContainText("Operating net −₹2,234.49 + received ₹2,234.00 − sent ₹0.00");
  await expect(page.getByText("Operating net (before settlements)",{exact:true})).toBeVisible();
  expect(requests.some(x=>x.path==="/finance/summary")).toBe(true);
+});
+
+test("Finance category cards show accurate posted, held and transferred amounts",async({page})=>{
+ const {requests}=await mockWorkspace(page);
+ await page.goto("/app/finance?view=mine&from=2026-10-22&to=2026-11-21");
+ const nav=page.getByRole("navigation",{name:"Finance categories"});
+ await expect(nav.getByRole("link",{name:/^Meta Ads/})).toContainText("₹100.00");
+ await expect(nav.getByRole("link",{name:/^Meta Ads/})).toContainText("Posted Meta Ads spend · this cycle");
+ await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("₹200.25");
+ await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("Net client fund balance · at cycle end");
+ await expect(nav.getByRole("link",{name:/^Founder settlements/})).toContainText("₹2,000.00");
+ await expect(nav.getByRole("link",{name:/^Founder settlements/})).toContainText("Received ₹2,234.00 · Sent ₹234.00");
+ await expect(nav.getByRole("link",{name:/^Agreement projections/})).toContainText("₹5,000.00");
+ await expect(nav.getByRole("link",{name:/^Agreement projections/})).toContainText("not posted income");
+ await expect(page.getByText("Agency balance carried forward",{exact:true})).toHaveCount(0);
+ expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(false);
+ await page.getByRole("button",{name:"Agency totals & register"}).click();
+ await expect(page.getByText("Agency balance carried forward",{exact:true})).toBeVisible();
+ expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(true);
+});
+
+test("carried balances appear in agency register but not My Entries",async({page})=>{
+ const {requests}=await mockWorkspace(page);
+ await page.goto("/app/finance/entries?view=mine&from=2026-10-22&to=2026-11-21");
+ await expect(page.getByText("Net balance remaining · My account",{exact:true})).toHaveCount(0);
+ expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(false);
+ await page.getByRole("button",{name:"Agency totals & register"}).click();
+ await expect(page.getByText("Agency net balance remaining",{exact:true})).toBeVisible();
+ expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(true);
 });
 
 test("next-cycle Income identifies previous cycle net without double counting new income",async({page})=>{
