@@ -56,12 +56,13 @@ export const financeCategoryInputSchema = z.strictObject({
 });
 export type FinanceCategoryInput = z.infer<typeof financeCategoryInputSchema>;
 export const financeEntryInputSchema = z.strictObject({
+  // Legacy bookkeeping compatibility only; normal finance screens never ask for an account.
   moneyAccountId:z.uuid().optional(),
   kind: financeKindSchema,
   categoryId: z.uuid(),
   // Only Meta Ads expenses may link to a client. Null/absent means agency-funded.
   clientId: z.uuid().nullable().optional(),
-  // Explicit assignee for new UI entries. Optional for older API clients; server validates when supplied.
+  // Legacy callers may send their own ID; the server always assigns the authenticated user on creation.
   enteredById: z.uuid().optional(),
   amount: z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),
   occurredOn: z.iso.date(),
