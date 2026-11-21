@@ -51,6 +51,8 @@ try{
     (error:{status?:number})=>error.status===422);
   await assert.rejects(()=>finance.submit(manager,{...input,enteredById:outsider.id}),
     (error:{status?:number})=>error.status===422);
+  await assert.rejects(()=>finance.submit(manager,{...input,enteredById:employee.id,idempotencyKey:randomUUID()}),
+    (error:{status?:number})=>error.status===422);
   const pending=await finance.submit(staff,{...input,enteredById:employee.id});
   assert.equal(pending.status,"PENDING");
   assert.equal(pending.amount,"150.2545");
@@ -362,6 +364,9 @@ try{
     method:"CASH",merchantOrSource:"",description:"",enteredById:newStaff.id,
   });
   assert.equal(moved.enteredById,newStaff.id);
+  const movedEntry=await db.financialTransaction.findUniqueOrThrow({where:{id:assigned.id}});
+  const movedAccount=await db.moneyAccount.findUniqueOrThrow({where:{id:movedEntry.moneyAccountId!}});
+  assert.equal(movedAccount.ownerUserId,newStaff.id);
   assert.equal((await db.approvalRequest.findUniqueOrThrow({where:{id:assigned.approvalRequestId}})).requesterId,founderUser.id);
   assert.equal((await finance.entries(founder,"mine")).some(entry=>entry.id===assigned.id),false);
   assert.equal((await finance.entries(secondFounder,"mine")).some(entry=>entry.id===assigned.id),true);
