@@ -48,7 +48,7 @@ export function FinanceOverview() {
     void Promise.all([
       request<Totals>("/finance/summary?" + w.query),
       request<TotalExpenseSummary>("/finance/total-expenses/summary?" + w.query),
-      request<Balance>("/finance/cycle-balance?" + w.query),
+      request<Balance>("/finance/cycle-balance?" + w.query).catch(() => null),
     ])
       .then(([r, expense, balanceValue]) => {
         if (active) {
