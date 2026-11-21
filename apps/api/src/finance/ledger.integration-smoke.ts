@@ -157,7 +157,7 @@ try {
     });
   await makeEntry("INCOME", inc.id, "2000", bank.id);
   const ownExpense = await makeEntry("EXPENSE", expense.id, "100", clearing.id);
-  await makeEntry("EXPENSE", ads.id, "300", bank.id, client.id);
+  const historicalAd=await makeEntry("EXPENSE", ads.id, "300", bank.id, client.id);
   const deposit = {
     clientId: client.id,
     accountId: bank.id,
@@ -560,6 +560,19 @@ try {
   assert.equal(personalClearing.normalizedName,"personal-clearing-"+founder.id);
   assert.equal(directRecord.enteredById, founder.id);
   assert.equal(directRecord.status, "POSTED");
+  // Authorized historical correction changes live reports, not the closing snapshot.
+  const originalClose=await db.financePeriodClose.findUniqueOrThrow({where:{organizationId_from:{organizationId:org.id,from:new Date(period.from)}}});
+  const historicalInput={categoryId:ads.id,amount:"325",occurredOn:"2026-10-24",method:"UPI" as const,clientId:client.id,enteredById:founder.id,merchantOrSource:"Meta",description:"Corrected historical expense"};
+  await assert.rejects(()=>finance.editEntry(f,historicalAd.id,historicalInput),checkStatus(403));
+  await assert.rejects(()=>finance.editEntry(a,historicalAd.id,{...historicalInput,occurredOn:"2026-11-22"}),checkStatus(409));
+  const originalNextOpening=(await ledger.balances(f,next)).find(x=>x.id===bank.id)!.opening;
+  const originalHistoricalSpend=(await finance.totals(f,"all",period)).clientAdSpend.posted;
+  await finance.editEntry(a,historicalAd.id,historicalInput);
+  assert.equal((await finance.editDetails(a,historicalAd.id)).amount,"325.0000");
+  assert.equal((await finance.totals(f,"all",period)).clientAdSpend.posted,new Prisma.Decimal(originalHistoricalSpend).add(25).toFixed(4));
+  assert.equal((await ledger.balances(f,next)).find(x=>x.id===bank.id)!.opening,new Prisma.Decimal(originalNextOpening).minus(25).toFixed(4));
+  assert.deepEqual(await db.financePeriodClose.findUniqueOrThrow({where:{id:originalClose.id}}),originalClose);
+  await assert.rejects(()=>db.financialTransaction.update({where:{id:historicalAd.id},data:{amount:"350"}}),closed);
   console.info(
     "Finance ledger integration passed: balances, tenant/role isolation, stable categories, 5,001-row export, close/write race, immutable history and four reversal sources.",
   );

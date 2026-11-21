@@ -31,10 +31,12 @@ export default function FinanceCyclesPage(){
  const [refresh,setRefresh]=useState(0),[notice,setNotice]=useState("");
  const [editing,setEditing]=useState<EditableExpense|null>(null),[editOptions,setEditOptions]=useState<EditOptions|null>(null);
  const [editLoading,setEditLoading]=useState<string|null>(null),[editSaving,setEditSaving]=useState(false),[editError,setEditError]=useState("");
- const isOpenDate=(date:string)=>!!w.cycleState&&date.slice(0,10)>=w.cycleState.current.from
-  &&date.slice(0,10)<=w.cycleState.current.to;
+ const cycleForDate=(date:string)=>w.cycleState&&[w.cycleState.current,...w.cycleState.history].find(c=>date.slice(0,10)>=c.from&&date.slice(0,10)<=c.to);
+ const isEditableDate=(date:string)=>!!cycleForDate(date);
+ const [originalEditDate,setOriginalEditDate]=useState("");
+ const editingClosed=!!w.cycleState&&originalEditDate!==""&&originalEditDate<w.cycleState.current.from;
  async function beginEdit(id:string,date:string){
-  if(!canEdit||!isOpenDate(date)||editLoading||editSaving)return;
+  if(!canEdit||!isEditableDate(date)||editLoading||editSaving)return;
   setEditLoading(id);setEditError("");setNotice("");
   try{
    const [entry,categories,people,clients]=await Promise.all([
@@ -43,19 +45,20 @@ export default function FinanceCyclesPage(){
     request<EditOptions["people"]>("/finance/assignees"),
     request<EditOptions["clients"]>("/finance/meta-ad-clients")
    ]);
-   setEditing(entry);setEditOptions({categories,people,clients});
+   setOriginalEditDate(entry.occurredOn);setEditing(entry);setEditOptions({categories,people,clients});
   }catch(e){setEditError(e instanceof Error?e.message:"Unable to open expense.");}
   finally{setEditLoading(null);}
  }
  async function saveEdit(e:FormEvent<HTMLFormElement>){
   e.preventDefault();
   if(!canEdit||!editing||editSaving)return;
-  if(!isOpenDate(editing.occurredOn)){setEditError("Select a date within the current open cycle.");return;}
+  const originalCycle=cycleForDate(originalEditDate),targetCycle=cycleForDate(editing.occurredOn);
+  if(!originalCycle||!targetCycle||originalCycle.from!==targetCycle.from){setEditError("Select a date within the expense's original cycle.");return;}
   setEditSaving(true);setEditError("");
   try{
    const {id,categoryId,enteredById,clientId,amount,occurredOn,method,merchantOrSource,description}=editing;
    await request("/finance/entries/"+encodeURIComponent(id),{method:"PUT",body:{categoryId,enteredById,clientId,amount,occurredOn,method,merchantOrSource,description}});
-   setEditing(null);setEditOptions(null);setNotice("Expense updated. Cycle totals and assigned user refreshed.");setRefresh(v=>v+1);
+   setEditing(null);setEditOptions(null);setNotice(editingClosed?"Closed-cycle expense corrected. Cycle stays closed; totals and carry-forward reflect the change.":"Expense updated. Cycle totals and assigned user refreshed.");setRefresh(v=>v+1);
   }catch(e){setEditError(e instanceof Error?e.message:"Unable to save expense.");}
   finally{setEditSaving(false);}
  }
@@ -96,6 +99,7 @@ export default function FinanceCyclesPage(){
   {error&&<Notice kind="error">{error}</Notice>}
   {editError&&!editing&&<Notice kind="error">{editError}</Notice>}
   {notice&&<Notice kind="success">{notice}</Notice>}
+  {canEdit&&selected&&w.cycleState?.history.some(c=>c.from===selected.from)&&<Notice>Closed cycle: administrators can correct posted expenses within this cycle. Its closing date and original confirmation remain unchanged.</Notice>}
   {loading&&!summary&&<Spinner label="Loading cycle records…"/>}
   <section aria-label="Cycle financial summary" className="space-y-3">
    <h2 className="text-lg font-semibold">{selected?selected.from+" – "+selected.to:w.period.from+" to "+w.period.to} · {w.view==="mine"?"My entries":"Company entries"}</h2>
@@ -130,7 +134,7 @@ export default function FinanceCyclesPage(){
     {["Date","Type","Status","Category","Assigned to","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{register?.items.map(x=><tr key={x.id}><td>{x.occurredOn.slice(0,10)}</td><td>{x.kind}</td><td>{x.status}</td>
      <td>{x.category.name}</td><td>{x.enteredBy?.displayName??""}</td><td>{money(x.amount)}</td>
-     <td>{x.description||x.merchantOrSource||""}</td>{canEdit&&<td>{x.kind==="EXPENSE"&&x.status==="POSTED"&&isOpenDate(x.occurredOn)?editButton(x.id,x.occurredOn):"—"}</td>}</tr>)}</tbody>
+     <td>{x.description||x.merchantOrSource||""}</td>{canEdit&&<td>{x.kind==="EXPENSE"&&x.status==="POSTED"&&isEditableDate(x.occurredOn)?editButton(x.id,x.occurredOn):"—"}</td>}</tr>)}</tbody>
    </table></div>
    {!register?.total&&!loading&&<p className="text-sm text-slate-400">No income or expense transactions in this cycle.</p>}
    {register&&<FinancePager page={page} total={register.total} limit={25} onChange={setPage}/>}
@@ -141,7 +145,7 @@ export default function FinanceCyclesPage(){
    <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr>
     {["Date","Type","Category","Person","Client","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{expenses?.items.map(x=><tr key={x.id}><td>{x.date.slice(0,10)}</td><td>{x.type}</td><td>{x.category}</td>
-     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td>{canEdit&&<td>{x.id.startsWith("finance:")&&!x.reversal&&isOpenDate(x.date)?editButton(x.id.slice("finance:".length),x.date):x.type==="SALARY"?<Link href="/app/salary" className="text-violet-300 underline">View salary</Link>:"—"}</td>}</tr>)}</tbody>
+     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td>{canEdit&&<td>{x.id.startsWith("finance:")&&!x.reversal&&isEditableDate(x.date)?editButton(x.id.slice("finance:".length),x.date):x.type==="SALARY"?<Link href="/app/salary" className="text-violet-300 underline">View salary</Link>:"—"}</td>}</tr>)}</tbody>
    </table></div>
    {!expenses?.total&&!loading&&<p className="text-sm text-slate-400">No recorded expenses for this cycle.</p>}
    {expenses&&<FinancePager page={expensePage} total={expenses.total} limit={25} onChange={setExpensePage}/>}

@@ -283,10 +283,17 @@ test("cycle expense editing saves a real entry id and refreshes the cycle regist
   expect(calls.find(c=>c.path==="/finance/entries/expense-0"&&c.method==="PUT")?.body).toMatchObject({amount:"25",enteredById:"dev"});
   expect(calls.filter(c=>c.path==="/finance/total-expenses/summary").length).toBeGreaterThan(1);
 });
-test("closed cycle rows cannot be edited by an administrator",async({page})=>{
-  await workspace(page,"SUPER_ADMIN",true);
+test("closed cycle posted expenses can be corrected without reopening the cycle",async({page})=>{
+  const calls=await workspace(page,"SUPER_ADMIN",true);
   await page.goto("/app/finance/cycles?from=2026-10-22&to=2026-11-21&view=all");
   const rows=page.getByRole("region",{name:"Cycle expense details"});
   await expect(rows.getByText("Journey 0",{exact:true})).toBeVisible();
-  await expect(rows.getByRole("button",{name:"Edit expense"})).toHaveCount(0);
+  await rows.getByRole("row").filter({hasText:"Journey 0"}).getByRole("button",{name:"Edit expense"}).click();
+  const editor=page.getByRole("dialog",{name:"Edit expense"});
+  await editor.getByLabel("Amount (INR)").fill("25");
+  await editor.getByRole("button",{name:"Save changes"}).click();
+  await expect(page.getByText(/Closed-cycle expense corrected/)).toBeVisible();
+  await expect(rows.getByRole("row").filter({hasText:"Journey 0"})).toContainText("₹25.00");
+  expect(calls.some(c=>c.path==="/finance/entries/expense-0"&&c.method==="PUT")).toBe(true);
+  expect(calls.some(c=>c.path.startsWith("/finance/cycle-close")&&c.method==="POST")).toBe(false);
 });

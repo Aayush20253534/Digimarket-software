@@ -362,6 +362,7 @@ export class FinanceService {
     const amount=new Prisma.Decimal(input.amount);
     if(!amount.isFinite()||amount.lte(0))throw invalid("Amount must be greater than zero");
     return this.db.$transaction(async tx=>{
+      await financeLock(tx,actor.organizationId);
       const entry=await tx.financialTransaction.findFirst({
         where:{id,organizationId:actor.organizationId},
         include:{verifiedPayment:{select:{id:true}},reversedBy:{select:{id:true}}},
@@ -369,6 +370,17 @@ export class FinanceService {
       if(!entry)throw new AuthError(404,"NOT_FOUND","Financial entry not found");
       if(entry.status==="CANCELLED"||entry.verifiedPayment||entry.reversesId||entry.reversedBy)
         throw new AuthError(409,"FINANCE_IMMUTABLE","Cancelled or reconciled entries cannot be edited");
+      const originalDate=entry.occurredOn.toISOString().slice(0,10);
+      const closedCycle=await tx.financePeriodClose.findFirst({where:{organizationId:actor.organizationId,from:{lte:entry.occurredOn},to:{gte:entry.occurredOn}}});
+      if(closedCycle){
+        const from=closedCycle.from.toISOString().slice(0,10),to=closedCycle.to.toISOString().slice(0,10);
+        if(entry.kind!=="EXPENSE"||entry.status!=="POSTED"||input.occurredOn<from||input.occurredOn>to)
+          throw new AuthError(409,"FINANCE_CYCLE_CLOSED","Only posted expenses can be corrected, and the date must remain within their original closed cycle.");
+        await tx.$queryRaw`SELECT set_config('digimarket.closed_expense_edit',${actor.organizationId+":"+id},true)`;
+      }else{
+        await openPeriod(tx,actor.organizationId,originalDate);
+        await openPeriod(tx,actor.organizationId,input.occurredOn);
+      }
       const category=await tx.financialCategory.findFirst({
         where:{id:input.categoryId,organizationId:actor.organizationId,kind:entry.kind,
           ...(input.categoryId===entry.categoryId?{}:{active:true})},
@@ -397,12 +409,11 @@ export class FinanceService {
       if(assignedAccountId===undefined&&assignedUserId!==entry.enteredById&&entry.moneyAccountId){
         const sourceAccount=await tx.moneyAccount.findFirst({where:{id:entry.moneyAccountId,organizationId:actor.organizationId},
           select:{normalizedName:true}});
-        if(sourceAccount?.normalizedName.startsWith("personal-clearing-"))
+        if(sourceAccount?.normalizedName.startsWith("personal-clearing-")){
+          if(closedCycle)await tx.$queryRaw`SELECT set_config('digimarket.closed_expense_assignee',${actor.organizationId+":"+assignedUserId},true)`;
           assignedAccountId=await ensurePersonalMoneyAccount(tx,actor.organizationId,assignedUserId);
+        }
       }
-      await financeLock(tx,actor.organizationId);
-      await openPeriod(tx,actor.organizationId,entry.occurredOn.toISOString().slice(0,10));
-      await openPeriod(tx,actor.organizationId,input.occurredOn);
       const updated=await tx.financialTransaction.update({where:{id},data:{
         ...(assignedAccountId!==undefined?{moneyAccountId:assignedAccountId}:{}),
         categoryId:category.id,amount,occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
@@ -410,12 +421,12 @@ export class FinanceService {
         clientId:requestedClientId??null,enteredById:assignedUserId,
       }});
       await tx.auditLog.create({data:{organizationId:actor.organizationId,actorId:actor.userId,
-        action:entry.kind==="INCOME"?"finance.income_edited":"finance.expense_edited",
+        action:closedCycle?"finance.closed_expense_edited":entry.kind==="INCOME"?"finance.income_edited":"finance.expense_edited",
         entityType:"FinancialTransaction",entityId:id,
         beforeRedacted:{amount:entry.amount.toFixed(4),categoryId:entry.categoryId,status:entry.status,
-          assignedUserId:entry.enteredById,clientId:entry.clientId},
+          assignedUserId:entry.enteredById,clientId:entry.clientId,occurredOn:originalDate,method:entry.method,closedCycleId:closedCycle?.id??null},
         afterRedacted:{amount:updated.amount.toFixed(4),categoryId:updated.categoryId,status:updated.status,
-          assignedUserId:updated.enteredById,clientId:updated.clientId},
+          assignedUserId:updated.enteredById,clientId:updated.clientId,occurredOn:input.occurredOn,method:updated.method,closedCycleId:closedCycle?.id??null},
       }});
       // ApprovalRequest.requesterId remains immutable as the original submitter.
       return {id,amount:updated.amount.toFixed(4),categoryId:updated.categoryId,
