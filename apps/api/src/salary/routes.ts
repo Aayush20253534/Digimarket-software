@@ -6,6 +6,7 @@ import type {AuthService,Principal} from "../auth/service";
 import {AuthError,unauthorized,forbidden} from "../auth/errors";
 import {paise,exactSplit,rupeePattern} from "./math";
 import {founderLedgerBalances} from "../finance/founder-balance";
+import {ensurePersonalMoneyAccount} from "../finance/ledger-service";
 
 const amount=z.string().regex(rupeePattern).refine(v=>paise(v)>0n,"Amount must be positive");
 // Finance is authoritative: do not independently seed salary wallets.
@@ -198,12 +199,19 @@ export function registerSalaryRoutes(app:Express,auth:AuthService){
      if(remaining.lessThan(requested))throw new AuthError(422,"INSUFFICIENT_FINANCE_BALANCE",
       "Founder's remaining Finance Net posted is insufficient for this salary allocation");
     }
+    // Salary funding is charged to the founder's personal clearing account.
+    const personalAccountIds=new Map<string,string>();
+    for(const founderId of requestedByFounder.keys())
+     personalAccountIds.set(founderId,await ensurePersonalMoneyAccount(tx,a.organizationId,founderId));
     const payment=await tx.salaryPayment.create({data:{
      organizationId:a.organizationId,recipientUserId:input.recipientUserId,createdById:a.userId,
      idempotencyKey:input.idempotencyKey,amount:dec(input.amount),
      salaryMonth:input.salaryMonth,paidOn:date(input.paidOn),method:input.method,
      reference:input.reference||null,note:input.note||null,
-     allocations:{create:input.allocations.map(x=>({accountId:x.accountId,amount:dec(x.amount)}))}
+     allocations:{create:input.allocations.map(x=>({
+      accountId:x.accountId,amount:dec(x.amount),
+      moneyAccountId:personalAccountIds.get(accountFounder.get(x.accountId)!)!
+     }))}
     }});
     await tx.notification.create({data:{
      organizationId:a.organizationId,recipientId:input.recipientUserId,
