@@ -23,7 +23,6 @@ import { PreviousCycleNetPosted } from "./previous-cycle-carry";
 import {PersonalNetAfterSettlements,calculatePersonalNet} from "./personal-net-after-settlements";
 type Balance = {opening:string;movement:string;remaining:string};
 type MetaAdsTotals = {totalPosted:string};
-type ClientFundBalance = {closing:string};
 type OwnClientSpend = {posted:string;entries:number};
 type AgencySettlements = {postedTotal:string;postedCount:number;voidedCount:number;total:number};
 type Settlement = Parameters<typeof calculatePersonalNet>[1][number];
@@ -32,18 +31,6 @@ type FinanceCard = {
   title:string;description:string;href:string;icon:LucideIcon;
   amount?:string|null;metricLabel?:string;metricDetail?:string;
 };
-/** Sum the server's exact four-decimal amounts. Do not round intermediate funds. */
-function sumMoney(values:string[]):string {
-  let total=0n;
-  for(const value of values){
-    const parts=/^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value);
-    if(!parts)throw new Error("Invalid finance amount");
-    const amount=BigInt(parts[2])*10000n+BigInt((parts[3]??"").padEnd(4,"0"));
-    total+=parts[1]==="-"?-amount:amount;
-  }
-  const abs=total<0n?-total:total;
-  return (total<0n?"-":"")+(abs/10000n).toString()+"."+(abs%10000n).toString().padStart(4,"0");
-}
 type Totals = {
   postedIncome: string;
   postedExpense: string;
@@ -61,7 +48,6 @@ export function FinanceOverview() {
     [balance, setBalance] = useState<Balance | null>(null),
     [totalExpense, setTotalExpense] = useState<TotalExpenseSummary | null>(null),
     [metaAds, setMetaAds] = useState<string|null|undefined>(undefined),
-    [clientFunds, setClientFunds] = useState<string|null|undefined>(undefined),
     [myClientSpend,setMyClientSpend] = useState<OwnClientSpend|null|undefined>(undefined),
     [agencySettlements,setAgencySettlements] = useState<AgencySettlements|null|undefined>(undefined),
     [settlements, setSettlements] = useState<SettlementTotals|null|undefined>(undefined),
@@ -100,7 +86,7 @@ export function FinanceOverview() {
   useEffect(()=>{
     if(!w.ready||!session)return;
     let active=true;
-    setMetaAds(undefined);setClientFunds(undefined);setSettlements(undefined);setProjected(undefined);
+    setMetaAds(undefined);setSettlements(undefined);setProjected(undefined);
     setMyClientSpend(undefined);setAgencySettlements(undefined);
     void request<MetaAdsTotals>("/finance/meta-ads-distribution?"+w.query)
       .then(result=>{if(active)setMetaAds(result.totalPosted)})
@@ -112,9 +98,6 @@ export function FinanceOverview() {
     }
     if(all){
       if(w.view==="all"){
-        void request<ClientFundBalance[]>("/finance/client-funds?"+w.query)
-          .then(rows=>{if(active)setClientFunds(sumMoney(rows.map(row=>row.closing)))})
-          .catch(()=>{if(active)setClientFunds(null)});
         void request<AgencySettlements>("/finance/internal-settlements/all?"+
           new URLSearchParams({...w.period,page:"1",limit:"1"}).toString())
           .then(result=>{if(active)setAgencySettlements(result)})
@@ -178,14 +161,14 @@ export function FinanceOverview() {
       ? [
           {
             title: "Client ad funds",
-            description:w.view==="mine"?"Client Meta Ads paid from my account":"Top-ups, refunds and client balances",
+            description:w.view==="mine"?"Client Meta Ads paid from my account":"Total client Meta Ads spent across all founder accounts",
             href: "/app/finance/client-funds",
             amount:w.view==="mine"
               ?myClientSpend?.posted??(myClientSpend===null?null:undefined)
-              :clientFunds,
+              :totals?.clientAdSpend?.posted,
             metricLabel:w.view==="mine"
               ?"Posted client ads paid from my account · this cycle"
-              :"Net client fund balance · at cycle end",
+              :"Posted client Meta Ads · all accounts · this cycle",
             metricDetail:w.view==="mine"&&myClientSpend
               ?myClientSpend.entries+" account-funded entries"
               :undefined,

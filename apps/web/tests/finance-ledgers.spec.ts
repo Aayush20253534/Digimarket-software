@@ -61,6 +61,7 @@ async function workspace(page: Page, role = "FOUNDER") {
         postedIncome: "100",
         postedExpense: "26",
         postedExpenseIncludingSalary: "26",
+        clientAdSpend: { posted: "26.0000", pending: "0.0000" },
         postedSalaryExpense: "0",
         postedNet: "74",
         agencyOperatingNet: "74",
@@ -71,6 +72,8 @@ async function workspace(page: Page, role = "FOUNDER") {
     else if (path === "/finance/cycle-balance")
       data = { opening: "0.0000", movement: "74.0000", remaining: "74.0000" };
     else if (path === "/finance/expenses/mine" && req.method() === "POST") data = { status: "POSTED" };
+    else if (path === "/finance/client-ad-spend/mine")
+      data = { posted: "12.0000", entries: 2, byClient: [] };
     else if (path === "/finance/category-summary")
       data = {
         ordinary: "26",
@@ -126,9 +129,9 @@ async function workspace(page: Page, role = "FOUNDER") {
           opening: "0",
           received: funded ? "100" : "0",
           refunded: "0",
-          spent: "0",
+          spent: "26",
           adjustments: reversed ? "-100" : "0",
-          closing: funded && !reversed ? "100" : "0",
+          closing: funded && !reversed ? "74" : "-26",
         },
       ];
     else if (path === "/finance/client-funds/history")
@@ -235,6 +238,17 @@ test("category cards drill into paginated search and export the same filters", a
   expect(exported.query.get("from")).toBe("2026-10-22");
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(377);
+});
+test("agency client funds shows posted client ad spend from all accounts instead of negative deposits", async ({ page }) => {
+  const calls = await workspace(page);
+  await page.goto("/app/finance?" + cycle);
+  await expect(page.getByTestId("finance-category-amount-client-ad-funds")).toHaveText("₹26.00");
+  expect(calls.some((call) => call.path === "/finance/client-funds")).toBe(false);
+  await page.getByRole("link", { name: /Client ad funds/ }).click();
+  await expect(page.getByTestId("agency-client-ad-spend")).toHaveText("₹26.00");
+  await expect(page.getByText("Remaining recorded funds: −₹26.00")).toBeVisible();
+  await page.goto("/app/finance?" + cycle.replace("view=all", "view=mine"));
+  await expect(page.getByTestId("finance-category-amount-client-ad-funds")).toHaveText("₹12.00");
 });
 test("client funds record an account and require a reason before reversal", async ({ page }) => {
   const calls = await workspace(page);

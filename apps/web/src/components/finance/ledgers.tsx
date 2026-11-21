@@ -625,6 +625,9 @@ export function ClientFundsOverview() {
   const {data,error}=useData<ClientBalance[]>(
     "/finance/client-funds?"+l.w.query,
     l.enabled&&l.w.view==="all",l.version);
+  const agencySpend=useData<{clientAdSpend:{posted:string}}>(
+    "/finance/summary?"+l.w.query,
+    l.enabled&&l.w.view==="all",l.version);
   const personal=useData<OwnClientAdSpend>(
     "/finance/client-ad-spend/mine?"+
       new URLSearchParams(l.w.period).toString(),
@@ -653,11 +656,16 @@ export function ClientFundsOverview() {
   return (
     <FinanceFrame
       title="Client ad funds"
-      description="Client deposits are held for advertising. Only actual top-ups, spending and refunds change these balances."
+      description="Client Meta Ads spending from all founder accounts. Deposit balances remain separate for reconciliation."
       window={l.w}
       agencyOnly
     >
-      <Feedback error={error} success="" />
+      <Feedback error={error||agencySpend.error} success="" />
+      {agencySpend.data?<Card>
+        <p className="text-sm text-slate-400">Total posted client Meta Ads · all accounts · selected cycle</p>
+        <strong className="mt-2 block text-2xl" data-testid="agency-client-ad-spend">{money(agencySpend.data.clientAdSpend.posted)}</strong>
+        <p className="mt-2 text-xs text-slate-400">Advertising spend, not the remaining client deposit balance.</p>
+      </Card>:!agencySpend.error&&<Spinner label="Loading agency client advertising spend…"/>}
       <Notice>
         Historical ad spending has not been treated as a deposit. Negative balances identify missing
         funding or spending that needs correction.
@@ -672,11 +680,13 @@ export function ClientFundsOverview() {
                 href={"/app/finance/client-funds/" + c.id + "?" + l.w.query}
               >
                 <h2 className="font-semibold">{c.name}</h2>
-                <p className={"mt-3 text-2xl " + (Number(c.closing) < 0 ? "text-amber-300" : "")}>
-                  {money(c.closing)}
+                <p className="mt-3 text-2xl">{money(c.spent)}</p>
+                <p className="mt-1 text-xs text-slate-400">Client ad spend · all accounts · this cycle</p>
+                <p className={"mt-2 text-sm " + (Number(c.closing) < 0 ? "text-amber-300" : "text-slate-400")}>
+                  Remaining recorded funds: {money(c.closing)}
                 </p>
                 <p className="mt-2 text-sm text-slate-400">
-                  Received {money(c.received)} · Spent {money(c.spent)}
+                  Received {money(c.received)} · Refunded {money(c.refunded)}
                 </p>
                 {Number(c.closing) < 0 && (
                   <p className="mt-2 text-xs text-amber-300">Outstanding funds · review required</p>
