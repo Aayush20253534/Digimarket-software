@@ -76,6 +76,11 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
     res.set("Cache-Control","no-store");
     res.json({data:await finance.metaAdClients(actor(res))});
   });
+  app.get("/api/v1/finance/client-ad-spend/mine",authenticate,async(req,res)=>{
+    res.set("Cache-Control","no-store").json({
+      data:await finance.clientAdAccountSpend(actor(res),parse(reportingPeriodQuerySchema,req.query))
+    });
+  });
   app.get("/api/v1/finance/internal-settlements/founders",authenticate,async(_req,res)=>{
     res.set("Cache-Control","no-store").json({data:await internal.founders(actor(res))});
   });
@@ -83,6 +88,16 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   // of the 200-entry limit in the combined financial register.
   app.get("/api/v1/finance/internal-settlements/mine",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store").json({data:await internal.projectMine(actor(res),200,parse(reportingPeriodQuerySchema,req.query))});
+  });
+  app.get("/api/v1/finance/internal-settlements/all",authenticate,async(req,res)=>{
+    const period=parse(reportingPeriodQuerySchema,req.query);
+    const paging=parse(z.object({
+      page:z.coerce.number().int().min(1).max(10000).default(1),
+      limit:z.coerce.number().int().min(1).max(100).default(50)
+    }),req.query);
+    res.set("Cache-Control","no-store").json({
+      data:await internal.projectAll(actor(res),period,paging.page,paging.limit)
+    });
   });
   app.get("/api/v1/finance/cycle-balance",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store").json({data:await internal.cycleBalance(actor(res),view(req),parse(reportingPeriodQuerySchema,req.query))});
