@@ -190,10 +190,11 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     setError(problems.join(" "));setLoading(false);setMetaDistributionRefresh(v=>v+1);
   },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,directExpense]);
   useEffect(()=>{
-    if(directExpense||section!=="entries"||!ready||!session)return;
+    if(directExpense||section!=="entries"||!ready||!session||view!=="all"||!canAll){
+      setBalance(null);return;
+    }
     let active=true;
-    const scope=view==="all"&&canAll?"all":"mine";
-    void request<{opening:string;movement:string;remaining:string}>("/finance/cycle-balance?view="+scope+"&"+periodQuery)
+    void request<{opening:string;movement:string;remaining:string}>("/finance/cycle-balance?view=all&"+periodQuery)
       .then(result=>{if(active)setBalance(result)}).catch(()=>{if(active)setBalance(null)});
     return()=>{active=false};
   },[directExpense,section,ready,session,request,view,canAll,periodQuery,metaDistributionRefresh]);
@@ -569,8 +570,8 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     </div>
     <PreviousCycleNetPosted period={period} view={view==="all"&&canAll?"all":"mine"}/>
     {isFounder&&view==="mine"&&<PersonalNetAfterSettlements period={period}/>}
-    {balance&&<Card>
-      <p className="text-sm font-semibold">Net balance remaining · {view==="mine"?"My account":"Company accounts"}</p>
+    {view==="all"&&canAll&&balance&&<Card>
+      <p className="text-sm font-semibold">Agency net balance remaining</p>
       <strong className="mt-2 block text-2xl">{money(balance.remaining)}</strong>
       <p className="mt-1 text-sm text-slate-400">Carried forward: {money(balance.opening)} · Movement this cycle: {money(balance.movement)}. Bookkeeping balances, not verified bank funds.</p>
     </Card>}
