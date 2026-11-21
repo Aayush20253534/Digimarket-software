@@ -2,9 +2,8 @@
 import {FormEvent,useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
-import {ArrowLeft,ArrowRight,CalendarDays,CheckCircle2,ClipboardList,FolderKanban,RefreshCw,Users,FolderOpen,Video,Newspaper} from "lucide-react";
+import {ArrowLeft,CalendarDays,CheckCircle2,ClipboardList,RefreshCw,Users,FolderOpen,Video,Newspaper} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
-import {ClientDeliveryWorkspace} from "@/components/client-delivery-workspace";
 import {ClientVideoReadiness} from "@/components/client-video-readiness";
 import {ClientPostReadiness} from "@/components/client-post-readiness";
 import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
@@ -12,7 +11,7 @@ import {Spinner} from "@/components/ui";
 import {EndClientAgreement} from "@/components/end-client-agreement";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED"|"EXPIRED";
-type ClientTab="delivery"|"video"|"post"|"services"|"agreement"|"contacts"|"files";
+type ClientTab="video"|"post"|"services"|"agreement"|"contacts"|"files";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
 type Service={id:string;name:string;description:string|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Detail={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;notes:string|null;
@@ -23,7 +22,7 @@ type Editing={businessName:string;businessType:string;phone:string;email:string;
  contractStartOn:string;contractEndOn:string;monthlyFee:string;monthlyAdBudget:string;status:Status};
 type ServiceDraft={name:string;description:string;status:Service["status"]};
 const blankService:ServiceDraft={name:"",description:"",status:"ACTIVE"};
-const tabs=[["delivery","Delivery",FolderKanban],["video","Video readiness",Video],["post","Post readiness",Newspaper],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users],["files","Files & Assets",FolderOpen]] as const;
+const tabs=[["video","Video readiness",Video],["post","Post readiness",Newspaper],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users],["files","Files & Assets",FolderOpen]] as const;
 function formFrom(c:Detail):Editing{return {
  businessName:c.businessName,businessType:c.businessType??"",phone:c.phone??"",email:c.email??"",location:c.location??"",notes:c.notes??"",
  contractStartOn:c.contractStartOn?.slice(0,10)??"",contractEndOn:c.contractEndOn?.slice(0,10)??"",
@@ -36,7 +35,7 @@ export default function ClientWorkspacePage(){
  const canRead=!!session?.identity.permissions.includes("clients.read");
  const canEdit=!!session?.identity.permissions.includes("clients.edit");
  const canFinance=!!session?.identity.permissions.includes("finance.read.all");
- const [client,setClient]=useState<Detail|null>(null),[form,setForm]=useState<Editing|null>(null),[tab,setTab]=useState<ClientTab>("delivery");
+ const [client,setClient]=useState<Detail|null>(null),[form,setForm]=useState<Editing|null>(null),[tab,setTab]=useState<ClientTab>("services");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const [contact,setContact]=useState({name:"",role:"",phone:"",email:"",isPrimary:false});
  const [service,setService]=useState<ServiceDraft>(blankService),[editingService,setEditingService]=useState<string|null>(null),[serviceEdit,setServiceEdit]=useState<ServiceDraft>(blankService);
@@ -82,7 +81,7 @@ export default function ClientWorkspacePage(){
   <nav className="aw-client-crumb"><Link href="/app/clients"><ArrowLeft size={15}/>All clients</Link><span>/</span><span>{client.businessName}</span></nav>
   <header className="aw-client-hero">
    <div className="aw-client-hero-top">
-    <div><p className="aw-client-kicker">CLIENT DELIVERY WORKSPACE</p><h1>{client.businessName}</h1>
+    <div><p className="aw-client-kicker">CLIENT WORKSPACE</p><h1>{client.businessName}</h1>
      <p>{client.businessType||"Business category not recorded"}{client.location?" · "+client.location:""}{client.phone?" · "+client.phone:""}</p>
     </div>
     <div className="aw-client-hero-actions"><span className={"aw-client-status aw-client-status-"+(client.agreementExpired?"ended":client.status.toLowerCase())}>{client.agreementExpired?"EXPIRED":client.status}</span>
@@ -116,12 +115,7 @@ export default function ClientWorkspacePage(){
   </section>}
   {tab==="video"&&<ClientVideoReadiness clientId={client.id}/>}
   {tab==="post"&&<ClientPostReadiness clientId={client.id}/>}
-  {tab==="delivery"&&<>
-    {client.services.length===0&&<div className="aw-client-callout"><div><strong>Start with the service agreement</strong><p>No service commitments are recorded. You can record an agreed service or schedule a named delivery directly.</p></div>
-     <button className="aw-client-btn" type="button" onClick={()=>setTab("services")}>Add services <ArrowRight size={15}/></button></div>}
-    <ClientDeliveryWorkspace clientId={client.id} contractStartOn={client.contractStartOn} contractEndOn={client.contractEndOn} services={client.services}/>
-   </>}
-   {tab==="services"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Agreed services</h2><p>Record the services promised in the agreement. Delivery dates and quantities belong under Client deliveries.</p></div></div>
+   {tab==="services"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Agreed services</h2><p>Record the services agreed with this client.</p></div></div>
     <div className="aw-client-service-grid">{client.services.map(item=><article className="aw-client-service" key={item.id}>
      <div className="aw-client-panel-heading"><div><h3>{item.name}</h3><p>{item.description||"No service description"}</p></div><span className={"aw-client-status aw-client-status-"+item.status.toLowerCase()}>{item.status}</span></div>
      {canEdit&&<button className="aw-client-btn" type="button" onClick={()=>{setEditingService(item.id);setServiceEdit({name:item.name,description:item.description??"",status:item.status});}}>Edit service</button>}
