@@ -23,6 +23,7 @@ function fixture() {
   ]);
   const findTransactions = vi.fn().mockResolvedValue([]);
   const groupTransactions = vi.fn().mockResolvedValue([]);
+  const aggregateTransactions = vi.fn().mockResolvedValue({_sum:{amount:new Prisma.Decimal("8500.0000")},_count:{_all:9}});
   const salaryFundingAggregate=vi.fn().mockResolvedValue({_sum:{amount:null}});
   const salaryFundingFindMany=vi.fn().mockResolvedValue([]);
   const settlementFindMany=vi.fn().mockResolvedValue([]);
@@ -32,14 +33,14 @@ function fixture() {
   const db = {
     financialCategory: { findMany: findCategories },
     client:{findMany:vi.fn().mockResolvedValue([])},
-    financialTransaction: { findMany: findTransactions, groupBy: groupTransactions },
+    financialTransaction: { findMany: findTransactions, groupBy: groupTransactions,aggregate:aggregateTransactions },
     salaryFundingAllocation:{aggregate:salaryFundingAggregate,findMany:salaryFundingFindMany},
     salaryPayment:{aggregate:salaryPaymentAggregate},
     internalSettlement:{findMany:settlementFindMany,findFirst:settlementFindFirst,aggregate:settlementAggregate},
   } as unknown as PrismaClient;
   return {
     service: new FinanceService(db),
-    findCategories, findTransactions, groupTransactions, salaryFundingAggregate, salaryFundingFindMany,
+    findCategories, findTransactions, groupTransactions, aggregateTransactions,salaryFundingAggregate, salaryFundingFindMany,
     salaryPaymentAggregate,settlementAggregate,settlementFindFirst,categoryId,
   };
 }
@@ -56,6 +57,23 @@ describe("Meta Ads register scopes", () => {
       categoryId: { in: [categoryId.meta, categoryId.ads] },
     });
     expect(where).not.toHaveProperty("clientId");
+  });
+
+  it("counts only posted client Meta Ads paid by my money-account owner, not by the recorder",async()=>{
+    const {service,aggregateTransactions,categoryId}=fixture();
+    const result=await service.clientAdAccountSpend(actor,{from:"2026-10-22",to:"2026-11-21"});
+    expect(result).toEqual({from:"2026-10-22",to:"2026-11-21",currency:"INR",
+      posted:"8500.0000",entries:9});
+    const where=aggregateTransactions.mock.calls[0][0].where;
+    expect(where).toMatchObject({
+      organizationId:actor.organizationId,kind:"EXPENSE",status:"POSTED",
+      clientId:{not:null},categoryId:{in:[categoryId.meta,categoryId.ads]},
+      moneyAccount:{is:{organizationId:actor.organizationId,ownerUserId:actor.userId}}
+    });
+    expect(where).not.toHaveProperty("enteredById");
+    const unauthorized={...actor,permissions:new Set<string>()};
+    await expect(service.clientAdAccountSpend(unauthorized,{from:"2026-10-22",to:"2026-11-21"}))
+      .rejects.toMatchObject({status:403});
   });
 
   it("does not accidentally include unrelated client-attributed expenses", async () => {
