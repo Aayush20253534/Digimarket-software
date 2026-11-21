@@ -19,13 +19,17 @@ export function money(value: string | number | null | undefined) {
     (cents % 100n).toString().padStart(2, "0")
   );
 }
+export type FinanceCycleState = { current: ReportingPeriod; history: (ReportingPeriod & {closedAt: string})[]; closePeriod: ReportingPeriod; canClose: boolean; plannedThrough: string };
 export function useFinanceWindow() {
-  const { session } = useAuth();
+  const { session, request } = useAuth();
+  const [cycleState, setCycleState] = useState<FinanceCycleState | null>(null);
+  const [cycleError, setCycleError] = useState("");
   const [period, setPeriod] = useState<ReportingPeriod>(() => reportingPreset("current"));
   const [view, setView] = useState<"mine" | "all">("mine");
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (!session) return;
+    let active = true;
     const q = new URLSearchParams(window.location.search);
     const from = q.get("from"),
       to = q.get("to");
@@ -44,8 +48,17 @@ export function useFinanceWindow() {
         !session.identity.roles.includes("FOUNDER"))
     )
       setView("all");
-    setReady(true);
-  }, [session]);
+    const explicit = !!(from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to);
+    void request<FinanceCycleState>("/finance/cycle-state").then(state => {
+      if (!active) return;
+      if (state?.current && Array.isArray(state.history)) {
+        setCycleState(state);
+        if (!explicit || (from! >= state.current.from && to! >= state.current.to)) setPeriod(state.current);
+      }
+      setReady(true);
+    }).catch(e => { if (active) { setCycleError(e instanceof Error ? e.message : "Cycle state unavailable"); } });
+    return () => { active = false; };
+  }, [session, request]);
   const query = new URLSearchParams({ ...period, view }).toString();
   useEffect(() => {
     if (!ready) return;
@@ -55,7 +68,7 @@ export function useFinanceWindow() {
     q.set("view", view);
     window.history.replaceState(null, "", window.location.pathname + "?" + q.toString());
   }, [ready, period, view]);
-  return { period, setPeriod, view, setView, query, ready };
+  return { period, setPeriod, view, setView, query, ready, cycleState, cycleError };
 }
 export function FinanceFrame({
   title,
@@ -93,7 +106,8 @@ export function FinanceFrame({
         </Link>
       )}
       <PageHeader eyebrow="Finance" title={title} description={description} actions={actions} />
-      <BusinessPeriodPicker value={w.period} onChange={w.setPeriod} />
+      {w.cycleError && <Notice kind="error">{w.cycleError}</Notice>}
+      <BusinessPeriodPicker value={w.period} onChange={w.setPeriod} financeCycles={w.cycleState ? [w.cycleState.current, ...w.cycleState.history] : undefined} />
       {!agencyOnly && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Finance visibility">
           <button

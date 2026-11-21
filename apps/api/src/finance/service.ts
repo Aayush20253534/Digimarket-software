@@ -436,11 +436,13 @@ export class FinanceService {
   async removeEntry(actor:Principal,id:string){
     this.administrator(actor);
     return this.db.$transaction(async tx=>{
+      await financeLock(tx,actor.organizationId);
       const entry=await tx.financialTransaction.findFirst({
         where:{id,organizationId:actor.organizationId},
         include:{verifiedPayment:{select:{id:true}},reversedBy:{select:{id:true}}},
       });
       if(!entry)throw new AuthError(404,"NOT_FOUND","Financial entry not found");
+      await openPeriod(tx,actor.organizationId,entry.occurredOn.toISOString().slice(0,10));
       if(entry.status==="CANCELLED")throw new AuthError(409,"ALREADY_CANCELLED","Financial entry already cancelled");
       if(entry.verifiedPayment||entry.reversesId||entry.reversedBy)throw new AuthError(409,"FINANCE_IMMUTABLE","Reconciled entries cannot be cancelled");
       await tx.financialTransaction.update({
@@ -520,6 +522,8 @@ export class FinanceService {
     }
     try{
       return await this.db.$transaction(async tx=>{
+        await financeLock(tx,actor.organizationId);
+        await openPeriod(tx,actor.organizationId,input.occurredOn);
         // Legacy money ledgers remain internal for reversals and cycle closing.
         // They do not determine personal finance totals or entry ownership.
         const moneyAccountId=input.moneyAccountId ??

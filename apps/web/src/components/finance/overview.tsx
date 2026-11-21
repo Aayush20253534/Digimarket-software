@@ -218,7 +218,7 @@ export function FinanceOverview() {
           },
           {
             title: "Cycle closing",
-            description: "Reconcile accounts and lock completed cycles",
+            description: "Verify income and expenses and manually close the cycle",
             href: "/app/finance/closing",
             icon: ShieldCheck,
           },
@@ -250,7 +250,7 @@ export function FinanceOverview() {
       }
     >
       {error && <Notice kind="error">{error}</Notice>}
-      <p className="text-sm text-slate-400">Work cycles restart transaction totals on the 22nd. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>
+      <p className="text-sm text-slate-400">Work cycles restart transaction totals only after a manual close. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {w.view==="mine"&&founder&&<PersonalNetAfterSettlements period={w.period}/>}
         {[

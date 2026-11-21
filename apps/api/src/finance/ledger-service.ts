@@ -591,6 +591,60 @@ export class FinanceLedgerService {
       };
     });
   }
+  // Financial reporting is anchored to the last saved close, never the calendar alone.
+  async cycleState(a: Principal, db: DB = this.db) {
+    if (!a.permissions.has("finance.read.all") && !a.permissions.has("finance.entry.read.own")) throw forbidden();
+    const rows = await db.financePeriodClose.findMany({
+      where: { organizationId: a.organizationId }, orderBy: { to: "desc" },
+      select: { from: true, to: true, closedAt: true },
+    });
+    const history = rows.map(r => ({ from: textDay(r.from), to: textDay(r.to), closedAt: r.closedAt.toISOString() }));
+    const nextDay = (date: string, delta: number) => {
+      const d = day(date); d.setUTCDate(d.getUTCDate() + delta); return textDay(d);
+    };
+    const from = history.length ? nextDay(history[0].to, 1) : AGENCY_START_DATE;
+    const plannedThrough = businessCycle(from).to;
+    const today = this.today();
+    const canClose = today > plannedThrough;
+    const current = { from, to: today > plannedThrough ? today : plannedThrough };
+    const closePeriod = { from, to: canClose ? nextDay(today, -1) : plannedThrough };
+    return { current, history, closePeriod, canClose, plannedThrough };
+  }
+
+  async simpleCycleReview(a: Principal, db: DB = this.db) {
+    ledgerRead(a);
+    const state = await this.cycleState(a, db);
+    const range = dateOnlyRange(state.closePeriod);
+    const [income, expenses, salaries, pending] = await Promise.all([
+      db.financialTransaction.aggregate({ where: { organizationId: a.organizationId, kind: "INCOME", status: "POSTED", occurredOn: range }, _sum: { amount: true } }),
+      db.financialTransaction.aggregate({ where: { organizationId: a.organizationId, kind: "EXPENSE", status: "POSTED", occurredOn: range }, _sum: { amount: true } }),
+      db.salaryPayment.aggregate({ where: { organizationId: a.organizationId, status: "PAID", paidOn: range }, _sum: { amount: true } }),
+      db.financialTransaction.count({ where: { organizationId: a.organizationId, status: "PENDING", occurredOn: range } }),
+    ]);
+    return { ...state, postedIncome: decimal(income._sum.amount).toFixed(4),
+      postedTotalExpense: decimal(expenses._sum.amount).plus(decimal(salaries._sum.amount)).toFixed(4), pending };
+  }
+
+  async closeSimple(a: Principal, p: ReportingPeriod, income: string, expense: string) {
+    ledgerWrite(a);
+    return this.db.$transaction(async tx => {
+      await financeLock(tx, a.organizationId);
+      const review = await this.simpleCycleReview(a, tx);
+      if (!review.canClose || review.closePeriod.from !== p.from || review.closePeriod.to !== p.to)
+        throw new AuthError(409, "CLOSE_BLOCKED", "Only the current cycle can be closed after its scheduled 21st. Refresh the review.");
+      if (review.pending)
+        throw new AuthError(409, "CLOSE_BLOCKED", "Resolve pending financial entries before closing.");
+      if (!decimal(income).eq(review.postedIncome) || !decimal(expense).eq(review.postedTotalExpense))
+        throw new AuthError(409, "CLOSE_TOTALS_CHANGED", "Income or expense totals changed. Refresh and verify again.");
+      const row = await tx.financePeriodClose.create({ data: {
+        organizationId: a.organizationId, from: day(p.from), to: day(p.to), closedById: a.userId,
+        note: "Income and total expenses confirmed", snapshot: JSON.parse(JSON.stringify(review)),
+      } });
+      await audit(tx, a, "finance.cycle_closed", row.id, { from: p.from, to: p.to, income, expense });
+      return { id: row.id, ...await this.cycleState(a, tx) };
+    }, { timeout: 30_000 });
+  }
+
   async review(a: Principal, p: ReportingPeriod, db: DB = this.db) {
     ledgerRead(a);
     const [

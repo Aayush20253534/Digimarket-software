@@ -1,7 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
 import Link from "next/link";
-import {AGENCY_START_DATE,agencyToday,businessCycle,cycleLabel} from "@digimarket/contracts";
+import {businessCycle} from "@digimarket/contracts";
 import {useAuth} from "@/components/auth-provider";
 import {Card,Notice,Spinner} from "@/components/ui";
 import {FinanceFrame,FinancePager,money,useFinanceWindow} from "@/components/finance/shared";
@@ -15,7 +15,7 @@ type FinanceRow={id:string;occurredOn:string;kind:string;status:string;amount:st
 type ExpensesRow={id:string;date:string;type:string;category:string;person:string;client:string;description:string;amount:string};
 type Register<T>={items:T[];total:number;page:number;limit:number};
 type Settlement={id:string;occurredOn:string;status:string;settlementDirection:"OUTGOING"|"INCOMING";amount:string;merchantOrSource:string;description:string};
-const cycles=Array.from({length:120},(_,index)=>businessCycle(agencyToday(),-index)).filter(c=>c.from>=AGENCY_START_DATE);
+
 
 export default function FinanceCyclesPage(){
  const w=useFinanceWindow(),{session,request}=useAuth();
@@ -25,6 +25,7 @@ export default function FinanceCyclesPage(){
  const [expenses,setExpenses]=useState<Register<ExpensesRow>|null>(null),[settlements,setSettlements]=useState<Settlement[]>([]);
  const [error,setError]=useState(""),[loading,setLoading]=useState(false);
  const founder=!!session?.identity.roles.includes("FOUNDER");
+ const cycles=(w.cycleState?[w.cycleState.current,...w.cycleState.history]:[]).map(c=>({...c,key:businessCycle(c.from).key}));
  const selected=cycles.find(c=>c.from===w.period.from&&c.to===w.period.to);
  useEffect(()=>{setPage(1);setExpensePage(1);},[w.period.from,w.period.to,w.view]);
  useEffect(()=>{
@@ -44,14 +45,14 @@ export default function FinanceCyclesPage(){
   return()=>{active=false};
  },[w.ready,w.query,w.view,w.period.from,w.period.to,session,request,page,expensePage,founder]);
  return <FinanceFrame title="Cycles" window={w}
-  description="Current and previous 22nd-to-21st agency work cycles. Each cycle keeps its full financial history, while the remaining bookkeeping balance carries forward.">
+  description="Current open and manually closed agency work cycles. Each cycle keeps its full financial history, while the remaining bookkeeping balance carries forward.">
   <section aria-label="Choose a financial cycle" className="space-y-3">
    <h2 className="text-lg font-semibold">Work cycles</h2>
    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
     {cycles.map((c,i)=><button type="button" key={c.from}
      className={"rounded-xl border p-4 text-left transition "+(selected?.from===c.from?"border-violet-400 bg-violet-500/10":"border-white/10 hover:border-violet-400/50")}
      onClick={()=>w.setPeriod({from:c.from,to:c.to})}>
-     <span className="block text-sm font-semibold">{cycleLabel(c.key)}</span>
+     <span className="block text-sm font-semibold">{c.from+" – "+c.to}</span>
      <span className="mt-1 block text-xs text-slate-400">{i===0?"Current cycle":"Historical cycle"} · {c.from} to {c.to}</span>
     </button>)}
    </div>
@@ -59,7 +60,7 @@ export default function FinanceCyclesPage(){
   {error&&<Notice kind="error">{error}</Notice>}
   {loading&&!summary&&<Spinner label="Loading cycle records…"/>}
   <section aria-label="Cycle financial summary" className="space-y-3">
-   <h2 className="text-lg font-semibold">{selected?cycleLabel(selected.key):w.period.from+" to "+w.period.to} · {w.view==="mine"?"My entries":"Company entries"}</h2>
+   <h2 className="text-lg font-semibold">{selected?selected.from+" – "+selected.to:w.period.from+" to "+w.period.to} · {w.view==="mine"?"My entries":"Company entries"}</h2>
    <PreviousCycleNetPosted period={w.period} view={w.view} />
    {w.view==="mine"&&<PersonalNetAfterSettlements period={w.period}/>}
    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

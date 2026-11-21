@@ -160,6 +160,12 @@ async function workspace(page: Page, role = "FOUNDER") {
     } else if (path === "/finance/reconciliations") {
       reconciled = true;
       data = { difference: "0.0000" };
+    } else if (path === "/finance/cycle-state") {
+      data = { current: closed ? {from:"2026-11-22",to:"2026-12-21"} : {from:"2026-10-22",to:"2026-11-21"}, history: closed ? [{from:"2026-10-22",to:"2026-11-21",closedAt:"2026-11-30"}] : [], canClose: !closed };
+    } else if (path === "/finance/cycle-confirmation") {
+      data = { closePeriod: {from:"2026-10-22",to:"2026-11-21"}, current:{from:"2026-10-22",to:"2026-11-21"}, canClose:!closed, plannedThrough:"2026-11-21", postedIncome:"100",postedTotalExpense:"26",pending:0 };
+    } else if (path === "/finance/cycle-close-simple") {
+      closed = true; data = { id:"close" };
     } else if (path === "/finance/cycle-close") {
       closed = true;
       data = { id: "close" };
@@ -283,27 +289,16 @@ test("client funds record an account and require a reason before reversal", asyn
   });
   await expect(page.getByRole("cell", { name: "Reversed", exact: true })).toBeVisible();
 });
-test("cycle closing stays blocked until reconciliation and explicit confirmation", async ({
-  page,
-}) => {
+test("cycle closing requires explicit verification of totals", async ({page}) => {
   const calls = await workspace(page);
   await page.goto("/app/finance/closing?" + cycle);
-  await expect(page.getByRole("button", { name: "Close cycle", exact: true })).toBeDisabled();
-  await page.getByLabel("Statement balance (INR)").fill("100");
-  await page.getByLabel("Statement reference / note").fill("Bank closing statement");
-  await page.getByRole("button", { name: "Save reconciliation" }).click();
-  await expect(page.getByText("Matched statement:", { exact: false })).toBeVisible();
-  await page.getByLabel("Closing note").fill("Statements verified");
-  await expect(page.getByRole("button", { name: "Close cycle", exact: true })).toBeDisabled();
+  await expect(page.getByText("₹100.00")).toBeVisible();
+  await expect(page.getByText("₹26.00")).toBeVisible();
+  await expect(page.getByRole("button", {name:"Close cycle",exact:true})).toBeDisabled();
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Close cycle", exact: true }).click();
-  await expect(page.getByText(/Cycle closed on 2026-11-30/)).toBeVisible();
-  expect(calls.find((c) => c.path === "/finance/cycle-close")?.body).toMatchObject({
-    from: "2026-10-22",
-    to: "2026-11-21",
-    confirmed: true,
-    note: "Statements verified",
-  });
+  await page.getByRole("button", {name:"Close cycle",exact:true}).click();
+  await expect(page).toHaveURL(/\/app\/finance(?:\?|$)/);
+  expect(calls.find(c=>c.path==="/finance/cycle-close-simple")?.body).toMatchObject({from:"2026-10-22",to:"2026-11-21",income:"100",expense:"26",confirmed:true});
 });
 test("employee direct access does not request agency money ledgers", async ({ page }) => {
   const calls = await workspace(page, "EMPLOYEE");

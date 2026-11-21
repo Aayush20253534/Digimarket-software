@@ -98,6 +98,18 @@ export function TotalExpenses() {
     };
   }, [w.ready, permitted, query, request, refresh]);
 
+  async function deleteExpense(row: Records["items"][number]) {
+    if (!canEdit || !row.id.startsWith("finance:") || row.reversal || editSaving) return;
+    if (!window.confirm("Delete this expense of " + money(row.amount) + "? It will be removed from all financial totals; the audit record is retained.")) return;
+    setEditSaving(true); setError(""); setNotice("");
+    try {
+      await request("/finance/entries/" + encodeURIComponent(row.id.slice("finance:".length)), { method: "DELETE" });
+      setNotice("Expense deleted from financial totals.");
+      setPage(1); setRefresh(v => v + 1);
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to delete expense."); }
+    finally { setEditSaving(false); }
+  }
+
   async function beginEdit(row: Records["items"][number]) {
     if (!canEdit || !row.id.startsWith("finance:") || row.reversal) return;
     setError(""); setNotice(""); setEditLoading(row.id);
@@ -310,6 +322,9 @@ export function TotalExpenses() {
                         onClick={() => void beginEdit(row)}>
                         {editLoading === row.id ? "Opening…" : "Edit expense"}
                       </button>}
+                    {canEdit && row.id.startsWith("finance:") && !row.reversal &&
+                      <button type="button" className="btn-secondary text-xs text-red-400" disabled={editSaving}
+                        onClick={() => void deleteExpense(row)}>Delete expense</button>}
                     {canEdit && row.type === "SALARY" && <Link href="/app/salary" className="text-sm underline text-violet-300">View salary workflow</Link>}
                   </article>
                 ))}
@@ -351,6 +366,7 @@ export function TotalExpenses() {
                               {editLoading === row.id ? "Opening…" : "Edit"}
                             </button> :
                             row.type === "SALARY" ? <Link href="/app/salary" className="underline text-violet-300">View salary</Link> : "—"}
+                          {row.id.startsWith("finance:") && !row.reversal && <button type="button" className="btn-secondary text-xs text-red-400 mt-1" disabled={editSaving} onClick={() => void deleteExpense(row)}>Delete</button>}
                         </td>}
                       </tr>
                     ))}

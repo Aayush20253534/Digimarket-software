@@ -301,6 +301,18 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
       });
     }),
   );
+  app.get(root + "/cycle-state", authenticate, run(async (_req, res) => {
+    res.json({ data: await ledger.cycleState(actor(res)) });
+  }));
+  app.get(root + "/cycle-confirmation", authenticate, run(async (_req, res) => {
+    res.json({ data: await ledger.simpleCycleReview(actor(res)) });
+  }));
+  app.post(root + "/cycle-close-simple", authenticate, run(async (req, res) => {
+    const input = parse(z.strictObject({
+      from: z.iso.date(), to: z.iso.date(), income: signedAmount, expense: signedAmount, confirmed: z.literal(true),
+    }), req.body);
+    res.json({ data: await ledger.closeSimple(actor(res), input, input.income, input.expense) });
+  }));
   app.get(
     root + "/cycle-review",
     authenticate,

@@ -53,18 +53,6 @@ type Unassigned = {
   page: number;
   limit: number;
 };
-type Review = {
-  from: string;
-  to: string;
-  closed: { closedAt: string; note: string } | null;
-  accounts: (Account & { matched: boolean; statementBalance: string | null })[];
-  pending: number;
-  unassignedFinance: number;
-  unassignedSalary: number;
-  blockers: string[];
-  canClose: boolean;
-  clientDeficits?: { id: string; name: string; closing: string }[];
-};
 function useData<T>(url: string, enabled: boolean, version = 0) {
   const { request } = useAuth();
   const [data, setData] = useState<T | null>(null),
@@ -1178,150 +1166,34 @@ export function UnassignedPage() {
   );
 }
 export function CycleClosingPage() {
-  const l = useLedger(),
-    { data, error } = useData<Review>("/finance/cycle-review?" + l.w.query, l.enabled, l.version),
-    [note, setNote] = useState(""),
-    [confirmed, setConfirmed] = useState(false),
-    [confirmClientDeficits, setConfirmClientDeficits] = useState(false);
-  useEffect(() => {
-    setConfirmed(false);
-    setConfirmClientDeficits(false);
-    setNote("");
-  }, [l.w.query]);
-  return (
-    <FinanceFrame
-      title="Close a work cycle"
-      description="Close only after all posted records are assigned and account balances match verified statements. Closed records are protected from editing or deletion."
-      window={l.w}
-      agencyOnly
-    >
-      <Feedback error={l.error || error} success={l.success} />
-      {data ? (
-        data.closed ? (
-          <Notice kind="success">
-            Cycle closed on {data.closed.closedAt.slice(0, 10)}. {data.closed.note} Corrections must
-            be reversals in an open cycle.
-          </Notice>
-        ) : (
-          <>
-            {!!data.blockers.length && (
-              <Card title="Complete before closing">
-                <ul className="list-disc pl-5 space-y-2">
-                  {data.blockers.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <Link className="btn-secondary" href={"/app/finance/unassigned?" + l.w.query}>
-                    Assign records
-                  </Link>
-                  <Link className="btn-secondary" href={"/app/finance/client-funds?" + l.w.query}>
-                    Review client funds
-                  </Link>
-                  <button className="btn-secondary" onClick={l.refresh}>
-                    Refresh checks
-                  </button>
-                </div>
-              </Card>
-            )}
-            {data.accounts.map((a) => (
-              <div key={a.id}>
-                {a.matched ? (
-                  <Card title={a.name}>
-                    <p>Matched statement: {money(a.closing)}</p>
-                  </Card>
-                ) : l.write ? (
-                  <ReconcileForm account={a} date={data.to} save={l.save} busy={l.busy} />
-                ) : (
-                  <Card title={a.name}>
-                    <p>Reconciliation required.</p>
-                  </Card>
-                )}
-              </div>
-            ))}
-            {l.write && (
-              <Card title="Lock this cycle">
-                <form
-                  className="space-y-4"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    await l.save(
-                      "/finance/cycle-close",
-                      { from: data.from, to: data.to, note, confirmed, confirmClientDeficits },
-                      "Cycle closed. Historical records are locked.",
-                    );
-                  }}
-                >
-                  <FormField id="close-note" label="Closing note">
-                    <textarea
-                      id="close-note"
-                      className="field"
-                      required
-                      minLength={4}
-                      maxLength={500}
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                    />
-                  </FormField>
-                  <label className="flex gap-3 items-start">
-                    <input
-                      type="checkbox"
-                      required
-                      checked={confirmed}
-                      onChange={(e) => setConfirmed(e.target.checked)}
-                    />
-                    <span>
-                      I verified the accounts and client balances. I understand that corrections
-                      will require reversals in an open cycle.
-                    </span>
-                  </label>
-                  {!!data.clientDeficits?.length && (
-                    <div className="space-y-3 rounded-lg border border-amber-400/40 p-4">
-                      <p className="text-sm">
-                        These clients have advertising spend above recorded funding. Check missing
-                        receipts and classification, then document any genuine amount still owed to
-                        the agency in the closing note.
-                      </p>
-                      <ul>
-                        {data.clientDeficits.map((c) => (
-                          <li key={c.id}>
-                            {c.name}: {money(c.closing)}
-                          </li>
-                        ))}
-                      </ul>
-                      <label className="flex gap-3 items-start">
-                        <input
-                          type="checkbox"
-                          required
-                          checked={confirmClientDeficits}
-                          onChange={(e) => setConfirmClientDeficits(e.target.checked)}
-                        />
-                        <span>
-                          I verified these outstanding client balances and documented the amounts
-                          owed.
-                        </span>
-                      </label>
-                    </div>
-                  )}
-                  <button
-                    className="btn-primary"
-                    disabled={
-                      l.busy ||
-                      !data.canClose ||
-                      !confirmed ||
-                      (!!data.clientDeficits?.length && !confirmClientDeficits)
-                    }
-                  >
-                    Close cycle
-                  </button>
-                </form>
-              </Card>
-            )}
-          </>
-        )
-      ) : (
-        !error && <Spinner label="Checking cycle…" />
-      )}
-    </FinanceFrame>
-  );
+  const l = useLedger();
+  const { data, error } = useData<{ closePeriod: {from: string; to: string}; current: {from: string; to: string}; canClose: boolean; plannedThrough: string; postedIncome: string; postedTotalExpense: string; pending: number }>("/finance/cycle-confirmation", l.enabled, l.version);
+  const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => { setConfirmed(false); }, [data]);
+  return <FinanceFrame title="Close a work cycle" description="Verify total income and total expenses, then close manually. No new cycle starts automatically." window={l.w} agencyOnly>
+    <Feedback error={l.error || error} success={l.success}/>
+    {!data && !error && <Spinner label="Checking cycle…"/>}
+    {data && <>
+      <Card title="Current cycle">
+        <p>{data.closePeriod.from} through {data.closePeriod.to} (inclusive)</p>
+        <p className="mt-2 text-sm text-slate-400">Closing becomes available after {data.plannedThrough} (India time). Today's dated entries belong to the new cycle after closure.</p>
+      </Card>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card title="Total income"><strong className="text-2xl">{money(data.postedIncome)}</strong></Card>
+        <Card title="Total expense"><strong className="text-2xl">{money(data.postedTotalExpense)}</strong><p className="text-sm text-slate-400">Includes salaries and client advertising.</p></Card>
+      </div>
+      {!data.canClose && <Notice>The cycle cannot be closed before its scheduled 21st has ended.</Notice>}
+      {!!data.pending && <Notice kind="error">{data.pending} pending financial entries must be resolved first.</Notice>}
+      {l.write && <Card title="Confirm closing">
+        <form className="space-y-4" onSubmit={async e => {
+          e.preventDefault();
+          const result = await l.save("/finance/cycle-close-simple", {...data.closePeriod, income: data.postedIncome, expense: data.postedTotalExpense, confirmed}, "Cycle closed. New cycle started.");
+          if (result) window.location.assign("/app/finance");
+        }}>
+          <label className="flex gap-3 items-start"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}/><span>I have verified the total income and total expenses and confirm closing this cycle.</span></label>
+          <button className="btn-primary" disabled={l.busy || !data.canClose || !!data.pending || !confirmed}>Close cycle</button>
+        </form>
+      </Card>}
+    </>}
+  </FinanceFrame>;
 }
