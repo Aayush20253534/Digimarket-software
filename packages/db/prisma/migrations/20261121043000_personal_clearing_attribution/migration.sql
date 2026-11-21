@@ -1,3 +1,9 @@
+-- Allow personally owned cash/clearing ledgers without labeling non-founders as founders.
+-- Founder-type accounts still must have an owner.
+ALTER TABLE "MoneyAccount" DROP CONSTRAINT "MoneyAccount_owner_kind";
+ALTER TABLE "MoneyAccount" ADD CONSTRAINT "MoneyAccount_owner_kind"
+  CHECK ("kind" <> 'FOUNDER'::"MoneyAccountKind" OR "ownerUserId" IS NOT NULL);
+
 -- Create unverified per-user clearing ledgers (not verified bank balances).
 -- Attribute historical transactions to the authenticated original requester, not
 -- enteredById, which an administrator can reassign after submission.
