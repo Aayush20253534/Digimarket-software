@@ -1,6 +1,7 @@
 import { agencyToday, businessCycle, reportingPreset, dateOnlyRange, type ReportingPeriod } from "@digimarket/contracts";
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
+import { ensurePersonalMoneyAccount, openPeriod, financeLock } from "./ledger-service";
 import { InternalSettlementService } from "./internal-settlements";
 import { founderPolicy, isFounder } from "../approvals/founder";
 import type { FinanceCategoryInput, FinanceEntryInput, FinanceEntryAdminEdit, FinanceKind, FinanceBreakdownQuery } from "@digimarket/contracts";
@@ -326,6 +327,8 @@ export class FinanceService {
         if(!assignedUser)throw invalid("Assigned user must be an active member of this organization");
       }
       if(input.moneyAccountId&&!await tx.moneyAccount.findFirst({where:{id:input.moneyAccountId,organizationId:actor.organizationId,active:true,openingOn:{lte:new Date(input.occurredOn+"T00:00:00Z")}}}))throw invalid("Choose an account open on this transaction date");
+      await financeLock(tx,actor.organizationId);
+      await openPeriod(tx,actor.organizationId,input.occurredOn);
       const updated=await tx.financialTransaction.update({where:{id},data:{
         ...(input.moneyAccountId!==undefined?{moneyAccountId:input.moneyAccountId}:{}),
         categoryId:category.id,amount,occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
@@ -438,16 +441,10 @@ export class FinanceService {
     }
     try{
       return await this.db.$transaction(async tx=>{
-        let moneyAccountId=input.moneyAccountId??null;
-        if(ownExpense){
-          const accounts=await tx.moneyAccount.findMany({where:{organizationId:actor.organizationId,
-            ownerUserId:actor.userId,kind:"FOUNDER",active:true,openingOn:{lte:new Date(input.occurredOn+"T00:00:00Z")}},
-            select:{id:true},take:2});
-          if(accounts.length!==1)throw invalid(accounts.length===0
-            ?"No personal founder account is open on this expense date. Set up your account in Finance > Accounts first."
-            :"Multiple personal founder accounts are open on this date. Use the regular register to select the correct account.");
-          moneyAccountId=accounts[0].id;
-        }
+        // Attribute new records to the actual signed-in submitter.
+        // An explicitly chosen account always wins.
+        const moneyAccountId=input.moneyAccountId ??
+          await ensurePersonalMoneyAccount(tx,actor.organizationId,actor.userId);
         const appliedPolicy=founder?await founderPolicy(tx,actor.organizationId,"FINANCE"):policy!;
         const now=new Date();
         const approval=await tx.approvalRequest.create({data:{
