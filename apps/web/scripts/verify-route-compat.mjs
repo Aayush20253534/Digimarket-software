@@ -13,7 +13,7 @@ import path from "node:path";
 
 export const phase0Routes = [
   "", "dashboard", "leads", "follow-ups", "meetings",
-  "clients", "clients/[id]", "deliveries",
+  "clients", "clients/[id]",
   "tasks", "task-history", "finance", "quotations", "agreements",
   "reports", "reports/leads", "reports/[kind]",
   "messages", "notes", "notes/list", "content", "assets",
