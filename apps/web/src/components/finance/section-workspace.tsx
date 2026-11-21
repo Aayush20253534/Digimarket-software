@@ -3,6 +3,7 @@ import {agencyToday,cycleLabel} from "@digimarket/contracts";
 import {BusinessPeriodPicker} from "@/components/business-period-picker";
 import {FinancePager,useFinanceWindow} from "./shared";
 import {ReversalButton} from "./reversal";
+import {PreviousCycleNetPosted} from "./previous-cycle-carry";
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -565,6 +566,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     <div className="flex flex-wrap items-center gap-3">
       <Link className="btn-secondary" href={"/app/finance/cycles?"+windowState.query}>Cycles · View previous entries</Link>
     </div>
+    <PreviousCycleNetPosted period={period} view={view==="all"&&canAll?"all":"mine"}/>
     {balance&&<Card>
       <p className="text-sm font-semibold">Net balance remaining · {view==="mine"?"My account":"Company accounts"}</p>
       <strong className="mt-2 block text-2xl">{money(balance.remaining)}</strong>
@@ -1010,7 +1012,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
             <td className="py-3 pr-4"><div className="min-w-40 max-w-80 whitespace-pre-wrap break-words text-sm" title={row.description??undefined}>{row.description?.trim()||"—"}</div></td>
             <td className={row.sourceType==="SETTLEMENT"?"aw-finance-amount text-slate-300":"aw-finance-amount "+(row.kind==="INCOME"?"income":"expense")}>
               {row.sourceType==="SETTLEMENT"?(row.settlementDirection==="OUTGOING"?"−":"+"):""}{money(row.amount)}
-              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">{"Resets both founders' personal expense cycles"}</small>}
+              {row.sourceType==="SETTLEMENT"&&<small className="block font-normal opacity-60">{"Debits sender and credits recipient accounts"}</small>}
             </td>
             <td><span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span></td>
             <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
@@ -1021,7 +1023,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
             <td className="py-3"><div className="flex items-center gap-2">
               {row.sourceType==="SETTLEMENT"?<>
-                <span className="text-xs text-slate-500">Informational only</span>
+                <span className="text-xs text-slate-500">Personal balance transfer; excluded from company income and expenses</span>
                 {row.settlementDirection==="OUTGOING"&&row.status!=="CANCELLED"&&
                   <button type="button" className="btn-secondary text-xs" disabled={busy}
                     onClick={()=>void voidSettlement(row)}>Void settlement</button>}
