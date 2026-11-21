@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   ArrowRight,
   Wallet,
-  Landmark,
   Users,
   ReceiptText,
   ShieldCheck,
@@ -94,12 +93,6 @@ export function FinanceOverview() {
             description: "Top-ups, refunds and client balances",
             href: "/app/finance/client-funds",
             icon: Wallet,
-          },
-          {
-            title: "Accounts & transfers",
-            description: "Cash, bank, UPI and founder clearing",
-            href: "/app/finance/accounts",
-            icon: Landmark,
           },
         ]
       : []),
