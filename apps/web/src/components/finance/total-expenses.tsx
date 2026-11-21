@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, Spinner } from "@/components/ui";
 import { FinanceFrame, FinancePager, money, useFinanceWindow } from "./shared";
@@ -36,6 +37,17 @@ type Records = {
   limit: number;
 };
 
+type EditableExpense = {
+  id: string; categoryId: string; enteredById: string; clientId: string | null;
+  amount: string; occurredOn: string; method: string;
+  merchantOrSource: string; description: string;
+};
+type EditOptions = {
+  categories: { id: string; name: string; kind: string; purpose?: string; active: boolean }[];
+  people: { id: string; displayName: string; loginId: string }[];
+  clients: { id: string; businessName: string }[];
+};
+const methods = ["CASH", "UPI", "BANK_TRANSFER", "CARD", "OTHER"] as const;
 export function TotalExpenses() {
   const w = useFinanceWindow(),
     { session, request } = useAuth();
@@ -45,6 +57,15 @@ export function TotalExpenses() {
     [type, setType] = useState<"ALL" | ExpenseType>("ALL");
   const [search, setSearch] = useState(""),
     [exporting, setExporting] = useState(false);
+  const [editing, setEditing] = useState<EditableExpense | null>(null);
+  const [editOptions, setEditOptions] = useState<EditOptions | null>(null);
+  const [editLoading, setEditLoading] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const canEdit = !!session?.identity.roles.some(r => r === "ADMIN" || r === "SUPER_ADMIN")
+    && session.identity.permissions.includes("finance.category.manage")
+    && session.identity.permissions.includes("finance.read.all");
   const query =
     w.query +
     "&" +
@@ -72,7 +93,53 @@ export function TotalExpenses() {
     return () => {
       active = false;
     };
-  }, [w.ready, permitted, query, request]);
+  }, [w.ready, permitted, query, request, refresh]);
+
+  async function beginEdit(rowId: string) {
+    if (!canEdit || !rowId.startsWith("finance:")) return;
+    setError(""); setNotice(""); setEditLoading(rowId);
+    try {
+      const id = rowId.slice("finance:".length);
+      const [record, categories, people, clients] = await Promise.all([
+        request<EditableExpense>("/finance/entries/" + encodeURIComponent(id) + "/edit"),
+        request<EditOptions["categories"]>("/finance/categories"),
+        request<EditOptions["people"]>("/finance/assignees"),
+        request<EditOptions["clients"]>("/finance/meta-ad-clients"),
+      ]);
+      setEditing(record);
+      setEditOptions({categories, people, clients});
+    } catch(e) {
+      setError(e instanceof Error ? e.message : "Unable to edit this entry.");
+    } finally {
+      setEditLoading(null);
+    }
+  }
+
+  async function saveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing || !canEdit || editSaving) return;
+    setEditSaving(true);setError("");
+    try {
+      const {id, categoryId, enteredById, clientId, amount, occurredOn, method,
+        merchantOrSource, description} = editing;
+      await request("/finance/entries/" + encodeURIComponent(id), {
+        method: "PUT",
+        body: {categoryId, enteredById, clientId, amount, occurredOn, method,
+          merchantOrSource, description},
+      });
+      setEditing(null);setEditOptions(null);
+      setNotice("Expense updated. User-wise totals reflect the assigned user; agency totals are unaffected by reassignment.");
+      setRefresh(value => value + 1);
+    } catch(e) {
+      setError(e instanceof Error ? e.message : "Unable to save the expense.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  const selectedEditCategory = editOptions?.categories.find(c => c.id === editing?.categoryId);
+  const editMetaAds = selectedEditCategory?.purpose === "META_ADS" ||
+    /^meta[\\s_-]*(?:ads?|advertising|advertisements?)$/i.test(selectedEditCategory?.name ?? "");
 
   async function exportCSV() {
     setExporting(true);
@@ -101,6 +168,7 @@ export function TotalExpenses() {
       description="Every posted expense in the selected work cycle, including self and client Meta Ads and salaries."
     >
       {error && <Notice kind="error">{error}</Notice>}
+      {notice && <Notice kind="success">{notice}</Notice>}
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Total expense summary">
         {(
           [
@@ -139,8 +207,8 @@ export function TotalExpenses() {
         aria-label="All expense records"
         className="space-y-4 rounded-xl border border-white/10 p-4 sm:p-5 min-w-0"
       >
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="flex-1 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
+          <label className="block w-full sm:flex-1 sm:min-w-[14rem]">
             Search expenses
             <input
               className="input mt-1 w-full"
@@ -154,10 +222,10 @@ export function TotalExpenses() {
               placeholder="Category, person, client or description"
             />
           </label>
-          <label>
+          <label className="block w-full sm:w-auto">
             Expense type
             <select
-              className="input mt-1 block"
+              className="input mt-1 block w-full"
               value={type}
               onChange={(e) => {
                 setType(e.target.value as typeof type);
@@ -173,7 +241,7 @@ export function TotalExpenses() {
             </select>
           </label>
           <button
-            className="btn-secondary"
+            className="btn-secondary w-full sm:w-auto"
             disabled={exporting || !data}
             onClick={() => void exportCSV()}
           >
@@ -192,7 +260,28 @@ export function TotalExpenses() {
         ) : (
           data && (
             <>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 md:hidden" aria-label="Mobile expense records">
+                {data.items.map(row => (
+                  <article key={row.id} className="rounded-lg border border-white/10 p-3 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <strong className="text-base">{money(row.amount)}</strong>
+                      <span className="text-xs text-slate-400">{row.date}</span>
+                    </div>
+                    <p className="text-sm font-semibold">{expenseTypes[row.type]} · {row.category}</p>
+                    <p className="text-sm">Assigned to: {row.person || "—"}</p>
+                    {row.client && <p className="text-sm">Client: {row.client}</p>}
+                    {row.description && <p className="text-sm break-words">{row.description}</p>}
+                    {row.reversal && <p className="text-xs text-amber-300">Reversal</p>}
+                    {canEdit && row.id.startsWith("finance:") && !row.reversal &&
+                      <button type="button" className="btn-secondary text-xs" disabled={!!editLoading || editSaving}
+                        onClick={() => void beginEdit(row.id)}>
+                        {editLoading === row.id ? "Opening…" : "Edit expense"}
+                      </button>}
+                    {canEdit && row.type === "SALARY" && <Link href="/app/salary" className="text-sm underline text-violet-300">View salary workflow</Link>}
+                  </article>
+                ))}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm text-left min-w-[780px]">
                   <thead className="text-slate-400 border-b border-white/10">
                     <tr>
@@ -203,15 +292,12 @@ export function TotalExpenses() {
                         "Client",
                         "Description",
                         "Amount",
-                      ].map((label) => (
-                        <th key={label} className="p-3">
-                          {label}
-                        </th>
-                      ))}
+                        ...(canEdit ? ["Actions"] : []),
+                      ].map(label => <th key={label} className="p-3">{label}</th>)}
                     </tr>
                   </thead>
                   <tbody>
-                    {data.items.map((row) => (
+                    {data.items.map(row => (
                       <tr key={row.id} className="border-b border-white/10 align-top">
                         <td className="p-3 whitespace-nowrap">{row.date}</td>
                         <td className="p-3">
@@ -225,6 +311,14 @@ export function TotalExpenses() {
                           {row.description || "—"}
                         </td>
                         <td className="p-3 whitespace-nowrap font-semibold">{money(row.amount)}</td>
+                        {canEdit && <td className="p-3">
+                          {row.id.startsWith("finance:") && !row.reversal ?
+                            <button type="button" className="btn-secondary text-xs" disabled={!!editLoading || editSaving}
+                              onClick={() => void beginEdit(row.id)}>
+                              {editLoading === row.id ? "Opening…" : "Edit"}
+                            </button> :
+                            row.type === "SALARY" ? <Link href="/app/salary" className="underline text-violet-300">View salary</Link> : "—"}
+                        </td>}
                       </tr>
                     ))}
                   </tbody>
@@ -236,6 +330,76 @@ export function TotalExpenses() {
           )
         )}
       </section>
+      {editing && editOptions && canEdit && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-3 sm:p-6">
+          <section role="dialog" aria-modal="true" aria-label="Edit expense"
+            className="w-full max-w-xl max-h-[92dvh] overflow-y-auto rounded-xl border border-white/20 bg-slate-950 p-4 sm:p-6 shadow-xl">
+            <h2 className="text-xl font-semibold">Edit expense</h2>
+            <p className="mt-1 mb-4 text-sm text-slate-400">
+              Reassigning changes the selected user's totals, without changing agency totals.
+              The original submitter stays recorded in audit history.
+            </p>
+            <form onSubmit={e => void saveEdit(e)} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block text-sm">Assigned user
+                <select className="field mt-1 w-full" required value={editing.enteredById}
+                  onChange={e => setEditing(v => v && ({...v,enteredById:e.target.value}))}>
+                  {!editOptions.people.some(p => p.id === editing.enteredById) &&
+                    <option value={editing.enteredById}>Previously assigned user</option>}
+                  {editOptions.people.map(p => <option value={p.id} key={p.id}>{p.displayName}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm">Category
+                <select className="field mt-1 w-full" required value={editing.categoryId}
+                  onChange={e => setEditing(v => v && ({...v,categoryId:e.target.value,clientId:null}))}>
+                  {editOptions.categories.filter(x => x.kind === "EXPENSE" && (x.active || x.id === editing.categoryId) && x.purpose !== "SALARY")
+                    .map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+              </label>
+              {editMetaAds && <label className="block text-sm sm:col-span-2">Meta Ads client
+                <select className="field mt-1 w-full" value={editing.clientId ?? ""}
+                  onChange={e => setEditing(v => v && ({...v,clientId:e.target.value || null}))}>
+                  <option value="">Agency / Self</option>
+                  {editing.clientId && !editOptions.clients.some(x => x.id === editing.clientId) &&
+                    <option value={editing.clientId}>Previously linked client</option>}
+                  {editOptions.clients.map(x => <option key={x.id} value={x.id}>{x.businessName}</option>)}
+                </select>
+              </label>}
+              <label className="block text-sm">Amount (INR)
+                <input className="field mt-1 w-full" required inputMode="decimal"
+                  pattern="(0|[1-9][0-9]{0,14})([.][0-9]{1,4})?"
+                  value={editing.amount}
+                  onChange={e => setEditing(v => v && ({...v,amount:e.target.value}))}/>
+              </label>
+              <label className="block text-sm">Date
+                <input className="field mt-1 w-full" type="date" required value={editing.occurredOn}
+                  onChange={e => setEditing(v => v && ({...v,occurredOn:e.target.value}))}/>
+              </label>
+              <label className="block text-sm">Payment method
+                <select className="field mt-1 w-full" value={editing.method}
+                  onChange={e => setEditing(v => v && ({...v,method:e.target.value}))}>
+                  {methods.map(m => <option key={m} value={m}>{m.replaceAll("_"," ")}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm">Merchant / payee
+                <input className="field mt-1 w-full" maxLength={160} value={editing.merchantOrSource}
+                  onChange={e => setEditing(v => v && ({...v,merchantOrSource:e.target.value}))}/>
+              </label>
+              <label className="block text-sm sm:col-span-2">Notes
+                <textarea className="field mt-1 w-full min-h-20" maxLength={2000}
+                  value={editing.description}
+                  onChange={e => setEditing(v => v && ({...v,description:e.target.value}))}/>
+              </label>
+              <div className="sm:col-span-2 flex flex-wrap justify-end gap-2 pt-2">
+                <button type="button" className="btn-secondary" disabled={editSaving}
+                  onClick={() => {setEditing(null);setEditOptions(null);}}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={editSaving}>
+                  {editSaving ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </FinanceFrame>
   );
 }
