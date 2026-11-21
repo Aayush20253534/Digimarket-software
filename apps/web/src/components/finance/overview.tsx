@@ -163,7 +163,7 @@ export function FinanceOverview() {
       <p className="text-sm text-slate-400">Work cycles restart transaction totals on the 22nd. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {[
-          ["Net operating money (this cycle)", totalExpense?.netOperatingMoney],
+          ["Net operating money", totalExpense?.netOperatingMoney],
           ["Net balance left (carried forward)", balance?.remaining],
           ["Pending income", totals?.pendingIncome],
           ["Pending expenses", totals?.pendingExpense],
