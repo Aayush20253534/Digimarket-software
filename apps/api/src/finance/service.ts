@@ -327,11 +327,20 @@ export class FinanceService {
         if(!assignedUser)throw invalid("Assigned user must be an active member of this organization");
       }
       if(input.moneyAccountId&&!await tx.moneyAccount.findFirst({where:{id:input.moneyAccountId,organizationId:actor.organizationId,active:true,openingOn:{lte:new Date(input.occurredOn+"T00:00:00Z")}}}))throw invalid("Choose an account open on this transaction date");
+      // Internal user clearing accounts follow assignment changes, but verified
+      // bank/cash account links are not silently modified.
+      let assignedAccountId=input.moneyAccountId;
+      if(assignedAccountId===undefined&&assignedUserId!==entry.enteredById&&entry.moneyAccountId){
+        const sourceAccount=await tx.moneyAccount.findFirst({where:{id:entry.moneyAccountId,organizationId:actor.organizationId},
+          select:{normalizedName:true}});
+        if(sourceAccount?.normalizedName.startsWith("personal-clearing-"))
+          assignedAccountId=await ensurePersonalMoneyAccount(tx,actor.organizationId,assignedUserId);
+      }
       await financeLock(tx,actor.organizationId);
       await openPeriod(tx,actor.organizationId,entry.occurredOn.toISOString().slice(0,10));
       await openPeriod(tx,actor.organizationId,input.occurredOn);
       const updated=await tx.financialTransaction.update({where:{id},data:{
-        ...(input.moneyAccountId!==undefined?{moneyAccountId:input.moneyAccountId}:{}),
+        ...(assignedAccountId!==undefined?{moneyAccountId:assignedAccountId}:{}),
         categoryId:category.id,amount,occurredOn:new Date(input.occurredOn+"T00:00:00.000Z"),
         method:input.method,merchantOrSource:input.merchantOrSource,description:input.description,
         clientId:requestedClientId??null,enteredById:assignedUserId,
@@ -405,11 +414,11 @@ export class FinanceService {
     if(!founder)need(actor,"approvals.submit");
     if(ownExpense&&(input.kind!=="EXPENSE"||input.enteredById!=null||input.moneyAccountId!=null))
       throw invalid("Direct expenses use your signed-in account automatically");
-    const enteredById=ownExpense?actor.userId:input.enteredById??actor.userId; // Legacy callers remain compatible.
-    const canAssignOthers=founder||(
-      actor.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&
-      actor.permissions.has("finance.category.manage")&&actor.permissions.has("finance.read.all"));
-    if(enteredById!==actor.userId&&!canAssignOthers)throw forbidden();
+    // The authenticated user owns every new finance record. An administrator
+    // can later reassign it through the audited edit endpoint.
+    if(input.enteredById&&input.enteredById!==actor.userId)
+      throw invalid("New finance entries belong to the signed-in user. An administrator can reassign them after saving.");
+    const enteredById=actor.userId;
     const amount=new Prisma.Decimal(input.amount);
     if(!amount.isFinite()||amount.lte(0))throw invalid("Amount must be greater than zero");
     const [category,policy,organization,assignedUser]=await Promise.all([
@@ -442,8 +451,8 @@ export class FinanceService {
     }
     try{
       return await this.db.$transaction(async tx=>{
-        // Attribute new records to the actual signed-in submitter.
-        // An explicitly chosen account always wins.
+        // Legacy money ledgers remain internal for reversals and cycle closing.
+        // They do not determine personal finance totals or entry ownership.
         const moneyAccountId=input.moneyAccountId ??
           await ensurePersonalMoneyAccount(tx,actor.organizationId,actor.userId);
         const appliedPolicy=founder?await founderPolicy(tx,actor.organizationId,"FINANCE"):policy!;
@@ -718,11 +727,11 @@ export class FinanceService {
     // A repeatable-read snapshot prevents inserts/edits between export pages
     // from duplicating or skipping records. No silent latest-N truncation.
     const csv=await this.db.$transaction(async tx=>{
-      const lines=["ID,Date,Kind,Status,Category,Client,Amount,Currency,Person,Account,Description,Reverses"];
+      const lines=["ID,Date,Kind,Status,Category,Client,Amount,Currency,Assigned user,Description,Reverses"];
       let skip=0;
       for(;;){
-        const rows=await tx.financialTransaction.findMany({where,include:{category:true,client:{select:{businessName:true}},enteredBy:{select:{displayName:true}},moneyAccount:{select:{name:true}}},orderBy:[{occurredOn:"desc"},{createdAt:"desc"},{id:"desc"}],skip,take:1000});
-        for(const row of rows)lines.push([row.id,row.occurredOn.toISOString().slice(0,10),row.kind,row.status,row.category.name,row.client?.businessName??"",row.amount.toFixed(4),row.currencyCode,row.enteredBy.displayName,row.moneyAccount?.name??"Unassigned",row.description??"",row.reversesId??""].map(csvCell).join(","));
+        const rows=await tx.financialTransaction.findMany({where,include:{category:true,client:{select:{businessName:true}},enteredBy:{select:{displayName:true}}},orderBy:[{occurredOn:"desc"},{createdAt:"desc"},{id:"desc"}],skip,take:1000});
+        for(const row of rows)lines.push([row.id,row.occurredOn.toISOString().slice(0,10),row.kind,row.status,row.category.name,row.client?.businessName??"",row.amount.toFixed(4),row.currencyCode,row.enteredBy.displayName,row.description??"",row.reversesId??""].map(csvCell).join(","));
         if(rows.length<1000)break;skip+=rows.length;
       }
       return lines.join("\r\n");
