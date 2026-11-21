@@ -239,10 +239,17 @@ export class FinanceLedgerService {
     ledgerRead(a);
     await account(this.db, a.organizationId, id);
     const founder = a.roles.includes("FOUNDER");
+    // Settlement details are private to the sending and receiving founders.
+    // Agency account totals still include both sides of the transfer.
     const source = founder
-      ? Prisma.sql`"FinanceMoneyMovement"`
+      ? Prisma.sql`(SELECT m.* FROM "FinanceMoneyMovement" m
+         WHERE m."source"<>'SETTLEMENT' OR EXISTS (
+           SELECT 1 FROM "InternalSettlement" s WHERE s."id"=m."sourceId"
+             AND s."organizationId"=${a.organizationId}::uuid
+             AND (s."senderId"=${a.userId}::uuid OR s."recipientId"=${a.userId}::uuid)
+         )) movement`
       : Prisma.sql`(
-   SELECT * FROM "FinanceMoneyMovement" WHERE "source"<>'SALARY'
+   SELECT * FROM "FinanceMoneyMovement" WHERE "source" NOT IN ('SALARY','SETTLEMENT')
    UNION ALL SELECT 'salary-total:'||"moneyAccountId"||':'||"occurredOn", "organizationId","moneyAccountId","occurredOn",'SALARY_TOTAL',NULL::uuid,SUM("amount"),'Salary funding (daily total)',MAX("createdAt"),NULL::uuid,NULL::uuid
    FROM "FinanceMoneyMovement" WHERE "source"='SALARY' GROUP BY "organizationId","moneyAccountId","occurredOn"
   ) movement`;
