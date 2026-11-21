@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, Spinner } from "@/components/ui";
 import { FinanceFrame, FinancePager, money, useFinanceWindow } from "./shared";
+import {PersonalNetAfterSettlements} from "./personal-net-after-settlements";
 
 const expenseTypes = {
   OTHER: "Other expenses",
@@ -201,11 +202,12 @@ export function TotalExpenses() {
         <p className="text-sm text-slate-400" role="status">My summary restarted with your latest founder settlement. Older entries remain in the register; agency totals are unchanged.</p>
       )}
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Total expense summary">
+        {w.view==="mine"&&<PersonalNetAfterSettlements period={w.period}/>}
         {(
           [
             ["Posted income", data?.summary.postedIncome],
             ["Total expense", data?.summary.postedTotalExpense],
-            ["Net operating money", data?.summary.netOperatingMoney],
+            [w.view==="mine"?"Operating net (before settlements)":"Net operating money", data?.summary.netOperatingMoney],
           ] as const
         ).map(([label, value]) => (
           <Card key={label}>
@@ -222,7 +224,7 @@ export function TotalExpenses() {
           ? " Salary records show your funded share."
           : " Salary records show each payment once, regardless of funding splits."}{" "}
         Reversals reduce expenses. Pending and cancelled entries, transfers, and client fund
-        deposits are excluded.
+        deposits are excluded from operating profit. Personal settlement transfers appear in a separate adjusted-net card.
       </p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Expense breakdown">
         {Object.entries(expenseTypes).map(([key, label]) => (

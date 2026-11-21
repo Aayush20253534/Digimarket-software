@@ -72,7 +72,7 @@ test("finance overview cards keep details on separate pages and preserve the wor
  await page.goto("/app/finance");
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
  await expect(page.getByLabel("Work cycle through")).toHaveValue("2026-11-21");
- await expect(page.getByText("Net operating money",{exact:true})).toBeVisible();
+ await expect(page.getByText("Operating net (before settlements)",{exact:true})).toBeVisible();
  await expect(page.getByRole("navigation",{name:"Finance categories"})).toBeVisible();
  await expect(page.getByRole("heading",{name:"New income or expense"})).toHaveCount(0);
  await expect(page.getByRole("region",{name:"Financial register",exact:true})).toHaveCount(0);
@@ -87,6 +87,24 @@ test("finance overview cards keep details on separate pages and preserve the wor
  await page.getByRole("link",{name:"New entry / register"}).click();
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-11-22");
  await expect.poll(()=>requests.some(row=>row.path==="/salary/summary"&&row.from==="2026-11-22")).toBe(true);
+});
+
+test("a founder's received settlement reduces personal deficit but never creates new income",async({page})=>{
+ const {requests}=await mockWorkspace(page);
+ await page.route("**/api/v1/finance/total-expenses/summary?*",route=>route.fulfill({json:{data:{
+  postedIncome:"10000.0000",postedTotalExpense:"12234.4900",netOperatingMoney:"-2234.4900",
+  breakdown:{OTHER:"4734.4900",SELF_ADS:"0",CLIENT_ADS:"7500",SALARY:"2000"}
+ }}}));
+ await page.route("**/api/v1/finance/internal-settlements/mine?*",route=>route.fulfill({json:{data:[
+  {amount:"2234.0000",status:"POSTED",settlementDirection:"INCOMING"},
+  {amount:"999.0000",status:"CANCELLED",settlementDirection:"OUTGOING"}
+ ]}}));
+ await page.goto("/app/finance?view=mine&from=2026-10-22&to=2026-11-21");
+ const card=page.getByText("My net after internal settlements · this cycle",{exact:true}).locator("..");
+ await expect(card.getByText("−₹0.49",{exact:true})).toBeVisible();
+ await expect(card).toContainText("Operating net −₹2,234.49 + received ₹2,234.00 − sent ₹0.00");
+ await expect(page.getByText("Operating net (before settlements)",{exact:true})).toBeVisible();
+ expect(requests.some(x=>x.path==="/finance/summary")).toBe(true);
 });
 
 test("next-cycle Income identifies previous cycle net without double counting new income",async({page})=>{

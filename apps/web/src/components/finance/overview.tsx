@@ -19,6 +19,7 @@ import { FinanceFrame, money, useFinanceWindow } from "./shared";
 import type { TotalExpenseSummary } from "./total-expenses";
 import { FinanceSectionWorkspace } from "./section-workspace";
 import { PreviousCycleNetPosted } from "./previous-cycle-carry";
+import {PersonalNetAfterSettlements} from "./personal-net-after-settlements";
 type Balance = {opening:string;movement:string;remaining:string};
 type Totals = {
   postedIncome: string;
@@ -163,8 +164,9 @@ export function FinanceOverview() {
       {error && <Notice kind="error">{error}</Notice>}
       <p className="text-sm text-slate-400">Work cycles restart transaction totals on the 22nd. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
+        {w.view==="mine"&&founder&&<PersonalNetAfterSettlements period={w.period}/>}
         {[
-          ["Net operating money", totalExpense?.netOperatingMoney],
+          [w.view==="mine"?"Operating net (before settlements)":"Net operating money", totalExpense?.netOperatingMoney],
           ["Net balance left (carried forward)", balance?.remaining],
           ["Pending income", totals?.pendingIncome],
           ["Pending expenses", totals?.pendingExpense],
