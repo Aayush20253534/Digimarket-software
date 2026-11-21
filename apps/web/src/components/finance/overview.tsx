@@ -149,6 +149,9 @@ export function FinanceOverview() {
       }
     >
       {error && <Notice kind="error">{error}</Notice>}
+      {w.view === "mine" && totalExpense?.personalSettlementResetAt && (
+        <p className="text-sm text-slate-400" role="status">Your current personal summary starts after the most recent founder settlement. Previous expenses remain recorded, and agency totals are unchanged.</p>
+      )}
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {[
           ["Net operating money", totalExpense?.netOperatingMoney],
