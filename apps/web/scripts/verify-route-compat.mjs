@@ -56,6 +56,15 @@ if(!gateway.includes('|| path==="finance/cycle-balance"')){
   process.exitCode=1;
 }
 
+for(const route of ['finance/client-ad-spend/mine','finance/internal-settlements/all']){
+  if(!gateway.includes('"'+route+'": ["GET"]') ||
+     !gateway.includes('"'+route+'"') ||
+     !gateway.includes('|| path==="'+route+'"')){
+    process.stderr.write("Finance gateway must permit, forward and diagnose "+route+"\\n");
+    process.exitCode=1;
+  }
+}
+
 const appDir=fileURLToPath(new URL("../src/app/app/",import.meta.url));
 const missing=[];
 for(const segment of phase0Routes){
