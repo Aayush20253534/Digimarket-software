@@ -84,6 +84,9 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   app.get("/api/v1/finance/internal-settlements/mine",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store").json({data:await internal.projectMine(actor(res),200,parse(reportingPeriodQuerySchema,req.query))});
   });
+  app.get("/api/v1/finance/cycle-balance",authenticate,async(req,res)=>{
+    res.set("Cache-Control","no-store").json({data:await internal.cycleBalance(actor(res),view(req),parse(reportingPeriodQuerySchema,req.query))});
+  });
   app.post("/api/v1/finance/internal-settlements",authenticate,async(req,res)=>{
     const input=parse(internalInput,req.body);
     res.status(201).json({data:await internal.record(actor(res),input)});
