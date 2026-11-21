@@ -32,11 +32,17 @@ const csvCell = (value: string) =>
 export class TotalExpenseService {
   constructor(private readonly db: PrismaClient) {}
 
-  private source(a: Principal, q: ReportingPeriod & { view: "mine" | "all" }) {
+  private source(a: Principal, q: ReportingPeriod & { view: "mine" | "all" }, resetAt: Date | null = null) {
     if (!a.permissions.has(q.view === "all" ? "finance.read.all" : "finance.entry.read.own"))
       throw forbidden();
     const from = new Date(q.from + "T00:00:00Z"),
       to = new Date(q.to + "T00:00:00Z");
+    const afterSettlementExpense = resetAt
+      ? Prisma.sql`AND (t."postedAt" > ${resetAt} OR (t."postedAt" IS NULL AND t."createdAt" > ${resetAt}))`
+      : Prisma.empty;
+    const afterSettlementSalary = resetAt
+      ? Prisma.sql`AND p."createdAt" > ${resetAt}`
+      : Prisma.empty;
     // My entries uses the amount funded by this founder, not the salary received.
     // In Agency, each payment appears once even when several founders funded it.
     const salaries =
@@ -50,6 +56,7 @@ export class TotalExpenseService {
         JOIN "User" u ON u.id=p."recipientUserId"
         WHERE p."organizationId"=${a.organizationId}::uuid AND account."organizationId"=${a.organizationId}::uuid
           AND account."founderUserId"=${a.userId}::uuid AND p.status='PAID' AND p."paidOn" BETWEEN ${from} AND ${to}
+          ${afterSettlementSalary}
         GROUP BY p.id, u."displayName"`
         : isFounder(a)
           ? Prisma.sql`SELECT 'salary:' || p.id::text AS id, p."paidOn" AS date, 'SALARY'::text AS type,
@@ -72,6 +79,7 @@ export class TotalExpenseService {
       WHERE t."organizationId"=${a.organizationId}::uuid AND t.kind='EXPENSE' AND t.status='POSTED'
         AND t."occurredOn" BETWEEN ${from} AND ${to}
         ${q.view === "mine" ? Prisma.sql`AND t."enteredById"=${a.userId}::uuid` : Prisma.empty}
+        ${afterSettlementExpense}
       UNION ALL ${salaries}
     )`;
   }
@@ -83,6 +91,21 @@ export class TotalExpenseService {
   }
 
   private async readSummary(db: DB, a: Principal, q: ReportingPeriod & { view: "mine" | "all" }) {
+    // The selected work cycle must not bypass the founder's latest settlement.
+    // Only settlements recorded no later than the selected cycle are relevant.
+    const endExclusive = new Date(Date.parse(q.to + "T00:00:00+05:30") + 86_400_000);
+    const lastSettlement = q.view === "mine" && isFounder(a)
+      ? await db.internalSettlement.findFirst({
+        where: {
+          organizationId: a.organizationId, voidedAt: null,
+          createdAt: { lt: endExclusive },
+          OR: [{ senderId: a.userId }, { recipientId: a.userId }],
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { createdAt: true },
+      })
+      : null;
+    const resetAt = lastSettlement?.createdAt ?? null;
     const [row] = await db.$queryRaw<
       {
         postedIncome: string;
@@ -92,7 +115,7 @@ export class TotalExpenseService {
         clientAds: string;
         salary: string;
       }[]
-    >(Prisma.sql`${this.source(a, q)} SELECT
+    >(Prisma.sql`${this.source(a, q, resetAt)} SELECT
       COALESCE(SUM(amount), 0)::text AS "postedTotalExpense",
       COALESCE(SUM(amount) FILTER (WHERE type='OTHER'), 0)::text AS other,
       COALESCE(SUM(amount) FILTER (WHERE type='SELF_ADS'), 0)::text AS "selfAds",
@@ -101,9 +124,11 @@ export class TotalExpenseService {
       (SELECT COALESCE(SUM(t.amount), 0)::text FROM "FinancialTransaction" t
         WHERE t."organizationId"=${a.organizationId}::uuid AND t.kind='INCOME' AND t.status='POSTED'
           AND t."occurredOn" BETWEEN ${new Date(q.from + "T00:00:00Z")} AND ${new Date(q.to + "T00:00:00Z")}
-          ${q.view === "mine" ? Prisma.sql`AND t."enteredById"=${a.userId}::uuid` : Prisma.empty}) AS "postedIncome"
+          ${q.view === "mine" ? Prisma.sql`AND t."enteredById"=${a.userId}::uuid` : Prisma.empty}
+          ${resetAt ? Prisma.sql`AND (t."postedAt" > ${resetAt} OR (t."postedAt" IS NULL AND t."createdAt" > ${resetAt}))` : Prisma.empty}) AS "postedIncome"
       FROM expenses`);
     return {
+      ...(resetAt ? { personalSettlementResetAt: resetAt.toISOString() } : {}),
       postedIncome: money(row.postedIncome),
       postedTotalExpense: money(row.postedTotalExpense),
       netOperatingMoney: money(new Prisma.Decimal(row.postedIncome).minus(row.postedTotalExpense)),
