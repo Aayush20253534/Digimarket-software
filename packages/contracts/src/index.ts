@@ -489,27 +489,3 @@ export const notificationListSchema=z.strictObject({
  unread:z.enum(["true","false"]).optional(),
  limit:z.coerce.number().int().min(1).max(100).default(30),
 });
-
-
-// Date-range service delivery, intentionally independent of the internal Tasks module.
-const serviceDeliveryPlanBase=z.strictObject({
- clientId:z.uuid(),serviceId:z.uuid().nullable().optional(),title:z.string().trim().min(2).max(180),
- assigneeId:z.uuid(),startOn:z.iso.date(),endOn:z.iso.date(),
- weekdays:z.array(z.number().int().min(0).max(6)).max(7)
-  .refine(values=>new Set(values).size===values.length,"Weekdays must be unique"),
- repeatEveryDays:z.number().int().min(2).max(31).nullable().optional(),
-});
-const validDeliveryFrequency=(x:{startOn:string;endOn:string;weekdays:number[];repeatEveryDays?:number|null})=>
- x.repeatEveryDays!=null?x.weekdays.length===0:x.weekdays.length>0||x.startOn===x.endOn;
-export const serviceDeliveryPlanSchema=serviceDeliveryPlanBase.refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"})
- .refine(validDeliveryFrequency,{message:"Use weekdays or a day interval; one-time deliveries need one date"});
-export const serviceDeliveryPlanUpdateSchema=serviceDeliveryPlanBase.omit({clientId:true}).extend({
- version:z.number().int().positive(),active:z.boolean(),
-}).refine(x=>x.endOn>=x.startOn,{message:"End date must not precede start date"})
- .refine(validDeliveryFrequency,{message:"Use weekdays or a day interval; one-time deliveries need one date"});
-export const serviceDeliveryOccurrenceUpdateSchema=z.strictObject({
- version:z.number().int().positive(),completed:z.boolean(),
-});
-export type ServiceDeliveryPlanInput=z.infer<typeof serviceDeliveryPlanSchema>;
-export type ServiceDeliveryPlanUpdateInput=z.infer<typeof serviceDeliveryPlanUpdateSchema>;
-export type ServiceDeliveryOccurrenceUpdateInput=z.infer<typeof serviceDeliveryOccurrenceUpdateSchema>;
