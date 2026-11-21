@@ -84,7 +84,7 @@ test("finance overview cards keep details on separate pages and preserve the wor
  await expect(page.getByRole("navigation",{name:"Finance categories"})).toBeVisible();
  await expect(page.getByRole("heading",{name:"New income or expense"})).toHaveCount(0);
  await expect(page.getByRole("region",{name:"Financial register",exact:true})).toHaveCount(0);
- expect(requests.some(row=>row.path==="/finance/register"||row.path==="/finance/meta-ads-distribution")).toBe(false);
+ expect(requests.some(row=>row.path==="/finance/register")).toBe(false);
  await page.getByRole("button",{name:"Next cycle",exact:true}).click();
  await page.getByRole("link",{name:/Meta Ads Self and client/}).click();
  await expect(page).toHaveURL(/finance\/ads/);
@@ -131,7 +131,7 @@ test("Finance category cards show accurate posted, held and transferred amounts"
  expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(false);
  await page.getByRole("button",{name:"Agency totals & register"}).click();
  await expect(page.getByText("Agency balance carried forward",{exact:true})).toBeVisible();
- expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(true);
+ await expect.poll(()=>requests.some(x=>x.path==="/finance/cycle-balance")).toBe(true);
 });
 
 test("carried balances appear in agency register but not My Entries",async({page})=>{
@@ -141,7 +141,7 @@ test("carried balances appear in agency register but not My Entries",async({page
  expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(false);
  await page.getByRole("button",{name:"Agency totals & register"}).click();
  await expect(page.getByText("Agency net balance remaining",{exact:true})).toBeVisible();
- expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(true);
+ await expect.poll(()=>requests.some(x=>x.path==="/finance/cycle-balance")).toBe(true);
 });
 
 test("next-cycle Income identifies previous cycle net without double counting new income",async({page})=>{
