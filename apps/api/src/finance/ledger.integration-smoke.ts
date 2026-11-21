@@ -547,7 +547,11 @@ try {
   await assert.rejects(() => finance.submit(f, {...directInput, occurredOn: "2026-10-21"}, true), checkStatus(422));
   const direct = await finance.submit(f, directInput, true);
   const directRecord = await db.financialTransaction.findUniqueOrThrow({where:{id:direct.id}});
-  assert.equal(directRecord.moneyAccountId, clearing.id);
+  // Personal clearing accounts are internal: user attribution is authoritative.
+  assert.ok(directRecord.moneyAccountId);
+  const personalClearing=await db.moneyAccount.findUniqueOrThrow({where:{id:directRecord.moneyAccountId!}});
+  assert.equal(personalClearing.ownerUserId,founder.id);
+  assert.equal(personalClearing.normalizedName,"personal-clearing-"+founder.id);
   assert.equal(directRecord.enteredById, founder.id);
   assert.equal(directRecord.status, "POSTED");
   console.info(
