@@ -1,4 +1,4 @@
-import { agencyToday, businessCycle, reportingPreset, dateOnlyRange, type ReportingPeriod } from "@digimarket/contracts";
+import { AGENCY_START_DATE, agencyToday, businessCycle, reportingPreset, dateOnlyRange, type ReportingPeriod } from "@digimarket/contracts";
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import { financeProofPrefix } from "../assets/service";
 import { ensurePersonalMoneyAccount, openPeriod, financeLock } from "./ledger-service";
@@ -454,7 +454,9 @@ export class FinanceService {
         // Legacy money ledgers remain internal for reversals and cycle closing.
         // They do not determine personal finance totals or entry ownership.
         const moneyAccountId=input.moneyAccountId ??
-          await ensurePersonalMoneyAccount(tx,actor.organizationId,actor.userId);
+          (input.occurredOn>=AGENCY_START_DATE
+            ?await ensurePersonalMoneyAccount(tx,actor.organizationId,actor.userId)
+            :null);
         const appliedPolicy=founder?await founderPolicy(tx,actor.organizationId,"FINANCE"):policy!;
         const now=new Date();
         const approval=await tx.approvalRequest.create({data:{
