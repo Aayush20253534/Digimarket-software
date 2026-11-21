@@ -84,7 +84,10 @@ export class FinanceService {
       select:{id:true,name:true,purpose:true},
     });
     const metaCategoryIds=categories.filter(isMetaAds).map(category=>category.id);
-    const result=await this.db.financialTransaction.aggregate({
+    // Attribute actual spending by owner, including entries recorded by others
+    // on this user's behalf. No client top-ups or hypothetical ad budgets.
+    const byClient=await this.db.financialTransaction.groupBy({
+      by:["clientId"],
       where:{
         organizationId:actor.organizationId,
         kind:"EXPENSE",status:"POSTED",clientId:{not:null},
@@ -94,9 +97,24 @@ export class FinanceService {
       },
       _sum:{amount:true},_count:{_all:true}
     });
+    const clientIds=byClient.flatMap(row=>row.clientId?[row.clientId]:[]);
+    const clients=clientIds.length?await this.db.client.findMany({
+      where:{organizationId:actor.organizationId,id:{in:clientIds}},
+      select:{id:true,businessName:true}
+    }):[];
+    const names=new Map(clients.map(client=>[client.id,client.businessName]));
+    const rows=byClient.filter(row=>row.clientId!==null)
+      .map(row=>({
+        clientId:row.clientId!,
+        name:names.get(row.clientId!)??"Archived client",
+        posted:(row._sum.amount??new Prisma.Decimal(0)).toFixed(4),
+        entries:row._count._all
+      })).sort((a,b)=>a.name.localeCompare(b.name));
+    const posted=rows.reduce((total,row)=>total.plus(row.posted),new Prisma.Decimal(0));
     return {from:period.from,to:period.to,currency:"INR",
-      posted:(result._sum.amount??new Prisma.Decimal(0)).toFixed(4),
-      entries:result._count._all};
+      posted:posted.toFixed(4),
+      entries:rows.reduce((n,row)=>n+row.entries,0),
+      byClient:rows};
   }
 
   // All views use the exact same filtered, database-wide grouping. Finance
