@@ -76,6 +76,32 @@ type Balance = {
   movement: string;
   closing: string;
 };
+// A user's clearing account records attribution, not a verified cash/bank balance.
+export async function ensurePersonalMoneyAccount(db: DB, organizationId: string, userId: string): Promise<string> {
+  const normalizedName = "personal-clearing-" + userId;
+  const existing = await db.moneyAccount.findUnique({
+    where: { organizationId_normalizedName: { organizationId, normalizedName } },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+  const user = await db.user.findFirst({
+    where: { id: userId, organizationId, status: "ACTIVE" },
+    select: { id: true, displayName: true },
+  });
+  if (!user) throw invalid("Signed-in user has no active account in this workspace");
+  const row = await db.moneyAccount.upsert({
+    where: { organizationId_normalizedName: { organizationId, normalizedName } },
+    create: {
+      organizationId, normalizedName,
+      name: (user.displayName + " - personal clearing (unverified)").slice(0,120),
+      kind: "CASH", ownerUserId: userId, createdById: userId,
+      openingOn: day(AGENCY_START_DATE), openingBalance: "0",
+    },
+    update: {},
+    select: { id: true },
+  });
+  return row.id;
+}
 export class FinanceLedgerService {
   constructor(
     private readonly db: PrismaClient,
@@ -87,7 +113,6 @@ export class FinanceLedgerService {
       where: {
         organizationId: a.organizationId,
         status: "ACTIVE",
-        roles: { some: { role: { key: "FOUNDER" } } },
       },
       select: { id: true, displayName: true },
       orderBy: { displayName: "asc" },
@@ -114,7 +139,7 @@ export class FinanceLedgerService {
     },
   ) {
     ledgerWrite(a);
-    if ((input.kind === "FOUNDER") !== !!input.ownerUserId)
+    if (input.kind === "FOUNDER" && !input.ownerUserId)
       throw invalid("Founder clearing accounts require a founder owner");
     if (input.openingOn < AGENCY_START_DATE || input.openingOn > this.today())
       throw invalid("Opening date must be between agency start and today");
@@ -128,11 +153,10 @@ export class FinanceLedgerService {
             id: input.ownerUserId,
             organizationId: a.organizationId,
             status: "ACTIVE",
-            roles: { some: { role: { key: "FOUNDER" } } },
           },
         }))
       )
-        throw invalid("Select a founder in this workspace");
+        throw invalid("Select an active user in this workspace");
       const row = await tx.moneyAccount.create({
         data: {
           ...input,
