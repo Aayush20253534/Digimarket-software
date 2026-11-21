@@ -96,6 +96,11 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
     res.set("Cache-Control","no-store");
     res.json({data:await finance.assignees(actor(res))});
   });
+  app.get("/api/v1/finance/entries/:id/edit",authenticate,async(req,res)=>{
+    res.set("Cache-Control","no-store");
+    const id=parse(z.uuid(),req.params.id);
+    res.json({data:await finance.editDetails(actor(res),id)});
+  });
   app.put("/api/v1/finance/entries/:id",authenticate,async(req,res)=>{
     const id=parse(z.uuid(),req.params.id),body=parse(financeEntryAdminEditSchema,req.body);
     res.json({data:await finance.editEntry(actor(res),id,body)});
