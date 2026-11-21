@@ -1187,13 +1187,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(incomeEdit).toBeVisible();
   await incomeEdit.getByLabel("Amount (INR)").fill("56.00");
   await incomeEdit.getByRole("button",{name:"Save income"}).click();
-  await expect(page.getByText("Finance entry updated and assigned user saved with an audit record.")).toBeVisible();
+  await expect(page.getByText("Finance entry updated. User-wise totals now reflect the assigned user, and the original submitter is preserved in the audit history.")).toBeVisible();
   await expenseRow.getByRole("button",{name:/Edit expense/}).click();
   const expenseEdit=page.getByRole("dialog",{name:"Edit expense"});
   await expect(expenseEdit).toBeVisible();
   await expenseEdit.getByLabel("Amount (INR)").fill("20.00");
   await expenseEdit.getByRole("button",{name:"Save expense"}).click();
-  await expect(page.getByText("Finance entry updated and assigned user saved with an audit record.")).toBeVisible();
+  await expect(page.getByText("Finance entry updated. User-wise totals now reflect the assigned user, and the original submitter is preserved in the audit history.")).toBeVisible();
 });
 test("unauthenticated dashboard access is denied",async({page})=>{
   await page.goto("/app/dashboard");await expect(page).toHaveURL(/\/login/);
