@@ -24,6 +24,8 @@ import {PersonalNetAfterSettlements,calculatePersonalNet} from "./personal-net-a
 type Balance = {opening:string;movement:string;remaining:string};
 type MetaAdsTotals = {totalPosted:string};
 type ClientFundBalance = {closing:string};
+type OwnClientSpend = {posted:string;entries:number};
+type AgencySettlements = {postedTotal:string;postedCount:number;voidedCount:number;total:number};
 type Settlement = Parameters<typeof calculatePersonalNet>[1][number];
 type SettlementTotals = {net:string;received:string;sent:string};
 type FinanceCard = {
@@ -60,6 +62,8 @@ export function FinanceOverview() {
     [totalExpense, setTotalExpense] = useState<TotalExpenseSummary | null>(null),
     [metaAds, setMetaAds] = useState<string|null|undefined>(undefined),
     [clientFunds, setClientFunds] = useState<string|null|undefined>(undefined),
+    [myClientSpend,setMyClientSpend] = useState<OwnClientSpend|null|undefined>(undefined),
+    [agencySettlements,setAgencySettlements] = useState<AgencySettlements|null|undefined>(undefined),
     [settlements, setSettlements] = useState<SettlementTotals|null|undefined>(undefined),
     [projected, setProjected] = useState<string|null|undefined>(undefined),
     [error, setError] = useState("");
@@ -97,13 +101,25 @@ export function FinanceOverview() {
     if(!w.ready||!session)return;
     let active=true;
     setMetaAds(undefined);setClientFunds(undefined);setSettlements(undefined);setProjected(undefined);
+    setMyClientSpend(undefined);setAgencySettlements(undefined);
     void request<MetaAdsTotals>("/finance/meta-ads-distribution?"+w.query)
       .then(result=>{if(active)setMetaAds(result.totalPosted)})
       .catch(()=>{if(active)setMetaAds(null)});
+    if(w.view==="mine"){
+      void request<OwnClientSpend>("/finance/client-ad-spend/mine?"+new URLSearchParams(w.period).toString())
+        .then(result=>{if(active)setMyClientSpend(result)})
+        .catch(()=>{if(active)setMyClientSpend(null)});
+    }
     if(all){
-      void request<ClientFundBalance[]>("/finance/client-funds?"+w.query)
-        .then(rows=>{if(active)setClientFunds(sumMoney(rows.map(row=>row.closing)))})
-        .catch(()=>{if(active)setClientFunds(null)});
+      if(w.view==="all"){
+        void request<ClientFundBalance[]>("/finance/client-funds?"+w.query)
+          .then(rows=>{if(active)setClientFunds(sumMoney(rows.map(row=>row.closing)))})
+          .catch(()=>{if(active)setClientFunds(null)});
+        void request<AgencySettlements>("/finance/internal-settlements/all?"+
+          new URLSearchParams({...w.period,page:"1",limit:"1"}).toString())
+          .then(result=>{if(active)setAgencySettlements(result)})
+          .catch(()=>{if(active)setAgencySettlements(null)});
+      }
       if(w.view==="mine"){
         const query=new URLSearchParams({...w.period,view:"all"}).toString();
         void request<Totals>("/finance/summary?"+query)
@@ -111,7 +127,7 @@ export function FinanceOverview() {
           .catch(()=>{if(active)setProjected(null)});
       }
     }
-    if(founder){
+    if(founder&&w.view==="mine"){
       const query=new URLSearchParams(w.query).toString();
       void request<Settlement[]>("/finance/internal-settlements/mine?"+query)
         .then(rows=>{
@@ -162,10 +178,17 @@ export function FinanceOverview() {
       ? [
           {
             title: "Client ad funds",
-            description: "Top-ups, refunds and client balances",
+            description:w.view==="mine"?"Client Meta Ads paid from my account":"Top-ups, refunds and client balances",
             href: "/app/finance/client-funds",
-            amount:clientFunds,
-            metricLabel:"Net client fund balance · at cycle end",
+            amount:w.view==="mine"
+              ?myClientSpend?.posted??(myClientSpend===null?null:undefined)
+              :clientFunds,
+            metricLabel:w.view==="mine"
+              ?"Posted client ads paid from my account · this cycle"
+              :"Net client fund balance · at cycle end",
+            metricDetail:w.view==="mine"&&myClientSpend
+              ?myClientSpend.entries+" account-funded entries"
+              :undefined,
             icon: Wallet,
           },
         ]
@@ -176,11 +199,18 @@ export function FinanceOverview() {
             title: "Founder settlements",
             description: "Private settlement history and reimbursements",
             href: "/app/finance/settlements",
-            amount:settlements?.net??(settlements===null?null:undefined),
-            metricLabel:"My net transfers · this cycle",
-            metricDetail:settlements
-              ? "Received "+money(settlements.received)+" · Sent "+money(settlements.sent)
-              : undefined,
+            amount:w.view==="all"
+              ?agencySettlements?.postedTotal??(agencySettlements===null?null:undefined)
+              :settlements?.net??(settlements===null?null:undefined),
+            metricLabel:w.view==="all"?"All founders' transfers · this cycle":"My net transfers · this cycle",
+            metricDetail:w.view==="all"
+              ?agencySettlements
+                ?agencySettlements.postedCount+" active settlements · "+
+                  agencySettlements.voidedCount+" voided · company net effect ₹0.00"
+                :undefined
+              :settlements
+                ?"Received "+money(settlements.received)+" · Sent "+money(settlements.sent)
+                :undefined,
             icon: Users,
           },
           {
