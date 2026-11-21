@@ -766,9 +766,15 @@ export class FinanceService {
     // A founder's latest active internal settlement (incoming OR outgoing)
     // starts a new personal summary reporting cycle. The agency ledger never
     // resets. Use the actual record timestamp, not an editable occurredOn.
-    const checkpoint=!period&&view==="mine"&&isFounder(actor)
+    // The UI always sends an explicit reporting period. A settlement inside
+    // that period must still reset My Entries, while later settlements must
+    // not rewrite a previously selected historical period.
+    const endExclusive=period
+      ?new Date(Date.parse(period.to+"T00:00:00+05:30")+86_400_000):null;
+    const checkpoint=view==="mine"&&isFounder(actor)
       ?await this.db.internalSettlement.findFirst({
         where:{organizationId:actor.organizationId,voidedAt:null,
+          ...(endExclusive?{createdAt:{lt:endExclusive}}:{}),
           OR:[{senderId:actor.userId},{recipientId:actor.userId}]},
         orderBy:[{createdAt:"desc"},{id:"desc"}],
         select:{createdAt:true}
@@ -786,7 +792,7 @@ export class FinanceService {
         _sum:{amount:true},_count:{_all:true},
       }),
       resetAt?this.db.financialTransaction.groupBy({
-        by:["kind","status"],where:{...this.scope(actor,view),...sinceReset},
+        by:["kind","status"],where:{...this.scope(actor,view),...occurredOn,...sinceReset},
         _sum:{amount:true},_count:{_all:true},
       }):Promise.resolve(null),
       this.db.financialTransaction.groupBy({
