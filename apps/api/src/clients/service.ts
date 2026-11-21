@@ -169,51 +169,6 @@ export class ClientsService {
      return updated;
    });
  }
- async deliverySummary(a:Principal){
-   deny(a,"clients.read");
-   const now=new Date();
-   const deliveryManager=a.permissions.has("clients.edit")&&a.roles.some(x=>["FOUNDER","ADMIN","SUPER_ADMIN"].includes(x));
-   const projectAllowed=a.permissions.has("projects.read");
-   const canSeeAllProjects=a.permissions.has("projects.assign");
-   const projectScope:Prisma.ProjectWhereInput=canSeeAllProjects?{}:{
-     OR:[{createdById:a.userId},{members:{some:{userId:a.userId}}}],
-   };
-   const rows=await this.db.client.findMany({
-     where:{organizationId:a.organizationId,status:{not:"ARCHIVED"},NOT:expiredAgreementWhere(this.today())},
-     orderBy:[{updatedAt:"desc"},{id:"desc"}],take:101,
-     select:{
-       id:true,businessName:true,status:true,contractStartOn:true,contractEndOn:true,
-       monthlyFee:true,monthlyAdBudget:true,
-       deliverySchedules:{where:deliveryManager?{}:{assigneeId:a.userId},
-         select:{active:true,occurrences:{select:{status:true,scheduledOn:true}}}},
-       projects:{where:projectAllowed?projectScope:{id:{in:[]}},select:{
-         id:true,name:true,status:true,dueOn:true,
-         deliverables:{select:{status:true}},
-       }},
-     },
-   });
-   const items=rows.slice(0,100).map(row=>{
-     const projects=row.projects||[];
-     return {
-       id:row.id,businessName:row.businessName,status:row.status,
-       contractStartOn:row.contractStartOn,contractEndOn:row.contractEndOn,
-       monthlyFee:a.permissions.has("finance.read.all")?row.monthlyFee:null,
-       monthlyAdBudget:a.permissions.has("finance.read.all")?row.monthlyAdBudget:null,
-       scheduledOccurrences:row.deliverySchedules.reduce((n,p)=>n+p.occurrences.length,0),
-       completedOccurrences:row.deliverySchedules.reduce((n,p)=>n+p.occurrences.filter(o=>o.status==="COMPLETED").length,0),
-       activeDeliverySchedules:row.deliverySchedules.filter(p=>p.active).length,
-       projects:projects.map(project=>({
-         id:project.id,name:project.name,status:project.status,dueOn:project.dueOn,
-         totalDeliverables:project.deliverables.length,
-         approvedDeliverables:project.deliverables.filter(d=>d.status==="APPROVED").length,
-       })),
-       activeProjects:projects.filter(p=>p.status==="ACTIVE"||p.status==="PLANNED").length,
-       totalDeliverables:projects.reduce((sum,p)=>sum+p.deliverables.length,0),
-       approvedDeliverables:projects.reduce((sum,p)=>sum+p.deliverables.filter(d=>d.status==="APPROVED").length,0),
-     };
-   });
-   return {items,truncated:rows.length>100,month:now.toISOString().slice(0,7)};
- }
  async convert(_a:Principal,_leadId:string,_version:number):Promise<never>{
    void _a;void _leadId;void _version;
    throw new AuthError(405,"AUTO_CONVERSION_ONLY","Clients are created when the lead is Approved");
