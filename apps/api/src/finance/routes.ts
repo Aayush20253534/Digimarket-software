@@ -7,6 +7,7 @@ import {
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { FinanceService } from "./service";
+import { FinanceLedgerService } from "./ledger-service";
 import { InternalSettlementService } from "./internal-settlements";
 import { AssetService } from "../assets/service";
 import { assetIntentSchema,assetConfirmSchema } from "@digimarket/contracts";
@@ -18,6 +19,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T {
 }
 export function registerFinanceRoutes(app:Express,auth:AuthService) {
   const finance=new FinanceService(auth.database);
+  const ledger=new FinanceLedgerService(auth.database);
   const internal=new InternalSettlementService(auth.database);
   const proofAssets=new AssetService(auth.database);
   const authenticate=async(req:Request,res:Response,next:NextFunction)=>{
@@ -29,6 +31,11 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
     }catch(error){next(error);}
   };
   const actor=(res:Response)=>res.locals.principal as Principal;
+  const periodFor=async(res:Response,query:{from?:unknown;to?:unknown})=>{
+    if(query.from!==undefined&&query.to!==undefined)return parse(reportingPeriodQuerySchema,query);
+    const current=(await ledger.cycleState(actor(res))).current;
+    return parse(reportingPeriodQuerySchema,{from:query.from??current.from,to:query.to??current.to});
+  };
   const view=(req:Request)=>parse(financeViewSchema,req.query.view??"mine");
   const ledgerScope=(req:Request)=>parse(z.enum(["agency","client_ads","meta_ads"]).default("agency"),req.query.scope);
   const internalInput=z.strictObject({
@@ -78,7 +85,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/client-ad-spend/mine",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store").json({
-      data:await finance.clientAdAccountSpend(actor(res),parse(reportingPeriodQuerySchema,req.query))
+      data:await finance.clientAdAccountSpend(actor(res),await periodFor(res,req.query))
     });
   });
   app.get("/api/v1/finance/internal-settlements/founders",authenticate,async(_req,res)=>{
@@ -87,10 +94,10 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   // Personal history includes incoming and outgoing settlements regardless
   // of the 200-entry limit in the combined financial register.
   app.get("/api/v1/finance/internal-settlements/mine",authenticate,async(req,res)=>{
-    res.set("Cache-Control","no-store").json({data:await internal.projectMine(actor(res),200,parse(reportingPeriodQuerySchema,req.query))});
+    res.set("Cache-Control","no-store").json({data:await internal.projectMine(actor(res),200,await periodFor(res,req.query))});
   });
   app.get("/api/v1/finance/internal-settlements/all",authenticate,async(req,res)=>{
-    const period=parse(reportingPeriodQuerySchema,req.query);
+    const period=await periodFor(res,req.query);
     const paging=parse(z.object({
       page:z.coerce.number().int().min(1).max(10000).default(1),
       limit:z.coerce.number().int().min(1).max(100).default(50)
@@ -100,7 +107,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
     });
   });
   app.get("/api/v1/finance/cycle-balance",authenticate,async(req,res)=>{
-    res.set("Cache-Control","no-store").json({data:await internal.cycleBalance(actor(res),view(req),parse(reportingPeriodQuerySchema,req.query))});
+    res.set("Cache-Control","no-store").json({data:await internal.cycleBalance(actor(res),view(req),await periodFor(res,req.query))});
   });
   app.post("/api/v1/finance/internal-settlements",authenticate,async(req,res)=>{
     const input=parse(internalInput,req.body);
@@ -129,7 +136,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.entries(actor(res),view(req),ledgerScope(req),parse(reportingPeriodQuerySchema,req.query))});
+    res.json({data:await finance.entries(actor(res),view(req),ledgerScope(req),await periodFor(res,req.query))});
   });
   app.post("/api/v1/finance/entries",authenticate,async(req,res)=>{
     res.status(201).json({data:await finance.submit(actor(res),parse(financeEntryInputSchema,req.body))});
@@ -139,7 +146,7 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/recurring-income",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.recurringIncome(actor(res),parse(reportingPeriodQuerySchema,req.query))});
+    res.json({data:await finance.recurringIncome(actor(res),await periodFor(res,req.query))});
   });
   app.get("/api/v1/finance/meta-ads-distribution",authenticate,async(req,res)=>{
     const query=parse(z.object({
@@ -147,12 +154,12 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
       from:z.iso.date().optional(),to:z.iso.date().optional(),
     }).refine(v=>!v.from||!v.to||v.from<=v.to),req.query);
     res.set("Cache-Control","no-store");
-    const period=parse(reportingPeriodQuerySchema,query);
+    const period=await periodFor(res,{...query,from:query.from??undefined,to:query.to??undefined});
     res.json({data:await finance.metaAdsDistribution(actor(res),query.view,period.from,period.to)});
   });
   app.get("/api/v1/finance/summary",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.totals(actor(res),view(req),parse(reportingPeriodQuerySchema,req.query))});
+    res.json({data:await finance.totals(actor(res),view(req),await periodFor(res,req.query))});
   });
   app.get("/api/v1/finance/report-breakdown",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
@@ -164,6 +171,6 @@ export function registerFinanceRoutes(app:Express,auth:AuthService) {
   });
   app.get("/api/v1/finance/export",authenticate,async(req,res)=>{
     res.set("Cache-Control","no-store");
-    res.json({data:await finance.exportCsv(actor(res),view(req),ledgerScope(req),parse(reportingPeriodQuerySchema,req.query))});
+    res.json({data:await finance.exportCsv(actor(res),view(req),ledgerScope(req),await periodFor(res,req.query))});
   });
 }

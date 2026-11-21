@@ -1,6 +1,6 @@
 import {expect,test,type Page} from "@playwright/test";
 
-async function mockWorkspace(page:Page,role="FOUNDER"){
+async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
  const requests:{path:string;from:string|null;to:string|null}[]=[];
  let leads=Array.from({length:20},(_,i)=>({id:"00000000-0000-4000-8000-"+String(i+1).padStart(12,"0"),
   businessName:"Business "+(i+1),contactName:"Contact "+(i+1),phone:"900000"+String(i).padStart(4,"0"),
@@ -28,7 +28,8 @@ async function mockWorkspace(page:Page,role="FOUNDER"){
    const rows=route.request().postDataJSON().leads as {id:string;version:number}[];
    deleted.push(rows.map(row=>row.id));leads=leads.filter(lead=>!rows.some(row=>row.id===lead.id));
    data={deletedCount:rows.length,ids:rows.map(row=>row.id)};
-  }else if(path==="/finance/register")data={items:[],total:0,page:1,limit:25};
+  }else if(path==="/finance/cycle-state")data=cycleClosed?{current:{from:"2026-11-22",to:"2026-12-21"},history:[{from:"2026-10-22",to:"2026-11-21",closedAt:"2026-11-22"}],plannedThrough:"2026-12-21",canClose:false}:{current:{from:"2026-10-22",to:"2026-11-21"},history:[],plannedThrough:"2026-11-21",canClose:false};
+  else if(path==="/finance/register")data={items:[],total:0,page:1,limit:25};
   else if(path==="/finance/summary")data=url.searchParams.get("from")==="2026-11-22"
     ? {...totals,postedIncome:"0",postedExpense:"0",postedNet:"0"}:totals;
   else if(path==="/finance/cycle-balance")data={opening:"650",movement:"0",remaining:"650"};
@@ -102,16 +103,16 @@ test("finance overview cards keep details on separate pages and preserve the wor
  await expect(page.getByRole("heading",{name:"New income or expense"})).toHaveCount(0);
  await expect(page.getByRole("region",{name:"Financial register",exact:true})).toHaveCount(0);
  expect(requests.some(row=>row.path==="/finance/register")).toBe(false);
- await page.getByRole("button",{name:"Next cycle",exact:true}).click();
+ await expect(page.getByRole("button",{name:"Next cycle",exact:true})).toBeDisabled();
  await page.getByRole("link",{name:/Meta Ads Self and client/}).click();
  await expect(page).toHaveURL(/finance\/ads/);
- await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-11-22");
+ await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
  for(const path of ["/finance/register","/finance/meta-ads-distribution"])
-  await expect.poll(()=>requests.some(row=>row.path===path&&row.from==="2026-11-22"&&row.to==="2026-12-21")).toBe(true);
+  await expect.poll(()=>requests.some(row=>row.path===path&&row.from==="2026-10-22"&&row.to==="2026-11-21")).toBe(true);
  await page.getByRole("link",{name:"← Finance overview"}).click();
  await page.getByRole("link",{name:"New entry / register"}).click();
- await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-11-22");
- await expect.poll(()=>requests.some(row=>row.path==="/salary/summary"&&row.from==="2026-11-22")).toBe(true);
+ await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
+ await expect.poll(()=>requests.some(row=>row.path==="/salary/summary"&&row.from==="2026-10-22")).toBe(true);
 });
 
 test("a founder's received settlement reduces personal deficit but never creates new income",async({page})=>{
@@ -180,7 +181,7 @@ test("carried balances appear in agency register but not My Entries",async({page
 });
 
 test("next-cycle Income identifies previous cycle net without double counting new income",async({page})=>{
- const {requests}=await mockWorkspace(page);
+ const {requests}=await mockWorkspace(page,"FOUNDER",true);
  await page.goto("/app/finance/income?view=mine&from=2026-11-22&to=2026-12-21");
  await expect(page.getByText("Previous cycle net posted",{exact:true})).toBeVisible();
  await expect(page.getByText("₹650.00",{exact:true})).toBeVisible();

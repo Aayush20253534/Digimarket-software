@@ -48,7 +48,11 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     }
   };
   const actor = (res: Response) => res.locals.principal as Principal;
-  const period = (req: Request) => parse(reportingPeriodQuerySchema, req.query);
+  const period = async (req: Request, res: Response) => {
+    if (req.query.from !== undefined && req.query.to !== undefined) return parse(reportingPeriodQuerySchema, req.query);
+    const current = (await ledger.cycleState(actor(res))).current;
+    return parse(reportingPeriodQuerySchema, {from: req.query.from ?? current.from, to: req.query.to ?? current.to});
+  };
   const page = (req: Request) => parse(pagination, req.query);
   // Keep a structured error when a concurrent idempotency/reversal insert wins.
   const run =
@@ -74,7 +78,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     run(async (req, res) => {
       res.json({
         data: await totalExpenses.summary(actor(res), {
-          ...period(req),
+          ...await period(req, res),
           view: parse(z.enum(["mine", "all"]).default("mine"), req.query.view),
         }),
       });
@@ -86,7 +90,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     run(async (req, res) => {
       res.json({
         data: await totalExpenses.records(actor(res), {
-          ...period(req),
+          ...await period(req, res),
           ...parse(totalExpenseQuery, req.query),
         }),
       });
@@ -98,7 +102,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     run(async (req, res) => {
       res.json({
         data: await totalExpenses.export(actor(res), {
-          ...period(req),
+          ...await period(req, res),
           ...parse(totalExpenseQuery, req.query),
         }),
       });
@@ -122,7 +126,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     root + "/accounts",
     authenticate,
     run(async (req, res) => {
-      res.json({ data: await ledger.balances(actor(res), period(req)) });
+      res.json({ data: await ledger.balances(actor(res), await period(req, res)) });
     }),
   );
   app.post(
@@ -174,7 +178,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
       res.json({
         data: await ledger.accountHistory(
           actor(res),
-          period(req),
+          await period(req, res),
           parse(z.uuid(), req.query.accountId),
           page(req),
         ),
@@ -185,7 +189,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     root + "/unassigned",
     authenticate,
     run(async (req, res) => {
-      res.json({ data: await ledger.unassigned(actor(res), period(req), page(req)) });
+      res.json({ data: await ledger.unassigned(actor(res), await period(req, res), page(req)) });
     }),
   );
   app.post(
@@ -211,7 +215,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     root + "/client-funds",
     authenticate,
     run(async (req, res) => {
-      res.json({ data: await ledger.clientBalances(actor(res), period(req)) });
+      res.json({ data: await ledger.clientBalances(actor(res), await period(req, res)) });
     }),
   );
   app.get(
@@ -221,7 +225,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
       res.json({
         data: await ledger.clientHistory(
           actor(res),
-          period(req),
+          await period(req, res),
           parse(z.uuid(), req.query.clientId),
           page(req),
         ),
@@ -256,7 +260,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     root + "/transfers",
     authenticate,
     run(async (req, res) => {
-      res.json({ data: await ledger.transfers(actor(res), period(req), page(req)) });
+      res.json({ data: await ledger.transfers(actor(res), await period(req, res), page(req)) });
     }),
   );
   app.post(
@@ -317,7 +321,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     root + "/cycle-review",
     authenticate,
     run(async (req, res) => {
-      res.json({ data: await ledger.review(actor(res), period(req)) });
+      res.json({ data: await ledger.review(actor(res), await period(req, res)) });
     }),
   );
   app.post(
@@ -368,7 +372,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
         data: await finance.categorySummary(
           actor(res),
           parse(z.enum(["mine", "all"]).default("mine"), req.query.view),
-          period(req),
+          await period(req, res),
           parse(z.enum(["INCOME", "EXPENSE"]), req.query.kind),
         ),
       });
@@ -380,7 +384,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     run(async (req, res) => {
       res.json({
         data: await finance.register(actor(res), {
-          ...period(req),
+          ...await period(req, res),
           ...parse(registerQuery, req.query),
         }),
       });
@@ -392,7 +396,7 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
     run(async (req, res) => {
       res.json({
         data: await finance.exportRegister(actor(res), {
-          ...period(req),
+          ...await period(req, res),
           ...parse(registerQuery, req.query),
         }),
       });

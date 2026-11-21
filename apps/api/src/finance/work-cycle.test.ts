@@ -4,6 +4,7 @@ import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {AuthService,Principal} from "../auth/service";
 import {createApp} from "../app";
 import {FinanceService} from "./service";
+import {FinanceLedgerService} from "./ledger-service";
 const period={from:"2026-10-22",to:"2026-11-21"};
 const range={gte:new Date("2026-10-22T00:00:00Z"),lte:new Date("2026-11-21T00:00:00Z")};
 const actor:Principal={organizationId:"org",userId:"founder",sessionId:"test",roles:["FOUNDER"],
@@ -14,7 +15,7 @@ function fixture(){
   {kind:"EXPENSE",status:"POSTED",_sum:{amount:new Prisma.Decimal(200)},_count:{_all:1}},
  ]).mockResolvedValue([{status:"POSTED",_sum:{amount:new Prisma.Decimal(100)},_count:{_all:1}}]);
  const salary={aggregate:vi.fn().mockResolvedValue({_sum:{amount:new Prisma.Decimal(50)}})};
- const db={financialTransaction:{groupBy,findMany:vi.fn().mockResolvedValue([])},
+ const db={financePeriodClose:{findMany:vi.fn().mockResolvedValue([])},financialTransaction:{groupBy,findMany:vi.fn().mockResolvedValue([])},
   financialCategory:{findMany:vi.fn().mockResolvedValue([{id:"meta",name:"Meta Ads"}])},
   salaryPayment:salary,salaryFundingAllocation:{...salary,findMany:vi.fn().mockResolvedValue([])},
   client:{findMany:vi.fn().mockResolvedValue([])},
@@ -54,5 +55,23 @@ describe("finance work-cycle reconciliation",()=>{
   const invalid=await request(app).get("/api/v1/finance/entries?from=2026-11-22&to=2026-11-21").set("Authorization","Bearer test");
   expect(invalid.status).toBe(422);
   expect((await request(app).get("/api/v1/tasks").set("Authorization","Bearer test")).status).toBe(404);
+ });
+});
+
+describe("manual financial cycle state",()=>{
+ it("keeps the first cycle open after the calendar passes the 21st",async()=>{
+  const {db}=fixture();
+  const ledger=new FinanceLedgerService(db as unknown as PrismaClient,()=> "2026-11-25");
+  const state=await ledger.cycleState(actor);
+  expect(state).toMatchObject({current:{from:"2026-10-22",to:"2026-11-25"},closePeriod:{from:"2026-10-22",to:"2026-11-24"},canClose:true});
+ });
+ it("does not allow closing on the 21st",async()=>{
+  const {db}=fixture();
+  expect(await new FinanceLedgerService(db as unknown as PrismaClient,()=> "2026-11-21").cycleState(actor)).toMatchObject({current:period,canClose:false});
+ });
+ it("starts the next cycle only once a saved close exists",async()=>{
+  const {db}=fixture();
+  db.financePeriodClose.findMany.mockResolvedValue([{from:new Date("2026-10-22"),to:new Date("2026-11-24"),closedAt:new Date("2026-11-25")}]);
+  expect(await new FinanceLedgerService(db as unknown as PrismaClient,()=> "2026-11-25").cycleState(actor)).toMatchObject({current:{from:"2026-11-25",to:"2026-12-21"},canClose:false});
  });
 });

@@ -53,7 +53,7 @@ export function useFinanceWindow() {
       if (!active) return;
       if (state?.current && Array.isArray(state.history)) {
         setCycleState(state);
-        if (!explicit || (from! >= state.current.from && to! >= state.current.to)) setPeriod(state.current);
+        if (!explicit || (from! === state.current.from && to! >= state.plannedThrough) || (from! > state.current.from && to! >= state.current.to)) setPeriod(state.current);
       }
       setReady(true);
     }).catch(e => { if (active) { setCycleError(e instanceof Error ? e.message : "Cycle state unavailable"); } });
