@@ -283,8 +283,8 @@ export function TotalExpenses() {
           {data
             ? `${data.total} matching records · ${money(data.matchingAmount)}`
             : "Loading records…"}
-          . Search and type filters apply to records and CSV; the summary shows the entire selected
-          cycle.
+          . Search and type filters apply to records and CSV. Personal summary cards restart after
+          the latest active founder settlement; historical rows remain listed.
         </p>
         {!data && !error ? (
           <Spinner label="Loading expense records…" />
