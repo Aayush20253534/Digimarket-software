@@ -185,8 +185,9 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   useEffect(()=>{if(categoryId&&categoryId!==SALARY_OPTION&&!selected.some(c=>c.id===categoryId))setCategoryId("");},[selected,categoryId]);
 
   const reload=useCallback(async()=>{
+    // Category management is independent of financial cycle resolution.
+    if(!ready&&section!=="categories")return;
     const sequence=++reloadSequence.current;
-    if(!ready)return;
     if(!canReadOwn&&!canAll){setLoading(false);return;}
     setLoading(true);setError("");
     const target=view==="all"&&canAll?"all":"mine";
@@ -381,7 +382,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     finally{setBusy(false);}
   }
   async function addCategory(e:FormEvent){
-    e.preventDefault();setBusy(true);setError("");setSuccess("");
+    e.preventDefault();if(loading||busy)return;setBusy(true);setError("");setSuccess("");
     try{
       if(categoryKind==="EXPENSE"&&isSalaryCategory(categoryName))throw new Error("Salary is a linked category. Use the Salary module to record payments.");
       await request("/finance/categories",{method:"POST",body:{kind:categoryKind,name:categoryName.trim(),purpose:categoryKind==="EXPENSE"?categoryPurpose:"GENERAL"}});
@@ -736,7 +737,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
           <FormField id="new-category-name" label="Category name"><input id="new-category-name" className="field" required minLength={2}
             maxLength={120} value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder={categoryKind==="INCOME"?"Service fees":"Travel"}/></FormField>
           {categoryKind==="EXPENSE"&&<FormField id="new-category-purpose" label="Category purpose"><select id="new-category-purpose" className="field" value={categoryPurpose} onChange={e=>setCategoryPurpose(e.target.value as typeof categoryPurpose)}><option value="GENERAL">Operating expense</option><option value="META_ADS">Meta advertising</option></select></FormField>}
-          <button className="btn-primary" type="submit" disabled={busy}>Add category</button>
+          <button className="btn-primary" type="submit" disabled={busy||loading||!categoryName.trim()}>Add category</button>
         </form>}
         <div className="aw-finance-category-list mt-5 space-y-2" role="region" aria-label="Financial categories" tabIndex={0}>{managedCategories.length?managedCategories.map(c=><div key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
           <div><p className="text-sm font-semibold">{c.name}</p><p className="text-xs text-slate-500">{c.kind} · {c.purpose??"GENERAL"} · {c.active?"Active":"Inactive"}</p></div>

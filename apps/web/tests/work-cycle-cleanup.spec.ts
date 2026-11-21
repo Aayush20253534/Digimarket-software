@@ -155,8 +155,8 @@ test("Finance category cards show accurate posted, held and transferred amounts"
  expect(requests.some(x=>x.path==="/finance/cycle-balance")).toBe(false);
  await page.getByRole("button",{name:"Agency totals & register"}).click();
  await expect(page.getByText("Agency balance carried forward",{exact:true})).toBeVisible();
- await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("₹200.25");
- await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("Net client fund balance · at cycle end");
+ await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("₹100.00");
+ await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("Posted client Meta Ads · all accounts · this cycle");
  await expect(nav.getByRole("link",{name:/^Founder settlements/})).toContainText("₹10,719.00");
  await expect(nav.getByRole("link",{name:/^Founder settlements/})).toContainText("All founders' transfers · this cycle");
  await expect(nav.getByRole("link",{name:/^Founder settlements/})).toContainText("2 active settlements");

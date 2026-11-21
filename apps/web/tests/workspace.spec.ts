@@ -251,9 +251,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByRole("link",{name:/Expense categories Operating costs/}).click();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
+  const addCategoryResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/finance/categories"&&r.request().method()==="POST");
   await page.getByRole("button",{name:"Add category"}).click();
-  await expect(page.getByText("CI Admin Category",{exact:true}).last()).toBeVisible();
-  await page.getByRole("button",{name:"Edit"}).last().click();
+  expect((await addCategoryResponse).status()).toBe(201);
+  const createdCategory=page.getByRole("region",{name:"Financial categories"}).getByText("CI Admin Category",{exact:true});
+  await expect(createdCategory).toBeVisible();
+  await createdCategory.locator("../..").getByRole("button",{name:"Edit",exact:true}).click();
   await expect(page.getByRole("dialog",{name:"Edit finance category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).last().fill("CI Admin Category Updated");
   await page.getByRole("button",{name:"Save changes"}).click();
