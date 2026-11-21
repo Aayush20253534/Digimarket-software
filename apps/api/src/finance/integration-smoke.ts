@@ -48,7 +48,7 @@ try{
   assert.equal(financeEntryInputSchema.safeParse({...input,enteredById:employee.id}).success,true);
   assert.equal(financeEntryInputSchema.safeParse({...input,enteredById:""}).success,false);
   await assert.rejects(()=>finance.submit(staff,{...input,enteredById:admin.id}),
-    (error:{status?:number})=>error.status===403);
+    (error:{status?:number})=>error.status===422);
   await assert.rejects(()=>finance.submit(manager,{...input,enteredById:outsider.id}),
     (error:{status?:number})=>error.status===422);
   const pending=await finance.submit(staff,{...input,enteredById:employee.id});
@@ -352,10 +352,21 @@ try{
   assert.ok(scopedCsv.csv.includes("10.2500"));
   assert.equal(financeBreakdownQuerySchema.safeParse({...dailyPeriod,day:"2026-11-01"}).success,false);
   assert.equal(financeBreakdownQuerySchema.safeParse({...dailyPeriod,personId:"not-uuid"}).success,false);
-  const assigned=await finance.submit(founder,{...directInput,enteredById:newStaff.id,amount:"7.0000",
+  const assigned=await finance.submit(founder,{...directInput,amount:"7.0000",
     occurredOn:"2026-11-01",idempotencyKey:randomUUID()});
-  assert.equal(assigned.enteredById,newStaff.id);
+  assert.equal(assigned.enteredById,founderUser.id);
+  const totalBefore=await finance.totals(founder,"all");
+  const directAdmin=principal(founderUser.id,directOrg.id,["ADMIN"],adminKeys);
+  const moved=await finance.editEntry(directAdmin,assigned.id,{
+    categoryId:fExpense.id,amount:"7.0000",occurredOn:"2026-11-01",
+    method:"CASH",merchantOrSource:"",description:"",enteredById:newStaff.id,
+  });
+  assert.equal(moved.enteredById,newStaff.id);
   assert.equal((await db.approvalRequest.findUniqueOrThrow({where:{id:assigned.approvalRequestId}})).requesterId,founderUser.id);
+  assert.equal((await finance.entries(founder,"mine")).some(entry=>entry.id===assigned.id),false);
   assert.equal((await finance.entries(secondFounder,"mine")).some(entry=>entry.id===assigned.id),true);
+  assert.equal((await finance.totals(founder,"all")).postedExpense,totalBefore.postedExpense);
+  assert.equal((await db.auditLog.count({where:{organizationId:directOrg.id,
+    action:"finance.expense_edited",entityId:assigned.id}})),1);
   console.info("Module 6 PASS: admin category rename/unused delete/referenced archive, other-user expense edits/cancellation, audit and tenant isolation.");
 }finally{await db.$disconnect();}
