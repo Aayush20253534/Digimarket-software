@@ -47,6 +47,9 @@ const endpoints: Record<string, string[]> = {
   "finance/transfers": ["GET","POST"],
   "finance/reconciliations": ["POST"],
   "finance/cycle-balance": ["GET"],
+  "finance/cycle-state": ["GET"],
+  "finance/cycle-confirmation": ["GET"],
+  "finance/cycle-close-simple": ["POST"],
   "finance/cycle-review": ["GET"],
   "finance/cycle-close": ["POST"],
   "finance/reversals": ["POST"],
@@ -74,6 +77,7 @@ const endpoints: Record<string, string[]> = {
   "finance/meta-ad-clients": ["GET"],
   "finance/meta-ads-distribution": ["GET"],
   "finance/summary": ["GET"],
+  "finance/recurring-income": ["GET"],
   "finance/export": ["GET"],
   "finance/report-breakdown": ["GET"],
   "finance/report-breakdown/export": ["GET"],
@@ -195,6 +199,7 @@ function permitted(path: string, method: string): boolean {
   if(messageNotePattern.test(path))return method==="GET";
   if(messageSavePattern.test(path))return method==="POST";
   if(financeProofPattern.test(path))return method==="GET";
+  if(/^finance\/entries\/[0-9a-fA-F-]{36}\/edit$/.test(path))return method==="GET";
   if(folderArchivePattern.test(path))return method==="POST";
   if(folderDetailPattern.test(path))return ["PUT","DELETE"].includes(method);
   if(assetOrganizePattern.test(path))return method==="POST";
@@ -307,7 +312,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
-  if(["finance/cycle-balance","finance/summary","finance/internal-settlements/mine","finance/internal-settlements/all","finance/client-ad-spend/mine","finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
+  if(["finance/cycle-balance","finance/recurring-income","finance/entries","finance/export","finance/summary","finance/internal-settlements/mine","finance/internal-settlements/all","finance/client-ad-spend/mine","finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
     for(const key of ["from","to","view","scope","funding","kind","type","status","categoryId","accountId","clientId","page","limit","q"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
   if(path==="service-deliveries"){
@@ -498,7 +503,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     // includes meta.requestId, unlike an actual missing note. Report the
     // deployment mismatch instead of misleading users with "Route not found".
     if (response.status===404 && (path==="notes" || noteDetailPattern.test(path)
-      || path==="finance/assignees" || path==="finance/cycle-balance" || path==="finance/internal-settlements/mine" || path==="finance/internal-settlements/all" || path==="finance/client-ad-spend/mine" || path==="finance/expenses/mine"
+      || path==="finance/cycle-state" || path==="finance/cycle-confirmation" || path==="finance/cycle-close-simple" || path==="finance/recurring-income" || path==="finance/assignees" || path==="finance/cycle-balance" || path==="finance/internal-settlements/mine" || path==="finance/internal-settlements/all" || path==="finance/client-ad-spend/mine" || path==="finance/expenses/mine"
       || financeEntryDetailPattern.test(path))) {
       const payload=await response.clone().json().catch(()=>null) as
         {error?:{code?:string;message?:string};meta?:{requestId?:string}} | null;

@@ -56,7 +56,12 @@ export function useFinanceWindow() {
         if (!explicit || (from! === state.current.from && to! >= state.plannedThrough) || (from! > state.current.from && to! >= state.current.to)) setPeriod(state.current);
       }
       setReady(true);
-    }).catch(e => { if (active) { setCycleError(e instanceof Error ? e.message : "Cycle state unavailable"); } });
+    }).catch(e => { if (active) {
+      setCycleError(e instanceof Error ? e.message : "Cycle state unavailable");
+      // Explicit historical date ranges remain readable during an API rollout.
+      // Never silently switch to a calendar-derived new cycle if state is missing.
+      if (explicit) setReady(true);
+    } });
     return () => { active = false; };
   }, [session, request]);
   const query = new URLSearchParams({ ...period, view }).toString();
