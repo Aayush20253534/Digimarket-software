@@ -28,7 +28,7 @@ type MetaAdClient={id:string;businessName:string};
 type Entry={id:string;kind:Kind;status:"PENDING"|"POSTED"|"REJECTED"|"CANCELLED";
   amount:string;currencyCode:string;occurredOn:string;method:string;description:string|null;
   merchantOrSource:string|null;createdAt:string;approvalRequestId:string|null;
-  moneyAccount?:{id:string;name:string}|null;reversesId?:string|null;reversedBy?:string|null;
+  reversesId?:string|null;reversedBy?:string|null;
   sourceType?:"FINANCE"|"SALARY"|"SETTLEMENT";salaryPaymentId?:string;salaryMonth?:string;
   settlementId?:string;settlementDirection?:"OUTGOING"|"INCOMING";
   receiptAssetId?:string|null;enteredById:string;clientId:string|null;client:MetaAdClient|null;
@@ -62,7 +62,6 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const windowState=useFinanceWindow();
   const {period,setPeriod,view,setView,ready}=windowState;
   const [page,setPage]=useState(1),[total,setTotal]=useState(0),[categoryFilter,setCategoryFilter]=useState("");
-  const [accounts,setAccounts]=useState<{id:string;name:string;ownerUserId?:string|null}[]>([]),[moneyAccountId,setMoneyAccountId]=useState("");
   const [categoryPurpose,setCategoryPurpose]=useState<"GENERAL"|"META_ADS">("GENERAL");
   const forms=section==="entries"||section==="ads";
   const {session,request}=useAuth();
@@ -76,7 +75,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [editedCategoryName,setEditedCategoryName]=useState("");
   const [editingEntry,setEditingEntry]=useState<Entry|null>(null);
   const [entryEdit,setEntryEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",
-    merchantOrSource:"",description:"",enteredById:"",clientId:null as string|null,moneyAccountId:null as string|null});
+    merchantOrSource:"",description:"",enteredById:"",clientId:null as string|null});
   const [editAdFunding,setEditAdFunding]=useState<"SELF"|"CLIENT">("SELF");
   const [assignees,setAssignees]=useState<Assignee[]>([]);
   const [assigneesError,setAssigneesError]=useState("");
@@ -135,12 +134,6 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [categoryName,setCategoryName]=useState("");
   useEffect(()=>{setCategoryName("");setEditingCategory(null);setCategoryPurpose("GENERAL");setError("");setSuccess("");},[categoryKind]);
   const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind&&c.purpose!=="SALARY"&&!isSalaryCategory(c.name)&&(section!=="ads"||isMetaAdsCategory(c))),[categories,kind,section]);
-  useEffect(()=>{
-    const currentUserId=session?.identity.userId;
-    if(moneyAccountId||!currentUserId)return;
-    const personal=accounts.find(a=>a.ownerUserId===currentUserId);
-    if(personal)setMoneyAccountId(personal.id);
-  },[accounts,moneyAccountId,session?.identity.userId]);
   const salarySelected=kind==="EXPENSE"&&categoryId===SALARY_OPTION;
   const metaAdsSelected=kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===categoryId));
   const filteredMetaAdEntries=metaAdEntries;
@@ -176,13 +169,12 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     if(!canReadOwn&&!canAll){setLoading(false);return;}
     setLoading(true);setError("");
     const target=view==="all"&&canAll?"all":"mine";
-    const [ledger,sums,cats,policies,settlements,accountOptions]=await Promise.allSettled([
+    const [ledger,sums,cats,policies,settlements]=await Promise.allSettled([
       forms&&!directExpense?request<{items:Entry[];total:number}>("/finance/register?"+registerQuery):Promise.resolve({items:[],total:0}),
       !directExpense&&(section==="entries"||section==="agreements")?request<Totals>("/finance/summary?view="+(section==="agreements"?"all":target)+"&"+periodQuery):Promise.resolve(zero),
       forms||section==="categories"?request<Category[]>("/finance/categories"):Promise.resolve([] as Category[]),
       forms&&canCreate?request<FinancePolicy[]>("/approval-policies"):Promise.resolve([] as FinancePolicy[]),
       section==="settlements"&&isFounder&&canReadOwn?request<Entry[]>("/finance/internal-settlements/mine?"+periodQuery):Promise.resolve([] as Entry[]),
-      forms&&canCreate&&!directExpense?request<{id:string;name:string;ownerUserId?:string|null}[]>("/finance/account-options"):Promise.resolve([] as {id:string;name:string;ownerUserId?:string|null}[]),
     ]);
     if(sequence!==reloadSequence.current)return;
     if(ledger.status==="fulfilled"){setEntries(section==="entries"?ledger.value.items:[]);setMetaAdEntries(section==="ads"?ledger.value.items:[]);setTotal(ledger.value.total);setHasLoadedEntries(true);}
@@ -190,9 +182,8 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     if(settlements.status==="fulfilled"){setSettlementHistory(settlements.value);setSettlementHistoryError("");}else setSettlementHistoryError(readable(settlements.reason));
     if(sums.status==="fulfilled"){setSummaryAvailable(true);setTotals(sums.value);setRecurring(sums.value.recurringIncome??null);}else{setSummaryAvailable(false);setTotals(zero);}
     if(cats.status==="fulfilled")setCategories(cats.value);
-    if(accountOptions.status==="fulfilled")setAccounts(accountOptions.value);
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(p=>p.category==="FINANCE"&&p.active));
-    const problems=[ledger,sums,cats,policies,accountOptions].flatMap(result=>result.status==="rejected"?[readable(result.reason)]:[]);
+    const problems=[ledger,sums,cats,policies].flatMap(result=>result.status==="rejected"?[readable(result.reason)]:[]);
     setError(problems.join(" "));setLoading(false);setMetaDistributionRefresh(v=>v+1);
   },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,directExpense]);
   useEffect(()=>{
@@ -299,7 +290,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       setUploadStatus(isFounder?"Recording transaction…":"Submitting transaction for approval…");
       const saved=await request<{status:string}>(directExpense?"/finance/expenses/mine":"/finance/entries",{method:"POST",body:{
         kind,categoryId,clientId:metaAdsSelected&&adFunding==="CLIENT"?clientId:null,
-        amount:amount.trim(),occurredOn,method,...(!directExpense&&moneyAccountId?{moneyAccountId}:{}),
+        amount:amount.trim(),occurredOn,method,
         merchantOrSource:source.trim(),description:description.trim(),
         idempotencyKey:crypto.randomUUID(),receiptAssetId,
       }});
@@ -380,7 +371,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     setEntryEdit({categoryId:row.category.id,
       amount:row.amount,occurredOn:row.occurredOn,method:row.method,
       merchantOrSource:row.merchantOrSource??"",description:row.description??"",
-      enteredById:row.enteredById,clientId:row.clientId,moneyAccountId:row.moneyAccount?.id??null});
+      enteredById:row.enteredById,clientId:row.clientId});
   }
   async function saveEntry(e:FormEvent){
     e.preventDefault();if(!editingEntry)return;
@@ -391,7 +382,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       await request("/finance/entries/"+editingEntry.id,{method:"PUT",body:{
         ...entryEdit,clientId:editIsMeta&&editAdFunding==="CLIENT"?entryEdit.clientId:null,
       }});
-      setEditingEntry(null);setSuccess("Finance entry updated and assigned user saved with an audit record.");
+      setEditingEntry(null);setSuccess("Finance entry updated. User-wise totals now reflect the assigned user, and the original submitter is preserved in the audit history.");
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }
@@ -489,7 +480,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
             onChange={e=>setOccurredOn(e.target.value)}/></FormField>
           <FormField id="finance-method" label="Payment method"><select id="finance-method" className="field" value={method} onChange={e=>setMethod(e.target.value as typeof method)}>
             {modes.map(m=><option key={m} value={m}>{m.replaceAll("_"," ")}</option>)}</select></FormField>
-          {directExpense?<div className="space-y-1"><p className="text-sm font-medium">Money account</p><p className="text-sm text-slate-400">Your signed-in founder account (automatic)</p></div>:<FormField id="finance-money-account" label="Money account" help="Choose the bank, cash or founder account actually used. Unassigned entries must be linked before closing a cycle."><select id="finance-money-account" className="field" value={moneyAccountId} onChange={e=>setMoneyAccountId(e.target.value)}><option value="">Unassigned — reconcile later</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></FormField>}
+          <p className="sm:col-span-2 text-sm text-slate-400" data-testid="finance-owner-notice">This entry belongs to your signed-in user. An administrator can reassign it later.</p>
           <FormField id="finance-source" label={kind==="EXPENSE"?"Merchant / payee":"Income source"}><input id="finance-source" className="field" maxLength={160}
             value={source} onChange={e=>setSource(e.target.value)} placeholder={kind==="EXPENSE"?"Rapido":"Agency service"}/></FormField>
           <div className="sm:col-span-2"><FormField id="finance-description" label="Notes (optional)"><textarea id="finance-description" className="field min-h-20" maxLength={2000}
@@ -962,7 +953,6 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
             <p className="text-sm">By: {row.enteredBy.displayName}</p>
             {row.submittedBy&&row.submittedBy.displayName!==row.enteredBy.displayName&&
               <p className="text-xs">Submitted by: {row.submittedBy.displayName}</p>}
-            <p className="text-sm">Money account: {row.moneyAccount?.name??"Unassigned"}</p>
             {row.description&&<p className="text-sm break-words">{row.description}</p>}
             {adminFinance&&row.sourceType==="FINANCE"&&row.status!=="CANCELLED"&&!row.reversesId&&!row.reversedBy&&
               <div className="flex flex-wrap gap-2">
@@ -975,7 +965,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
         <div className="aw-finance-register-scroll hidden md:block" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
             {(adminFinance||isFounder)&&<th className="pb-3 pr-4">Actions</th>}
-            {["Date","Type","Category","Source","Notes","Amount","Status","Assigned to","Money account","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
+            {["Date","Type","Category","Source","Notes","Amount","Status","Assigned to","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
           </tr></thead><tbody>{filteredEntries.map(row=><tr key={row.id} id={"finance-"+row.id}>
             {(adminFinance||isFounder)&&<td className="py-3 pr-4">
               {adminFinance&&row.sourceType==="FINANCE"&&row.status!=="CANCELLED"&&!row.reversesId&&!row.reversedBy&&<div className="flex items-center gap-2">
@@ -1009,7 +999,6 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
             <td className="py-3 pr-4"><strong>{row.enteredBy.displayName}</strong>
               {row.submittedBy&&row.submittedBy.displayName!==row.enteredBy.displayName&&
                <span className="aw-finance-original-submitter">Submitted by {row.submittedBy.displayName}</span>}</td>
-            <td>{row.moneyAccount?.name??"Unassigned"}{row.reversesId&&<small className="block">Reversal</small>}{row.reversedBy&&<small className="block">Reversed</small>}</td>
             <td className="py-3">{row.receiptAssetId?
               <button type="button" className="btn-secondary" disabled={busy} aria-label={"View receipt for "+row.occurredOn}
                 onClick={()=>void showReceipt(row.id)}><FileImage size={16}/> Proof</button>:"—"}</td>
@@ -1046,7 +1035,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     {adminFinance&&editingEntry&&<div className="aw-finance-admin-overlay" role="presentation">
       <div className="aw-finance-admin-modal" role="dialog" aria-modal="true" aria-label={"Edit "+editingEntry.kind.toLowerCase()}>
         <h2>Edit {editingEntry.kind.toLowerCase()}</h2><p>Originally submitted by {editingEntry.submittedBy?.displayName??editingEntry.enteredBy.displayName}.
-          Edit this {editingEntry.kind.toLowerCase()} entry or assign it to an active member of the company. The original approval requester remains recorded.</p>
+          Edit this {editingEntry.kind.toLowerCase()} entry or assign it to an active member of the company. Reassignment moves the entry between personal totals, without changing agency totals or the original submitter.</p>
         {assigneesError&&<Notice kind="error">{assigneesError}</Notice>}
         <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>void saveEntry(e)}>
           <FormField id="admin-expense-category" label={editingEntry.kind==="INCOME"?"Income category":"Expense category"}><select id="admin-expense-category" className="field" required value={entryEdit.categoryId}
@@ -1079,13 +1068,6 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
               {!assignees.some(user=>user.id===editingEntry.enteredById)&&
                 <option value={editingEntry.enteredById}>{editingEntry.enteredBy.displayName} (current)</option>}
               {assignees.map(user=><option key={user.id} value={user.id}>{user.displayName} ({user.loginId})</option>)}
-            </select>
-          </FormField>
-          <FormField id="admin-money-account" label="Money account">
-            <select id="admin-money-account" className="field" value={entryEdit.moneyAccountId??""}
-              onChange={e=>setEntryEdit(v=>({...v,moneyAccountId:e.target.value||null}))}>
-              <option value="">Unassigned (requires review)</option>
-              {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </FormField>
           <FormField id="admin-expense-amount" label="Amount (INR)"><input id="admin-expense-amount" className="field" inputMode="decimal" required
