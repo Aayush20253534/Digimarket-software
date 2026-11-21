@@ -130,6 +130,12 @@ export function FinanceOverview() {
         ]
       : []),
     {
+      title: "Cycles",
+      description: "Previous cycle income, expenses, salaries and settlement history",
+      href: "/app/finance/cycles",
+      icon: CalendarRange,
+    },
+    {
       title: "Categories",
       description: "Manage stable income and expense categories",
       href: "/app/finance/categories",
