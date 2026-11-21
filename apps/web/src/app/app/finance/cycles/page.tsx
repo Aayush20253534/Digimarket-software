@@ -33,7 +33,7 @@ export default function FinanceCyclesPage(){
   void Promise.all([
    request<Summary>("/finance/summary?"+base),
    request<ExpenseSummary>("/finance/total-expenses/summary?"+base),
-   request<Balance>("/finance/cycle-balance?"+base),
+   request<Balance>("/finance/cycle-balance?"+base).catch(()=>null),
    request<Register<FinanceRow>>("/finance/register?"+base+"&scope=agency&limit=25&page="+page),
    request<{items:ExpensesRow[];total:number;page:number;limit:number}>("/finance/total-expenses?"+base+"&type=ALL&limit=25&page="+expensePage),
    founder&&w.view==="mine"?request<Settlement[]>("/finance/internal-settlements/mine?"+base):Promise.resolve([] as Settlement[])
@@ -71,7 +71,7 @@ export default function FinanceCyclesPage(){
      ["Pending income",summary?.pendingIncome],
      ["Pending expenses",summary?.pendingExpense]
     ] as const).map(([label,value])=><Card key={label}><p className="text-sm text-slate-400">{label}</p>
-     <strong className="mt-2 block text-xl">{value===undefined?"…":money(value)}</strong></Card>)}
+     <strong className="mt-2 block text-xl">{value===undefined?(loading?"…":"Unavailable until backend deploy"):money(value)}</strong></Card>)}
    </div>
    <p className="text-sm text-slate-400">New-cycle income and expenses restart at zero. The opening balance is the previous cycle's closing balance. Settlement transfers change founders' personal balances, not company profit. Account balances are bookkeeping figures, not verified bank balances.</p>
    {expenseSummary&&<Card title="Expense breakdown"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
