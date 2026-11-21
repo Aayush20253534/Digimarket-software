@@ -47,8 +47,8 @@ if(!gateway.includes('"finance/internal-settlements/mine": ["GET"]')){
 // Direct expenses (including Tool Subscriptions) must reach the backend for
 // every signed-in user. A missing proxy allowlist entry returns a misleading
 // 404 "Route not found" before the expense can be recorded.
-if(!/"finance\\/expenses\\/mine"\\s*:\\s*\\["POST"\\]/.test(gateway)){
-  process.stderr.write("Finance proxy must permit POST /finance/expenses/mine for direct expenses.\\n");
+if(!gateway.includes('"finance/expenses/mine": ["POST"]')){
+  process.stderr.write("Finance proxy must permit POST /finance/expenses/mine for direct expenses.\n");
   process.exitCode=1;
 }
 
