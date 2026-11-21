@@ -1,5 +1,7 @@
 # DigiMarket FREE-TIER Render Blueprint.
 # Creates only the free API web service: NO paid background worker.
+# Keep the API in sync with main: finance UI routes require matching backend endpoints.
+# Existing Render Blueprint services must be re-synced once for this setting to apply.
 # Migrations + permission seeding run in startCommand because Render Free
 # does not provide a pre-deploy command. Initial admin bootstrap remains
 # guarded by the temporary BOOTSTRAP_* secrets documented in docs/29.
@@ -12,7 +14,7 @@ services:
     repo: https://github.com/Aayush20253534/Digimarket-software
     branch: main
     region: singapore
-    autoDeployTrigger: off
+    autoDeployTrigger: commit
     healthCheckPath: /api/v1/ready
     buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm --filter @digimarket/db db:generate && pnpm --filter @digimarket/contracts build && pnpm --filter @digimarket/api build
     startCommand: pnpm --filter @digimarket/db db:migrate:deploy && pnpm --filter @digimarket/api exec tsx ../../packages/db/src/seed.ts && pnpm --filter @digimarket/api start
