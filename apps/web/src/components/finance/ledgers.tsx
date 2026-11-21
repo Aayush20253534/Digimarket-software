@@ -18,6 +18,10 @@ type Account = {
   movement: string;
   closing: string;
 };
+type OwnClientAdSpend={
+  posted:string;entries:number;
+  byClient:{clientId:string;name:string;posted:string;entries:number}[];
+};
 type ClientBalance = {
   id: string;
   name: string;
@@ -616,12 +620,36 @@ function ReconcileForm({
 }
 
 export function ClientFundsOverview() {
-  const l = useLedger(),
-    { data, error } = useData<ClientBalance[]>(
-      "/finance/client-funds?" + l.w.query,
-      l.enabled,
-      l.version,
-    );
+  const l = useLedger();
+  const ownAccess=!!l.session?.identity.permissions.includes("finance.entry.read.own");
+  const {data,error}=useData<ClientBalance[]>(
+    "/finance/client-funds?"+l.w.query,
+    l.enabled&&l.w.view==="all",l.version);
+  const personal=useData<OwnClientAdSpend>(
+    "/finance/client-ad-spend/mine?"+
+      new URLSearchParams(l.w.period).toString(),
+    ownAccess&&l.w.ready&&l.w.view==="mine",l.version);
+  if(l.w.view==="mine")return (
+    <FinanceFrame title="Client ads paid from my account"
+      description="Only posted client Meta Ads expenses assigned to your personal clearing account for the selected cycle. This is money spent, not the total client deposit balance."
+      window={l.w}>
+      <Feedback error={personal.error} success=""/>
+      {personal.data?<><Card>
+        <p className="text-sm text-slate-400">Client advertising outflow from my account</p>
+        <strong className="mt-2 block text-2xl">{money(personal.data.posted)}</strong>
+        <p className="mt-2 text-sm text-slate-400">{personal.data.entries} posted entries in this cycle</p>
+      </Card>
+      <section className="grid gap-3 sm:grid-cols-2" aria-label="My client ad spending by client">
+        {personal.data.byClient.map(row=><Card key={row.clientId}>
+          <p className="font-semibold">{row.name}</p>
+          <strong className="mt-2 block text-xl">{money(row.posted)}</strong>
+          <p className="mt-1 text-xs text-slate-400">{row.entries} posted entries · My account only</p>
+        </Card>)}
+      </section>
+      {!personal.data.byClient.length&&<Notice>No client Meta Ads have been paid from this account during the selected cycle.</Notice>}
+      </>:!personal.error&&<Spinner label="Loading client advertising outflows…"/>}
+    </FinanceFrame>
+  );
   return (
     <FinanceFrame
       title="Client ad funds"

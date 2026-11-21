@@ -71,6 +71,52 @@ export class FinanceService {
   }
 
 
+  /**
+   * Client Meta Ads paid from the logged-in person's clearing account.
+   * Ownership comes from MoneyAccount.ownerUserId, not enteredById: an
+   * administrative entry may be recorded by a different founder.
+   * This is actual posted outflow (net of reversals), not client fund balance.
+   */
+  async clientAdAccountSpend(actor:Principal,period:ReportingPeriod){
+    need(actor,"finance.entry.read.own");
+    const categories=await this.db.financialCategory.findMany({
+      where:{organizationId:actor.organizationId,kind:"EXPENSE"},
+      select:{id:true,name:true,purpose:true},
+    });
+    const metaCategoryIds=categories.filter(isMetaAds).map(category=>category.id);
+    // Attribute actual spending by owner, including entries recorded by others
+    // on this user's behalf. No client top-ups or hypothetical ad budgets.
+    const byClient=await this.db.financialTransaction.groupBy({
+      by:["clientId"],
+      where:{
+        organizationId:actor.organizationId,
+        kind:"EXPENSE",status:"POSTED",clientId:{not:null},
+        occurredOn:dateOnlyRange(period),
+        categoryId:{in:metaCategoryIds},
+        moneyAccount:{is:{organizationId:actor.organizationId,ownerUserId:actor.userId}},
+      },
+      _sum:{amount:true},_count:{_all:true}
+    });
+    const clientIds=byClient.flatMap(row=>row.clientId?[row.clientId]:[]);
+    const clients=clientIds.length?await this.db.client.findMany({
+      where:{organizationId:actor.organizationId,id:{in:clientIds}},
+      select:{id:true,businessName:true}
+    }):[];
+    const names=new Map(clients.map(client=>[client.id,client.businessName]));
+    const rows=byClient.filter(row=>row.clientId!==null)
+      .map(row=>({
+        clientId:row.clientId!,
+        name:names.get(row.clientId!)??"Archived client",
+        posted:(row._sum.amount??new Prisma.Decimal(0)).toFixed(4),
+        entries:row._count._all
+      })).sort((a,b)=>a.name.localeCompare(b.name));
+    const posted=rows.reduce((total,row)=>total.plus(row.posted),new Prisma.Decimal(0));
+    return {from:period.from,to:period.to,currency:"INR",
+      posted:posted.toFixed(4),
+      entries:rows.reduce((n,row)=>n+row.entries,0),
+      byClient:rows};
+  }
+
   // All views use the exact same filtered, database-wide grouping. Finance
   // entries() intentionally paginates to 200 and must not drive these totals.
   async metaAdsDistribution(actor:Principal,view:View,from?:string,to?:string){

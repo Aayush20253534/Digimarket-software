@@ -42,6 +42,15 @@ type Totals={agencyOperatingNet?:string;currency:string;postedIncome:string;post
   personalSettlementResetAt?:string|null;
   pendingIncome:string;pendingExpense:string;groups:{kind:Kind;status:string;amount:string;count:number}[];
   clientAdSpend?:{posted:string;pending:string;count:number};recurringIncome?:RecurringIncome};
+type AgencySettlementRow={
+  id:string;occurredOn:string;senderName:string;recipientName:string;
+  amount:string;method:string;status:"POSTED"|"CANCELLED";
+  note:string|null;voidReason:string|null
+};
+type AgencySettlementPage={
+  items:AgencySettlementRow[];total:number;page:number;limit:number;
+  postedTotal:string;postedCount:number;voidedCount:number;
+};
 type FinancePolicy={category:string;active:boolean};
 type SalaryFinanceSummary={totalPaid:string;founderFunding:{founderUserId:string;name:string;amount:string}[]};
 type RecurringIncome={month:string;from?:string;to?:string;monthlyServiceTotal:string;monthlyAdBudgetTotal:string;monthlyCombinedTotal:string;items:{id:string;businessName:string;monthlyServiceCharge:string;monthlyAdBudget:string;monthlyCombined:string;contractEndOn:string|null}[]};
@@ -113,6 +122,10 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [success,setSuccess]=useState("");
   const [settlementHistory,setSettlementHistory]=useState<Entry[]>([]);
   const [settlementHistoryError,setSettlementHistoryError]=useState("");
+  const [agencySettlementHistory,setAgencySettlementHistory]=useState<AgencySettlementPage|null>(null);
+  const [agencySettlementPage,setAgencySettlementPage]=useState(1);
+  const [agencySettlementLoading,setAgencySettlementLoading]=useState(false);
+  const [agencySettlementError,setAgencySettlementError]=useState("");
   const [settlementPeers,setSettlementPeers]=useState<Assignee[]>([]);
   const [settlementPeer,setSettlementPeer]=useState("");
   const [settlementAmount,setSettlementAmount]=useState("");
@@ -177,7 +190,9 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       !directExpense&&(section==="entries"||section==="agreements")?request<Totals>("/finance/summary?view="+(section==="agreements"?"all":target)+"&"+periodQuery):Promise.resolve(zero),
       forms||section==="categories"?request<Category[]>("/finance/categories"):Promise.resolve([] as Category[]),
       forms&&canCreate?request<FinancePolicy[]>("/approval-policies"):Promise.resolve([] as FinancePolicy[]),
-      section==="settlements"&&isFounder&&canReadOwn?request<Entry[]>("/finance/internal-settlements/mine?"+periodQuery):Promise.resolve([] as Entry[]),
+      section==="settlements"&&view==="mine"&&isFounder&&canReadOwn
+        ?request<Entry[]>("/finance/internal-settlements/mine?"+periodQuery)
+        :Promise.resolve([] as Entry[]),
     ]);
     if(sequence!==reloadSequence.current)return;
     if(ledger.status==="fulfilled"){setEntries(section==="entries"?ledger.value.items:[]);setMetaAdEntries(section==="ads"?ledger.value.items:[]);setTotal(ledger.value.total);setHasLoadedEntries(true);}
@@ -315,6 +330,23 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
   }
+  useEffect(()=>{
+    setAgencySettlementPage(1);
+  },[period.from,period.to,view]);
+  useEffect(()=>{
+    if(section!=="settlements"||view!=="all"||!canAll||!ready||!session){
+      setAgencySettlementHistory(null);setAgencySettlementLoading(false);return;
+    }
+    let active=true;
+    setAgencySettlementHistory(null);setAgencySettlementLoading(true);setAgencySettlementError("");
+    const query=new URLSearchParams({...period,page:String(agencySettlementPage),limit:"50"});
+    void request<AgencySettlementPage>("/finance/internal-settlements/all?"+query.toString())
+      .then(result=>{if(active)setAgencySettlementHistory(result)})
+      .catch(error=>{if(active)setAgencySettlementError(readable(error))})
+      .finally(()=>{if(active)setAgencySettlementLoading(false)});
+    return()=>{active=false};
+  },[section,view,canAll,ready,session,request,period.from,period.to,agencySettlementPage,metaDistributionRefresh]);
+
   async function recordSettlement(e:FormEvent){
     e.preventDefault();
     if(!settlementPeer||!settlementAmount.trim()){setError("Select a receiving founder and positive amount.");return;}
@@ -528,11 +560,12 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       <Link className={categoryKind==="INCOME"?"btn-primary":"btn-secondary"} href={"/app/finance/categories/income?"+windowState.query}>Income categories</Link>
       <Link className={categoryKind==="EXPENSE"?"btn-primary":"btn-secondary"} href={"/app/finance/categories/expenses?"+windowState.query}>Expense categories</Link>
     </nav>}
-    {forms&&<div className="aw-v5-finance-visibility flex gap-2" role="group" aria-label="Finance visibility">
+    {(forms||(section==="settlements"&&isFounder&&canAll))&&
+      <div className="aw-v5-finance-visibility flex gap-2" role="group" aria-label="Finance visibility">
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
     </div>}
-    {section==="settlements"&&isFounder&&canReadOwn&&
+    {section==="settlements"&&view==="mine"&&isFounder&&canReadOwn&&
       <section id="finance-settlement-history" aria-label="My internal settlements">
         <Card title="Internal settlements received & sent"
           description="The recipient sees Settlement In and the sender sees Settlement Out. Both personal account balances change; company income and expense totals stay unchanged.">
@@ -562,6 +595,42 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
                  </div>
                </div>)}
            </div>}
+        </Card>
+      </section>}
+    {section==="settlements"&&view==="all"&&canAll&&
+      <section id="finance-agency-settlement-history" aria-label="All founder settlements">
+        <Card title="All founder settlements"
+          description="Every founder-to-founder settlement within the selected cycle. Transferred amounts are counted once; these transfers do not create agency revenue or expense.">
+          {agencySettlementError&&<p role="alert" className="text-sm text-amber-400">{agencySettlementError}</p>}
+          {agencySettlementHistory&&<div className="grid gap-3 sm:grid-cols-3">
+            <div><p className="text-sm text-slate-400">Total transferred (active)</p>
+              <strong className="text-xl">{money(agencySettlementHistory.postedTotal)}</strong></div>
+            <div><p className="text-sm text-slate-400">Active transfers</p>
+              <strong className="text-xl">{agencySettlementHistory.postedCount}</strong></div>
+            <div><p className="text-sm text-slate-400">Voided transfers</p>
+              <strong className="text-xl">{agencySettlementHistory.voidedCount}</strong></div>
+          </div>}
+          {agencySettlementLoading?<Spinner label="Loading agency settlements…"/>:
+            agencySettlementHistory&&!agencySettlementHistory.items.length?
+              <p className="text-sm text-slate-400">No founder settlements in this work cycle.</p>:
+            agencySettlementHistory?<div className="space-y-3" role="region" aria-label="Agency settlement history">
+              {agencySettlementHistory.items.map(row=>
+                <div key={row.id} data-testid="agency-settlement-entry"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 p-3">
+                  <div className="space-y-1">
+                    <p className="font-semibold">{row.senderName} → {row.recipientName}</p>
+                    <p className="text-xs text-slate-400">{row.occurredOn} · {row.method.replaceAll("_"," ")} · {row.status}</p>
+                    {row.note&&<p className="text-sm text-slate-400">{row.note}</p>}
+                    {row.voidReason&&<p className="text-sm text-slate-400">Void reason: {row.voidReason}</p>}
+                  </div>
+                  <strong className={row.status==="CANCELLED"?"line-through text-slate-500":"text-slate-200"}>
+                    {money(row.amount)}
+                  </strong>
+                </div>)}
+              <FinancePager page={agencySettlementPage}
+                total={agencySettlementHistory.total} limit={agencySettlementHistory.limit}
+                onChange={setAgencySettlementPage}/>
+            </div>:null}
         </Card>
       </section>}
     {section==="entries"&&<>
