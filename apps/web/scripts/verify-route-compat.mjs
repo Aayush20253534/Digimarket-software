@@ -54,10 +54,26 @@ if(!gateway.includes('"finance/expenses/mine": ["POST"]')){
 
 // The cycle-balance endpoint needs both the Next.js gateway allowlist and the
 // original date/visibility parameters. A missing route silently hid balances.
-if(!gateway.includes('"finance/cycle-balance": ["GET"]')||
-   !gateway.includes('"finance/cycle-balance","finance/summary","finance/internal-settlements/mine"')){
-  process.stderr.write("Finance cycle balance, summary and settlement history must forward authenticated requests with from/to/view.\n");
-  process.exitCode=1;
+// Check the route set and forwarded parameter set independently, rather
+// than requiring unrelated route names to be adjacent in a particular order.
+const financeForwarding = Array.from(gateway.matchAll(/if\(\s*(\[[^\]]*\])\.includes\(path\)\s*\)\s*\{\s*for\(const key of\s*(\[[^\]]*\])/g))
+  .map(match => ({routes:JSON.parse(match[1]), keys:JSON.parse(match[2])}));
+for(const route of ["finance/cycle-balance","finance/summary","finance/internal-settlements/mine","finance/internal-settlements/all","finance/client-ad-spend/mine"]){
+  if(!gateway.includes('"'+route+'": ["GET"]') ||
+     !financeForwarding.some(group => group.routes.includes(route) &&
+       ["from","to","view"].every(key => group.keys.includes(key)))){
+    process.stderr.write("Finance gateway must permit and forward from/to/view for "+route+"\n");
+    process.exitCode=1;
+  }
+}
+// Every manual cycle endpoint must reach the API; the API still verifies
+// authorization, the period boundary and the submitted confirmation totals.
+for(const [route,method] of [["finance/cycle-state","GET"],["finance/cycle-confirmation","GET"],["finance/cycle-close-simple","POST"]]){
+  if(!gateway.includes('"'+route+'": ["'+method+'"]') ||
+     !gateway.includes('|| path==="'+route+'"')){
+    process.stderr.write("Finance gateway must permit and diagnose "+method+" /"+route+"\n");
+    process.exitCode=1;
+  }
 }
 if(!gateway.includes('|| path==="finance/cycle-balance"')){
   process.stderr.write("The Finance proxy must report outdated backend cycle routes explicitly.\n");
