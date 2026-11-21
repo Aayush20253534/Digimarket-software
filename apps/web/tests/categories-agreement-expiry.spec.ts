@@ -70,7 +70,6 @@ async function workspace(page: Page, editable = true) {
     else if (path === "/notifications") data = { items: [], unreadCount: 0 };
     else if (path === "/notifications/push-key") data = { publicKey: null };
     else if (path === "/messages/users") data = { items: [] };
-    else if (path === "/service-deliveries") data = { items: [] };
     else if (path === "/finance/categories") {
       if (req.method() === "POST")
         categories.push({ ...body, id: String(categories.length), active: true });
