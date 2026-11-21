@@ -162,6 +162,7 @@ export async function verifyTotalExpenses(db: PrismaClient) {
     idempotencyKey: randomUUID(),
   });
   const expected = {
+    personalSettlementResetAt: null,
     postedIncome: "1000.0000",
     postedTotalExpense: "1415.0000",
     netOperatingMoney: "-415.0000",
@@ -184,6 +185,7 @@ export async function verifyTotalExpenses(db: PrismaClient) {
   assert.equal(all.items.find((r) => r.id === "salary:" + salary.id)?.amount, "250.0000");
   assert.ok(all.items.some((r) => r.reversal && r.amount === "-60.0000"));
   assert.deepEqual(await report.summary(f, { ...q, view: "mine" }), {
+    personalSettlementResetAt: null,
     postedIncome: "1000.0000",
     postedTotalExpense: "1190.0000",
     netOperatingMoney: "-190.0000",
