@@ -1,13 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function workspace(page: Page, role = "FOUNDER") {
-  const calls: { path: string; query: URLSearchParams }[] = [];
+  const calls: { path: string; query: URLSearchParams; method: string; body?: Record<string,unknown> }[] = [];
   await page.clock.setFixedTime(new Date("2026-11-17T12:00:00Z"));
   await page.route("**/api/v1/**", async (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname.slice(7),
       q = url.searchParams;
-    calls.push({ path, query: q });
+    calls.push({ path, query: q, method: route.request().method(),
+      body: route.request().postDataJSON() ?? undefined });
     const all = q.get("view") === "all";
     const summary = {
       postedIncome: all ? "300" : "100",
@@ -41,7 +42,7 @@ async function workspace(page: Page, role = "FOUNDER") {
         roles: [role],
         permissions: [
           "finance.entry.read.own",
-          ...(role === "FOUNDER" ? ["finance.read.all", "finance.category.manage"] : []),
+          ...(["FOUNDER", "SUPER_ADMIN"].includes(role) ? ["finance.read.all", "finance.category.manage"] : []),
         ],
       };
     else if (path === "/notifications") data = { items: [], unreadCount: 0 };
@@ -73,11 +74,27 @@ async function workspace(page: Page, role = "FOUNDER") {
           },
         ],
       };
+    else if (path === "/finance/categories") data = [
+      {id:"travel",name:"Travel",kind:"EXPENSE",purpose:"GENERAL",active:true},
+      {id:"meta",name:"Meta Ads",kind:"EXPENSE",purpose:"META_ADS",active:true},
+    ];
+    else if (path === "/finance/assignees") data = [
+      {id:"founder",displayName:"Test Founder",loginId:"founder"},
+      {id:"dev",displayName:"Dev Raj",loginId:"dev"},
+    ];
+    else if (path === "/finance/meta-ad-clients") data = [
+      {id:"cafe",businessName:"Test Cafe"},
+    ];
+    else if (path === "/finance/entries/expense-0/edit") data = {
+      id:"expense-0",categoryId:"travel",enteredById:"founder",clientId:null,
+      amount:"0.5000",occurredOn:"2026-11-15",method:"UPI",
+      merchantOrSource:"",description:"Journey 0",
+    };
     else if (path === "/finance/total-expenses/summary") data = summary;
     else if (path === "/finance/total-expenses") {
       const rows = [
         ...Array.from({ length: all ? 46 : 32 }, (_, i) => ({
-          id: "expense-" + i,
+          id: "finance:expense-" + i,
           type: "OTHER",
           category: "Travel",
           amount: all ? "1" : "0.50",
@@ -86,7 +103,7 @@ async function workspace(page: Page, role = "FOUNDER") {
           client: "",
         })),
         {
-          id: "self-ad",
+          id: "finance:self-ad",
           type: "SELF_ADS",
           category: "Meta Ads",
           amount: summary.breakdown.SELF_ADS,
@@ -95,7 +112,7 @@ async function workspace(page: Page, role = "FOUNDER") {
           client: "",
         },
         {
-          id: "client-ad",
+          id: "finance:client-ad",
           type: "CLIENT_ADS",
           category: "Meta Ads",
           amount: summary.breakdown.CLIENT_ADS,
@@ -104,7 +121,7 @@ async function workspace(page: Page, role = "FOUNDER") {
           client: "Test Cafe",
         },
         {
-          id: "salary",
+          id: "salary:salary",
           type: "SALARY",
           category: "Salary",
           amount: summary.breakdown.SALARY,
@@ -212,4 +229,31 @@ test("personal-only users cannot request agency expense totals from the page", a
       .filter((c) => c.path === "/finance/total-expenses")
       .every((c) => c.query.get("view") === "mine"),
   ).toBe(true);
+});
+
+test("super admin edits expense owner directly from mobile Total Expense, salaries remain protected", async ({page}) => {
+  const calls=await workspace(page,"SUPER_ADMIN");
+  await page.setViewportSize({width:375,height:812});
+  await page.goto("/app/finance/total-expenses?from=2026-10-22&to=2026-11-21&view=all");
+  const records=page.getByRole("region",{name:"All expense records"});
+  await expect(records.getByRole("button",{name:"Edit expense"}).first()).toBeVisible();
+  await records.getByRole("button",{name:"Edit expense"}).first().click();
+  const modal=page.getByRole("dialog",{name:"Edit expense"});
+  await expect(modal).toBeVisible();
+  await modal.getByLabel("Assigned user").selectOption("dev");
+  await modal.getByRole("button",{name:"Save changes"}).click();
+  await expect(modal).toHaveCount(0);
+  await expect(page.getByText(/User-wise totals reflect the assigned user/)).toBeVisible();
+  const updated=calls.find(call=>call.path==="/finance/entries/expense-0" && call.method==="PUT");
+  expect(updated?.body).toMatchObject({enteredById:"dev",amount:"0.5000",categoryId:"travel"});
+  await page.getByRole("combobox",{name:"Expense type"}).selectOption("SALARY");
+  await expect(records.getByRole("button",{name:"Edit expense"})).toHaveCount(0);
+  await expect(records.getByRole("link",{name:"View salary workflow"})).toBeVisible();
+});
+
+test("non-admin cannot edit Total Expense rows", async ({page}) => {
+  await workspace(page,"EMPLOYEE");
+  await page.goto("/app/finance/total-expenses?from=2026-10-22&to=2026-11-21&view=mine");
+  await expect(page.getByRole("button",{name:"Edit expense"})).toHaveCount(0);
+  await expect(page.getByRole("button",{name:"Edit",exact:true})).toHaveCount(0);
 });
