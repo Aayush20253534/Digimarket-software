@@ -60,8 +60,13 @@ const modes=["CASH","UPI","BANK_TRANSFER","CARD","OTHER"] as const;
 const SALARY_OPTION="__salary_workflow__";
 const isSalaryCategory=(name:string)=>/^salary$/i.test(name.trim());
 const isMetaAdsCategory=(category:{name:string;purpose?:string}|undefined)=>category?.purpose?category.purpose==="META_ADS":/^meta[\s_-]*(?:ads?|advertising|advertisements?)$/i.test(category?.name.trim()??"");
-function money(value:string){
-  const negative=value.startsWith("-"),raw=negative?value.slice(1):value;
+function money(value:string|number|null|undefined){
+  // API snapshots and historical rows can lack optional financial fields.
+  // An absent value must never crash the entire ledger or masquerade as ₹0.
+  if(value===null||value===undefined)return "Unavailable";
+  const text=String(value);
+  if(!/^-?\d+(?:\.\d{1,4})?$/.test(text))return "Unavailable";
+  const negative=text.startsWith("-"),raw=negative?text.slice(1):text;
   const [whole,fraction=""]=raw.split(".");
   const digits=fraction.padEnd(3,"0");
   const cents=BigInt(whole||"0")*100n+BigInt(digits.slice(0,2))+(digits.charCodeAt(2)>=53?1n:0n);

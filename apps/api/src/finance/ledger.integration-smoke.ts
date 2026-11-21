@@ -245,6 +245,12 @@ try {
   );
   await ledger.link(f, { source: "salary", id: salary.allocations[0].id, accountId: bank.id });
   const unmapped = await makeEntry("EXPENSE", expense.id, "10");
+  // New entries correctly default to the logged-in founder's clearing account.
+  // Model a pre-migration legacy record explicitly to verify that an admin
+  // can still recover missing account links without altering new-entry rules.
+  await db.financialTransaction.update({
+    where:{id:unmapped.id},data:{moneyAccountId:null}
+  });
   assert.equal((await ledger.review(f, period)).unassignedFinance, 1);
   await ledger.link(f, { source: "finance", id: unmapped.id, accountId: bank.id });
   let totals = await finance.totals(f, "all", period);

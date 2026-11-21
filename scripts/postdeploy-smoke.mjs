@@ -20,10 +20,14 @@ await check(api+"/api/v1/ready",(r,b)=>r.ok&&b?.data?.database==="ok","Live data
 await check(api+"/api/v1/me",r=>r.status===401,"Auth gate rejects anonymous access");
 await check(api+"/api/v1/notes",r=>r.status===401,"Notes route deployed and rejects anonymous access");
 await check(api+"/api/v1/finance/cycle-balance?view=mine&from=2026-11-22&to=2026-12-21",r=>r.status===401,"Backend cycle-balance route exists and requires authorization");
+await check(api+"/api/v1/finance/client-ad-spend/mine?from=2026-11-22&to=2026-12-21",r=>r.status===401,"Backend personal client ad spend exists and requires authorization");
+await check(api+"/api/v1/finance/internal-settlements/all?from=2026-11-22&to=2026-12-21",r=>r.status===401,"Backend all-founder settlement register exists and requires authorization");
 await check(api+"/api/v1/ops/health",r=>r.status===404,"Operational stats are private");
 await check(web+"/",(r,b)=>r.ok&&typeof b==="string"&&b.includes("AmplifyWorld Workspace"),
  "Website responds");
 await check(web+"/api/v1/me",r=>r.status===401,"Frontend BFF rejects anonymous requests");
 await check(web+"/api/v1/notes",r=>r.status===401,"Frontend Notes proxy matches backend deployment");
 await check(web+"/api/v1/finance/cycle-balance?view=mine&from=2026-11-22&to=2026-12-21",r=>r.status===401,"Frontend Finance balance proxy matches backend deployment");
+await check(web+"/api/v1/finance/client-ad-spend/mine?from=2026-11-22&to=2026-12-21",r=>r.status===401,"Frontend personal client ad proxy matches backend");
+await check(web+"/api/v1/finance/internal-settlements/all?from=2026-11-22&to=2026-12-21",r=>r.status===401,"Frontend all-founder settlements proxy matches backend");
 console.info("Production anonymous smoke passed. Authenticated journeys and worker state require protected operational checks.");

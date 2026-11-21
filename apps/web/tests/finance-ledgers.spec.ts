@@ -68,6 +68,8 @@ async function workspace(page: Page, role = "FOUNDER") {
         pendingExpense: "0",
         groups: [],
       };
+    else if (path === "/finance/cycle-balance")
+      data = { opening: "0.0000", movement: "74.0000", remaining: "74.0000" };
     else if (path === "/finance/expenses/mine" && req.method() === "POST") data = { status: "POSTED" };
     else if (path === "/finance/category-summary")
       data = {
@@ -191,10 +193,31 @@ async function workspace(page: Page, role = "FOUNDER") {
 const cycle = "from=2026-10-22&to=2026-11-21&view=all";
 test("category cards drill into paginated search and export the same filters", async ({ page }) => {
   const calls = await workspace(page);
+  const browserExceptions:string[]=[];
+  page.on("pageerror",error=>browserExceptions.push(error.stack??error.message));
+  page.on("console",message=>{
+    if(message.type()==="error")browserExceptions.push(message.text());
+  });
   await page.goto("/app/finance/expenses?" + cycle);
   await page.getByRole("link", { name: /Travel/ }).click();
   await expect(page).toHaveURL(new RegExp("categoryId=" + categoryId));
-  await expect(page.getByText("Page 1 of 2 · 26 records")).toBeVisible();
+  // Wait for the paginated data view, not merely a client-side URL transition.
+  // Expose actionable diagnostics if an API or rendering regression blocks it.
+  const pageSummary=page.getByRole("navigation",{name:"Finance pagination"})
+    .getByText("Page 1 of 2 · 26 records",{exact:true});
+  try {
+    await expect(pageSummary).toBeVisible({timeout:15000});
+  } catch (error) {
+    const body=(await page.locator("body").innerText().catch(() => "")).slice(-5000);
+    console.error("Finance category drilldown failed",JSON.stringify({
+      url:page.url(),
+      registerCalls:calls.filter(c=>c.path.includes("/finance/register"))
+        .map(c=>({path:c.path,query:c.query.toString()})),
+      pageContent:body,
+      browserExceptions:browserExceptions.slice(-15)
+    }));
+    throw error;
+  }
   await page.getByRole("button", { name: "Next page", exact: true }).click();
   await expect(
     page
@@ -277,6 +300,11 @@ test("employee direct access does not request agency money ledgers", async ({ pa
 
 test("founder adds an expense automatically attributed to signed-in user", async ({ page }) => {
   const calls = await workspace(page);
+  const browserExceptions:string[]=[];
+  page.on("pageerror",error=>browserExceptions.push(error.stack??error.message));
+  page.on("console",message=>{
+    if(message.type()==="error")browserExceptions.push(message.text());
+  });
   await page.goto("/app/finance/expenses?" + cycle);
   await page.getByRole("button", {name: "+ Add Expense"}).click();
   await expect(page.getByLabel("Entry type")).toBeDisabled();

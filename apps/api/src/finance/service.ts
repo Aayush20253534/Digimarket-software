@@ -474,6 +474,11 @@ export class FinanceService {
 
   async submit(actor:Principal,input:FinanceEntryInput,ownExpense=false){
     need(actor,"finance.entry.create");
+    // Direct expense flow must never create an unassigned pre-bookkeeping entry.
+    // Keep the normal finance creation path compatible with historical
+    // backfills (which may legitimately precede the configured start).
+    if(ownExpense&&input.occurredOn<AGENCY_START_DATE)
+      throw invalid("Direct expenses must be dated on or after the bookkeeping start (22 October 2026)");
     const founder=isFounder(actor);
     if(!founder)need(actor,"approvals.submit");
     if(ownExpense&&(input.kind!=="EXPENSE"||input.enteredById!=null||input.moneyAccountId!=null))
