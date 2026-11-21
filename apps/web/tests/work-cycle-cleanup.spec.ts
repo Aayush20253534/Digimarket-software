@@ -34,7 +34,11 @@ async function mockWorkspace(page:Page,role="FOUNDER"){
   else if(path==="/finance/cycle-balance")data={opening:"650",movement:"0",remaining:"650"};
   else if(path==="/finance/client-ad-spend/mine")data={
     from:url.searchParams.get("from"),to:url.searchParams.get("to"),
-    currency:"INR",posted:"8500.0000",entries:9
+    currency:"INR",posted:"8500.0000",entries:9,
+    byClient:[
+      {clientId:"c1",name:"Rouche Cafe",posted:"4192.0000",entries:6},
+      {clientId:"c2",name:"Other clients",posted:"4308.0000",entries:3}
+    ]
   };
   else if(path==="/finance/internal-settlements/all")data={
     postedTotal:"10719.0000",postedCount:2,voidedCount:0,total:2,page:1,limit:50,
@@ -136,6 +140,12 @@ test("Finance category cards show accurate posted, held and transferred amounts"
  await expect(nav.getByRole("link",{name:/^Meta Ads/})).toContainText("Posted Meta Ads spend · this cycle");
  await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("₹8,500.00");
  await expect(nav.getByRole("link",{name:/^Client ad funds/})).toContainText("Posted client ads paid from my account · this cycle");
+ await nav.getByRole("link",{name:/^Client ad funds/}).click();
+ await expect(page.getByText("Client advertising outflow from my account")).toBeVisible();
+ await expect(page.getByRole("region",{name:"My client ad spending by client"})).toContainText("Rouche Cafe");
+ await expect(page.getByRole("region",{name:"My client ad spending by client"})).toContainText("₹4,192.00");
+ await page.getByRole("link",{name:"← Finance overview"}).click();
+
  await expect(nav.getByRole("link",{name:/^Founder settlements/})).toContainText("₹2,000.00");
  await expect(nav.getByRole("link",{name:/^Founder settlements/})).toContainText("Received ₹2,234.00 · Sent ₹234.00");
  await expect(nav.getByRole("link",{name:/^Agreement projections/})).toContainText("₹5,000.00");
