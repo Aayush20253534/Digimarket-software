@@ -68,6 +68,8 @@ async function workspace(page: Page, role = "FOUNDER") {
         pendingExpense: "0",
         groups: [],
       };
+    else if (path === "/finance/cycle-balance")
+      data = { opening: "0.0000", movement: "74.0000", remaining: "74.0000" };
     else if (path === "/finance/expenses/mine" && req.method() === "POST") data = { status: "POSTED" };
     else if (path === "/finance/category-summary")
       data = {
