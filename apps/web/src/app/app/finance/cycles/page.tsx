@@ -5,6 +5,7 @@ import {AGENCY_START_DATE,agencyToday,businessCycle,cycleLabel} from "@digimarke
 import {useAuth} from "@/components/auth-provider";
 import {Card,Notice,Spinner} from "@/components/ui";
 import {FinanceFrame,FinancePager,money,useFinanceWindow} from "@/components/finance/shared";
+import {PreviousCycleNetPosted} from "@/components/finance/previous-cycle-carry";
 
 type Summary={postedIncome:string;postedExpense:string;postedSalaryExpense:string;postedExpenseIncludingSalary:string;postedNet:string;clientAdSpend?:{posted:string};pendingIncome:string;pendingExpense:string};
 type ExpenseSummary={postedTotalExpense:string;breakdown:{OTHER:string;SELF_ADS:string;CLIENT_ADS:string;SALARY:string}};
@@ -50,7 +51,7 @@ export default function FinanceCyclesPage(){
      className={"rounded-xl border p-4 text-left transition "+(selected?.from===c.from?"border-violet-400 bg-violet-500/10":"border-white/10 hover:border-violet-400/50")}
      onClick={()=>w.setPeriod({from:c.from,to:c.to})}>
      <span className="block text-sm font-semibold">{cycleLabel(c.key)}</span>
-     <span className="mt-1 block text-xs text-slate-400">{i===0?"Current cycle":"Previous cycle"} · {c.from} to {c.to}</span>
+     <span className="mt-1 block text-xs text-slate-400">{i===0?"Current cycle":"Historical cycle"} · {c.from} to {c.to}</span>
     </button>)}
    </div>
   </section>
@@ -58,6 +59,7 @@ export default function FinanceCyclesPage(){
   {loading&&!summary&&<Spinner label="Loading cycle records…"/>}
   <section aria-label="Cycle financial summary" className="space-y-3">
    <h2 className="text-lg font-semibold">{selected?cycleLabel(selected.key):w.period.from+" to "+w.period.to} · {w.view==="mine"?"My entries":"Company entries"}</h2>
+   <PreviousCycleNetPosted period={w.period} view={w.view} />
    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
     {([
      ["Opening balance (carried forward)",balance?.opening],
