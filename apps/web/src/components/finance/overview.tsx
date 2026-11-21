@@ -193,7 +193,7 @@ export function FinanceOverview() {
           },
         ]
       : []),
-    ...(founder
+    ...(founder || (all && w.view==="all")
       ? [
           {
             title: "Founder settlements",
@@ -213,14 +213,14 @@ export function FinanceOverview() {
                 :undefined,
             icon: Users,
           },
-          {
+          ...(founder?[{
             title: "Salaries",
             description: "Payroll, funding and payment history",
             href: "/app/salary",
             amount: totals?.postedSalaryExpense,
             metricLabel:"Paid / funded this cycle",
             icon: ReceiptText,
-          },
+          }]:[]),
         ]
       : []),
     ...(all
