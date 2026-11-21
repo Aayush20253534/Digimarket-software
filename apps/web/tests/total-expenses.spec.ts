@@ -172,7 +172,7 @@ test("Total expense includes every type and drives the negative operating-money 
   await page.getByRole("link", { name: "← Finance overview", exact: true }).click();
   const totalCard = cards.getByRole("link", { name: /^Total expense / });
   await expect(totalCard).toContainText("₹176.00");
-  await expect(page.getByLabel("Finance overview totals")).toContainText("Net operating money");
+  await expect(page.getByLabel("Finance overview totals")).toContainText("Operating net (before settlements)");
   await expect(page.getByLabel("Finance overview totals")).toContainText("−₹76.00");
   await expect(page.getByLabel("Finance overview totals")).not.toContainText("₹24.00");
   await totalCard.click();
