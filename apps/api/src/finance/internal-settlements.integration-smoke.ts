@@ -5,6 +5,7 @@ import {createDatabaseClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {InternalSettlementService} from "./internal-settlements";
 import {FinanceService} from "./service";
+import {TotalExpenseService} from "./total-expenses";
 import {founderLedgerBalances} from "./founder-balance";
 
 if(process.env.NODE_ENV!=="test"||!process.env.DATABASE_URL?.includes("digimarket_ci"))
@@ -111,6 +112,33 @@ try{
  assert.equal(recipientTotals.receivedInternalSettlement,"2000.0000");
  assert.equal(senderTotals.postedNet,"0.0000");
  assert.equal(recipientTotals.postedNet,"0.0000");
+ // The frontend always sends from/to. Both summaries must obey a settlement
+ // checkpoint while keeping historical expense rows available.
+ const activeWindow={from:"2026-01-01",to:new Date(Date.now()+86_400_000).toISOString().slice(0,10)};
+ const expenseReport=new TotalExpenseService(db);
+ for(const founder of [a,b]){
+  const scoped=await finance.totals(founder,"mine",activeWindow);
+  const combined=await expenseReport.summary(founder,{...activeWindow,view:"mine"});
+  assert.equal(scoped.postedIncome,"0.0000");
+  assert.equal(scoped.postedExpense,"0.0000");
+  assert.equal(scoped.postedSalaryExpense,"0.0000");
+  assert.equal(scoped.postedNet,"0.0000");
+  assert.equal(combined.postedIncome,"0.0000");
+  assert.equal(combined.postedTotalExpense,"0.0000");
+  assert.equal(combined.netOperatingMoney,"0.0000");
+  assert.ok(combined.personalSettlementResetAt);
+ }
+ // Historical work cycles ending before settlement keep their original balances.
+ const historyWindow={from:"2026-11-01",to:"2026-11-07"};
+ assert.equal((await finance.totals(a,"mine",historyWindow)).postedExpense,"4500.0000");
+ assert.equal((await expenseReport.summary(a,{...historyWindow,view:"mine"})).postedTotalExpense,"5300.0000");
+ const historyRows=await expenseReport.records(a,{
+  ...activeWindow,view:"mine",type:"ALL",q:"",page:1,limit:50
+ });
+ assert.ok(historyRows.total>0);
+ assert.ok(Number(historyRows.matchingAmount)>0);
+ assert.equal((await expenseReport.summary(a,{...activeWindow,view:"all"})).postedTotalExpense,
+   (await expenseReport.summary(a,{...historyWindow,view:"all"})).postedTotalExpense);
  const afterBalance=await founderLedgerBalances(db,organization.id,[a.userId,b.userId]);
  for(const id of [a.userId,b.userId]){
   assert.equal(afterBalance.get(id)?.remaining.toFixed(4),beforeBalance.get(id)?.remaining.toFixed(4));
