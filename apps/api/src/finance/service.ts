@@ -328,6 +328,7 @@ export class FinanceService {
       }
       if(input.moneyAccountId&&!await tx.moneyAccount.findFirst({where:{id:input.moneyAccountId,organizationId:actor.organizationId,active:true,openingOn:{lte:new Date(input.occurredOn+"T00:00:00Z")}}}))throw invalid("Choose an account open on this transaction date");
       await financeLock(tx,actor.organizationId);
+      await openPeriod(tx,actor.organizationId,entry.occurredOn.toISOString().slice(0,10));
       await openPeriod(tx,actor.organizationId,input.occurredOn);
       const updated=await tx.financialTransaction.update({where:{id},data:{
         ...(input.moneyAccountId!==undefined?{moneyAccountId:input.moneyAccountId}:{}),
