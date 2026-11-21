@@ -18,6 +18,7 @@ import { Card, Notice, Spinner } from "@/components/ui";
 import { FinanceFrame, money, useFinanceWindow } from "./shared";
 import type { TotalExpenseSummary } from "./total-expenses";
 import { FinanceSectionWorkspace } from "./section-workspace";
+type Balance = {opening:string;movement:string;remaining:string};
 type Totals = {
   postedIncome: string;
   postedExpense: string;
@@ -31,6 +32,7 @@ export function FinanceOverview() {
   const w = useFinanceWindow(),
     { session, request } = useAuth();
   const [totals, setTotals] = useState<Totals | null>(null),
+    [balance, setBalance] = useState<Balance | null>(null),
     [totalExpense, setTotalExpense] = useState<TotalExpenseSummary | null>(null),
     [error, setError] = useState("");
   const all = !!session?.identity.permissions.includes("finance.read.all"),
@@ -40,15 +42,18 @@ export function FinanceOverview() {
     let active = true;
     setTotals(null);
     setTotalExpense(null);
+    setBalance(null);
     setError("");
     void Promise.all([
       request<Totals>("/finance/summary?" + w.query),
       request<TotalExpenseSummary>("/finance/total-expenses/summary?" + w.query),
+      request<Balance>("/finance/cycle-balance?" + w.query),
     ])
-      .then(([r, expense]) => {
+      .then(([r, expense, balanceValue]) => {
         if (active) {
           setTotals(r);
           setTotalExpense(expense);
+          setBalance(balanceValue);
         }
       })
       .catch((e) => {
@@ -155,12 +160,11 @@ export function FinanceOverview() {
       }
     >
       {error && <Notice kind="error">{error}</Notice>}
-      {w.view === "mine" && totalExpense?.personalSettlementResetAt && (
-        <p className="text-sm text-slate-400" role="status">Your current personal summary starts after the most recent founder settlement. Previous expenses remain recorded, and agency totals are unchanged.</p>
-      )}
+      <p className="text-sm text-slate-400">Work cycles restart transaction totals on the 22nd. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {[
-          ["Net operating money", totalExpense?.netOperatingMoney],
+          ["Net operating money (this cycle)", totalExpense?.netOperatingMoney],
+          ["Net balance left (carried forward)", balance?.remaining],
           ["Pending income", totals?.pendingIncome],
           ["Pending expenses", totals?.pendingExpense],
         ].map(([label, value]) => (
