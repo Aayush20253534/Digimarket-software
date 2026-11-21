@@ -18,7 +18,8 @@ BEGIN
     CREATE TABLE IF NOT EXISTS client_delivery_archive_20261121."ServiceDeliverySchedule"
       AS SELECT * FROM public."ServiceDeliverySchedule";
     CREATE TABLE IF NOT EXISTS client_delivery_archive_20261121."ServiceDeliveryOccurrence"
-      AS SELECT * FROM public."ServiceDeliveryOccurrence";
+      AS SELECT id, "scheduleId", "scheduledOn", status::text AS status, "completedAt", "completedById", version
+         FROM public."ServiceDeliveryOccurrence";
     SELECT count(*) INTO n_schedules FROM public."ServiceDeliverySchedule";
     SELECT count(*) INTO n_occurrences FROM public."ServiceDeliveryOccurrence";
     IF (SELECT count(*) FROM client_delivery_archive_20261121."ServiceDeliverySchedule") <> n_schedules OR
