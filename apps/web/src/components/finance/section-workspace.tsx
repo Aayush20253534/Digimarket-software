@@ -62,7 +62,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const windowState=useFinanceWindow();
   const {period,setPeriod,view,setView,ready}=windowState;
   const [page,setPage]=useState(1),[total,setTotal]=useState(0),[categoryFilter,setCategoryFilter]=useState("");
-  const [accounts,setAccounts]=useState<{id:string;name:string}[]>([]),[moneyAccountId,setMoneyAccountId]=useState("");
+  const [accounts,setAccounts]=useState<{id:string;name:string;ownerUserId?:string|null}[]>([]),[moneyAccountId,setMoneyAccountId]=useState("");
   const [categoryPurpose,setCategoryPurpose]=useState<"GENERAL"|"META_ADS">("GENERAL");
   const forms=section==="entries"||section==="ads";
   const {session,request}=useAuth();
@@ -76,7 +76,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [editedCategoryName,setEditedCategoryName]=useState("");
   const [editingEntry,setEditingEntry]=useState<Entry|null>(null);
   const [entryEdit,setEntryEdit]=useState({categoryId:"",amount:"",occurredOn:"",method:"UPI",
-    merchantOrSource:"",description:"",enteredById:"",clientId:null as string|null});
+    merchantOrSource:"",description:"",enteredById:"",clientId:null as string|null,moneyAccountId:null as string|null});
   const [editAdFunding,setEditAdFunding]=useState<"SELF"|"CLIENT">("SELF");
   const [assignees,setAssignees]=useState<Assignee[]>([]);
   const [assigneesError,setAssigneesError]=useState("");
@@ -135,6 +135,11 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [categoryName,setCategoryName]=useState("");
   useEffect(()=>{setCategoryName("");setEditingCategory(null);setCategoryPurpose("GENERAL");setError("");setSuccess("");},[categoryKind]);
   const selected=useMemo(()=>categories.filter(c=>c.active&&c.kind===kind&&c.purpose!=="SALARY"&&!isSalaryCategory(c.name)&&(section!=="ads"||isMetaAdsCategory(c))),[categories,kind,section]);
+  useEffect(()=>{
+    if(moneyAccountId||!session?.identity.userId)return;
+    const personal=accounts.find(a=>a.ownerUserId===session.identity.userId);
+    if(personal)setMoneyAccountId(personal.id);
+  },[accounts,moneyAccountId,session?.identity.userId]);
   const salarySelected=kind==="EXPENSE"&&categoryId===SALARY_OPTION;
   const metaAdsSelected=kind==="EXPENSE"&&isMetaAdsCategory(categories.find(c=>c.id===categoryId));
   const filteredMetaAdEntries=metaAdEntries;
@@ -176,7 +181,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       forms||section==="categories"?request<Category[]>("/finance/categories"):Promise.resolve([] as Category[]),
       forms&&canCreate?request<FinancePolicy[]>("/approval-policies"):Promise.resolve([] as FinancePolicy[]),
       section==="settlements"&&isFounder&&canReadOwn?request<Entry[]>("/finance/internal-settlements/mine?"+periodQuery):Promise.resolve([] as Entry[]),
-      forms&&canCreate&&!directExpense?request<{id:string;name:string}[]>("/finance/account-options"):Promise.resolve([] as {id:string;name:string}[]),
+      forms&&canCreate&&!directExpense?request<{id:string;name:string;ownerUserId?:string|null}[]>("/finance/account-options"):Promise.resolve([] as {id:string;name:string;ownerUserId?:string|null}[]),
     ]);
     if(sequence!==reloadSequence.current)return;
     if(ledger.status==="fulfilled"){setEntries(section==="entries"?ledger.value.items:[]);setMetaAdEntries(section==="ads"?ledger.value.items:[]);setTotal(ledger.value.total);setHasLoadedEntries(true);}
@@ -374,7 +379,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     setEntryEdit({categoryId:row.category.id,
       amount:row.amount,occurredOn:row.occurredOn,method:row.method,
       merchantOrSource:row.merchantOrSource??"",description:row.description??"",
-      enteredById:row.enteredById,clientId:row.clientId});
+      enteredById:row.enteredById,clientId:row.clientId,moneyAccountId:row.moneyAccount?.id??null});
   }
   async function saveEntry(e:FormEvent){
     e.preventDefault();if(!editingEntry)return;
@@ -946,7 +951,27 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       {loading&&!hasLoadedEntries?<Spinner label="Loading financial entries…"/>:
         !entries.length&&!error?<EmptyState title="No entries yet" description="Submitted income and expense records appear here after entry."/>:
         !entries.length?<Notice kind="error">The financial register could not be loaded. Saved entries have not been deleted. Retry Refresh.</Notice>:
-        <div className="aw-finance-register-scroll" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
+        <div className="space-y-3 md:hidden" role="region" aria-label="Financial entries mobile view">
+          {filteredEntries.map(row=><article key={row.id} className="rounded-xl border border-white/10 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <strong>{money(row.amount)}</strong>
+              <span className={"aw-finance-status status-"+row.status.toLowerCase()}>{row.status}</span>
+            </div>
+            <p className="text-sm">{row.occurredOn} · {row.kind} · {row.category.name}</p>
+            <p className="text-sm">By: {row.enteredBy.displayName}</p>
+            {row.submittedBy&&row.submittedBy.displayName!==row.enteredBy.displayName&&
+              <p className="text-xs">Submitted by: {row.submittedBy.displayName}</p>}
+            <p className="text-sm">Money account: {row.moneyAccount?.name??"Unassigned"}</p>
+            {row.description&&<p className="text-sm break-words">{row.description}</p>}
+            {adminFinance&&row.sourceType==="FINANCE"&&row.status!=="CANCELLED"&&!row.reversesId&&!row.reversedBy&&
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>beginEntryEdit(row)}>Edit fields</button>
+                <button type="button" className="btn-secondary text-xs" disabled={busy} onClick={()=>void deleteEntry(row)}>Delete</button>
+              </div>}
+            {row.receiptAssetId&&<button type="button" className="btn-secondary text-xs" onClick={()=>void showReceipt(row.id)}>Proof</button>}
+          </article>)}
+        </div>
+        <div className="aw-finance-register-scroll hidden md:block" role="region" aria-label="Financial register" tabIndex={0}><table className="aw-finance-register">
           <thead><tr className="border-b text-xs uppercase text-slate-500">
             {(adminFinance||isFounder)&&<th className="pb-3 pr-4">Actions</th>}
             {["Date","Type","Category","Source","Notes","Amount","Status","Assigned to","Money account","Receipt","Approval"].map(x=><th key={x} className="pb-3 pr-4">{x}</th>)}
@@ -1053,6 +1078,13 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
               {!assignees.some(user=>user.id===editingEntry.enteredById)&&
                 <option value={editingEntry.enteredById}>{editingEntry.enteredBy.displayName} (current)</option>}
               {assignees.map(user=><option key={user.id} value={user.id}>{user.displayName} ({user.loginId})</option>)}
+            </select>
+          </FormField>
+          <FormField id="admin-money-account" label="Money account">
+            <select id="admin-money-account" className="field" value={entryEdit.moneyAccountId??""}
+              onChange={e=>setEntryEdit(v=>({...v,moneyAccountId:e.target.value||null}))}>
+              <option value="">Unassigned (requires review)</option>
+              {accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </FormField>
           <FormField id="admin-expense-amount" label="Amount (INR)"><input id="admin-expense-amount" className="field" inputMode="decimal" required
