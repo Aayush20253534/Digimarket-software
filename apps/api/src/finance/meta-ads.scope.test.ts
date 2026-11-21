@@ -59,12 +59,18 @@ describe("Meta Ads register scopes", () => {
     expect(where).not.toHaveProperty("clientId");
   });
 
-  it("counts only posted client Meta Ads paid by my money-account owner, not by the recorder",async()=>{
-    const {service,aggregateTransactions,categoryId}=fixture();
+  it("counts client Meta Ads from my money-account ownership, not the recorder",async()=>{
+    const {service,groupTransactions,categoryId}=fixture();
+    groupTransactions.mockResolvedValueOnce([{
+      clientId:"00000000-0000-4000-8000-000000000009",
+      _sum:{amount:new Prisma.Decimal("8500.0000")},_count:{_all:9}
+    }]);
     const result=await service.clientAdAccountSpend(actor,{from:"2026-10-22",to:"2026-11-21"});
     expect(result).toEqual({from:"2026-10-22",to:"2026-11-21",currency:"INR",
-      posted:"8500.0000",entries:9});
-    const where=aggregateTransactions.mock.calls[0][0].where;
+      posted:"8500.0000",entries:9,
+      byClient:[{clientId:"00000000-0000-4000-8000-000000000009",
+        name:"Archived client",posted:"8500.0000",entries:9}]});
+    const where=groupTransactions.mock.calls[0][0].where;
     expect(where).toMatchObject({
       organizationId:actor.organizationId,kind:"EXPENSE",status:"POSTED",
       clientId:{not:null},categoryId:{in:[categoryId.meta,categoryId.ads]},
