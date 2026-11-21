@@ -16,6 +16,7 @@ export type TotalExpenseSummary = {
   postedIncome: string;
   postedTotalExpense: string;
   netOperatingMoney: string;
+  personalSettlementResetAt?: string;
   breakdown: Record<ExpenseType, string>;
 };
 type Records = {
@@ -196,6 +197,9 @@ export function TotalExpenses() {
     >
       {error && <Notice kind="error">{error}</Notice>}
       {notice && <Notice kind="success">{notice}</Notice>}
+      {w.view === "mine" && data?.summary.personalSettlementResetAt && (
+        <p className="text-sm text-slate-400" role="status">My summary restarted with your latest founder settlement. Older entries remain in the register; agency totals are unchanged.</p>
+      )}
       <div className="grid gap-3 sm:grid-cols-3" aria-label="Total expense summary">
         {(
           [
