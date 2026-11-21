@@ -63,7 +63,8 @@ export function TotalExpenses() {
   const [editSaving, setEditSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [refresh, setRefresh] = useState(0);
-  const canEdit = !!session?.identity.roles.some(r => r === "ADMIN" || r === "SUPER_ADMIN")
+  const canEdit = !!session
+    && session.identity.roles.some(r => r === "ADMIN" || r === "SUPER_ADMIN")
     && session.identity.permissions.includes("finance.category.manage")
     && session.identity.permissions.includes("finance.read.all");
   const query =
@@ -339,6 +340,7 @@ export function TotalExpenses() {
               Reassigning changes the selected user's totals, without changing agency totals.
               The original submitter stays recorded in audit history.
             </p>
+            {error && <p role="alert" className="mb-3 text-sm text-red-300">{error}</p>}
             <form onSubmit={e => void saveEdit(e)} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block text-sm">Assigned user
                 <select className="field mt-1 w-full" required value={editing.enteredById}
