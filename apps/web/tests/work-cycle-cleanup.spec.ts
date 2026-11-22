@@ -58,7 +58,8 @@ async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
     {amount:"234.0000",status:"POSTED",settlementDirection:"OUTGOING"},
     {amount:"500.0000",status:"CANCELLED",settlementDirection:"INCOMING"}
   ];
-  else if(path==="/finance/category-summary")data={ordinary:"0",total:"0",items:[]};
+  else if(path==="/finance/category-summary")data={ordinary:"200",total:"200",items:[{id:"cat1",name:url.searchParams.get("kind")==="INCOME"?"Service fees":"Travel",posted:"200",pending:"0",count:2,active:true}]};
+  else if(path==="/finance/total-expenses")data={items:[],total:0,page:1,limit:25,summary:{postedIncome:"1000",postedTotalExpense:"350",netOperatingMoney:"650",breakdown:{OTHER:"200",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}}};
   else if(path==="/finance/total-expenses/summary")data={postedIncome:"1000",postedTotalExpense:"350",netOperatingMoney:"650",breakdown:{OTHER:"200",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}};
   else if(path==="/salary/summary")data={totalPaid:"50",founderFunding:[]};
   else if(path==="/finance/meta-ads-distribution")data={view:"mine",from:url.searchParams.get("from"),to:url.searchParams.get("to"),totalPosted:"100",totalPending:"0",total:"100",excludedAmount:"0",excludedCount:0,transactionCount:1,selfPosted:"0",selfPending:"0",clientPosted:"100",clientPending:"0",categories:[],individuals:[],daily:[],monthly:[]};
@@ -199,4 +200,20 @@ test("Tasks are hidden and preserved routes display the pause notice",async({pag
  expect(requests.some(row=>row.path.startsWith("/tasks"))).toBe(false);
  await page.goto("/app/task-history");
  await expect(page.getByRole("heading",{name:"Tasks are paused"})).toBeVisible();
+});
+
+test("closed cycle dashboard exposes category drilldowns and preserves selected dates",async({page})=>{
+ const {requests}=await mockWorkspace(page,"FOUNDER",true);
+ await page.goto("/app/finance/cycles?from=2026-10-22&to=2026-11-21&view=all");
+ const nav=page.getByRole("navigation",{name:"Cycle finance categories"});
+ await expect(nav.getByRole("link",{name:/^Meta Ads/})).toContainText("₹100.00");
+ await expect(nav.getByRole("link",{name:/^Salaries/})).toContainText("₹50.00");
+ const categories=page.getByRole("region",{name:"Cycle category breakdown"});
+ await expect(categories.getByRole("link",{name:/^Travel/})).toContainText("₹200.00");
+ await expect(categories.getByRole("link",{name:/^Service fees/})).toHaveAttribute("href",/from=2026-10-22.*to=2026-11-21.*kind=INCOME/);
+ await categories.getByRole("link",{name:/^Travel/}).click();
+ await expect(page).toHaveURL(/finance\/entries/);
+ await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
+ await expect(page.getByLabel("Work cycle through")).toHaveValue("2026-11-21");
+ await expect.poll(()=>requests.some(x=>x.path==="/finance/register"&&x.from==="2026-10-22"&&x.to==="2026-11-21")).toBe(true);
 });

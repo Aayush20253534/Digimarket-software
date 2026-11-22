@@ -47,6 +47,10 @@ export function TotalExpenses() {
     [error, setError] = useState("");
   const [page, setPage] = useState(1),
     [type, setType] = useState<"ALL" | ExpenseType>("ALL");
+  useEffect(()=>{
+    const value=new URLSearchParams(window.location.search).get("type");
+    if(value&&Object.prototype.hasOwnProperty.call(expenseTypes,value))setType(value as ExpenseType);
+  },[]);
   const [search, setSearch] = useState(""),
     [exporting, setExporting] = useState(false);
   const [editing, setEditing] = useState<EditableExpense | null>(null);

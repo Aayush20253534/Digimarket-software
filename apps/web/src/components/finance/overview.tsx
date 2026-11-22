@@ -41,9 +41,20 @@ type Totals = {
   pendingIncome: string;
   pendingExpense: string;
 };
-export function FinanceOverview() {
-  const w = useFinanceWindow(),
-    { session, request } = useAuth();
+export function FinanceOverview(){
+  const w=useFinanceWindow();
+  return <FinanceFrame overview title="Finance" description="Choose a card to open its records. All figures follow the selected work cycle." window={w}
+    actions={<Link href={"/app/finance/entries?"+w.query} className="btn-primary">New entry / register</Link>}>
+    <FinanceOverviewContent w={w}/>
+  </FinanceFrame>;
+}
+
+// The same cards, server totals and destinations power the main dashboard
+// and historical cycle inspection. A single parent owns the selected dates.
+export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
+  w:ReturnType<typeof useFinanceWindow>;refresh?:number;cycleDetails?:boolean;
+}){
+  const {session,request}=useAuth();
   const [totals, setTotals] = useState<Totals | null>(null),
     [balance, setBalance] = useState<Balance | null>(null),
     [totalExpense, setTotalExpense] = useState<TotalExpenseSummary | null>(null),
@@ -82,7 +93,7 @@ export function FinanceOverview() {
     return () => {
       active = false;
     };
-  }, [w.ready, w.query, session, request,all,w.view]);
+  }, [w.ready, w.query, session, request,all,w.view,refresh]);
   useEffect(()=>{
     if(!w.ready||!session)return;
     let active=true;
@@ -123,7 +134,7 @@ export function FinanceOverview() {
         .catch(()=>{if(active)setSettlements(null)});
     }
     return()=>{active=false};
-  },[w.ready,w.query,w.view,w.period,session,request,all,founder]);
+  },[w.ready,w.query,w.view,w.period,session,request,all,founder,refresh]);
   const cards:FinanceCard[] = [
     {
       title: "Income",
@@ -196,7 +207,7 @@ export function FinanceOverview() {
                 :undefined,
             icon: Users,
           },
-          ...(founder?[{
+          ...(!cycleDetails&&founder?[{
             title: "Salaries",
             description: "Payroll, funding and payment history",
             href: "/app/salary",
@@ -206,7 +217,12 @@ export function FinanceOverview() {
           }]:[]),
         ]
       : []),
-    ...(all
+    ...(cycleDetails?[{
+      title:"Salaries",description:"Salary expenses funded or paid in the selected cycle",
+      href:"/app/finance/total-expenses?type=SALARY",
+      amount:totalExpense?.breakdown.SALARY,metricLabel:"Paid / funded this cycle",icon:ReceiptText,
+    }]:[]),
+    ...(all&&!cycleDetails
       ? [
           {
             title: "Agreement projections",
@@ -224,7 +240,7 @@ export function FinanceOverview() {
           },
         ]
       : []),
-    {
+    ...(!cycleDetails? [{
       title: "Cycles",
       description: "Previous cycle income, expenses, salaries and settlement history",
       href: "/app/finance/cycles",
@@ -235,23 +251,13 @@ export function FinanceOverview() {
       description: "Manage stable income and expense categories",
       href: "/app/finance/categories",
       icon: Tags,
-    },
+    }]:[]),
   ];
   return (
-    <FinanceFrame
-      overview
-      title="Finance"
-      description="Choose a card to open its records. All figures follow the selected work cycle."
-      window={w}
-      actions={
-        <Link href={"/app/finance/entries?" + w.query} className="btn-primary">
-          New entry / register
-        </Link>
-      }
-    >
+    <>
       {error && <Notice kind="error">{error}</Notice>}
-      <p className="text-sm text-slate-400">Work cycles restart transaction totals only after a manual close. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>
-      <div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
+      {!cycleDetails&&<p className="text-sm text-slate-400">Work cycles restart transaction totals only after a manual close. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>}
+      {!cycleDetails&&<div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {w.view==="mine"&&founder&&<PersonalNetAfterSettlements period={w.period}/>}
         {[
           [w.view==="mine"?"Operating net (before settlements)":"Net operating money", totalExpense?.netOperatingMoney],
@@ -268,12 +274,12 @@ export function FinanceOverview() {
             </strong>
           </Card>
         ))}
-      </div>
-      <nav className="grid grid-cols-2 gap-4 xl:grid-cols-3" aria-label="Finance categories">
+      </div>}
+      <nav className="grid grid-cols-2 gap-4 xl:grid-cols-3" aria-label={cycleDetails?"Cycle finance categories":"Finance categories"}>
         {cards.map(({ title, description, href, amount, metricLabel, metricDetail, icon: Icon }) => (
           <Link
             key={title}
-            href={href + "?" + w.query}
+            href={href + (href.includes("?")?"&":"?") + w.query + (cycleDetails?"&cycle=1":"")}
             className="group min-w-0 rounded-2xl border border-white/10 bg-white/[.025] p-5 transition hover:border-violet-400/60 hover:bg-violet-500/5 focus-visible:outline-2 focus-visible:outline-violet-400"
           >
             <div className="flex items-center justify-between">
@@ -297,7 +303,7 @@ export function FinanceOverview() {
         self and client Meta Ads, and salaries counted once. Transfers and client fund deposits are
         separate.
       </p>
-    </FinanceFrame>
+    </>
   );
 }
 export function FinanceCategorySummary({ kind }: { kind: "INCOME" | "EXPENSE" }) {

@@ -27,10 +27,12 @@ export function useFinanceWindow() {
   const [period, setPeriod] = useState<ReportingPeriod>(() => reportingPreset("current"));
   const [view, setView] = useState<"mine" | "all">("mine");
   const [ready, setReady] = useState(false);
+  const [cycleContext,setCycleContext]=useState(false);
   useEffect(() => {
     if (!session) return;
     let active = true;
     const q = new URLSearchParams(window.location.search);
+    setCycleContext(q.get("cycle")==="1");
     const from = q.get("from"),
       to = q.get("to");
     if (
@@ -64,7 +66,7 @@ export function useFinanceWindow() {
     } });
     return () => { active = false; };
   }, [session, request]);
-  const query = new URLSearchParams({ ...period, view }).toString();
+  const query = new URLSearchParams({ ...period, view, ...(cycleContext?{cycle:"1"}:{}) }).toString();
   useEffect(() => {
     if (!ready) return;
     const q = new URLSearchParams(window.location.search);
@@ -73,7 +75,7 @@ export function useFinanceWindow() {
     q.set("view", view);
     window.history.replaceState(null, "", window.location.pathname + "?" + q.toString());
   }, [ready, period, view]);
-  return { period, setPeriod, view, setView, query, ready, cycleState, cycleError };
+  return { period, setPeriod, view, setView, query, ready, cycleState, cycleError, cycleContext };
 }
 export function FinanceFrame({
   title,
@@ -104,10 +106,10 @@ export function FinanceFrame({
     <div className="aw-finance-page space-y-6" data-aw-module="finance">
       {!overview && (
         <Link
-          href={"/app/finance?" + w.query}
+          href={(w.cycleContext?"/app/finance/cycles?":"/app/finance?") + w.query}
           className="inline-flex text-sm text-violet-300 hover:underline"
         >
-          ← Finance overview
+          {w.cycleContext?"← Cycle finance dashboard":"← Finance overview"}
         </Link>
       )}
       <PageHeader eyebrow="Finance" title={title} description={description} actions={actions} />

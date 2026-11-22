@@ -8,6 +8,7 @@ import {FinanceFrame,FinancePager,money,useFinanceWindow} from "@/components/fin
 import {PreviousCycleNetPosted} from "@/components/finance/previous-cycle-carry";
 import {PersonalNetAfterSettlements} from "@/components/finance/personal-net-after-settlements";
 import {ExpenseEditDialog,type EditableExpense,type EditOptions} from "@/components/finance/expense-edit-dialog";
+import {FinanceOverviewContent} from "@/components/finance/overview";
 
 type Summary={postedIncome:string;postedExpense:string;postedSalaryExpense:string;postedExpenseIncludingSalary:string;postedNet:string;clientAdSpend?:{posted:string};pendingIncome:string;pendingExpense:string};
 type ExpenseSummary={postedTotalExpense:string;breakdown:{OTHER:string;SELF_ADS:string;CLIENT_ADS:string;SALARY:string}};
@@ -15,6 +16,7 @@ type Balance={opening:string;movement:string;remaining:string};
 type FinanceRow={id:string;occurredOn:string;kind:string;status:string;amount:string;reversesId?:string|null;reversedBy?:string|null;category:{name:string};description:string|null;merchantOrSource:string|null;enteredBy?:{displayName:string}};
 type ExpensesRow={id:string;date:string;type:string;category:string;person:string;client:string;description:string;amount:string;reversal:boolean};
 type Register<T>={items:T[];total:number;page:number;limit:number};
+type CategoryTotals={ordinary:string;items:{id:string;name:string;posted:string;pending:string;count:number;active:boolean}[]};
 type Settlement={id:string;occurredOn:string;status:string;settlementDirection:"OUTGOING"|"INCOMING";amount:string;merchantOrSource:string;description:string};
 
 
@@ -29,6 +31,8 @@ export default function FinanceCyclesPage(){
  const canEdit=!!session&&session.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN")
   &&session.identity.permissions.includes("finance.category.manage")&&session.identity.permissions.includes("finance.read.all");
  const [refresh,setRefresh]=useState(0),[notice,setNotice]=useState("");
+ const [categoryTotals,setCategoryTotals]=useState<{income:CategoryTotals|null;expense:CategoryTotals|null}>({income:null,expense:null});
+ const [categoryError,setCategoryError]=useState("");
  const [editing,setEditing]=useState<EditableExpense|null>(null),[editOptions,setEditOptions]=useState<EditOptions|null>(null);
  const [editLoading,setEditLoading]=useState<string|null>(null),[editSaving,setEditSaving]=useState(false),[editError,setEditError]=useState("");
  const cycleForDate=(date:string)=>w.cycleState&&[w.cycleState.current,...w.cycleState.history].find(c=>date.slice(0,10)>=c.from&&date.slice(0,10)<=c.to);
@@ -99,6 +103,16 @@ export default function FinanceCyclesPage(){
    .finally(()=>{if(active)setLoading(false);});
   return()=>{active=false};
  },[w.ready,w.query,w.view,w.period.from,w.period.to,session,request,page,expensePage,founder,refresh]);
+ useEffect(()=>{
+  if(!w.ready||!session)return;
+  let active=true;setCategoryTotals({income:null,expense:null});setCategoryError("");
+  void Promise.all([
+   request<CategoryTotals>("/finance/category-summary?"+w.query+"&kind=INCOME"),
+   request<CategoryTotals>("/finance/category-summary?"+w.query+"&kind=EXPENSE")
+  ]).then(([income,expense])=>{if(active)setCategoryTotals({income,expense});})
+   .catch(e=>{if(active)setCategoryError(e instanceof Error?e.message:"Unable to load category totals.");});
+  return()=>{active=false};
+ },[w.ready,w.query,session,request,refresh]);
  return <FinanceFrame title="Cycles" window={w}
   description="Current open and manually closed agency work cycles. Each cycle keeps its full financial history, while the remaining bookkeeping balance carries forward.">
   <section aria-label="Choose a financial cycle" className="space-y-3">
@@ -143,9 +157,39 @@ export default function FinanceCyclesPage(){
     {Object.entries(expenseSummary.breakdown).map(([name,value])=><div key={name}><p className="text-sm text-slate-400">{name.replaceAll("_"," ")}</p><strong>{money(value)}</strong></div>)}
    </div></Card>}
   </section>
+  <section className="space-y-3" aria-label="Cycle finance dashboard">
+   <div className="flex flex-wrap items-center justify-between gap-3">
+    <div><h2 className="text-lg font-semibold">Finance dashboard for this cycle</h2>
+     <p className="text-sm text-slate-400">{w.period.from} to {w.period.to} · {w.view==="mine"?"My entries":"Agency totals"}. Open any card to inspect its records, search and export.</p></div>
+   </div>
+   <FinanceOverviewContent w={w} refresh={refresh} cycleDetails/>
+  </section>
+  <section aria-label="Cycle category breakdown" className="space-y-4">
+   <h2 className="text-lg font-semibold">Category-wise breakdown</h2>
+   <p className="text-sm text-slate-400">Income and operating expense categories for the selected cycle. Client ad expenditure and salaries are shown separately above, so they are not counted twice.</p>
+   {categoryError&&<Notice kind="error">{categoryError}</Notice>}
+   <div className="grid gap-4 lg:grid-cols-2">
+    {(["INCOME","EXPENSE"] as const).map(kind=>{
+     const data=kind==="INCOME"?categoryTotals.income:categoryTotals.expense;
+     const items=data?.items??[];
+     return <Card key={kind} title={kind==="INCOME"?"Income by category":"Operating expenses by category"}>
+      <p className="text-xl font-semibold">{data?.ordinary===undefined?"…":money(data.ordinary)}</p>
+      <div className="mt-3 space-y-2">
+       {items.map(c=><Link key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 p-3 hover:border-violet-400"
+         href={"/app/finance/entries?"+w.query+"&cycle=1&kind="+kind+"&categoryId="+encodeURIComponent(c.id)}>
+        <span className="min-w-0"><span className="block font-medium break-words">{c.name}{!c.active?" · archived":""}</span>
+         <span className="block text-xs text-slate-400">{c.count} posted entries · Pending {money(c.pending)}</span></span>
+        <strong className="shrink-0">{money(c.posted)}</strong>
+       </Link>)}
+       {!items.length&&<p className="text-sm text-slate-400">{data?"No categories or entries in this cycle.":categoryError?"Unavailable":"Loading categories…"}</p>}
+      </div>
+     </Card>;
+    })}
+   </div>
+  </section>
   <section className="space-y-3" aria-label="Cycle income and expense transactions">
    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">Income and expense register</h2>
-    <Link className="btn-secondary" href={"/app/finance/entries?"+w.query}>Open register and exports</Link></div>
+    <Link className="btn-secondary" href={"/app/finance/entries?"+w.query+"&cycle=1"}>Open register and exports</Link></div>
    <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr>
     {["Date","Type","Status","Category","Assigned to","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{register?.items.map(x=><tr key={x.id}><td>{x.occurredOn.slice(0,10)}</td><td>{x.kind}</td><td>{x.status}</td>
@@ -157,18 +201,18 @@ export default function FinanceCyclesPage(){
   </section>
   <section className="space-y-3" aria-label="Cycle expense details">
    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">All expenses, salaries and client ads</h2>
-    <Link className="btn-secondary" href={"/app/finance/total-expenses?"+w.query}>Detailed expense report and CSV</Link></div>
+    <Link className="btn-secondary" href={"/app/finance/total-expenses?"+w.query+"&cycle=1"}>Detailed expense report and CSV</Link></div>
    <div className="overflow-x-auto"><table className="aw-finance-register"><thead><tr>
     {["Date","Type","Category","Person","Client","Amount","Description",...(canEdit?["Actions"]:[])].map(x=><th key={x}>{x}</th>)}</tr></thead>
     <tbody>{expenses?.items.map(x=><tr key={x.id}><td>{x.date.slice(0,10)}</td><td>{x.type}</td><td>{x.category}</td>
-     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td>{canEdit&&<td>{x.id.startsWith("finance:")&&!x.reversal&&isEditableDate(x.date)?expenseActions(x.id.slice("finance:".length),x.date,x.amount):x.type==="SALARY"?<Link href="/app/salary" className="text-violet-300 underline">View salary</Link>:"—"}</td>}</tr>)}</tbody>
+     <td>{x.person}</td><td>{x.client}</td><td>{money(x.amount)}</td><td>{x.description}</td>{canEdit&&<td>{x.id.startsWith("finance:")&&!x.reversal&&isEditableDate(x.date)?expenseActions(x.id.slice("finance:".length),x.date,x.amount):x.type==="SALARY"?<Link href={"/app/finance/total-expenses?type=SALARY&"+w.query+"&cycle=1"} className="text-violet-300 underline">View salary</Link>:"—"}</td>}</tr>)}</tbody>
    </table></div>
    {!expenses?.total&&!loading&&<p className="text-sm text-slate-400">No recorded expenses for this cycle.</p>}
    {expenses&&<FinancePager page={expensePage} total={expenses.total} limit={25} onChange={setExpensePage}/>}
   </section>
   {founder&&w.view==="mine"&&<section className="space-y-3" aria-label="Internal settlements in this cycle">
    <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold">Internal settlements</h2>
-    <Link className="btn-secondary" href={"/app/finance/settlements?"+w.query}>Settlement history</Link></div>
+    <Link className="btn-secondary" href={"/app/finance/settlements?"+w.query+"&cycle=1"}>Settlement history</Link></div>
    {settlements.map(s=><div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 p-3" key={s.id}>
     <div><p>{s.settlementDirection==="OUTGOING"?"Sent to ":"Received from "}{s.merchantOrSource}</p>
     <p className="text-xs text-slate-400">{s.occurredOn} · {s.status} · {s.description}</p></div>
