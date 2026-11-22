@@ -48,16 +48,8 @@ export class TasksService {
       if(unique.some(id=>!members.has(id)))throw invalid("Assign only existing project members");
     }
   }
-  private async ensureService(a:Principal,serviceId:string|null|undefined,projectId:string|null|undefined){
-    if(!serviceId)return;
-    const service=await this.db.clientService.findFirst({where:{
-      id:serviceId,status:"ACTIVE",client:{organizationId:a.organizationId,status:"ACTIVE"}
-    },select:{clientId:true}});
-    if(!service)throw invalid("Choose an active service belonging to this agency");
-    if(projectId){
-      const project=await this.db.project.findFirst({where:{id:projectId,organizationId:a.organizationId},select:{clientId:true}});
-      if(!project||project.clientId!==service.clientId)throw invalid("Project and service must belong to the same client");
-    }
+  private ensureService(serviceId:string|null|undefined){
+    if(serviceId)throw invalid("Client services have been retired. Assign work to a project instead.");
   }
   async list(a:Principal,input:TaskListInput){
     need(a,"tasks.read");
@@ -126,7 +118,7 @@ export class TasksService {
   async create(a:Principal,input:TaskCreateInput){
     requireTaskManager(a);need(a,"tasks.create");need(a,"tasks.read");
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
-    await this.ensureService(a,input.serviceId,input.projectId);
+    this.ensureService(input.serviceId);
     if(!input.dueAt||!Number.isFinite(Date.parse(input.dueAt))||Date.parse(input.dueAt)<=Date.now())
       throw invalid("A future expiry date and time are required for every assigned task");
     const task=await this.db.$transaction(async tx=>{
@@ -188,7 +180,7 @@ export class TasksService {
     requireTaskManager(a);need(a,"tasks.manage");need(a,"tasks.read");
     const existing=await this.allowed(a,id);
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
-    await this.ensureService(a,input.serviceId===undefined?existing.serviceId:input.serviceId,input.projectId);
+    this.ensureService(input.serviceId);
     const nextDueAt=new Date(input.dueAt);
     if(!Number.isFinite(nextDueAt.getTime()))throw invalid("Task expiry date and time is invalid");
     // Determine added/removed assignees only after the version-guarded update,
@@ -325,7 +317,7 @@ export class TasksService {
   async createRecurrence(a:Principal,input:TaskRecurrenceCreateInput){
     requireTaskManager(a);need(a,"tasks.recurrence.manage");need(a,"tasks.read");
     await this.ensureAssignment(a,input.projectId,input.assigneeIds);
-    await this.ensureService(a,input.serviceId,input.projectId);
+    this.ensureService(input.serviceId);
     try{new Intl.DateTimeFormat("en-US",{timeZone:input.timezone});}
     catch{throw invalid("Invalid IANA timezone");}
     const start=new Date(input.startAt);

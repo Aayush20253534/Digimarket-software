@@ -2,7 +2,7 @@
 import {FormEvent,useCallback,useEffect,useState} from "react";
 import Link from "next/link";
 import {useParams} from "next/navigation";
-import {ArrowLeft,CalendarDays,CheckCircle2,ClipboardList,RefreshCw,Users,FolderOpen,Video,Newspaper} from "lucide-react";
+import {ArrowLeft,CalendarDays,CheckCircle2,RefreshCw,Users,FolderOpen,Video,Newspaper} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {ClientVideoReadiness} from "@/components/client-video-readiness";
 import {ClientPostReadiness} from "@/components/client-post-readiness";
@@ -11,18 +11,15 @@ import {Spinner} from "@/components/ui";
 import {EndClientAgreement} from "@/components/end-client-agreement";
 
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED"|"EXPIRED";
-type ClientTab="video"|"post"|"services"|"agreement"|"contacts"|"files";
+type ClientTab="video"|"post"|"agreement"|"contacts"|"files";
 type Contact={id:string;name:string;role:string|null;phone:string|null;email:string|null;isPrimary:boolean};
-type Service={id:string;name:string;description:string|null;status:"ACTIVE"|"PAUSED"|"ENDED"};
 type Detail={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;notes:string|null;
  contractStartOn:string|null;contractEndOn:string|null;monthlyFee:string|null;monthlyAdBudget:string|null;status:Status;version:number;
  agreementExpired?:boolean;agreementEndedOn?:string|null;agreementEndReason?:string|null;
- sourceLead:{businessName:string}|null;contacts:Contact[];services:Service[]};
+ sourceLead:{businessName:string}|null;contacts:Contact[]};
 type Editing={businessName:string;businessType:string;phone:string;email:string;location:string;notes:string;
  contractStartOn:string;contractEndOn:string;monthlyFee:string;monthlyAdBudget:string;status:Status};
-type ServiceDraft={name:string;description:string;status:Service["status"]};
-const blankService:ServiceDraft={name:"",description:"",status:"ACTIVE"};
-const tabs=[["video","Video readiness",Video],["post","Post readiness",Newspaper],["services","Services",ClipboardList],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users],["files","Files & Assets",FolderOpen]] as const;
+const tabs=[["video","Video readiness",Video],["post","Post readiness",Newspaper],["agreement","Agreement",CalendarDays],["contacts","Contacts",Users],["files","Files & Assets",FolderOpen]] as const;
 function formFrom(c:Detail):Editing{return {
  businessName:c.businessName,businessType:c.businessType??"",phone:c.phone??"",email:c.email??"",location:c.location??"",notes:c.notes??"",
  contractStartOn:c.contractStartOn?.slice(0,10)??"",contractEndOn:c.contractEndOn?.slice(0,10)??"",
@@ -35,10 +32,9 @@ export default function ClientWorkspacePage(){
  const canRead=!!session?.identity.permissions.includes("clients.read");
  const canEdit=!!session?.identity.permissions.includes("clients.edit");
  const canFinance=!!session?.identity.permissions.includes("finance.read.all");
- const [client,setClient]=useState<Detail|null>(null),[form,setForm]=useState<Editing|null>(null),[tab,setTab]=useState<ClientTab>("services");
+ const [client,setClient]=useState<Detail|null>(null),[form,setForm]=useState<Editing|null>(null),[tab,setTab]=useState<ClientTab>("agreement");
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(""),[success,setSuccess]=useState("");
  const [contact,setContact]=useState({name:"",role:"",phone:"",email:"",isPrimary:false});
- const [service,setService]=useState<ServiceDraft>(blankService),[editingService,setEditingService]=useState<string|null>(null),[serviceEdit,setServiceEdit]=useState<ServiceDraft>(blankService);
  const load=useCallback(async()=>{
   if(!canRead)return;
   try{const response=await request<Detail>("/clients/"+id);setClient(response);setForm(formFrom(response));setError("");}
@@ -64,14 +60,6 @@ export default function ClientWorkspacePage(){
   void execute(async()=>{await request("/clients/"+id+"/contacts",{method:"POST",body:contact});
    setContact({name:"",role:"",phone:"",email:"",isPrimary:false});},"Contact added.");
  }
- function addService(e:FormEvent){
-  e.preventDefault();
-  void execute(async()=>{await request("/clients/"+id+"/services",{method:"POST",body:service});setService(blankService);},"Service commitment added.");
- }
- function saveService(e:FormEvent){
-  e.preventDefault();if(!editingService)return;
-  void execute(async()=>{await request("/clients/"+id+"/services/"+editingService,{method:"PUT",body:serviceEdit});setEditingService(null);},"Service commitment saved.");
- }
  if(!session)return <Spinner label="Verifying workspace access…"/>;
  if(!canRead)return <div className="aw-client-workspace"><p role="alert">Client access denied.</p></div>;
  if(loading)return <div className="aw-client-workspace"><Spinner label="Loading client workspace…"/></div>;
@@ -89,9 +77,8 @@ export default function ClientWorkspacePage(){
     </div>
    </div>
    <div className="aw-client-statrow">
-    <div className="aw-client-stat"><ClipboardList size={18}/><span>Active services</span><strong>{client.services.filter(s=>s.status==="ACTIVE").length}</strong></div>
     <div className="aw-client-stat"><CalendarDays size={18}/><span>{client.agreementExpired?"Agreement ended":"Agreement ends"}</span><strong>{(client.agreementEndedOn??client.contractEndOn)?.slice(0,10)||"Not set"}</strong></div>
-    <div className="aw-client-stat"><CheckCircle2 size={18}/><span>Onboarding</span><strong>{client.services.length&&client.contractStartOn?"Configured":"Needs setup"}</strong></div>
+    <div className="aw-client-stat"><CheckCircle2 size={18}/><span>Onboarding</span><strong>{client.contractStartOn?"Configured":"Needs setup"}</strong></div>
    </div>
   </header>
   <nav className="aw-client-tabs" role="tablist" aria-label="Client workspace sections">
@@ -115,27 +102,6 @@ export default function ClientWorkspacePage(){
   </section>}
   {tab==="video"&&<ClientVideoReadiness clientId={client.id}/>}
   {tab==="post"&&<ClientPostReadiness clientId={client.id}/>}
-   {tab==="services"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Agreed services</h2><p>Record the services agreed with this client.</p></div></div>
-    <div className="aw-client-service-grid">{client.services.map(item=><article className="aw-client-service" key={item.id}>
-     <div className="aw-client-panel-heading"><div><h3>{item.name}</h3><p>{item.description||"No service description"}</p></div><span className={"aw-client-status aw-client-status-"+item.status.toLowerCase()}>{item.status}</span></div>
-     {canEdit&&<button className="aw-client-btn" type="button" onClick={()=>{setEditingService(item.id);setServiceEdit({name:item.name,description:item.description??"",status:item.status});}}>Edit service</button>}
-    </article>)}</div>
-    {!client.services.length&&<p className="aw-client-empty">No services yet. Add the first agreed service below.</p>}
-    {canEdit&&editingService&&<form className="aw-client-form aw-client-subform" onSubmit={saveService} aria-label="Edit client service">
-     <h3>Edit service commitment</h3>
-     <label>Service name<input className="field" required minLength={2} maxLength={120} value={serviceEdit.name} onChange={e=>setServiceEdit(v=>({...v,name:e.target.value}))}/></label>
-     <label>Description<input className="field" maxLength={1000} value={serviceEdit.description} onChange={e=>setServiceEdit(v=>({...v,description:e.target.value}))}/></label>
-     <label>Status<select className="field" value={serviceEdit.status} onChange={e=>setServiceEdit(v=>({...v,status:e.target.value as Service["status"]}))}><option>ACTIVE</option><option>PAUSED</option><option>ENDED</option></select></label>
-     <div className="aw-client-actions"><button className="aw-client-primary" disabled={busy}>Save changes</button><button className="aw-client-btn" type="button" onClick={()=>setEditingService(null)}>Cancel</button></div>
-    </form>}
-    {canEdit&&<form className="aw-client-form aw-client-subform" onSubmit={addService} aria-label="Add client service">
-     <h3>Add agreed service</h3>
-     <label>Service name<input className="field" required minLength={2} maxLength={120} placeholder="e.g. Reels" value={service.name} onChange={e=>setService(v=>({...v,name:e.target.value}))}/></label>
-     <label>Description<input className="field" maxLength={1000} placeholder="Scope and expectations" value={service.description} onChange={e=>setService(v=>({...v,description:e.target.value}))}/></label>
-     <label>Status<select className="field" value={service.status} onChange={e=>setService(v=>({...v,status:e.target.value as Service["status"]}))}><option>ACTIVE</option><option>PAUSED</option><option>ENDED</option></select></label>
-     <div className="aw-client-actions"><button className="aw-client-primary" disabled={busy}>Add service</button></div>
-    </form>}
-   </section>}
    {tab==="agreement"&&<section className="aw-client-panel"><div className="aw-client-panel-heading"><div><h2>Client profile & agreement</h2><p>Keep account information and commercial terms tied to the original client record.</p></div><span className="aw-client-muted">Revision {client.version}</span></div>
     {client.agreementExpired&&<div className="aw-client-callout" role="status"><div><strong>Agreement expired</strong>
       <p>Excluded from projected income. {client.agreementEndedOn?"Ended on "+client.agreementEndedOn.slice(0,10)+". ":""}{client.agreementEndReason}</p></div>

@@ -113,10 +113,10 @@ function TasksPageWorkspace(){
  useEffect(()=>{
   if(!canCreate)return;
   const q=new URLSearchParams(window.location.search);
-  const clientId=q.get("clientId"),serviceId=q.get("serviceId");
+  const clientId=q.get("clientId");
   if(clientId&&/^[0-9a-f-]{36}$/i.test(clientId)){
-   setCreate(v=>v.clientId===clientId&&v.serviceId===(serviceId??"")?v:{...v,clientId,serviceId:serviceId&&/^[0-9a-f-]{36}$/i.test(serviceId)?serviceId:""});
-   setSchedule(v=>v.clientId===clientId&&v.serviceId===(serviceId??"")?v:{...v,clientId,serviceId:serviceId&&/^[0-9a-f-]{36}$/i.test(serviceId)?serviceId:""});
+   setCreate(v=>v.clientId===clientId?v:{...v,clientId,serviceId:""});
+   setSchedule(v=>v.clientId===clientId?v:{...v,clientId,serviceId:""});
   }
  },[canCreate]);
  useEffect(()=>{
@@ -137,7 +137,7 @@ function TasksPageWorkspace(){
   setError("");setMessage("");
   setEditDraft({
    title:task.title,description:task.description??"",priority:task.priority,
-   projectId:task.projectId??"",clientId:task.service?.clientId??"",serviceId:task.serviceId??"",dueAt:localDeadline(task.dueAt),
+   projectId:task.projectId??"",clientId:"",serviceId:"",dueAt:localDeadline(task.dueAt),
    assigneeIds:task.assignees.map(a=>a.userId),
   });
   setEditing(true);
@@ -274,7 +274,7 @@ function TasksPageWorkspace(){
     <button type="button" className="btn-secondary" disabled={!nextCursor||busy} onClick={()=>setCursor(nextCursor)}>Next page</button>
    </div>
   </Card>
-  {canCreate&&<Card title="Create a task" description="For independent internal work. Client service deliveries are scheduled separately.">
+  {canCreate&&<Card title="Create a task" description="For independent internal and project work.">
     <form className="grid gap-3 md:grid-cols-2" onSubmit={submitTask}>
      <label className="text-sm">Task title<input className="field mt-1 w-full" required minLength={2} maxLength={180}
        value={create.title} onChange={e=>setCreate(p=>({...p,title:e.target.value}))}/></label>
@@ -389,7 +389,7 @@ function TasksPageWorkspace(){
     </section>
    </div>
   </Card>}
-  {canRepeat&&<Card title="Recurring service allocations" description="The database-backed scheduler creates recurring task occurrences. Schedules can be paused or resumed by Admins and Founders.">
+  {canRepeat&&<Card title="Recurring tasks" description="The database-backed scheduler creates recurring task occurrences. Schedules can be paused or resumed by Admins and Founders.">
     <ul className="mb-5 space-y-2">{recurrences.map(x=><li key={x.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm">
      <div><b>{x.title}</b>{x.service&&<p className="text-xs text-purple-300">{x.service.client.businessName} / {x.service.name}</p>}<p className="text-xs text-slate-500">{x.frequency} every {x.interval} · Next {new Date(x.nextRunAt).toLocaleString()} ({x.timezone})</p></div>
      <button className="btn-secondary" type="button" disabled={busy} onClick={()=>void run(()=>

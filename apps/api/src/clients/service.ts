@@ -1,6 +1,6 @@
 import type { PrismaClient, Prisma } from "@digimarket/db";
 import type {
-  ClientCreateInput, ClientUpdateInput, ClientListQuery, ClientContactInput, ClientServiceInput, ClientEndAgreementInput,
+  ClientCreateInput, ClientUpdateInput, ClientListQuery, ClientContactInput, ClientEndAgreementInput,
 } from "@digimarket/contracts";
 import { agencyToday } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
@@ -45,7 +45,7 @@ export class ClientsService {
      select:{id:true,businessName:true,businessType:true,phone:true,email:true,location:true,
        status:true,sourceLeadId:true,version:true,createdAt:true,updatedAt:true,
        contractEndOn:true,agreementEndedOn:true,agreementEndReason:true,
-       _count:{select:{contacts:true,services:true}}}});
+       _count:{select:{contacts:true}}}});
    const more=rows.length>input.limit;
    const page=rows.slice(0,input.limit);
    return {items:page.map(row=>({...row,agreementExpired:agreementExpired(row,this.today())})),nextCursor:more?page.at(-1)?.id??null:null};
@@ -54,7 +54,6 @@ export class ClientsService {
    await this.existing(a,id);
    const client=await this.db.client.findFirstOrThrow({where:{id,organizationId:a.organizationId},
      include:{contacts:{orderBy:[{isPrimary:"desc"},{createdAt:"asc"}]},
-       services:{orderBy:{createdAt:"asc"}},
        sourceLead:{select:{id:true,businessName:true,status:true}}}});
    const result={...client,agreementExpired:agreementExpired(client,this.today())};
    return a.permissions.has("finance.read.all")?result:{...result,monthlyFee:null,monthlyAdBudget:null};
@@ -135,38 +134,6 @@ export class ClientsService {
        action:"clients.contact_added",entityType:"Client",entityId:id,
        afterRedacted:{contactId:contact.id}}});
      return contact;
-   });
- }
- async addService(a:Principal,id:string,input:ClientServiceInput){
-   deny(a,"clients.edit");
-   await this.existing(a,id);
-   return this.db.$transaction(async tx=>{
-     const service=await tx.clientService.create({data:{
-       clientId:id,name:input.name.trim(),description:optional(input.description),status:input.status,
-     }});
-     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-       action:"clients.service_added",entityType:"Client",entityId:id,
-       afterRedacted:{serviceId:service.id,status:service.status}}});
-     return service;
-   });
- }
-
- // A single permission-scoped snapshot powers client delivery Overview and client workspaces.
- // Project visibility exactly follows ProjectsService: private team projects are not leaked.
- async updateService(a:Principal,id:string,serviceId:string,input:ClientServiceInput){
-   deny(a,"clients.edit");
-   await this.existing(a,id);
-   return this.db.$transaction(async tx=>{
-     const found=await tx.clientService.findFirst({where:{id:serviceId,clientId:id}});
-     if(!found)throw missing();
-     const updated=await tx.clientService.update({where:{id:serviceId},data:{
-       name:input.name.trim(),description:optional(input.description),status:input.status,
-     }});
-     await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
-       action:"clients.service_updated",entityType:"ClientService",entityId:serviceId,
-       beforeRedacted:{status:found.status},
-       afterRedacted:{status:updated.status}}});
-     return updated;
    });
  }
  async convert(_a:Principal,_leadId:string,_version:number):Promise<never>{

@@ -48,10 +48,11 @@ try{
    projectId:project.id,assigneeIds:[other.id]}),failed(422));
  const deadline=new Date(Date.now()+86400000).toISOString();
  const founderTask=await tasks.create(founder,{title:"Founder campaign allocation",priority:"MEDIUM",
-   serviceId:clientService.id,dueAt:deadline,assigneeIds:[staff.id]});
- assert.equal(founderTask.serviceId,clientService.id);
- assert.equal((await tasks.list(founder,{view:"team",serviceId:clientService.id,limit:10})).items.length,1);
- assert.equal((await tasks.detail(founder,founderTask.id)).service?.clientId,client.id);
+   projectId:project.id,dueAt:deadline,assigneeIds:[staff.id]});
+ assert.equal(founderTask.serviceId,null);
+ assert.equal((await tasks.list(founder,{view:"team",projectId:project.id,limit:10})).items.length,1);
+ assert.equal((await tasks.detail(founder,founderTask.id)).projectId,project.id);
+ await assert.rejects(()=>tasks.create(founder,{title:"Retired service",priority:"MEDIUM",serviceId:clientService.id,dueAt:deadline,assigneeIds:[staff.id]}),failed(422));
  await tasks.delete(founder,founderTask.id,founderTask.version);
  const foreignClient=await db.client.create({data:{organizationId:outside.id,createdById:foreign.id,businessName:"Other tenant"}});
  const foreignService=await db.clientService.create({data:{clientId:foreignClient.id,name:"Hidden service"}});
@@ -62,10 +63,10 @@ try{
  await assert.rejects(()=>tasks.create(mgr,{title:"Mismatched client project",priority:"MEDIUM",
    serviceId:unrelatedService.id,projectId:project.id,dueAt:deadline,assigneeIds:[staff.id]}),failed(422));
  const founderSchedule=await tasks.createRecurrence(founder,{
-   title:"Founder weekly social schedule",priority:"LOW",serviceId:clientService.id,
+   title:"Founder weekly social schedule",priority:"LOW",projectId:project.id,
    frequency:"WEEKLY",interval:1,timezone:"Asia/Kolkata",
    startAt:new Date(Date.now()+3600000).toISOString(),dueOffsetDays:1,assigneeIds:[staff.id]});
- assert.equal(founderSchedule.serviceId,clientService.id);
+ assert.equal(founderSchedule.serviceId,null);
  await tasks.toggleRecurrence(founder,founderSchedule.id,founderSchedule.version,false);
  await assert.rejects(()=>tasks.create(mgr,{title:"Missing expiry",priority:"MEDIUM",assigneeIds:[staff.id]}),failed(422));
  await assert.rejects(()=>tasks.create(mgr,{title:"Expired at assignment",priority:"MEDIUM",dueAt:new Date(Date.now()-60000).toISOString(),assigneeIds:[staff.id]}),failed(422));
@@ -189,7 +190,7 @@ try{
  await assert.rejects(()=>tasks.delete(limitedAdmin,t.id,statusTask.version),failed(403));
  await assert.rejects(()=>tasks.delete(mgr,t.id,statusTask.version-1),failed(409));
  const start=new Date(Date.now()-120000).toISOString();
- const repeat=await tasks.createRecurrence(mgr,{title:"Daily campaign check",priority:"MEDIUM",serviceId:clientService.id,
+ const repeat=await tasks.createRecurrence(mgr,{title:"Daily campaign check",priority:"MEDIUM",projectId:project.id,
    frequency:"DAILY",interval:1,timezone:"Asia/Kolkata",startAt:start,
    dueOffsetDays:0,assigneeIds:[staff.id]});
  await assert.rejects(()=>tasks.createRecurrence(mgr,{title:"Impossible zone",priority:"MEDIUM",
@@ -200,7 +201,7 @@ try{
  assert.equal((await sweepRecurrences(db,new Date(),100)).created,0);
  const generated=await db.task.findMany({where:{recurrenceId:repeat.id}});
  assert.equal(generated.length,1);
- assert.equal(generated[0].serviceId,clientService.id);
+ assert.equal(generated[0].serviceId,null);
  assert.equal(await db.notification.count({where:{organizationId:org.id,recipientId:staff.id,
    kind:"TASK_ASSIGNED",href:"/app/tasks?task="+generated[0].id}}),1);
 

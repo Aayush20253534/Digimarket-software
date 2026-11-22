@@ -90,8 +90,6 @@ const endpoints: Record<string, string[]> = {
   "leads/meetings": ["GET"],
   "clients": ["GET","POST"],
   "review-cards": ["GET","POST"],
-  "clients/deliveries": ["GET"],
-  "service-deliveries": ["GET","POST"],
   "assets": ["GET"],
   "projects": ["GET","POST"],
   "projects/assignees": ["GET"],
@@ -168,10 +166,7 @@ const clientVideoReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness
 const clientVideoWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness\/[1-5]$/;
 const clientPostReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/post-readiness$/;
 const clientPostWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/post-readiness\/[1-5]$/;
-const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/(contacts|services)$/;
-const clientServiceEditPattern = /^clients\/[0-9a-fA-F-]{36}\/services\/[0-9a-fA-F-]{36}$/;
-const deliveryPlanEditPattern=/^service-deliveries\/[0-9a-fA-F-]{36}$/;
-const deliveryOccurrenceEditPattern=/^service-deliveries\/[0-9a-fA-F-]{36}\/occurrences\/[0-9a-fA-F-]{36}$/;
+const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/contacts$/;
 const clientConvertPattern = /^leads\/[0-9a-fA-F-]{36}\/convert$/;
 const assetIdPattern = /^assets\/[0-9a-fA-F-]{36}$/;
 const assetActionPattern = /^assets\/[0-9a-fA-F-]{36}\/(authorized-download|link|archive)$/;
@@ -241,8 +236,6 @@ function permitted(path: string, method: string): boolean {
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (clientEndAgreementPattern.test(path)) return method === "POST";
   if (clientChildrenPattern.test(path)) return method === "POST";
-  if (clientServiceEditPattern.test(path)) return method === "PUT";
-  if (deliveryPlanEditPattern.test(path)||deliveryOccurrenceEditPattern.test(path))return method==="PUT";
   if (clientConvertPattern.test(path)) return method === "POST";
   if (leadDetailPattern.test(path)) return ["GET","PUT","DELETE"].includes(method);
   if (leadAssignPattern.test(path)) return method === "PUT";
@@ -314,9 +307,6 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   const url = new URL("/api/v1/" + path, base);
   if(["finance/cycle-balance","finance/recurring-income","finance/entries","finance/export","finance/summary","finance/internal-settlements/mine","finance/internal-settlements/all","finance/client-ad-spend/mine","finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
     for(const key of ["from","to","view","scope","funding","kind","type","status","categoryId","accountId","clientId","page","limit","q"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
-  }
-  if(path==="service-deliveries"){
-    for(const key of ["clientId","mine"]){const value=request.nextUrl.searchParams.get(key);if(value)url.searchParams.set(key,value);}
   }
   if (path === "approvals" || ["finance/entries","finance/summary","finance/export","finance/meta-ads-distribution"].includes(path)) {
     const view = request.nextUrl.searchParams.get("view");

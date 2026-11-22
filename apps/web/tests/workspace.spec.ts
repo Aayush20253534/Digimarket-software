@@ -919,6 +919,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByText("Lead approved and automatically added to Clients.")).toBeVisible();
   await visitWorkspace(page,"/app/clients");
   await expect(page.getByRole("table",{name:"Clients directory"})).toBeVisible();
+  await expect(page.getByRole("table",{name:"Clients directory"}).getByRole("columnheader",{name:"Services",exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Add client"})).toHaveCount(0);
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Sales workspace sections"}).getByRole("link",{name:"Clients"}))
@@ -932,24 +933,12 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const workspace=page.getByTestId("client-workspace-page");
   await expect(workspace).toBeVisible();
   const clientTabs=workspace.getByRole("tablist",{name:"Client workspace sections"});
-  await expect(clientTabs.getByRole("tab",{name:"Services"})).toHaveAttribute("aria-selected","true");
+  await expect(clientTabs.getByRole("tab",{name:"Services"})).toHaveCount(0);
+  await expect(clientTabs.getByRole("tab",{name:"Agreement"})).toHaveAttribute("aria-selected","true");
   await expect(clientTabs.getByRole("tab",{name:"Delivery"})).toHaveCount(0);
   await clientTabs.getByRole("tab",{name:"Agreement"}).click();
   await expect(workspace.getByRole("heading",{name:"Client profile & agreement"})).toBeVisible();
   await expect(workspace.getByRole("heading",{name:"Client deliveries"})).toHaveCount(0);
-  await clientTabs.getByRole("tab",{name:"Services"}).click();
-  await expect(workspace.getByRole("heading",{name:"Agreed services"})).toBeVisible();
-  const newService=workspace.getByRole("form",{name:"Add client service"});
-  await newService.getByLabel("Service name").fill("CI Reels");
-  await newService.getByRole("button",{name:"Add service"}).click();
-  await expect(workspace.getByText("Service commitment added.")).toBeVisible();
-  await workspace.getByRole("button",{name:"Edit service"}).first().click();
-  const editService=workspace.getByRole("form",{name:"Edit client service"});
-  await editService.getByRole("button",{name:"Save changes"}).click();
-  await expect(workspace.getByText("Service commitment saved.")).toBeVisible();
-  await expect(workspace.getByText("9 deliverables / month")).toHaveCount(0);
-  await expect(editService.getByLabel("Monthly quantity")).toHaveCount(0);
-  await expect(newService.getByLabel("Monthly target")).toHaveCount(0);
   await expect(page.getByRole("dialog",{name:"Client details"})).toHaveCount(0);
   const clientUrl=page.url();
   await visitWorkspace(page,"/app/dashboard");

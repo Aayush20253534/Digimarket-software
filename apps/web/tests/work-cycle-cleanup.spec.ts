@@ -58,7 +58,7 @@ async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
     {amount:"234.0000",status:"POSTED",settlementDirection:"OUTGOING"},
     {amount:"500.0000",status:"CANCELLED",settlementDirection:"INCOMING"}
   ];
-  else if(path==="/finance/category-summary")data={ordinary:"200",total:"200",items:[{id:"cat1",name:url.searchParams.get("kind")==="INCOME"?"Service fees":"Travel",posted:"200",pending:"0",count:2,active:true}]};
+  else if(path==="/finance/category-summary")data=url.searchParams.get("from")==="2026-11-22"?{ordinary:"0",total:"0",items:[]}:{ordinary:"200",total:"200",items:[{id:"cat1",name:url.searchParams.get("kind")==="INCOME"?"Service fees":"Travel",posted:"200",pending:"0",count:2,active:true}]};
   else if(path==="/finance/total-expenses")data={items:[],total:0,page:1,limit:25,summary:{postedIncome:"1000",postedTotalExpense:"350",netOperatingMoney:"650",breakdown:{OTHER:"200",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}}};
   else if(path==="/finance/total-expenses/summary")data={postedIncome:"1000",postedTotalExpense:"350",netOperatingMoney:"650",breakdown:{OTHER:"200",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}};
   else if(path==="/salary/summary")data={totalPaid:"50",founderFunding:[]};

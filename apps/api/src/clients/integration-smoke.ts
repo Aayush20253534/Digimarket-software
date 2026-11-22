@@ -200,14 +200,7 @@ try{
  const contact=await clients.addContact(team,client.id,{name:"Manager",role:"Marketing",isPrimary:true});
  assert.ok(contact.id);
  assert.equal((await clients.detail(team,client.id)).contacts.filter(c=>c.isPrimary).length,1);
- const service=await clients.addService(team,client.id,{name:"SEO",description:"Search",status:"ACTIVE"});
- assert.equal(service.name,"SEO");
- assert.equal(service.monthlyTarget,null);
- const modified=await clients.updateService(team,client.id,service.id,{name:"SEO",description:"Search optimization",status:"ACTIVE"});
- assert.equal(modified.monthlyTarget,null);
- await assert.rejects(()=>clients.updateService(external,client.id,service.id,{name:"Hijack",status:"ACTIVE"}),fail(404));
- await assert.rejects(()=>clients.updateService(team,client.id,outsider.id,{name:"Unknown",status:"ACTIVE"}),fail(404));
- // Delivery scheduling is retired; clients and agreed services remain intact.
+ assert.equal(Object.prototype.hasOwnProperty.call(await clients.detail(team,client.id),"services"),false);
  assert.equal((await db.client.count({where:{id:client.id}})),1);
  assert.equal((await clients.list(manager,{limit:30,q:"Updated"})).items.length,1);
  assert.equal((await clients.list(manager,{limit:30,status:"PAUSED"})).items.length,0);

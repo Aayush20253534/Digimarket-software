@@ -8,7 +8,7 @@ import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
 import {PageHeader,Spinner} from "@/components/ui";
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED"|"EXPIRED";
-type Client={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;status:Status;sourceLeadId:string|null;agreementExpired?:boolean;contractEndOn?:string|null;agreementEndedOn?:string|null;agreementEndReason?:string|null;_count?:{services:number;contacts:number}};
+type Client={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;status:Status;sourceLeadId:string|null;agreementExpired?:boolean;contractEndOn?:string|null;agreementEndedOn?:string|null;agreementEndReason?:string|null;_count?:{contacts:number}};
 type Register={items:Client[];nextCursor:string|null};
 const readable=(e:unknown)=>e instanceof Error?e.message:"Unable to load clients";
 export function ClientDirectory({section}:{section:"current"|"expired"}){
@@ -48,7 +48,7 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
  return <div data-aw-module="clients" className="aw-client-directory aw-module-root space-y-5">
   <SalesWorkspaceNav/>
   <PageHeader eyebrow="CLIENT RELATIONSHIPS" title={section==="expired"?"Expired agreements":"Clients & delivery"}
-    description={section==="expired"?"Ended and expired client agreements. Their records remain available and are excluded from projected income.":"Manage each client's agreement, services, projects and delivery from one place."}
+    description={section==="expired"?"Ended and expired client agreements. Their records remain available and are excluded from projected income.":"Manage each client's agreement, projects and readiness from one place."}
     actions={<div className="flex gap-2 flex-wrap"><Link href="/app/leads" className="aw-client-btn">View leads</Link>
     <Link href="/app/clients/video-readiness" className="aw-client-btn"><Video size={16}/>Video readiness</Link>
     <Link href="/app/clients/post-readiness" className="aw-client-btn"><Newspaper size={16}/>Post readiness</Link>
@@ -91,13 +91,13 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
    {loading?<p role="status" className="aw-client-muted">Loading clients…</p>:!rows.length?<p className="aw-client-empty">No clients match these filters. A lead becomes a client when its stage is Approved.</p>:null}
    <div className="aw-client-table-wrap">
     <table className="aw-client-table" aria-label="Clients directory">
-     <thead><tr><th>Business</th><th>Category</th><th>Phone</th><th>Location</th><th>Services</th><th>Status</th>{section==="expired"&&<th>Agreement ended</th>}<th>Video readiness</th><th>Post readiness</th><th>Workspace</th></tr></thead>
+     <thead><tr><th>Business</th><th>Category</th><th>Phone</th><th>Location</th><th>Status</th>{section==="expired"&&<th>Agreement ended</th>}<th>Video readiness</th><th>Post readiness</th><th>Workspace</th></tr></thead>
      <tbody>{sorted.map(c=><tr key={c.id}>
        <td><div className="aw-v3-client-identity">
          <span aria-hidden="true" className="aw-v3-client-avatar">{c.businessName.trim().slice(0,2).toUpperCase()}</span>
          <span><strong>{c.businessName}</strong>{c.sourceLeadId&&<small>Converted from lead</small>}</span>
         </div></td>
-       <td>{c.businessType||"Not set"}</td><td>{c.phone||"—"}</td><td>{c.location||"—"}</td><td>{c._count?.services??0}</td>
+       <td>{c.businessType||"Not set"}</td><td>{c.phone||"—"}</td><td>{c.location||"—"}</td>
        <td><span className={"aw-client-status aw-client-status-"+(c.agreementExpired?"ended":c.status.toLowerCase())}>{c.agreementExpired?"EXPIRED":c.status}</span></td>
        {section==="expired"&&<td>{(c.agreementEndedOn??c.contractEndOn)?.slice(0,10)||"—"}{c.agreementEndReason&&<small className="block max-w-xs">{c.agreementEndReason}</small>}</td>}
        <td><Link className="aw-client-open" href={"/app/clients/video-readiness?clientId="+encodeURIComponent(c.id)}>Weekly videos</Link></td>
