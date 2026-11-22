@@ -171,6 +171,27 @@ test("Finance category cards show accurate posted, held and transferred amounts"
  await expect.poll(()=>requests.some(x=>x.path==="/finance/cycle-balance")).toBe(true);
 });
 
+test("agency operating money includes opening carry exactly once and keeps cycle totals separate",async({page})=>{
+ await mockWorkspace(page);
+ await page.route("**/api/v1/finance/cycle-balance?*",route=>route.fulfill({json:{data:{
+  opening:"19051.5100",movement:"-1142.0000",remaining:"17909.5100"
+ }}}));
+ await page.route("**/api/v1/finance/total-expenses/summary?*",route=>route.fulfill({json:{data:{
+  postedIncome:"1000.0000",postedTotalExpense:"2142.0000",netOperatingMoney:"-1142.0000",
+  breakdown:{OTHER:"1992.0000",SELF_ADS:"0",CLIENT_ADS:"100",SALARY:"50"}
+ }}}));
+ await page.goto("/app/finance?view=all&from=2026-10-22&to=2026-11-21");
+ const net=page.getByText("Net operating money",{exact:true}).locator("..");
+ const carry=page.getByText("Agency balance carried forward",{exact:true}).locator("..");
+ await expect(net).toContainText("₹17,909.51");
+ await expect(carry).toContainText("₹19,051.51");
+ await expect(page.getByTestId("finance-category-amount-income")).toHaveText("₹1,000.00");
+ await expect(page.getByTestId("finance-category-amount-total-expense")).toHaveText("₹2,142.00");
+ await page.getByRole("button",{name:"My entries"}).click();
+ await expect(page.getByText("Agency balance carried forward",{exact:true})).toHaveCount(0);
+ await expect(page.getByText("Operating net (before settlements)",{exact:true}).locator("..")).toContainText("−₹1,142.00");
+});
+
 test("carried balances appear in agency register but not My Entries",async({page})=>{
  const {requests}=await mockWorkspace(page);
  await page.goto("/app/finance/entries?view=mine&from=2026-10-22&to=2026-11-21");

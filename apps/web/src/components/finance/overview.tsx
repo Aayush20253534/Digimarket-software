@@ -22,6 +22,22 @@ import { FinanceSectionWorkspace } from "./section-workspace";
 import { PreviousCycleNetPosted } from "./previous-cycle-carry";
 import {PersonalNetAfterSettlements,calculatePersonalNet} from "./personal-net-after-settlements";
 type Balance = {opening:string;movement:string;remaining:string};
+// The opening balance predates the selected cycle. Its closing balance already
+// contains current-cycle account movements, so adding those again would double count.
+function agencyOperatingMoney(opening:string,income:string,expense:string):string|null {
+  const units=(value:string):bigint|null=>{
+    const match=/^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value);
+    if(!match)return null;
+    const absolute=BigInt(match[2])*10000n+BigInt((match[3]??"").padEnd(4,"0"));
+    return match[1]==="-"?-absolute:absolute;
+  };
+  const start=units(opening),received=units(income),spent=units(expense);
+  if(start===null||received===null||spent===null)return null;
+  const net=start+received-spent;
+  const absolute=net<0n?-net:net;
+  return (net<0n?"-":"")+(absolute/10000n).toString()+"."+(absolute%10000n).toString().padStart(4,"0");
+}
+
 type MetaAdsTotals = {totalPosted:string};
 type OwnClientSpend = {posted:string;entries:number};
 type AgencySettlements = {postedTotal:string;postedCount:number;voidedCount:number;total:number};
@@ -260,9 +276,12 @@ export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
       {!cycleDetails&&<div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {w.view==="mine"&&founder&&<PersonalNetAfterSettlements period={w.period}/>}
         {[
-          [w.view==="mine"?"Operating net (before settlements)":"Net operating money", totalExpense?.netOperatingMoney],
+          [w.view==="mine"?"Operating net (before settlements)":"Net operating money",
+            w.view==="all"&&all
+              ? totalExpense ? balance ? agencyOperatingMoney(balance.opening,totalExpense.postedIncome,totalExpense.postedTotalExpense) : null : undefined
+              : totalExpense?.netOperatingMoney],
           ...(w.view==="all"&&all
-            ? [["Agency balance carried forward",balance?.remaining] as const]
+            ? [["Agency balance carried forward",balance?.opening??(totalExpense?null:undefined)] as const]
             : []),
           ["Pending income", totals?.pendingIncome],
           ["Pending expenses", totals?.pendingExpense],
@@ -270,7 +289,7 @@ export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
           <Card key={label}>
             <p className="text-sm text-slate-400">{label}</p>
             <strong className="block mt-2 text-2xl">
-              {value === undefined ? (error ? "Unavailable" : "…") : money(value)}
+              {value === undefined ? (error ? "Unavailable" : "…") : value===null ? "Unavailable" : money(value)}
             </strong>
           </Card>
         ))}
@@ -299,7 +318,9 @@ export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
         ))}
       </nav>
       <p className="text-xs text-slate-400">
-        Net operating money = posted income − Total expense. Total expense includes ordinary costs,
+        {w.view==="all"&&all&&!cycleDetails
+          ?"Net operating money = agency balance carried forward + posted income this cycle − Total expense."
+          :"Operating net = posted income − Total expense."} Total expense includes ordinary costs,
         self and client Meta Ads, and salaries counted once. Transfers and client fund deposits are
         separate.
       </p>
