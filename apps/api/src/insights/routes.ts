@@ -37,7 +37,7 @@ export function registerInsightsRoutes(app:Express,auth:AuthService){
  });
  const leadReportQuery=z.strictObject({
   from:z.iso.date(),to:z.iso.date(),
-  source:z.enum(["META_LEADS","COLD_CALL","REFERRAL"]).optional(),
+  source:z.enum(["META_LEADS","COLD_CALL","REFERRAL","OTHER"]).optional(),
   stage:z.enum(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP",
     "MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED",
     "NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"]).optional(),

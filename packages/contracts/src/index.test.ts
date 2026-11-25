@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, followUpListQuerySchema, meetingListQuerySchema, meetingConflictQuerySchema, leadStageSchema, clientServiceSchema, clientRenewSchema, clientListQuerySchema, clientUpdateSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, followUpListQuerySchema, meetingListQuerySchema, meetingConflictQuerySchema, leadStageSchema, clientServiceSchema, clientRenewSchema, clientListQuerySchema, clientUpdateSchema, financeEntryInputSchema, financeEntryAdminEditSchema, financeBreakdownQuerySchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -129,3 +129,9 @@ describe("meeting workspace contracts",()=>{
 });
 
 describe("client workspace contracts",()=>{it("validates renewal, health and filters",()=>{expect(clientRenewSchema.safeParse({version:1,startOn:"2026-11-25",endOn:"2026-11-24",monthlyFee:"1000",monthlyAdBudget:"500",reason:"Renewal"}).success).toBe(false);expect(clientUpdateSchema.safeParse({version:1,health:"HEALTHY",onboarding:["AGREEMENT"]}).success).toBe(true);expect(clientUpdateSchema.safeParse({version:1,health:"HOT"}).success).toBe(false);expect(clientListQuerySchema.parse({workspace:"1",expiring:"1",sort:"contractEndOn"}).workspace).toBe("1");});});
+
+ it("validates financial report category drilldown",()=>{
+  const period={kind:"EXPENSE",from:"2026-11-22",to:"2026-12-21"};
+  expect(financeBreakdownQuerySchema.safeParse({...period,categoryId:"00000000-0000-4000-8000-000000000001"}).success).toBe(true);
+  expect(financeBreakdownQuerySchema.safeParse({...period,categoryId:"invalid"}).success).toBe(false);
+ });

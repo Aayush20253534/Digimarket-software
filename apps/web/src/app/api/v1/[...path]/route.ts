@@ -15,6 +15,7 @@ const endpoints: Record<string, string[]> = {
   "finance/proof-confirm": ["POST"],
   "search": ["GET"],
   "reports/overview": ["GET"],
+  "reports/client-delivery": ["GET"],
   // Permit the lead dashboard and its filtered CSV export.
   "reports/leads": ["GET"],
   "reports/leads/export": ["GET"],
@@ -363,7 +364,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
   }
   if(path==="finance/report-breakdown"||path==="finance/report-breakdown/export"){
-    for(const key of ["kind","from","to","q","page","limit"]){
+    for(const key of ["kind","from","to","q","page","limit","day","personId","categoryId"]){
       const v=request.nextUrl.searchParams.get(key);
       if(v!==null)url.searchParams.set(key,v);
     }

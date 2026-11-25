@@ -180,7 +180,7 @@ export default function LeadBreakdownPage(){
     <button type="button" className="aw-lead-reset" onClick={clear}>Clear filters</button></div>
    <div className="aw-lead-filter-grid">
     <label>Source<select aria-label="Lead source filter" value={source} onChange={e=>{setSource(e.target.value);setPage(1);}}>
-     <option value="">All sources</option><option value="META_LEADS">Meta Leads</option><option value="COLD_CALL">Cold Calls</option><option value="REFERRAL">Referral</option>
+     <option value="">All sources</option><option value="META_LEADS">Meta Leads</option><option value="COLD_CALL">Cold Calls</option><option value="REFERRAL">Referral</option><option value="OTHER">Other</option>
     </select></label>
     <label>Status<select aria-label="Lead stage filter" value={stage} onChange={e=>{setStage(e.target.value);setPage(1);}}>
      <option value="">All statuses</option>{["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED","NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"].map(v=><option key={v} value={v}>{label(v)}</option>)}
