@@ -6,23 +6,21 @@ import {ArrowUpRight,RefreshCw,Search,Video,Newspaper,PhoneCall,MapPin} from "lu
 import {SalesWorkspaceNav} from "@/components/sales-workspace-nav";
 import {useAuth} from "@/components/auth-provider";
 import {ApiError} from "@/lib/api";
-import {agencyToday,clientHealthSchema} from "@digimarket/contracts";
+import {agencyToday} from "@digimarket/contracts";
 import {PageHeader,Spinner} from "@/components/ui";
 type Status="ACTIVE"|"PAUSED"|"ARCHIVED"|"EXPIRED";
-type Client={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;status:Status;sourceLeadId:string|null;agreementExpired?:boolean;contractEndOn?:string|null;agreementEndedOn?:string|null;agreementEndReason?:string|null;_count?:{contacts:number};monthlyFee?:string|null;monthlyAdBudget?:string|null;health?:Health;manager?:{displayName:string}|null;sourceLead?:{googleMapsUrl:string|null}|null;readiness?:Stock};
-type Health=typeof clientHealthSchema.options[number];
+type Client={id:string;businessName:string;businessType:string|null;phone:string|null;email:string|null;location:string|null;status:Status;sourceLeadId:string|null;agreementExpired?:boolean;contractEndOn?:string|null;agreementEndedOn?:string|null;agreementEndReason?:string|null;_count?:{contacts:number};monthlyFee?:string|null;monthlyAdBudget?:string|null;sourceLead?:{googleMapsUrl:string|null}|null;readiness?:Stock};
 type Stock={from?:string|null;to?:string|null;videos:number;posts:number;festival:number;videosDelivered:number;postsDelivered:number;festivalDelivered:number};
 type Summary={all:number;active:number;paused:number;archived:number;past:number;expiring:number;monthlyFees:string|null};
-type Register={items:Client[];nextCursor:string|null;total?:number;today?:string;cycle?:{key:string};summary?:Summary;managers?:{id:string;displayName:string}[]};
+type Register={items:Client[];nextCursor:string|null;total?:number;today?:string;cycle?:{key:string};summary?:Summary};
 const money=(v:string|null|undefined)=>v==null?"—":"₹"+Number(v).toLocaleString("en-IN",{maximumFractionDigits:2});
-const healthLabel=(h:string)=>h.replaceAll("_"," ").toLowerCase().replace(/^./,v=>v.toUpperCase());
 const readable=(e:unknown)=>e instanceof Error?e.message:"Unable to load clients";
 export function ClientDirectory({section}:{section:"current"|"expired"}){
  const router=useRouter();
  const loadVersion=useRef(0);
  const {session,request}=useAuth();
  const canRead=!!session?.identity.permissions.includes("clients.read"),canFinance=!!session?.identity.permissions.includes("finance.read.all");
- const [scope,setScope]=useState<"current"|"expired"|"all">(section),[expiring,setExpiring]=useState(false),[health,setHealth]=useState(""),[manager,setManager]=useState(""),[summary,setSummary]=useState<Summary|null>(null),[total,setTotal]=useState<number|null>(null),[today,setToday]=useState(agencyToday),[managers,setManagers]=useState<{id:string;displayName:string}[]>([]),[view,setView]=useState<"register"|"readiness">("register");
+ const [scope,setScope]=useState<"current"|"expired"|"all">(section),[expiring,setExpiring]=useState(false),[summary,setSummary]=useState<Summary|null>(null),[total,setTotal]=useState<number|null>(null),[today,setToday]=useState(agencyToday),[view,setView]=useState<"register"|"readiness">("register");
  const [rows,setRows]=useState<Client[]>([]),[search,setSearch]=useState(""),[filter,setFilter]=useState(""),[cursor,setCursor]=useState<string|null>(null),[next,setNext]=useState<string|null>(null);
  const [history,setHistory]=useState<string[]>([]),[sortBy,setSortBy]=useState<"businessName"|"businessType"|"location"|"status"|"contractEndOn">("businessName"),[descending,setDescending]=useState(false),[legacy,setLegacy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState("");
  const load=useCallback(async()=>{
@@ -33,17 +31,17 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
    const q=new URLSearchParams({limit:"30",section:scope,sort:sortBy,direction:descending?"desc":"asc",workspace:"1"});
    if(search.trim())q.set("q",search.trim());
    if(filter)q.set("status",filter);
-   if(expiring)q.set("expiring","1");if(health)q.set("health",health);if(manager)q.set("managerId",manager);
+   if(expiring)q.set("expiring","1");
    if(cursor)q.set("cursor",cursor);
    let response:Register;
    try{response=await request<Register>("/clients?"+q);setLegacy(false);}
    catch(e){
-    if(!(e instanceof ApiError)||e.status!==422||expiring||health||manager||sortBy==="contractEndOn")throw e;
+    if(!(e instanceof ApiError)||e.status!==422||expiring||sortBy==="contractEndOn")throw e;
     q.delete("workspace");q.delete("sort");q.delete("direction");response=await request<Register>("/clients?"+q);setLegacy(true);
    }
-   if(version===loadVersion.current){setRows(response.items);setNext(response.nextCursor);setError("");setSummary(response.summary??null);setTotal(response.total??null);setToday(response.today??agencyToday());setManagers(response.managers??[]);}
+   if(version===loadVersion.current){setRows(response.items);setNext(response.nextCursor);setError("");setSummary(response.summary??null);setTotal(response.total??null);setToday(response.today??agencyToday());}
   }catch(e){if(version===loadVersion.current){setError(readable(e));setSummary(null);setTotal(null);}}finally{if(version===loadVersion.current)setLoading(false);}
- },[canRead,request,search,filter,cursor,sortBy,descending,scope,expiring,health,manager]);
+ },[canRead,request,search,filter,cursor,sortBy,descending,scope,expiring]);
  useEffect(()=>{void load();return()=>{loadVersion.current++;};},[load]);
  useEffect(()=>{setCursor(null);setHistory([]);setFilter("");setScope(section);setExpiring(false);},[section]);
  const choose=(key:string)=>{setCursor(null);setHistory([]);setFilter("");setExpiring(false);if(key==="past"){setScope("expired");router.push("/app/clients/expired");return;}setScope(key==="all"?"all":"current");if(key==="expiring")setExpiring(true);else if(["ACTIVE","PAUSED","ARCHIVED"].includes(key))setFilter(key);};
@@ -79,19 +77,17 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
     {scope!=="expired"&&<select aria-label="Filter clients" className="field" value={filter} onChange={e=>{setFilter(e.target.value);setExpiring(false);setCursor(null);setHistory([]);}}>
      <option value="">All statuses</option><option value="ACTIVE">Active</option><option value="PAUSED">Paused</option><option value="ARCHIVED">Archived</option>
     </select>}
-    <select className="field" aria-label="Client health filter" disabled={!summary} value={health} onChange={e=>{setHealth(e.target.value);setCursor(null);setHistory([]);}}><option value="">All health ratings</option>{clientHealthSchema.options.map(h=><option key={h} value={h}>{healthLabel(h)}</option>)}</select>
-    <select className="field" aria-label="Account manager filter" disabled={!summary} value={manager} onChange={e=>{setManager(e.target.value);setCursor(null);setHistory([]);}}><option value="">All managers</option>{managers.map(m=><option key={m.id} value={m.id}>{m.displayName}</option>)}</select>
     <select className="field" aria-label="Sort clients" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setCursor(null);setHistory([]);}}>
      <option value="businessName">Business</option><option value="businessType">Category</option><option value="location">Location</option><option value="status">Status</option><option value="contractEndOn" disabled={!summary}>Agreement end</option>
     </select>
     <button className="aw-client-btn" aria-label="Reverse client sort" onClick={()=>{setDescending(v=>!v);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
-    <button type="button" className="aw-client-btn" onClick={()=>{setScope(section);setFilter("");setExpiring(false);setHealth("");setManager("");setSearch("");setCursor(null);setHistory([]);}}>Clear filters</button>
+    <button type="button" className="aw-client-btn" onClick={()=>{setScope(section);setFilter("");setExpiring(false);setSearch("");setCursor(null);setHistory([]);}}>Clear filters</button>
    </div>
    {loading?<p role="status" className="aw-client-muted">Loading clients…</p>:!rows.length?<p className="aw-client-empty">{section==="expired"?"No past clients match these filters.":"No clients match these filters. A lead becomes a client when its stage is Approved."}</p>:null}
    <div className="aw-client-table-wrap">
     <table className="aw-client-table" aria-label={view==="register"?"Clients directory":"Client content readiness"} aria-busy={loading}><thead><tr>{(view==="register"?["Call","Business","Status","Agreement ends",...(canFinance?["Monthly fee","Ad budget"]:[]),"Ready stock","Map","Workspace"]:["Business","Client cycle","Videos ready","Regular posts ready","Festival posts ready","Videos delivered","Posts delivered","Festival delivered"]).map(h=><th key={h} scope="col">{h}</th>)}</tr></thead>
      <tbody>{sorted.map(c=>{const ended=c.agreementExpired||c.status==="EXPIRED",date=(c.agreementEndedOn??c.contractEndOn)?.slice(0,10),days=date?Math.round((Date.parse(date)-Date.parse(today))/86400000):null,stock=c.readiness,map=c.sourceLead?.googleMapsUrl;
-     const identity=<div className="aw-v3-client-identity"><span className="aw-v3-client-avatar" aria-hidden="true">{c.businessName.slice(0,2).toUpperCase()}</span><span><strong>{c.businessName}</strong><small>{c.businessType||"Category not set"} · {c.manager?.displayName??"Unassigned"}</small><small data-health={c.health??"UNASSESSED"}>{healthLabel(c.health??"UNASSESSED")}</small></span></div>;
+     const identity=<div className="aw-v3-client-identity"><span className="aw-v3-client-avatar" aria-hidden="true">{c.businessName.slice(0,2).toUpperCase()}</span><span><strong>{c.businessName}</strong><small>{c.businessType||"Category not set"}</small></span></div>;
      return view==="register"?<tr key={c.id}><td>{c.phone?<a className="aw-followup-icon" href={"tel:"+(c.phone.trim().startsWith("+")?"+":"")+c.phone.replace(/\D/g,"")} title={c.phone} aria-label={"Call "+c.phone}><PhoneCall size={16}/></a>:"—"}</td><td>{identity}</td><td><span className={"aw-client-status aw-client-status-"+(ended?"ended":c.status.toLowerCase())}>{ended?"EXPIRED":c.status}</span></td>
      <td>{date??"Open / not set"}{date&&<small className="aw-client-expiry" data-urgency={ended?"ended":days!==null&&days<=7?"urgent":days!==null&&days<=30?"soon":"normal"}>{ended?"Ended":days===0?"Ends today":days+" days left"}</small>}{ended&&c.agreementEndReason&&<small className="block">{c.agreementEndReason}</small>}</td>
      {canFinance&&<><td>{money(c.monthlyFee)}</td><td>{money(c.monthlyAdBudget)}</td></>}

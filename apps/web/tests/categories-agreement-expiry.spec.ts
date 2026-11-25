@@ -262,6 +262,9 @@ test("client overview and register use global summaries and permission-scoped wo
  await page.goto("/app/clients");
  const metrics=page.getByRole("region",{name:"Client status across all cycles"});
  await expect(metrics.getByRole("button",{name:"Total clients 5"})).toBeVisible();
+ await expect(page.getByLabel("Client health filter")).toHaveCount(0);
+ await expect(page.getByLabel("Account manager filter")).toHaveCount(0);
+ await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Unassessed",{exact:true})).toHaveCount(0);
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:900});
   const label=metrics.getByRole("button",{name:"Total clients 5"}).locator("span");
@@ -276,7 +279,10 @@ test("client overview and register use global summaries and permission-scoped wo
  await expect(table.getByRole("row").filter({hasText:client.businessName})).toContainText("4");
  await table.getByRole("link",{name:new RegExp(client.businessName)}).click();
  await expect(page.getByRole("tab",{name:"Overview",exact:true})).toHaveAttribute("aria-selected","true");
- await expect(page.getByLabel("Client health")).toHaveValue("UNASSESSED");
+ await expect(page.getByRole("heading",{name:"Notes & onboarding"})).toBeVisible();
+ await expect(page.getByLabel("Client health",{exact:true})).toHaveCount(0);
+ await expect(page.getByLabel("Account manager",{exact:true})).toHaveCount(0);
+ await expect(page.getByLabel("Account notes")).toBeVisible();
  await expect(page.getByText("Services subscribed",{exact:true})).toHaveCount(0);
  await expect(page.getByText("Stored service",{exact:true})).toHaveCount(0);
  await expect(page.getByLabel("Agreement completed")).not.toBeChecked();
