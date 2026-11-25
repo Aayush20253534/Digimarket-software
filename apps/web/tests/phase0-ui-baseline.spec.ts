@@ -157,16 +157,12 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  expect(lightRoot.scrollbar).not.toBe("auto");
  expect(lightRoot.scrollbar).not.toBe(darkRoot.scrollbar);
  expect(await page.evaluate(()=>localStorage.getItem("aw-workspace-theme"))).toBe("light");
- // Verify browser-local preference survives a fresh authenticated workspace.
- // Repeated rapid full reloads can race rotation of the HttpOnly refresh
- // cookie in this long diagnostic capture. Keep actual sign-in/sign-out
- // checks and separately exercise full reload persistence in the mock suite.
+ // The capture suite runs in a fresh isolated API process after the long
+ // functional suite so authentication request quotas cannot leak between them.
  await settledLeadWorkspace();
- await page.getByRole("button",{name:"Sign out",exact:true}).click();
- await expect(page).toHaveURL(/\/login$/);
- await page.getByLabel("Login ID").fill(login);
- await page.getByLabel("Password",{exact:true}).fill(password);
- await page.getByRole("button",{name:"Sign in",exact:true}).click();
+ const refreshed=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/v1/auth/refresh"&&response.request().method()==="POST");
+ await page.reload();
+ expect((await refreshed).status(),"Authenticated refresh during theme persistence reload").toBe(200);
  await settledLeadWorkspace();
  await expect(workspace).toHaveAttribute("data-theme","light");
  await page.getByRole("button",{name:"Switch to dark theme"}).click();
