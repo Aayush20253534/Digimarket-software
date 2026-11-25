@@ -308,7 +308,7 @@ export default function LeadsPage(){
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Lead register" description="Select any row to edit details. Call, location, short notes and scheduled actions stay visible.">
+       <Card title="Lead register" description="Select a row to edit details. Use the call and map icons for quick actions; notes and scheduled dates stay visible.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setTotalLeads(null);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
@@ -341,7 +341,7 @@ export default function LeadsPage(){
               ref={node=>{if(node)node.indeterminate=items.some(lead=>checkedLeads[lead.id]!==undefined)&&!items.every(lead=>checkedLeads[lead.id]!==undefined);}}
               onChange={e=>{const checked=e.target.checked;setCheckedLeads(previous=>{
                 const next={...previous};for(const lead of items){if(checked&&Object.keys(next).length<100)next[lead.id]=lead.version;else if(!checked)delete next[lead.id];}return next;
-              });}}/></th>}<th>Phone / call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
+              });}}/></th>}<th>Call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
            <tbody>{loading&&!items.length?
              Array.from({length:5},(_,i)=><tr key={"loading-"+i} aria-hidden="true" className="aw-lead-loading-row">
                {Array.from({length:canDelete?10:9},(_,j)=><td key={j}><div className="aw-lead-skeleton"/></td>)}
@@ -354,16 +354,16 @@ export default function LeadsPage(){
              {canDelete&&<td onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={"Select lead "+(l.contactName||l.businessName)}
                checked={checkedLeads[l.id]!==undefined} disabled={busy||loading||(selectedCount>=100&&checkedLeads[l.id]===undefined)}
                onChange={e=>selectLead(l,e.target.checked)}/></td>}
-             <td className="aw-crm-phone-cell">{l.phone?<a href={callHref(l.phone)} className="aw-lead-action aw-crm-phone-link" aria-label={"Call "+l.phone}
+             <td className="aw-crm-phone-cell">{l.phone?<a href={callHref(l.phone)} className="aw-lead-action" aria-label={"Call "+l.phone}
                title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
-               <PhoneCall size={15} aria-hidden="true"/><span>{l.phone}</span></a>:<span title="No phone number">—</span>}</td>
+               <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>
              <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
              <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular uppercase/></td>
              <td><time dateTime={l.createdAt} title="Automatically recorded when this lead was created">{fmt(l.createdAt)}</time></td>
-             <td className="aw-crm-location-cell"><div className="aw-crm-location">{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+             <td className="aw-crm-location-cell">{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                className="aw-lead-action" aria-label={"Open Google Maps for "+(l.contactName||l.businessName)}
-               title="Open location in Google Maps" onClick={e=>e.stopPropagation()}>
-               <MapPin size={16} aria-hidden="true"/></a>:null}<span title={l.location||undefined}>{l.location?.trim()||(l.googleMapsUrl?"Map link":"Not recorded")}</span></div></td>
+               title={l.location?.trim()||"Open location in Google Maps"} onClick={e=>e.stopPropagation()}>
+               <MapPin size={17} aria-hidden="true"/></a>:<span className="aw-lead-no-location" title={l.location?.trim()||"Location link not added"} aria-label="Location link not added"><MapPin size={17} aria-hidden="true"/></span>}</td>
              <td className="aw-lead-notes-cell"><div className={"aw-lead-notes-preview"+(!l.stageNote?.trim()?" aw-lead-notes-empty":"")} title={l.stageNote||"No notes yet"}>{l.stageNote?.trim()||"No notes yet"}</div>
                {l.status==="FOLLOW_UP"&&l.nextFollowUpAt&&<div className="aw-crm-next-action" data-overdue={l.nextFollowUpAt.slice(0,10)<new Date(Date.now()+330*60_000).toISOString().slice(0,10)}>Follow-up: {new Date(l.nextFollowUpAt.slice(0,10)+"T12:00:00Z").toLocaleDateString("en-IN",{timeZone:"UTC",dateStyle:"medium"})}</div>}
                {l.status==="MEETING_PROCESS"&&l.meetingAt&&<div className="aw-crm-next-action">Meeting: {new Date(l.meetingAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",dateStyle:"medium",timeStyle:"short"})}</div>}</td>

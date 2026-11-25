@@ -47,7 +47,7 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
  if(!canRead)return <div className="aw-client-directory"><h1>Clients access denied</h1><p>Your account cannot view client records.</p></div>;
  return <div data-aw-module="clients" className="aw-client-directory aw-module-root space-y-5">
   <SalesWorkspaceNav/>
-  <PageHeader eyebrow="CLIENT RELATIONSHIPS" title={section==="expired"?"Expired agreements":"Clients & delivery"}
+  <PageHeader eyebrow="CLIENT RELATIONSHIPS" title={section==="expired"?"Past Clients":"Clients & delivery"}
     description={section==="expired"?"Ended and expired client agreements. Their records remain available and are excluded from projected income.":"Manage each client's agreement, projects and readiness from one place."}
     actions={<div className="flex gap-2 flex-wrap"><Link href="/app/leads" className="aw-client-btn">View leads</Link>
     <Link href="/app/clients/video-readiness" className="aw-client-btn"><Video size={16}/>Video readiness</Link>
@@ -57,7 +57,7 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
     <button className="aw-client-btn" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
   <nav className="flex flex-wrap gap-3" aria-label="Client sections">
    <Link className={section==="current"?"aw-client-primary":"aw-client-btn"} href="/app/clients" aria-current={section==="current"?"page":undefined}>Clients</Link>
-   <Link className={section==="expired"?"aw-client-primary":"aw-client-btn"} href="/app/clients/expired" aria-current={section==="expired"?"page":undefined}>Expired</Link>
+   <Link className={section==="expired"?"aw-client-primary":"aw-client-btn"} href="/app/clients/expired" aria-current={section==="expired"?"page":undefined}>Past Clients</Link>
   </nav>
   {section==="current"&&<><div className="aw-client-statrow">
    <div className="aw-client-stat"><Users size={18}/><span>Clients on this page</span><strong>{loading?"…":rows.length}</strong></div>
@@ -77,7 +77,7 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
   </div></>}
     {error&&<div role="alert" className="aw-client-alert">{error}</div>}
   <section className="aw-client-panel">
-   <div className="aw-client-panel-heading"><div><h2>{section==="expired"?"Expired client directory":"Client directory"}</h2><p>Select a client to open their dedicated workspace. Records originate from approved leads.</p></div></div>
+   <div className="aw-client-panel-heading"><div><h2>{section==="expired"?"Past client directory":"Client directory"}</h2><p>Select a client to open their dedicated workspace. Records originate from approved leads.</p></div></div>
    <div className="aw-client-controls">
     <label className="aw-v3-directory-search"><Search size={17} aria-hidden="true"/><input aria-label="Search clients" className="field" placeholder="Search business, location, phone or email" value={search} onChange={e=>{setSearch(e.target.value);setCursor(null);setHistory([]);}}/></label>
     {section==="current"&&<select aria-label="Filter clients" className="field" value={filter} onChange={e=>{setFilter(e.target.value);setCursor(null);setHistory([]);}}>
@@ -88,7 +88,7 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
     </select>
     <button className="aw-client-btn" aria-label="Reverse client sort" onClick={()=>{setDescending(v=>!v);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
    </div>
-   {loading?<p role="status" className="aw-client-muted">Loading clients…</p>:!rows.length?<p className="aw-client-empty">No clients match these filters. A lead becomes a client when its stage is Approved.</p>:null}
+   {loading?<p role="status" className="aw-client-muted">Loading clients…</p>:!rows.length?<p className="aw-client-empty">{section==="expired"?"No past clients match these filters.":"No clients match these filters. A lead becomes a client when its stage is Approved."}</p>:null}
    <div className="aw-client-table-wrap">
     <table className="aw-client-table" aria-label="Clients directory">
      <thead><tr><th>Business</th><th>Category</th><th>Phone</th><th>Location</th><th>Status</th>{section==="expired"&&<th>Agreement ended</th>}<th>Video readiness</th><th>Post readiness</th><th>Workspace</th></tr></thead>
