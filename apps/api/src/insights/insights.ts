@@ -1,4 +1,7 @@
-import {agencyTimestampRange,TASKS_ENABLED} from "@digimarket/contracts";
+import {ClientPostReadinessService} from "../clients/post-readiness-service";
+import {ClientVideoReadinessService} from "../clients/video-readiness-service";
+import {expiredAgreementWhere} from "../clients/agreement-status";
+import {agencyToday,agencyTimestampRange,TASKS_ENABLED} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {forbidden} from "../auth/errors";
@@ -78,12 +81,30 @@ export class InsightsService{
   const grouped=await Promise.all(parts);
   return {query:q,items:grouped.flat().slice(0,70)};
  }
+ async clientDelivery(a:Principal){
+  requireGrant(a,"reports.business.read");
+  requireGrant(a,"clients.read");
+  const today=agencyToday();
+  const clients=await this.db.client.findMany({where:{organizationId:a.organizationId,status:"ACTIVE",NOT:expiredAgreementWhere(today)},select:{id:true,businessName:true,contractEndOn:true},orderBy:[{businessName:"asc"},{id:"asc"}]});
+  const posts=new ClientPostReadinessService(this.db),videos=new ClientVideoReadinessService(this.db);
+  const items=[];
+  for(let i=0;i<clients.length;i+=4){
+   const batch=await Promise.all(clients.slice(i,i+4).map(async client=>{
+    const [p,v]=await Promise.all([posts.clientCycle(a,client.id,undefined,today),videos.clientCycle(a,client.id,undefined,today)]);
+    return {id:client.id,name:client.businessName,from:p.from,to:p.to,agreementEnd:client.contractEndOn?.toISOString().slice(0,10)??null,
+     posts:p.totalStock,videos:v.totalStock,festival:p.festivalTotalStock,postsDelivered:p.from?p.deliveredThisMonth:null,videosDelivered:v.from?v.deliveredThisMonth:null,festivalDelivered:p.from?p.festivalDeliveredThisMonth:null};
+   }));
+   items.push(...batch);
+  }
+  return {asOf:today,items};
+ }
  async report(a:Principal,from:string,to:string){
   requireGrant(a,"reports.business.read");
   const org=a.organizationId;
   const start=new Date(from+"T00:00:00.000Z"),end=new Date(to+"T23:59:59.999Z");
   const timestampRange=agencyTimestampRange({from,to});
   const sections:Record<string,unknown>={};
+  let cashTrend:{date:string;income:string;expense:string}[]|undefined;
   const work:Promise<void>[]=[];
   if(can(a,"leads.read"))work.push((async()=>{
     const scope={organizationId:org,deletedAt:null,createdAt:timestampRange};
@@ -104,7 +125,7 @@ export class InsightsService{
       conversionRatePercent:created?Math.round(converted/created*10000)/100:0,
       overdueFollowUps:overdue};
   })());
-  if(can(a,"clients.read"))work.push(this.db.client.count({where:{organizationId:org,status:"ACTIVE"}})
+  if(can(a,"clients.read"))work.push(this.db.client.count({where:{organizationId:org,status:"ACTIVE",NOT:expiredAgreementWhere()}})
     .then(count=>{sections.clients={active:count};}));
   if(can(a,"projects.read"))work.push((async()=>{
     const scope={organizationId:org,...projectScope(a)};
@@ -138,14 +159,24 @@ export class InsightsService{
       outstanding:uncollected.reduce((s,i)=>s.plus(i.total.minus(i.paidTotal)),new Prisma.Decimal(0)).toFixed(4)};
   })());
   if(can(a,"finance.read.all"))work.push((async()=>{
-    const sums=await this.db.financialTransaction.groupBy({by:["kind"],where:{
-      organizationId:org,clientId:null,status:"POSTED",occurredOn:{gte:start,lte:end}},
-      _sum:{amount:true}});
+    const where={organizationId:org,clientId:null,status:"POSTED" as const,occurredOn:{gte:start,lte:end}};
+    const [sums,days]=await Promise.all([
+     this.db.financialTransaction.groupBy({by:["kind"],where,_sum:{amount:true}}),
+     this.db.financialTransaction.groupBy({by:["kind","occurredOn"],where,_sum:{amount:true}}),
+    ]);
+    const daily=new Map<string,{date:string;income:string;expense:string}>();
+    for(const row of days){
+     const date=row.occurredOn.toISOString().slice(0,10),entry=daily.get(date)??{date,income:"0.00",expense:"0.00"};
+     if(row.kind==="INCOME")entry.income=row._sum.amount?.toFixed(2)??"0.00";
+     if(row.kind==="EXPENSE")entry.expense=row._sum.amount?.toFixed(2)??"0.00";
+     daily.set(date,entry);
+    }
+    cashTrend=[...daily.values()].sort((a,b)=>a.date.localeCompare(b.date));
     sections.cashLedger={currency:"INR",posted:sums.map(v=>({
       kind:v.kind,amount:v._sum.amount?.toFixed(2)??"0.00"}))};
   })());
   await Promise.all(work);
-  return {from,to,asOf:new Date().toISOString(),sections,
+  return {from,to,asOf:new Date().toISOString(),sections,cashTrend,
     definitions:{
       period:"Indian civil dates, inclusive; work cycles run from the 22nd to the next 22nd (exclusive)",
       leadConversion:"Approved leads with linked clients divided by all non-deleted leads created in the selected period; rejected leads are included in the denominator",

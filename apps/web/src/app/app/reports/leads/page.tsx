@@ -1,6 +1,7 @@
 "use client";
 import {reportingPreset,cycleLabel} from "@digimarket/contracts";
 import Link from "next/link";
+import {ReportTabs} from "../report-controls";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {ArrowDownToLine,ArrowLeft,ArrowRight,CalendarRange,ChartNoAxesCombined,Clock3,Filter,RefreshCcw,Search,ShieldCheck,TrendingUp,Users} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
@@ -34,11 +35,11 @@ const pct=(n:number)=>n.toLocaleString("en-IN",{maximumFractionDigits:2})+"%";
 const getError=(e:unknown)=>e instanceof Error?e.message:"Lead analytics unavailable";
 const hues=["var(--aw-chart-1)","var(--aw-chart-2)","var(--aw-chart-3)","var(--aw-chart-4)","var(--aw-chart-5)","var(--aw-chart-6)","var(--aw-chart-7)","var(--aw-chart-8)","var(--aw-chart-9)","var(--aw-chart-10)"];
 
-function Bars({items,maxRows=12}: {items:Count[];maxRows?:number}){
+function Bars({items,maxRows=12,onSelect}: {items:Count[];maxRows?:number;onSelect?:(name:string)=>void}){
  const rows=items.slice(0,maxRows),maximum=Math.max(1,...rows.map(x=>x.count));
  if(!items.length||!items.some(x=>x.count))return <p className="aw-lead-empty">No matching leads in this period.</p>;
  return <div className="aw-lead-bars">{rows.map((item,i)=><div className="aw-lead-bar" key={item.name}>
-  <div className="aw-lead-bar-label"><span title={label(item.name)}>{label(item.name)}</span><strong>{count(item.count)}</strong></div>
+  <div className="aw-lead-bar-label">{onSelect?<button type="button" className="rp-link" onClick={()=>onSelect(item.name)}>{label(item.name)}</button>:<span title={label(item.name)}>{label(item.name)}</span>}<strong>{count(item.count)}</strong></div>
   <div className="aw-lead-track" role="img" aria-label={label(item.name)+": "+count(item.count)}>
    <div style={{width:Math.max(1,item.count/maximum*100)+"%",background:hues[i%hues.length]}}/>
   </div>
@@ -160,6 +161,7 @@ export default function LeadBreakdownPage(){
   <Link className="aw-lead-back" href={back}><ArrowLeft size={16}/>Back to Reports</Link>
   <PageHeader eyebrow="AGENCY LEAD INTELLIGENCE" title="Leads Breakdown"
    description="Actual CRM records, funnel history and conversion outcomes. All numbers respect the selected reporting filters."/>
+  <ReportTabs from={from} to={to}/>
   <section className="aw-lead-filter">
    <div className="aw-lead-filter-head"><strong><CalendarRange size={18}/>Reporting period</strong>
     <span><ShieldCheck size={15}/> Live, permission-protected</span></div>
@@ -173,6 +175,7 @@ export default function LeadBreakdownPage(){
     <button type="button" className="aw-lead-primary" disabled={busy} onClick={()=>void refresh()}>
      <RefreshCcw size={16} className={busy?"animate-spin":""}/>Refresh</button>
    </div>
+   <details className="rp-advanced"><summary>Advanced filters</summary>
    <div className="aw-lead-filter-head"><strong><Filter size={17}/>Filter all analytics</strong>
     <button type="button" className="aw-lead-reset" onClick={clear}>Clear filters</button></div>
    <div className="aw-lead-filter-grid">
@@ -194,15 +197,17 @@ export default function LeadBreakdownPage(){
     <label className="aw-lead-search-label">Search<input aria-label="Search leads" type="search" maxLength={100} value={search}
      placeholder="Business, contact, phone, location…" onChange={e=>{setSearch(e.target.value);setPage(1);}}/></label>
    </div>
+   </details>
   </section>
   {error&&<Notice kind="error">{error}</Notice>}
   {busy&&!report&&<Spinner label="Calculating lead analytics…"/>}
   {report&&<>
    <p className="aw-lead-muted">Period: {date(report.from+"T00:00:00Z")} to {date(report.to+"T00:00:00Z")} · Calculated {new Date(report.asOf).toLocaleString("en-IN")} · {count(report.summary.total)} matching leads {busy?" · Updating…":""}</p>
-   <div className="aw-lead-kpis">{statCards.map(([name,value,description],i)=><article key={name} className="aw-lead-kpi">
+   <div className="aw-lead-kpis">{statCards.filter(([name])=>["Total leads","Approved","Client converted","Client conversion rate"].includes(String(name))).map(([name,value,description],i)=><article key={name} className="aw-lead-kpi">
     <div className="aw-lead-kpi-icon">{i%3===0?<Users size={18}/>:i%3===1?<TrendingUp size={18}/>:<Clock3 size={18}/>}</div>
     <p>{name}</p><strong>{typeof value==="number"?count(value):value}</strong><small>{description}</small>
    </article>)}</div>
+   <details className="rp-panel"><summary>More lead metrics</summary><div className="rp-kpis">{statCards.filter(([name])=>!["Total leads","Approved","Client converted","Client conversion rate"].includes(String(name))).map(([name,value,description])=><article className="rp-kpi" key={name}><span>{name}</span><strong>{value}</strong><small>{description}</small></article>)}</div></details>
    <div className="aw-lead-panels">
     <Section title="Lead acquisition trend" subtitle="New leads by creation date. Switch the time grouping without changing the cohort.">
      <div className="aw-lead-panel-toolbar"><label>Group by <select value={bucket} onChange={e=>setBucket(e.target.value as typeof bucket)}>
@@ -211,12 +216,12 @@ export default function LeadBreakdownPage(){
      <Trend rows={report.trends[bucket].map(row=>({...row,name:bucket==="monthly"?cycleLabel(row.name):row.name}))}/>
     </Section>
     <Section title="Lead sources" subtitle="Acquisition channel distribution"><Donut items={report.sources.map(x=>({name:x.name,count:x.total}))}/></Section>
-    <Section title="Current lead statuses" subtitle="Exactly one current status per lead"><Bars items={report.stages}/></Section>
+    <Section title="Current lead statuses" subtitle="Exactly one current status per lead"><Bars items={report.stages} onSelect={name=>{setStage(name);setPage(1)}}/></Section>
     <Section title="Conversion stage reach" subtitle="Historical stages reached, not a strictly sequential funnel"><Bars items={report.funnel}/></Section>
     <Section title="Acquisition effectiveness" subtitle="Approved and client-converted counts stay separate">
      <div className="aw-lead-table-scroll"><table className="aw-lead-table">
       <thead><tr><th>Source</th><th>Leads</th><th>Approved</th><th>Clients</th><th>Approval %</th><th>Conversion %</th></tr></thead>
-      <tbody>{report.sources.map(row=><tr key={row.name}><td>{label(row.name)}</td><td>{row.total}</td>
+      <tbody>{report.sources.map(row=><tr key={row.name}><td><button className="rp-link" type="button" onClick={()=>{setSource(row.name);setPage(1)}}>{label(row.name)}</button></td><td>{row.total}</td>
        <td>{row.approved}</td><td>{row.converted}</td><td>{pct(row.approvalRate)}</td><td>{pct(row.conversionRate)}</td></tr>)}</tbody>
      </table></div>
     </Section>
@@ -260,11 +265,11 @@ export default function LeadBreakdownPage(){
      <button type="button" disabled={busy||!report.hasMore} onClick={()=>setPage(p=>p+1)}>Next<ArrowRight size={15}/></button>
     </nav>
    </Section>
-   <section className="aw-lead-definitions"><h2><ChartNoAxesCombined size={18}/> Metric definitions and data integrity</h2>
+   <details className="aw-lead-definitions"><summary><ChartNoAxesCombined size={18}/> Metric definitions and data integrity</summary>
     <dl>{Object.entries(report.definitions).map(([name,description])=><div key={name}>
      <dt>{label(name)}</dt><dd>{description}</dd></div>)}</dl>
     <p>Advertising spend, cost per lead and advertising ROI are not computed here because campaign expenses are not reliably linked to individual Meta leads.</p>
-   </section>
+   </details>
   </>}
  </div>;
 }

@@ -95,6 +95,7 @@ export const financeBreakdownQuerySchema=z.strictObject({
  q:z.string().trim().max(100).default(""),
  // Optional drill-down filters apply only to the transaction ledger/CSV.
  personId:z.uuid().optional(),
+ categoryId:z.uuid().optional(),
  day:z.iso.date().optional(),
  page:z.coerce.number().int().min(1).max(100000).default(1),
  limit:z.coerce.number().int().min(1).max(100).default(20),

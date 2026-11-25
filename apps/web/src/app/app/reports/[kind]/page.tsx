@@ -1,6 +1,7 @@
 "use client";
 import {businessCycle,cycleLabel,reportingPreset} from "@digimarket/contracts";
 import Link from "next/link";
+import {ReportTabs} from "../report-controls";
 import {useParams} from "next/navigation";
 import {useAuth} from "@/components/auth-provider";
 import {Notice,PageHeader,Spinner} from "@/components/ui";
@@ -43,6 +44,7 @@ export default function FinanceBreakdownPage(){
  const [selectedMonth,setSelectedMonth]=useState<string|null>(null);
  const [selectedDay,setSelectedDay]=useState<string|null>(null);
  const [selectedPersonId,setSelectedPersonId]=useState<string|null>(null);
+ const [selectedCategoryId,setSelectedCategoryId]=useState<string|null>(null);
  const [records,setRecords]=useState<Breakdown|null>(null);
  const [busy,setBusy]=useState(false);
  const [exporting,setExporting]=useState(false);
@@ -60,7 +62,8 @@ export default function FinanceBreakdownPage(){
    kind:kind??"INCOME",from,to,q:query,page:String(page),limit:"20",
    ...(selectedDay?{day:selectedDay}:{}),
    ...(selectedPersonId?{personId:selectedPersonId}:{}),
- }),[kind,from,to,query,page,selectedDay,selectedPersonId]);
+   ...(selectedCategoryId?{categoryId:selectedCategoryId}:{}),
+ }),[kind,from,to,query,page,selectedDay,selectedPersonId,selectedCategoryId]);
  const refresh=useCallback(async()=>{
    if(!ready||!session||!allowed||!kind)return;
    if(!from||!to||from>to){setError("Select a valid start and end date.");return;}
@@ -74,7 +77,7 @@ export default function FinanceBreakdownPage(){
  useEffect(()=>{void refresh();return()=>{seq.current+=1;};},[refresh]);
  const changePeriod=(start:string,end:string)=>{
    setFrom(start);setTo(end);setPage(1);
-   setSelectedMonth(null);setSelectedDay(null);setSelectedPersonId(null);
+   setSelectedMonth(null);setSelectedDay(null);setSelectedPersonId(null);setSelectedCategoryId(null);
  };
  const preset=(mode:"current"|"three"|"year"|"all")=>{
    const period=reportingPreset(mode);changePeriod(period.from,period.to);
@@ -130,6 +133,7 @@ export default function FinanceBreakdownPage(){
   <PageHeader eyebrow="AGENCY FINANCIAL INTELLIGENCE"
     title={isIncome?"Income Breakdown":"Expense Breakdown"}
     description="Verified posted transactions, matched to the selected Reports period. Pending, rejected and cancelled entries are excluded."/>
+  <ReportTabs from={from} to={to}/>
   <section className="aw-report-breakdown-filter" aria-label="Financial breakdown filters">
    <div className="flex items-center gap-2 font-bold"><CalendarRange size={17}/>Reporting period</div>
    <div className="aw-report-preset-row">
@@ -196,7 +200,7 @@ export default function FinanceBreakdownPage(){
       <div className="aw-finance-categories">
        {records.categories.length===0&&<p>No posted entries in this period.</p>}
        {records.categories.map(c=><div className="aw-finance-category" key={c.id}>
-        <div className="aw-finance-category-head"><strong>{c.name}</strong>
+        <div className="aw-finance-category-head"><button type="button" className="rp-link" aria-pressed={selectedCategoryId===c.id} onClick={()=>{setSelectedCategoryId(id=>id===c.id?null:c.id);setPage(1)}}>{c.name}</button>
          <span>{money(c.total)} · {c.count} transaction{c.count===1?"":"s"}</span></div>
         <div className="aw-finance-category-track"><div style={{width:Math.min(100,Number(c.total)/categoryMax*100)+"%"}}/></div>
        </div>)}
@@ -246,11 +250,12 @@ export default function FinanceBreakdownPage(){
    <section className="aw-finance-panel" aria-label="Financial transactions ledger">
      <div className="aw-finance-ledger-heading">
       <div><h2>Transaction ledger</h2>
-       <p>20 transactions per page. Search and day/person selection filter this ledger and CSV, not overall totals.</p>
-       {(selectedDay||selectedPersonId)&&<p className="aw-finance-active-filters">
+       <p>20 transactions per page. Search and day/person/category selection filter this ledger and CSV, not overall totals.</p>
+       {(selectedDay||selectedPersonId||selectedCategoryId)&&<p className="aw-finance-active-filters">
         {selectedDay&&<span>Day: {pretty(selectedDay)}</span>}
         {selectedPersonId&&<span>Person: {activePerson?.name??"Selected member"}</span>}
-        <button type="button" onClick={()=>{setSelectedDay(null);setSelectedPersonId(null);setPage(1);}}>Clear ledger filters</button>
+        {selectedCategoryId&&<span>Category: {records.categories.find(c=>c.id===selectedCategoryId)?.name}</span>}
+        <button type="button" onClick={()=>{setSelectedDay(null);setSelectedPersonId(null);setSelectedCategoryId(null);setPage(1);}}>Clear ledger filters</button>
        </p>}</div>
       <button type="button" className="aw-report-primary" disabled={exporting||busy}
         onClick={()=>void exportCsv()}><ArrowDownToLine size={16}/>{exporting?"Exporting…":"Export filtered CSV"}</button>
@@ -260,6 +265,7 @@ export default function FinanceBreakdownPage(){
         <input aria-label="Search financial transactions" type="search" maxLength={100}
          placeholder="Source, category, method, description, or person"
          value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/></label>
+       <select className="field" aria-label="Filter transaction category" value={selectedCategoryId??""} onChange={e=>{setSelectedCategoryId(e.target.value||null);setPage(1)}}><option value="">All categories</option>{records.categories.map(c=><option value={c.id} key={c.id}>{c.name}</option>)}</select>
        <span>{records.matchingCount} matching · {money(records.matchingTotal)}</span>
      </div>
      <div className="aw-finance-table-scroller"><table className="aw-finance-table" aria-label="Financial breakdown transactions" aria-busy={busy}>

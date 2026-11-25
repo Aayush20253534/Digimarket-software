@@ -26,6 +26,10 @@ export function registerInsightsRoutes(app:Express,auth:AuthService){
   res.set("Cache-Control","no-store");
   const q=parse(searchQuerySchema,req.query);res.json({data:await insights.search(actor(res),q.q)});
  });
+ app.get(base+"/reports/client-delivery",authenticate,async(_req,res)=>{
+  res.set("Cache-Control","no-store");
+  res.json({data:await insights.clientDelivery(actor(res))});
+ });
  app.get(base+"/reports/overview",authenticate,async(req,res)=>{
   res.set("Cache-Control","no-store");
   const p=parse(reportsPeriodSchema,req.query);

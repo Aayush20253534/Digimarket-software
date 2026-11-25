@@ -1,192 +1,68 @@
 "use client";
 import {reportingPreset} from "@digimarket/contracts";
-import {BusinessPeriodPicker} from "@/components/business-period-picker";
 import {useCallback,useEffect,useRef,useState} from "react";
 import Link from "next/link";
-import {Activity,ArrowUpRight,BarChart3,ChartNoAxesCombined,RefreshCcw,ShieldCheck,TrendingUp,Users,Wallet,ArrowDownLeft} from "lucide-react";
+import {ArrowUpRight,Download} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
-import {ApiError} from "@/lib/api";
 import {Notice,PageHeader,Spinner} from "@/components/ui";
-type MetricValue=number|string|{kind:string;amount:string}[];
-type Section=Record<string,MetricValue>;
-type Report={from:string;to:string;asOf:string;sections:Record<string,Section>;definitions:Record<string,string>};
-type SalaryReport={totalPaid:string;paymentCount:number;founderFunding:{founderUserId:string;name:string;amount:string}[]};
-const first=()=>reportingPreset("current").from;
-const label=(s:string)=>s.replace(/([A-Z])/g," $1").replace(/_/g," ").replace(/^./,x=>x.toUpperCase());
-const themes=["violet","cyan","coral","mint","amber","pink"] as const;
-const icons=[ChartNoAxesCombined,Users,TrendingUp,Wallet,Activity,BarChart3];
-const format=(value:MetricValue)=>Array.isArray(value)?value.map(v=>v.kind+": "+v.amount).join(" · "):typeof value==="number"?new Intl.NumberFormat("en-IN").format(value):String(value);
-const numeric=(v:MetricValue|undefined)=>typeof v==="number"?v:
- typeof v==="string"&&Number.isFinite(Number(v))?Number(v):0;
+import {ReportTabs,ReportToolbar,comparisonPeriod} from "./report-controls";
+type Metric=number|string|{kind:string;amount:string}[];
+type Report={from:string;to:string;asOf:string;sections:Record<string,Record<string,Metric>>;definitions:Record<string,string>;cashTrend?:{date:string;income:string;expense:string}[]};
+type Salary={totalPaid:string;paymentCount:number;founderFunding:{founderUserId:string;name:string;amount:string}[]};
+const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
+const count=(n:number)=>n.toLocaleString("en-IN",{maximumFractionDigits:2});
+const val=(r:Report|null,s:string,k:string)=>{const v=r?.sections[s]?.[k];return typeof v==="number"||typeof v==="string"&&Number.isFinite(Number(v))?Number(v):null};
+const cash=(r:Report|null,k:string)=>{const v=r?.sections.cashLedger?.posted;return Array.isArray(v)?Number(v.find(x=>x.kind===k)?.amount??0):null};
+const net=(r:Report|null)=>{const a=cash(r,"INCOME"),b=cash(r,"EXPENSE");return a===null||b===null?null:Math.round((a-b)*100)/100};
+const title=(s:string)=>s.replace(/([A-Z])/g," $1").replace(/^./,v=>v.toUpperCase());
+function Bars({rows}:{rows:{label:string;value:number}[]}){
+ const max=Math.max(1,...rows.map(x=>x.value));
+ return <div className="rp-bars">{rows.map(x=><div key={x.label}><div className="rp-line"><span>{x.label}</span><strong>{count(x.value)}</strong></div><div className="rp-track"><span style={{width:x.value/max*100+"%"}}/></div></div>)}</div>;
+}
 export default function ReportsPage(){
- const {session,request}=useAuth();
- const can=!!session?.identity.permissions.includes("reports.business.read");
- const founder=!!session?.identity.roles.includes("FOUNDER");
- const [from,setFrom]=useState(()=>{
-   if(typeof window==="undefined")return first();
-   const candidate=new URLSearchParams(window.location.search).get("from");
-   return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:first();
- }),[to,setTo]=useState(()=>{
-   if(typeof window==="undefined")return reportingPreset("current").to;
-   const candidate=new URLSearchParams(window.location.search).get("to");
-   return candidate&&/^\d{4}-\d{2}-\d{2}$/.test(candidate)?candidate:reportingPreset("current").to;
- }),[report,setReport]=useState<Report|null>(null);
- const [busy,setBusy]=useState(false),[error,setError]=useState("");
- const [salaryReport,setSalaryReport]=useState<SalaryReport|null>(null),[salaryWarning,setSalaryWarning]=useState("");
- const reportSequence=useRef(0);
- const load=useCallback(async()=>{
-  const sequence=++reportSequence.current;
-  if(!can)return;
-  if(from>to){setError("The start date must be before the end date.");return;}
-  setBusy(true);setError("");
+ const {session,request}=useAuth(),can=!!session?.identity.permissions.includes("reports.business.read"),founder=!!session?.identity.roles.includes("FOUNDER");
+ const [period,setPeriod]=useState(()=>reportingPreset("current")),[ready,setReady]=useState(false),[report,setReport]=useState<Report|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
+ const [comparison,setComparison]=useState<{current:Report;previous:Report}|null>(null),[salary,setSalary]=useState<Salary|null>(null),[salaryWarning,setSalaryWarning]=useState("");
+ const sequence=useRef(0);
+ useEffect(()=>{const q=new URLSearchParams(window.location.search),from=q.get("from"),to=q.get("to");if(from&&to&&/^\d{4}-\d{2}-\d{2}$/.test(from)&&/^\d{4}-\d{2}-\d{2}$/.test(to)&&from<=to)setPeriod({from,to});setReady(true)},[]);
+ const load=useCallback(async()=>{if(!can||!ready)return;const id=++sequence.current;setBusy(true);setError("");setComparison(null);setSalary(null);setSalaryWarning("");
   try{
-   const next=await request<Report>("/reports/overview?"+new URLSearchParams({from,to}));
-   if(sequence===reportSequence.current)setReport(next);
-  }
-  catch(e){if(sequence===reportSequence.current)
-   setError(e instanceof ApiError?e.message:"Report unavailable");}
-  finally{if(sequence===reportSequence.current)setBusy(false);}
- },[can,request,from,to]);
- useEffect(()=>{void load();return()=>{reportSequence.current+=1;};},[load]);
- useEffect(()=>{
-  if(!founder||!can||from>to)return;
-  let active=true;
-  void request<SalaryReport>("/salary/summary?"+new URLSearchParams({from,to})).then(data=>{
-   if(active){setSalaryReport(data);setSalaryWarning("");}
-  }).catch(e=>{if(active){setSalaryReport(null);setSalaryWarning(e instanceof Error?e.message:"Salary data unavailable");}});
-  return()=>{active=false;};
- },[founder,can,from,to,request]);
+   const result=await request<Report>("/reports/overview?"+new URLSearchParams(period));
+   if(id!==sequence.current)return;setReport(result);
+   const pair=comparisonPeriod(period);
+   await Promise.all([
+    pair?Promise.all([pair.current.to===period.to?Promise.resolve(result):request<Report>("/reports/overview?"+new URLSearchParams(pair.current)),request<Report>("/reports/overview?"+new URLSearchParams(pair.previous))]).then(([current,previous])=>{if(id===sequence.current)setComparison({current,previous})}).catch(()=>{}):Promise.resolve(),
+    founder?request<Salary>("/salary/summary?"+new URLSearchParams(period)).then(data=>{if(id===sequence.current)setSalary(data)}).catch(()=>{if(id===sequence.current)setSalaryWarning("Salary reporting unavailable.")}):Promise.resolve()
+   ]);
+  }catch(e){if(id===sequence.current){setReport(null);setError(e instanceof Error?e.message:"Report unavailable")}}
+  finally{if(id===sequence.current)setBusy(false)}
+ },[can,ready,period,request,founder]);
+ useEffect(()=>{void load();return()=>{sequence.current++}},[load]);
+ const change=(v:typeof period)=>{setPeriod({from:v.from,to:v.to});setReport(null);setComparison(null);setSalary(null);const url=new URL(window.location.href);url.searchParams.set("from",v.from);url.searchParams.set("to",v.to);window.history.replaceState(null,"",url.pathname+url.search)};
  if(!session)return <Spinner label="Checking reporting permissions…"/>;
  if(!can)return <Notice kind="error">Business reporting permission required.</Notice>;
- const cards=Object.entries(report?.sections??{}).filter(([key])=>key!=="invoices");
- const leadStages=report?.sections.leads?[
-   {name:"Pending",value:numeric(report.sections.leads.pending)},
-   {name:"Follow-up",value:numeric(report.sections.leads.followUp)},
-   {name:"Meeting",value:numeric(report.sections.leads.meetingProcess)},
-   {name:"Decision",value:numeric(report.sections.leads.decisionPending)},
-   {name:"Agreement",value:numeric(report.sections.leads.agreementPending)},
-   {name:"Approved",value:numeric(report.sections.leads.approved)},
-  ]:[];
- const ledger=report?.sections.cashLedger?.posted;
- const financeBars=Array.isArray(ledger)?(["INCOME","EXPENSE"] as const).map(kind=>({
-   name:kind==="INCOME"?"Income":"Expenses",
-   value:Math.max(0,Number(ledger.find(item=>item.kind===kind)?.amount??"0")),
- } )):[];
- const leadMax=Math.max(1,...leadStages.map(x=>x.value));
- const financeMax=Math.max(1,...financeBars.map(x=>x.value));
- const leadConversionRate=report?.sections.leads?.conversionRatePercent;
- const leadConversionValue=typeof leadConversionRate==="number" ? leadConversionRate:
-   typeof leadConversionRate==="string" ? Number(leadConversionRate):null;
- return <div className="aw-report-page aw-v5-reports-page space-y-6" data-aw-module="reports">
-  <PageHeader eyebrow="Agency intelligence" title="Performance reports"
-   description="A comprehensive view of your business, delivered from real records and enforced by the current API permissions."/>
-  <nav className="aw-v5-report-jump" aria-label="Reporting breakdowns">
-    <Link href={"/app/reports/leads?"+new URLSearchParams({from,to})}><Users size={16} aria-hidden="true"/>Leads analytics</Link>
-    <Link href={"/app/reports/income?"+new URLSearchParams({from,to})}><ArrowDownLeft size={16} aria-hidden="true"/>Income breakdown</Link>
-    <Link href={"/app/reports/expenses?"+new URLSearchParams({from,to})}><ArrowUpRight size={16} aria-hidden="true"/>Expense breakdown</Link>
-   </nav>
-  <BusinessPeriodPicker value={{from,to}} onChange={period=>{setFrom(period.from);setTo(period.to);
-   const url=new URL(window.location.href);url.searchParams.set("from",period.from);url.searchParams.set("to",period.to);
-   window.history.replaceState(null,"",url.pathname+url.search+url.hash);
-  }}/>
-  <button className="btn-secondary" disabled={busy} type="button" onClick={()=>void load()}><RefreshCcw size={17}/>Refresh insights</button>
-  {error&&<Notice kind="error">{error}</Notice>}
-  {busy&&!report&&<Spinner label="Calculating permitted metrics…"/>}
-  {report&&<>
-   <div className="aw-v5-report-period-note" role="status">
-    <span>Reporting window</span><strong>{report.from} to {report.to}</strong>
-    <small>Last calculated {new Date(report.asOf).toLocaleString("en-IN")}</small>
-   </div>
-   <div id="report-kpis" className="aw-report-sectionhead"><div><p>BUSINESS OVERVIEW</p><h2>Key performance indicators</h2></div>
-    <span><ShieldCheck size={15}/> Live, role-protected metrics</span></div>
-   {(leadStages.length>0||financeBars.length>0)&&<section id="report-charts" className="aw-report-visuals" aria-label="Operational charts">
-    {leadStages.length>0&&<div className="aw-insights-card">
-     <div className="aw-insights-head">
-      <div><h3 className="aw-insights-title">Lead pipeline by current stage</h3>
-       <p className="aw-insights-hint">Leads created in the reporting period</p></div>
-      <BarChart3 className="text-violet-400" size={19} aria-hidden="true"/>
-     </div>
-     <div className="aw-insights-bar-list" role="img" aria-label={leadStages.map(x=>x.name+": "+x.value).join("; ")}>
-      {leadStages.map(item=><div key={item.name}>
-       <div className="aw-insights-label"><span>{item.name}</span><strong>{item.value.toLocaleString("en-IN")}</strong></div>
-       <div className="aw-insights-track"><div className="aw-insights-fill" style={{width:item.value/leadMax*100+"%"}}/></div>
-      </div>)}
-     </div>
-     <p className="aw-insights-chart-note">Current stage counts, not a chronological conversion funnel.</p>
-    </div>}
-    {financeBars.length>0&&<div className="aw-insights-card">
-     <div className="aw-insights-head">
-      <div><h3 className="aw-insights-title">Posted income versus expenses</h3>
-       <p className="aw-insights-hint">Actual agency ledger entries in the selected period</p></div>
-      <Wallet className="text-violet-400" size={19} aria-hidden="true"/>
-     </div>
-     <div className="aw-insights-bar-list" role="img"
-       aria-label={financeBars.map(x=>x.name+": "+new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(x.value)).join("; ")}>
-      {financeBars.map(item=><div key={item.name}>
-       <div className="aw-insights-label"><span>{item.name}</span><strong>{new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(item.value)}</strong></div>
-       <div className="aw-insights-track"><div className="aw-insights-fill" style={{width:item.value/financeMax*100+"%"}}/></div>
-      </div>)}
-     </div>
-     <p className="aw-insights-chart-note">Client-funded Meta Ads spending is excluded from agency expenses.</p>
-    </div>}
-   </section>}
-   {founder&&<section className="aw-insights-card space-y-3" aria-label="Separate founder salary expenses">
-    <div className="aw-insights-head"><div><h3 className="aw-insights-title">Founder-paid salaries</h3>
-     <p className="aw-insights-hint">Paid salary expenses by founder funding source; excluded from ordinary ledger income and expenses.</p></div>
-     <Link href="/app/salary" className="underline text-sm">Open Salary</Link></div>
-    {salaryWarning&&<p role="status" className="text-sm text-amber-400">Salary reporting unavailable: {salaryWarning}</p>}
-    <p className="text-lg font-bold">Total paid: {new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(salaryReport?.totalPaid||0))}</p>
-    <div className="aw-insights-bar-list">{(salaryReport?.founderFunding||[]).map(x=><div key={x.founderUserId}>
-     <div className="aw-insights-label"><span>{x.name}</span><strong>{new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(x.amount))}</strong></div>
-     <div className="aw-insights-track"><div className="aw-insights-fill" style={{width:Number(x.amount)/Math.max(1,...(salaryReport?.founderFunding||[]).map(y=>Number(y.amount)))*100+"%"}}/></div>
-    </div>)}</div>
-    <p className="aw-insights-chart-note">Founder contributions and received salaries never appear as new agency income. The total cost is counted once per salary payment, regardless of how many founder accounts funded it.</p>
-   </section>}
-   <div className="aw-report-grid" id="report-breakdown-cards">
-    {leadConversionValue!==null&&Number.isFinite(leadConversionValue)&&
-     <article className="aw-report-card aw-report-mint" aria-label="Lead conversion rate">
-       <div className="aw-report-card-top"><span className="aw-report-icon"><TrendingUp size={22}/></span>
-         <ArrowUpRight size={18} aria-hidden="true"/></div>
-       <p className="aw-report-card-label">LEAD CONVERSION RATE</p>
-       <div className="aw-report-hero-value">{leadConversionValue.toLocaleString("en-IN",{maximumFractionDigits:2})}%</div>
-       <p className="aw-report-hero-label">Approved leads converted into clients</p>
-       <p className="mt-3 text-xs text-[#c8b6d4]">For leads created during the selected reporting period.</p>
-     </article>}
-    {cards.map(([name,values],i)=>{
-     const Icon=icons[i%icons.length],entries=Object.entries(values).filter(([key])=>!(name==="leads"&&key==="conversionRatePercent")),ledger=name==="cashLedger"&&Array.isArray(values.posted)?values.posted:null,spot=entries.find(([,v])=>!Array.isArray(v)&&
-       (typeof v==="number"||(/^-?\d+(\.\d+)?$/.test(v)&&v.length<20)))??entries[0];
-     return <article className={"aw-report-card aw-report-"+themes[i%themes.length]+(name==="leads"?" relative":"")} key={name}>
-      {name==="leads"&&<Link href={"/app/reports/leads?"+new URLSearchParams({from:report.from,to:report.to})} className="absolute inset-0 z-10 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300" aria-label="Open complete Leads analytics breakdown"><span className="sr-only">View leads breakdown</span></Link>}
-      <div className="aw-report-card-top"><span className="aw-report-icon"><Icon size={22}/></span>
-       <ArrowUpRight size={18} aria-hidden="true"/></div>
-      <p className="aw-report-card-label">{label(name)}</p>
-      {ledger?<div className="aw-cash-ledger" aria-label="Posted income and expenses">
-       <p className="aw-cash-ledger-currency">Currency · INR</p>
-       {(["INCOME","EXPENSE"] as const).map(kind=>{
-        const row=ledger.find(item=>item.kind===kind);
-        const amount=Number(row?.amount??0);
-        const detailPath="/app/reports/"+(kind==="INCOME"?"income":"expenses")+"?"+new URLSearchParams({from:report.from,to:report.to}).toString();
-        return <Link key={kind} href={detailPath}
-         aria-label={"View "+(kind==="INCOME"?"Income":"Expenses")+" breakdown"}
-         className={"aw-cash-ledger-line aw-cash-"+kind.toLowerCase()+" aw-report-ledger-link"}>
-         <span>{kind==="INCOME"?"Income":"Expense"} <ArrowUpRight size={14} className="inline" aria-hidden="true"/></span>
-         <strong>{new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)}</strong>
-        </Link>;
-       })}
-      </div>:<>
-       {spot&&<><div className="aw-report-hero-value">{format(spot[1])}</div>
-        <p className="aw-report-hero-label">{label(spot[0])}</p></>}
-       <dl className="aw-report-details">{entries.filter(([key])=>key!==spot?.[0]).map(([key,value])=>
-        <div key={key}><dt>{label(key)}</dt><dd>{format(value)}</dd></div>)}</dl>
-      </>}
-     </article>;
-    })}
-   </div>
-   {!cards.length&&<p className="aw-report-empty">No report sections are available for this period.</p>}
-   <section id="report-definitions" className="aw-report-footnote"><ShieldCheck size={21}/><div>
-    <h2>Data integrity and definitions</h2><p>Calculated {new Date(report.asOf).toLocaleString()} using current agency records. No estimated data.</p>
-    <dl>{Object.entries(report.definitions).map(([k,v])=><div key={k}><dt>{label(k)}</dt><dd>{v}</dd></div>)}</dl>
-   </div></section>
-  </>}
+ const query="?"+new URLSearchParams(period);
+ const kpis=[{label:"Agency income",get:(r:Report|null)=>cash(r,"INCOME"),format:money,href:"/app/reports/income",compare:true},{label:"Agency expenses",get:(r:Report|null)=>cash(r,"EXPENSE"),format:money,href:"/app/reports/expenses",compare:true},{label:"Net cash flow",get:net,format:money,href:null,compare:true},{label:"Active clients",get:(r:Report|null)=>val(r,"clients","active"),format:count,href:"/app/clients",compare:false},{label:"New leads",get:(r:Report|null)=>val(r,"leads","created"),format:count,href:"/app/reports/leads",compare:true},{label:"Lead conversion rate",get:(r:Report|null)=>val(r,"leads","conversionRatePercent"),format:(n:number)=>count(n)+"%",href:"/app/reports/leads",compare:true}];
+ const pipeline=[["Pending","pending"],["Follow-up","followUp"],["Meeting","meetingProcess"],["Decision","decisionPending"],["Agreement","agreementPending"],["Approved","approved"]];
+ const attention=[["Overdue follow-ups","leads","overdueFollowUps"],["Decisions pending","leads","decisionPending"],["Agreements pending","leads","agreementPending"],["Content in review","content","pendingReview"]];
+ const trend=report?.cashTrend??[],max=Math.max(1,...trend.flatMap(x=>[Number(x.income),Number(x.expense)]));
+ return <div className="rp-page space-y-5" data-aw-module="reports">
+ <PageHeader eyebrow="Agency intelligence" title="Performance reports" description="Agency performance, acquisition and posted cash flow."/>
+ <ReportTabs {...period}/>
+ <ReportToolbar value={period} onChange={change} busy={busy} onRefresh={()=>void load()}/>
+ <div className="rp-line"><span className="rp-muted">{report?"Calculated "+new Date(report.asOf).toLocaleString("en-IN"):""}{busy?" · Updating…":""}</span><button type="button" className="btn-secondary rp-no-print" disabled={busy||!report} onClick={()=>window.print()}><Download size={16}/>Print / Save PDF</button></div>
+ {error&&<Notice kind="error">{error}</Notice>}{busy&&!report&&<Spinner label="Calculating permitted metrics…"/>}
+ {report&&<>
+ <section id="report-kpis" className="rp-kpis" aria-label="Key performance indicators">{kpis.map(k=>{const value=k.get(report);if(value===null)return null;const a=comparison&&k.compare?k.get(comparison.current):null,b=comparison&&k.compare?k.get(comparison.previous):null;const delta=a!==null&&b!==null?a-b:null;const content=<><div className="rp-line"><span className="rp-muted">{k.label}</span>{k.href&&<ArrowUpRight size={16}/>}</div><strong>{k.format(value)}</strong><small>{delta!==null?(delta>0?"+":"")+k.format(delta)+(k.label==="Lead conversion rate"?" points":" vs previous comparable cycle"):k.label==="Active clients"?"Current snapshot":k.label==="Net cash flow"?"Posted income less expenses":"Selected reporting period"}</small></>;return k.href?<Link key={k.label} className="rp-kpi" href={k.href+(k.href.startsWith("/app/reports")?query:"")}>{content}</Link>:<article key={k.label} className="rp-kpi">{content}</article>})}</section>
+ {comparison&&<p className="rp-muted">Comparison: {comparison.current.from} – {comparison.current.to} vs {comparison.previous.from} – {comparison.previous.to}. Conversion reflects current cohort outcomes.</p>}
+ {report.sections.cashLedger&&<section className="rp-panel"><div className="rp-line"><div><h2>Financial performance</h2><p className="rp-muted">Posted agency ledger only · client-funded ads excluded</p></div><div className="rp-legend"><span>Income</span><span>Expenses</span></div></div>
+ {trend.length?<div className="rp-chart-scroll"><div className="rp-chart" style={{minWidth:Math.max(320,trend.length*36)}}>{trend.map(d=><div className="rp-chart-day" key={d.date}><div className="rp-chart-bars" role="img" aria-label={d.date+": income "+money(Number(d.income))+", expenses "+money(Number(d.expense))}><span title={money(Number(d.income))} style={{height:Number(d.income)/max*100+"%"}}/><span title={money(Number(d.expense))} style={{height:Number(d.expense)/max*100+"%"}}/></div><small>{d.date.slice(5)}</small></div>)}</div></div>:<p className="rp-muted">No posted transactions in this period.</p>}
+ <div className="rp-line rp-finance-links"><Link href={"/app/reports/income"+query}>Income breakdown <ArrowUpRight size={15}/></Link><Link href={"/app/reports/expenses"+query}>Expense breakdown <ArrowUpRight size={15}/></Link></div></section>}
+ <div className="rp-grid">{report.sections.leads&&<section className="rp-panel"><h2>Lead pipeline</h2><p className="rp-muted">Current stages of leads created in the selected period; not a chronological funnel.</p><Bars rows={pipeline.map(([label,key])=>({label,value:val(report,"leads",key)??0}))}/><Link className="rp-link" href={"/app/reports/leads"+query}>Leads analytics <ArrowUpRight size={15}/></Link></section>}
+ {attention.some(([,s,k])=>val(report,s,k)!==null)&&<section className="rp-panel"><h2>Needs attention</h2><p className="rp-muted">Current outstanding items; decisions and agreements use the selected lead cohort.</p>{attention.map(([label,s,k])=>{const value=val(report,s,k);return value===null?null:<div className="rp-list-row" key={label}><span>{label}</span><strong>{count(value)}</strong></div>})}</section>}</div>
+ {founder&&<section className="rp-panel"><div className="rp-line"><div><h2>Founder-paid salaries</h2><p className="rp-muted">Separate from ordinary agency ledger income and expenses.</p></div><Link className="rp-link" href="/app/salary">Open Salary <ArrowUpRight size={15}/></Link></div>{salaryWarning&&<p role="status">{salaryWarning}</p>}{salary?<><strong className="rp-big">{money(Number(salary.totalPaid))}</strong>{salary.founderFunding.map(x=><div key={x.founderUserId} className="rp-list-row"><span>{x.name}</span><strong>{money(Number(x.amount))}</strong></div>)}</>:<p className="rp-muted">{busy?"Loading salary data…":"Salary data unavailable."}</p>}</section>}
+ {(report.sections.projects||report.sections.content)&&<section className="rp-panel"><h2>Operations</h2>{Object.entries(report.sections).filter(([k])=>k==="projects"||k==="content").map(([k,values])=><div key={k}><h3>{title(k)}</h3>{Object.entries(values).map(([key,value])=>typeof value==="number"?<div className="rp-list-row" key={key}><span>{key==="completedCurrent"?"Completed (all time)":title(key)}</span><strong>{count(value)}</strong></div>:null)}</div>)}</section>}
+ <details className="rp-panel" id="report-definitions"><summary>Metric definitions and data integrity</summary><dl>{Object.entries(report.definitions).map(([k,v])=><div key={k} className="rp-list-row"><dt>{title(k)}</dt><dd>{v}</dd></div>)}</dl></details>
+ </>}
  </div>;
 }
