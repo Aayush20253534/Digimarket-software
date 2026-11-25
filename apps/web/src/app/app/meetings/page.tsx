@@ -96,7 +96,7 @@ export default function MeetingsPage(){
      const status=outcome==="RESCHEDULED"||!outcome?"MEETING_PROCESS":outcome==="NO_SHOW"?"FOLLOW_UP":outcome;
      if(status==="APPROVED"&&(!canConvert||!approval))throw Error("Confirm client conversion before saving.");
      if(status==="MEETING_PROCESS"){
-       const scheduleChanged=editOn!==local(selected.meetingAt).slice(0,10)||editTime!==local(selected.meetingAt).slice(11,16)||duration!==selected.meetingDurationMinutes;
+       const scheduleChanged=editOn!==local(selected.meetingAt).slice(0,10)||editTime!==local(selected.meetingAt).slice(11,16)||duration!==(selected.meetingDurationMinutes??60);
        if(scheduleChanged&&!allowConflict){
          const result=await request<{count:number}>("/leads/meetings/conflicts?"+new URLSearchParams({id:selected.id,on:editOn,time:editTime,duration:String(duration)}));
          if(result.count){setConflict(result.count);return;}

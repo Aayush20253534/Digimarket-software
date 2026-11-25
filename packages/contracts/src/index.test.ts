@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, followUpListQuerySchema, leadStageSchema, clientServiceSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, followUpListQuerySchema, meetingListQuerySchema, meetingConflictQuerySchema, leadStageSchema, clientServiceSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -113,5 +113,17 @@ describe("follow-up register filters",()=>{
   expect(followUpListQuerySchema.safeParse({from:"2026-12-01",to:"2026-11-01"}).success).toBe(false);
   expect(followUpListQuerySchema.safeParse({month:"2026-13"}).success).toBe(false);
   expect(followUpListQuerySchema.safeParse({cycle:"2026-10"}).success).toBe(false);
+ });
+});
+
+describe("meeting workspace contracts",()=>{
+ it("validates schedule filters, outcome metadata and Google Meet links",()=>{
+  expect(meetingListQuerySchema.parse({view:"overdue",type:"GOOGLE_MEET",temperature:"HOT",month:"2026-11",limit:"20"})).toMatchObject({limit:20,type:"GOOGLE_MEET"});
+  expect(meetingListQuerySchema.safeParse({from:"2026-12-01",to:"2026-11-01"}).success).toBe(false);
+  expect(meetingListQuerySchema.safeParse({cycle:"2026-10"}).success).toBe(false);
+  expect(leadUpdateSchema.safeParse({version:1,meetingOutcome:"NO_SHOW",status:"FOLLOW_UP",followUpOn:"2026-11-26"}).success).toBe(true);
+  expect(leadUpdateSchema.safeParse({version:1,meetingType:"GOOGLE_MEET",meetingJoinUrl:"https://meet.google.com/abc-defg-hij",meetingDurationMinutes:60}).success).toBe(true);
+  expect(leadUpdateSchema.safeParse({version:1,meetingJoinUrl:"https://meet.google.com.example.com/abc"}).success).toBe(false);
+  expect(meetingConflictQuerySchema.safeParse({id:"00000000-0000-4000-8000-000000000001",on:"2026-11-26",time:"15:30",duration:"0"}).success).toBe(false);
  });
 });

@@ -392,3 +392,60 @@ test("follow-up workspace searches globally, reschedules and updates lead detail
  await expect(table.locator("tbody tr")).toHaveCount(0);
  await expect(page.getByText("Lead stage updated. Removed from scheduled follow-ups.")).toBeVisible();
 });
+
+test("meeting actions preserve the original lead, warn about overlaps and retain recorded outcomes",async({page})=>{
+ await mockWorkspace(page);
+ const id="00000000-0000-4000-8000-000000000009";
+ let at="2026-11-18T09:00:00.000Z",status="MEETING_PROCESS",version=1,note="Discuss services",type="UNSPECIFIED",join="",temperature="UNCLASSIFIED",duration=60;
+ const recorded:unknown[]=[];
+ const detail=()=>({id,businessName:"Earlier cycle meeting",contactName:"Owner",phone:"9000000000",location:"Example address",googleMapsUrl:"https://maps.app.goo.gl/abcdEFG123",meetingAt:at,status,version,stageNote:note,meetingType:type,meetingJoinUrl:join,temperature,meetingDurationMinutes:duration,canEdit:true});
+ await page.route("**/api/v1/leads/meetings?*",async route=>{
+   const q=new URL(route.request().url()).searchParams;expect(q.has("cycle")).toBe(false);
+   const active=status==="MEETING_PROCESS",day=new Date(Date.parse(at)+330*60000).toISOString().slice(0,10);
+   const matches=active&&(!q.get("q")||"Earlier cycle meeting".toLowerCase().includes(q.get("q")!.toLowerCase()))&&(!q.get("from")||day>=q.get("from")!)&&(!q.get("to")||day<=q.get("to")!);
+   await route.fulfill({json:{data:{items:matches?[detail()]:[],total:matches?1:0,nextCursor:null,today:"2026-11-17",now:"2026-11-17T12:00:00Z",summary:{all:matches?1:0,overdue:0,today:0,upcoming:matches?1:0},calendar:active?{[day]:1}:{}}}});
+ });
+ await page.route("**/api/v1/leads/meetings/conflicts?*",async route=>route.fulfill({json:{data:{count:1}}}));
+ await page.route("**/api/v1/leads/meetings/history?*",async route=>route.fulfill({json:{data:{items:recorded,total:recorded.length,nextCursor:null}}}));
+ await page.route("**/api/v1/leads/"+id,async route=>{
+   if(route.request().method()==="PUT"){
+     const b=route.request().postDataJSON();expect(b.version).toBe(version);
+     const previous=at;
+     if(b.meetingOn)at=new Date(b.meetingOn+"T"+b.meetingTime+":00+05:30").toISOString();
+     note=b.stageNote??note;type=b.meetingType??type;join=b.meetingJoinUrl??join;temperature=b.temperature??temperature;duration=b.meetingDurationMinutes??duration;status=b.status;version++;
+     if(b.meetingOutcome)recorded.unshift({id:"event"+version,leadId:id,createdAt:"2026-11-17T12:00:00Z",note,metadata:{scheduledAt:previous,meetingOutcome:b.meetingOutcome,toStatus:status},lead:{businessName:"Earlier cycle meeting",contactName:"Owner",status}});
+   }
+   await route.fulfill({json:{data:detail()}});
+ });
+ await page.goto("/app/meetings");
+ const table=page.getByRole("table",{name:"Meetings register"});
+ await expect(table.getByText("Discuss services")).toBeVisible();
+ await expect(table.getByRole("link",{name:"Call 9000000000"})).toHaveAttribute("href","tel:9000000000");
+ await page.getByRole("button",{name:"Actions for Earlier cycle meeting"}).click();
+ const editor=page.getByRole("dialog",{name:"Update meeting"});
+ await editor.getByLabel("Meeting outcome").selectOption("RESCHEDULED");
+ await editor.getByRole("button",{name:"After 3 days"}).click();
+ await editor.getByLabel("Meeting type").selectOption("GOOGLE_MEET");
+ await editor.getByLabel("Google Meet link").fill("https://meet.google.com/abc-defg-hij");
+ await editor.getByLabel("Lead temperature").selectOption("HOT");
+ await editor.getByRole("button",{name:"Save meeting"}).click();
+ await expect(editor.getByText("1 other scheduled meeting(s) overlap this time.",{exact:false})).toBeVisible();
+ await expect(editor.getByRole("button",{name:"Save meeting"})).toBeDisabled();
+ await editor.getByLabel("Save anyway").check();
+ await editor.getByRole("button",{name:"Save meeting"}).click();
+ await expect(table.getByRole("link",{name:"Join meeting for Earlier cycle meeting"})).toHaveAttribute("href","https://meet.google.com/abc-defg-hij");
+ await expect(table.getByRole("img",{name:"Lead temperature: Hot"})).toBeVisible();
+ await page.getByRole("button",{name:"Calendar",exact:true}).click();
+ await expect(page.getByRole("button",{name:"2026-11-20: 1 meetings"})).toBeVisible();
+ await page.getByRole("button",{name:"Actions for Earlier cycle meeting"}).click();
+ await editor.getByLabel("Meeting outcome").selectOption("NO_SHOW");
+ await editor.getByLabel("Follow-up date").fill("2026-11-21");
+ await editor.getByLabel("Meeting notes").fill("Client did not attend");
+ await editor.getByRole("button",{name:"Save meeting"}).click();
+ await expect(table.locator("tbody tr")).toHaveCount(0);
+ expect(status).toBe("FOLLOW_UP");
+ await page.getByRole("button",{name:"History",exact:true}).click();
+ const history=page.getByRole("table",{name:"Meeting history register"});
+ await expect(history.getByText("Client did not attend",{exact:true})).toHaveCount(2);
+ await expect(history.getByText("Reschedule meeting")).toBeVisible();
+});

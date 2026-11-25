@@ -277,7 +277,7 @@ export class LeadsService {
  async meetingHistory(a:Principal,input:MeetingListQuery){
    deny(a,"leads.read");
    const where:Prisma.LeadActivityWhereInput={metadata:{path:["meetingEvent"],equals:"recorded"},
-     lead:{organizationId:a.organizationId,deletedAt:null,...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},{contactName:{contains:input.q,mode:"insensitive"}}]}:{})},
+     lead:{organizationId:a.organizationId,deletedAt:null,...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},{contactName:{contains:input.q,mode:"insensitive"}},{location:{contains:input.q,mode:"insensitive"}},{phone:{contains:input.q}}]}:{})},
      ...(input.from||input.to?{createdAt:{...(input.from?{gte:new Date(input.from+"T00:00:00+05:30")}:{}),...(input.to?{lt:new Date(new Date(input.to+"T00:00:00+05:30").getTime()+86400000)}:{})}}:{})};
    const [total,rows]=await Promise.all([this.db.leadActivity.count({where}),this.db.leadActivity.findMany({where,take:input.limit+1,
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),orderBy:[{createdAt:"desc"},{id:"desc"}],select:{id:true,leadId:true,createdAt:true,note:true,metadata:true,lead:{select:{businessName:true,contactName:true,status:true}}}})]);
