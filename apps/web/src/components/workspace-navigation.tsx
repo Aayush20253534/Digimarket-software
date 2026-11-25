@@ -5,7 +5,7 @@ import type {LucideIcon} from "lucide-react";
 import {
  BriefcaseBusiness,CalendarDays,CalendarClock,ChartNoAxesCombined,ChevronDown,
  FileStack,MessageCircle,
- Settings2,Users,Wallet,QrCode,Banknote
+ Settings2,Users,Wallet,QrCode,Banknote,Archive
 } from "lucide-react";
 
 export type NavItem={label:string;href:string;icon:LucideIcon;permits?:readonly string[];roles?:readonly string[]};
@@ -18,6 +18,7 @@ const sections:readonly NavGroup[]=[
   {label:"Follow-ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
   {label:"Meetings",href:"/app/meetings",icon:CalendarDays,permits:["leads.read"]},
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]},
+  {label:"Past Clients",href:"/app/clients/expired",icon:Archive,permits:["clients.read"]},
   {label:"AI Review Cards",href:"/app/ai-review-cards",icon:QrCode,permits:["clients.read"]}
  ]},
  {title:"Business",items:[
@@ -44,6 +45,7 @@ const legacyDestinations:Record<string,string>={
  "/app/profitability":"/app/finance",
 };
 function matches(pathname:string,href:string){
+ if(href==="/app/clients"&&(pathname==="/app/clients/expired"||pathname.startsWith("/app/clients/expired/")))return false;
  if(pathname===href||pathname.startsWith(href+"/"))return true;
  if(href==="/app/documents/quotations"&&pathname.startsWith("/app/documents/"))return true;
  const canonical=legacyDestinations[pathname];

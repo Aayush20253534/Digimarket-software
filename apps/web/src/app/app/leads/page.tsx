@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, MapPin, PhoneCall, Plus, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
+import {leadCycles,cycleLabel} from "@digimarket/contracts";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryModal } from "@/components/directory-modal";
 import { SalesWorkspaceNav } from "@/components/sales-workspace-nav";
@@ -19,7 +20,7 @@ type Lead={id:string;businessName:string;contactName:string|null;phone:string|nu
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null;total:number};
-type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
+type Metrics={callNotPicking:number;callBusy:number;total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS"|"REFERRAL";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"},{value:"REFERRAL",label:"Referral"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value==="REFERRAL"?"Referral":value;
@@ -54,6 +55,11 @@ export default function LeadsPage(){
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [legacySort,setLegacySort]=useState(false);
  const [cursor,setCursor]=useState<string|null>(null);
+ const [cycles,setCycles]=useState(()=>leadCycles());
+ const [cycleChoice,setCycleChoice]=useState("current");
+ const cycleKey=cycleChoice==="total"?"":cycleChoice==="current"?(cycles[0]?.key??""):cycleChoice;
+ const cycleQuery=cycleKey?"?"+new URLSearchParams({cycle:cycleKey}):"";
+ useEffect(()=>{const refresh=()=>setCycles(previous=>{const next=leadCycles();return previous[0]?.key===next[0]?.key?previous:next;});const timer=window.setInterval(refresh,60_000);window.addEventListener("focus",refresh);return()=>{window.clearInterval(timer);window.removeEventListener("focus",refresh);};},[]);
  const [stage,setStage]=useState("");
  const [sourceFilter,setSourceFilter]=useState<""|LeadSource>("");
  const [search,setSearch]=useState("");
@@ -111,6 +117,8 @@ export default function LeadsPage(){
    catch{/* Optional view preferences. */}
  },[preferencesReady,session?.identity.userId,stage,sourceFilter,search,sortBy,descending]);
  useEffect(()=>{setCheckedLeads({});},[stage,sourceFilter,search,sortBy,descending,session?.identity.userId]);
+ const changeCycle=(choice:string)=>{if(choice===cycleChoice)return;loadSequence.current++;setCycleChoice(choice);setCursor(null);setHistory([]);setTotalLeads(null);setItems([]);setMetrics(null);setNextCursor(null);setCheckedLeads({});setStage("");setLoading(true);};
+ useEffect(()=>{setCursor(null);setHistory([]);setCheckedLeads({});},[cycleKey]);
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
    if(!preferencesReady)return;
@@ -118,6 +126,7 @@ export default function LeadsPage(){
    setLoading(true);
    try{
      const q=new URLSearchParams({limit:"10",sort:sortBy,direction:descending?"desc":"asc"});
+     if(cycleKey)q.set("cycle",cycleKey);
      if(stage)q.set("stage",stage);if(sourceFilter)q.set("source",sourceFilter);if(search.trim())q.set("q",search.trim());
      if(cursor)q.set("cursor",cursor);
      let result:Page;
@@ -129,12 +138,12 @@ export default function LeadsPage(){
      }
      if(sequence!==loadSequence.current)return;
      setItems(result.items);setNextCursor(result.nextCursor);setTotalLeads(result.total);setError("");
-     void request<Metrics>("/leads/metrics").then(result=>{
+     void request<Metrics>("/leads/metrics"+cycleQuery).then(result=>{
        if(sequence===loadSequence.current)setMetrics(result);
      }).catch(()=>{});
    }catch(e){if(sequence===loadSequence.current)setError(errText(e));}
    finally{if(sequence===loadSequence.current)setLoading(false);}
- },[canRead,preferencesReady,request,stage,sourceFilter,search,cursor,sortBy,descending]);
+ },[canRead,preferencesReady,request,stage,sourceFilter,search,cursor,sortBy,descending,cycleKey,cycleQuery]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const focusedRef=useRef(false);
@@ -198,7 +207,7 @@ export default function LeadsPage(){
    try{
      const data=await request<Lead>("/leads",{method:"POST",body:created});
      setCreated(blank);setCreating(false);setMessage("Lead added to PENDING as "+sourceLabel(created.source)+".");
-     setCursor(null);await load();await open(data.id);
+     if(cycleChoice!=="current"&&cycleChoice!=="total")changeCycle("current");else{setCursor(null);await load();}await open(data.id);
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function edit(e:FormEvent){
@@ -265,10 +274,10 @@ export default function LeadsPage(){
  async function download(){
    setBusy(true);setError("");
    try{
-     const result=await request<{filename:string;csv:string}>("/leads/export");
+     const result=await request<{filename:string;csv:string}>("/leads/export"+cycleQuery);
      const u=URL.createObjectURL(new Blob([result.csv],{type:"text/csv;charset=utf-8"}));
      const a=document.createElement("a");a.href=u;a.download=result.filename;a.click();URL.revokeObjectURL(u);
-     setMessage("Organization CSV exported and recorded in audit history.");
+     setMessage("Selected cycle CSV exported and recorded in audit history.");
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  const leadsPage=history.length+1;
@@ -291,8 +300,15 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   {metrics&&<section aria-label="CRM pipeline summary" className="aw-crm-quick-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-     {([["Total leads",metrics.total,""],["Approved clients",metrics.converted,"APPROVED"],
+   <section aria-label="Lead business cycle" className="flex flex-wrap items-center gap-2">
+     <button type="button" className={cycleChoice==="total"?"btn-primary":"btn-secondary"} aria-pressed={cycleChoice==="total"} disabled={busy} onClick={()=>{if(cycleChoice!=="total")changeCycle("total");}}>Total</button>
+     <label className="text-sm">Business cycle <select className="field" aria-label="Lead cycle" value={cycleChoice==="total"?"total":cycleChoice==="current"?(cycles[0]?.key??"total"):cycleChoice} disabled={busy} onChange={e=>changeCycle(e.target.value===cycles[0]?.key?"current":e.target.value)}>
+       <option value="total">All cycles</option>{cycles.map((c,i)=><option key={c.key} value={c.key}>{cycleLabel(c.key)} · {i===0?"Current":"Completed"}</option>)}
+     </select></label>
+     <span className="text-xs">{cycleKey?"Live statuses · acquired in selected cycle":"All recorded leads, including legacy records"}</span>
+   </section>
+   {metrics&&<section aria-label="CRM pipeline summary" className="aw-crm-quick-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+     {([["Total leads",metrics.total,""],["Approved clients",metrics.approved,"APPROVED"],["PENDING",metrics.pending,"PENDING"],["CALL NOT PICKING",metrics.callNotPicking??0,"CALL_NOT_PICKING"],["CALL BUSY",metrics.callBusy??0,"CALL_BUSY"],
        ["YET TO CALL",metrics.yetToCall,"YET_TO_CALL"],["FOLLOW UP",metrics.followUp,"FOLLOW_UP"],
        ["MEETING PROCESS",metrics.meetingProcess,"MEETING_PROCESS"],["DECISION PENDING",metrics.decisionPending,"DECISION_PENDING"],
        ["AGREEMENT PENDING",metrics.agreementPending,"AGREEMENT_PENDING"],["REJECTED",metrics.rejected,"REJECTED"]] as const).map(([label,value,filter])=>
@@ -308,7 +324,7 @@ export default function LeadsPage(){
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Lead register" description="Select any row to edit details. Call, location, short notes and scheduled actions stay visible.">
+       <Card title="Lead register" description="Select a row to edit details. Use the call and map icons for quick actions; notes and scheduled dates stay visible.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setTotalLeads(null);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
@@ -341,7 +357,7 @@ export default function LeadsPage(){
               ref={node=>{if(node)node.indeterminate=items.some(lead=>checkedLeads[lead.id]!==undefined)&&!items.every(lead=>checkedLeads[lead.id]!==undefined);}}
               onChange={e=>{const checked=e.target.checked;setCheckedLeads(previous=>{
                 const next={...previous};for(const lead of items){if(checked&&Object.keys(next).length<100)next[lead.id]=lead.version;else if(!checked)delete next[lead.id];}return next;
-              });}}/></th>}<th>Phone / call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
+              });}}/></th>}<th>Call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
            <tbody>{loading&&!items.length?
              Array.from({length:5},(_,i)=><tr key={"loading-"+i} aria-hidden="true" className="aw-lead-loading-row">
                {Array.from({length:canDelete?10:9},(_,j)=><td key={j}><div className="aw-lead-skeleton"/></td>)}
@@ -354,16 +370,16 @@ export default function LeadsPage(){
              {canDelete&&<td onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={"Select lead "+(l.contactName||l.businessName)}
                checked={checkedLeads[l.id]!==undefined} disabled={busy||loading||(selectedCount>=100&&checkedLeads[l.id]===undefined)}
                onChange={e=>selectLead(l,e.target.checked)}/></td>}
-             <td className="aw-crm-phone-cell">{l.phone?<a href={callHref(l.phone)} className="aw-lead-action aw-crm-phone-link" aria-label={"Call "+l.phone}
+             <td className="aw-crm-phone-cell">{l.phone?<a href={callHref(l.phone)} className="aw-lead-action" aria-label={"Call "+l.phone}
                title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
-               <PhoneCall size={15} aria-hidden="true"/><span>{l.phone}</span></a>:<span title="No phone number">—</span>}</td>
+               <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>
              <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
              <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular uppercase/></td>
              <td><time dateTime={l.createdAt} title="Automatically recorded when this lead was created">{fmt(l.createdAt)}</time></td>
-             <td className="aw-crm-location-cell"><div className="aw-crm-location">{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+             <td className="aw-crm-location-cell">{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                className="aw-lead-action" aria-label={"Open Google Maps for "+(l.contactName||l.businessName)}
-               title="Open location in Google Maps" onClick={e=>e.stopPropagation()}>
-               <MapPin size={16} aria-hidden="true"/></a>:null}<span title={l.location||undefined}>{l.location?.trim()||(l.googleMapsUrl?"Map link":"Not recorded")}</span></div></td>
+               title={l.location?.trim()||"Open location in Google Maps"} onClick={e=>e.stopPropagation()}>
+               <MapPin size={17} aria-hidden="true"/></a>:<span className="aw-lead-no-location" title={l.location?.trim()||"Location link not added"} aria-label="Location link not added"><MapPin size={17} aria-hidden="true"/></span>}</td>
              <td className="aw-lead-notes-cell"><div className={"aw-lead-notes-preview"+(!l.stageNote?.trim()?" aw-lead-notes-empty":"")} title={l.stageNote||"No notes yet"}>{l.stageNote?.trim()||"No notes yet"}</div>
                {l.status==="FOLLOW_UP"&&l.nextFollowUpAt&&<div className="aw-crm-next-action" data-overdue={l.nextFollowUpAt.slice(0,10)<new Date(Date.now()+330*60_000).toISOString().slice(0,10)}>Follow-up: {new Date(l.nextFollowUpAt.slice(0,10)+"T12:00:00Z").toLocaleDateString("en-IN",{timeZone:"UTC",dateStyle:"medium"})}</div>}
                {l.status==="MEETING_PROCESS"&&l.meetingAt&&<div className="aw-crm-next-action">Meeting: {new Date(l.meetingAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",dateStyle:"medium",timeStyle:"short"})}</div>}</td>
@@ -499,7 +515,7 @@ export default function LeadsPage(){
    {metrics&&<div className="aw-v3-lead-panels">
     <section className="aw-v3-chart-card" aria-label="Live sales pipeline distribution">
      <div className="aw-v3-chart-heading"><div><h2>Pipeline distribution</h2>
-      <p>Live stage counts across all accessible leads, not just the current table page.</p></div>
+      <p>Live stage counts for the selected acquisition cycle, not just the current table page.</p></div>
       <Link href="/app/reports" className="aw-v3-chart-action">Reporting</Link>
      </div>
      <div className="aw-v3-bars">
@@ -516,7 +532,7 @@ export default function LeadsPage(){
     </section>
     <section className="aw-v3-chart-card aw-v3-conversion-card" aria-label="Pipeline conversion summary">
      <div className="aw-v3-chart-heading"><div><h2>Conversion performance</h2>
-      <p>Based on the latest CRM metrics.</p></div></div>
+      <p>Based on live conversions for the selected acquisition cycle.</p></div></div>
      <div className="aw-v3-conversion-value">{Number(metrics.conversionRatePercent).toLocaleString("en-IN",{maximumFractionDigits:1})}%</div>
      <p className="aw-v3-conversion-detail">{metrics.converted} converted from {metrics.total} total leads</p>
      <div className="aw-v3-conversion-track"><span style={{width:Math.min(100,Math.max(0,Number(metrics.conversionRatePercent)))+"%"}}/></div>

@@ -99,9 +99,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(statusMetrics.getByText("FOLLOW UP",{exact:true})).toBeVisible();
   await expect(statusMetrics.getByText("Conversion rate",{exact:true})).toHaveCount(0);
   await expect(statusMetrics.getByText("REJECTED",{exact:true})).toBeVisible();
-  await expect(statusMetrics.getByText("Pending",{exact:true})).toHaveCount(0);
+  await expect(statusMetrics.getByText("PENDING",{exact:true})).toBeVisible();
+  await expect(statusMetrics.getByText("CALL BUSY",{exact:true})).toBeVisible();
+  await expect(page.getByLabel("Lead cycle")).toBeVisible();
+  await page.getByRole("region",{name:"Lead business cycle"}).getByRole("button",{name:"Total",exact:true}).click();
+  await expect(page.getByLabel("Lead cycle")).toHaveValue("total");
   const leadsRegister=page.getByRole("table",{name:"Leads directory"});
-  for(const heading of ["Phone / call","Contact name","Business name","Business type","Source","Stage","Date added","Location","Meeting / status notes"])
+  for(const heading of ["Call","Contact name","Business name","Business type","Source","Stage","Date added","Location","Meeting / status notes"])
     await expect(leadsRegister.getByRole("columnheader",{name:heading,exact:true})).toBeVisible();
   await expect(leadsRegister).toBeVisible();
   await expect(leadsRegister).toHaveAttribute("aria-busy","false");
@@ -741,8 +745,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-yet-to-call");
   await expect(yetToCallBadge).toHaveText("YET TO CALL");
-  await expect(yetToCallBadge).toHaveCSS("background-color","rgb(40, 40, 43)");
-  await expect(yetToCallBadge).toHaveCSS("color","rgb(228, 228, 231)");
+  await expect(yetToCallBadge).toHaveCSS("background-color","rgb(57, 38, 83)");
+  await expect(yetToCallBadge).toHaveCSS("color","rgb(228, 215, 255)");
   await page.getByLabel("Lead status").selectOption("FOLLOW_UP");
   await expect(page.getByLabel("Follow-up date")).toBeVisible();
   const agencyDay=(offset:number)=>new Intl.DateTimeFormat("en-CA",{
@@ -810,7 +814,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-not-picking");
   await expect(notPickingBadge).toHaveText("CALL NOT PICKING");
-  await expect(notPickingBadge).toHaveCSS("background-color","rgb(40, 40, 43)");
+  await expect(notPickingBadge).toHaveCSS("background-color","rgb(57, 38, 83)");
   await page.getByLabel("Lead status").selectOption("REJECTED");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const rejectedBadge=page.getByRole("table",{name:"Leads directory"})
@@ -927,9 +931,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("table",{name:"Clients directory"}).getByRole("columnheader",{name:"Services",exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Add client"})).toHaveCount(0);
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
-  await expect(page.getByRole("navigation",{name:"Sales workspace sections"}).getByRole("link",{name:"Clients"}))
+  await expect(page.getByRole("navigation",{name:"Sales workspace sections"}).getByRole("link",{name:"Clients",exact:true}))
    .toHaveAttribute("aria-current","page");
   await expect(page.getByRole("img",{name:/active, .* paused, .* archived/})).toBeVisible();
+  await page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Past Clients",exact:true}).click();
+  await expect(page).toHaveURL(/\/app\/clients\/expired$/);
+  await expect(page.getByRole("heading",{name:"Past Clients",exact:true})).toBeVisible();
+  const pastNav=page.getByRole("navigation",{name:"Workspace navigation"});
+  await expect(pastNav.getByRole("link",{name:"Past Clients",exact:true})).toHaveAttribute("aria-current","page");
+  await expect(pastNav.getByRole("link",{name:"Clients",exact:true})).not.toHaveAttribute("aria-current","page");
+  await visitWorkspace(page,"/app/clients");
   // Client records open as real pages, not as cramped modal drawers.
   const openClient=page.getByRole("table",{name:"Clients directory"}).getByRole("row")
     .filter({hasText:"Founder CI Lead"}).getByRole("link",{name:"Open workspace"});

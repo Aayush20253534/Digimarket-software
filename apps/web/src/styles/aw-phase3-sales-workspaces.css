@@ -744,12 +744,8 @@
 .aw-workspace [data-aw-module="leads"] .aw-crm-quick-metrics .aw-v3-pipeline-metric[aria-pressed="true"]{border-color:var(--ui-primary)!important;box-shadow:inset 0 -2px 0 var(--ui-primary);}
 .aw-workspace [data-aw-module="leads"] .aw-crm-quick-metrics .aw-v3-pipeline-metric:hover{background:var(--ui-hover)!important;}
 .aw-workspace [data-aw-module="leads"] .aw-crm-quick-metrics .aw-v3-pipeline-metric p:last-child{font-size:1.35rem;}
-.aw-workspace [data-aw-module="leads"] .aw-register-table{min-width:1220px;}
+.aw-workspace [data-aw-module="leads"] .aw-register-table{min-width:1060px;}
 .aw-workspace [data-aw-module="leads"] .aw-register-table th,.aw-workspace [data-aw-module="leads"] .aw-register-table td{padding:9px 10px;}
-.aw-workspace [data-aw-module="leads"] .aw-lead-action.aw-crm-phone-link{width:auto;height:auto;min-height:32px;gap:6px;padding:4px 7px;white-space:nowrap;}
-.aw-workspace [data-aw-module="leads"] .aw-crm-phone-link span,.aw-workspace [data-aw-module="leads"] .aw-crm-location span{display:inline;margin:0;color:var(--ui-strong)!important;font-size:12px;}
-.aw-workspace [data-aw-module="leads"] .aw-crm-location-cell{min-width:130px;max-width:180px;white-space:normal;}
-.aw-workspace [data-aw-module="leads"] .aw-crm-location{display:flex;align-items:center;gap:7px;overflow-wrap:anywhere;}
-.aw-workspace [data-aw-module="leads"] .aw-crm-location .aw-lead-action{flex:none;}
+.aw-workspace [data-aw-module="leads"] :is(.aw-crm-phone-cell,.aw-crm-location-cell){width:1%;white-space:nowrap;text-align:center;}
 .aw-workspace [data-aw-module="leads"] .aw-crm-next-action{font-size:11px;margin-top:5px;color:var(--ui-muted);font-weight:600;}
 .aw-workspace [data-aw-module="leads"] .aw-crm-next-action[data-overdue="true"]{color:var(--ui-danger);}

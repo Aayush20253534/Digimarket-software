@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { leadCreateSchema, leadUpdateSchema, leadAssignSchema, leadNoteSchema, leadDuplicateReviewSchema,
-  leadListQuerySchema, leadImportSchema, leadDeleteSchema, leadBulkDeleteSchema } from "@digimarket/contracts";
+  leadListQuerySchema, leadCycleQuerySchema, leadImportSchema, leadDeleteSchema, leadBulkDeleteSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { LeadsService } from "./service";
@@ -59,9 +59,9 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
    const input=parse(z.strictObject({date:z.iso.date()}),req.query);
    res.json({data:await svc.followUpsOn(actor(res),input.date)});
  });
- app.get(root+"/metrics",authenticated,async(_req,res)=>{
+ app.get(root+"/metrics",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
-   res.json({data:await svc.metrics(actor(res))});
+   res.json({data:await svc.metrics(actor(res),parse(leadCycleQuerySchema,req.query).cycle)});
  });
  app.get(root+"/assignees",authenticated,async(_req,res)=>{
    res.set("Cache-Control","no-store");
@@ -79,9 +79,9 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
    const input=parse(leadImportSchema,req.body);
    res.status(201).json({data:await svc.import(actor(res),input.batchId,input.rows)});
  });
- app.get(root+"/export",authenticated,async(_req,res)=>{
+ app.get(root+"/export",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
-   res.json({data:await svc.export(actor(res))});
+   res.json({data:await svc.export(actor(res),parse(leadCycleQuerySchema,req.query).cycle)});
  });
  app.post(root+"/bulk-delete",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");

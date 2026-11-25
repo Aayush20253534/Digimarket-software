@@ -1,7 +1,7 @@
 import {expect,test,type Page} from "@playwright/test";
 
 async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
- const requests:{path:string;from:string|null;to:string|null}[]=[];
+ const requests:{path:string;from:string|null;to:string|null;cycle:string|null}[]=[];
  let leads=Array.from({length:20},(_,i)=>({id:"00000000-0000-4000-8000-"+String(i+1).padStart(12,"0"),
   businessName:"Business "+(i+1),contactName:"Contact "+(i+1),phone:"900000"+String(i).padStart(4,"0"),
   status:"PENDING",source:"COLD_CALL",version:1,createdAt:"2026-11-10T10:00:00Z",updatedAt:"2026-11-10T10:00:00Z",
@@ -13,7 +13,7 @@ async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
  await page.clock.setFixedTime(new Date("2026-11-17T12:00:00Z"));
  await page.route("**/api/v1/**",async route=>{
   const url=new URL(route.request().url()),path=url.pathname.slice("/api/v1".length);
-  requests.push({path,from:url.searchParams.get("from"),to:url.searchParams.get("to")});
+  requests.push({path,from:url.searchParams.get("from"),to:url.searchParams.get("to"),cycle:url.searchParams.get("cycle")});
   let data:unknown=[];
   if(path==="/auth/refresh")data={next:"SIGNED_IN",accessToken:"test",user:{id:"user",organizationId:"org",loginId:"test",displayName:"Test Founder",status:"ACTIVE",mustChangePassword:false}};
   else if(path==="/me")data={userId:"user",organizationId:"org",roles:[role],permissions};
@@ -22,8 +22,9 @@ async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
   else if(path==="/messages/users")data={items:[]};
   else if(path==="/leads"){
    const start=url.searchParams.has("cursor")?10:0;
-   data={items:leads.slice(start,start+10),total:leads.length,nextCursor:start+10<leads.length?leads[start+9].id:null};
-  }else if(path==="/leads/metrics")data={total:leads.length,pending:leads.length,yetToCall:0,meetingProcess:0,decisionPending:0,agreementPending:0,followUp:0,approved:0,rejected:0,converted:0,conversionRatePercent:0};
+   const scoped=url.searchParams.get("cycle")==="2026-11"?[]:leads;
+   data={items:scoped.slice(start,start+10),total:scoped.length,nextCursor:start+10<scoped.length?scoped[start+9].id:null};
+  }else if(path==="/leads/metrics"){const n=url.searchParams.get("cycle")==="2026-11"?0:leads.length;data={total:n,pending:n,yetToCall:0,meetingProcess:0,decisionPending:0,agreementPending:0,followUp:0,approved:0,rejected:0,converted:0,callNotPicking:0,callBusy:0,conversionRatePercent:0};}
   else if(path==="/leads/bulk-delete"){
    const rows=route.request().postDataJSON().leads as {id:string;version:number}[];
    deleted.push(rows.map(row=>row.id));leads=leads.filter(lead=>!rows.some(row=>row.id===lead.id));
@@ -237,4 +238,36 @@ test("closed cycle dashboard exposes category drilldowns and preserves selected 
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
  await expect(page.getByLabel("Work cycle through")).toHaveValue("2026-11-21");
  await expect.poll(()=>requests.some(x=>x.path==="/finance/register"&&x.from==="2026-10-22"&&x.to==="2026-11-21")).toBe(true);
+});
+
+test("lead cycle scopes the register and metrics together and Total includes earlier leads",async({page})=>{
+ const {requests}=await mockWorkspace(page);
+ await page.clock.setFixedTime(new Date("2026-11-25T12:00:00Z"));
+ await page.goto("/app/leads");
+ const picker=page.getByLabel("Lead cycle");
+ await expect(picker).toHaveValue("2026-11");
+ await expect(picker.locator("option")).toHaveCount(3);
+ await expect(page.getByText("No matching leads.",{exact:false})).toBeVisible();
+ await expect.poll(()=>requests.some(r=>r.path==="/leads/metrics"&&r.cycle==="2026-11")).toBe(true);
+ await picker.selectOption("2026-10");
+ await expect(page.getByRole("table",{name:"Leads directory"}).getByText("Business 1",{exact:true})).toBeVisible();
+ await expect.poll(()=>requests.some(r=>r.path==="/leads/metrics"&&r.cycle==="2026-10")).toBe(true);
+ await page.getByRole("region",{name:"Lead business cycle"}).getByRole("button",{name:"Total",exact:true}).click();
+ await expect(picker).toHaveValue("total");
+ await expect.poll(()=>requests.some(r=>r.path==="/leads/metrics"&&r.cycle===null)).toBe(true);
+});
+
+test("purple and light theme choices persist through full CRM reloads",async({page})=>{
+ await mockWorkspace(page);
+ await page.goto("/app/leads");
+ const workspace=page.locator(".aw-workspace");
+ await expect(workspace).toHaveAttribute("data-theme","dark");
+ await page.getByRole("button",{name:"Switch to light theme"}).click();
+ await expect(workspace).toHaveAttribute("data-theme","light");
+ await page.reload();
+ await expect(workspace).toHaveAttribute("data-theme","light");
+ await page.getByRole("button",{name:"Switch to dark theme"}).click();
+ await expect(workspace).toHaveAttribute("data-theme","dark");
+ await page.reload();
+ await expect(workspace).toHaveAttribute("data-theme","dark");
 });
