@@ -430,7 +430,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     }
   }
   if(path==="leads/follow-ups"){
-    for(const key of ["cursor","limit"]){
+    for(const key of ["cursor","limit","view","q","temperature","from","to","month"]){
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }

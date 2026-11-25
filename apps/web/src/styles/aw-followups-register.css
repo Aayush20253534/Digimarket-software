@@ -25,3 +25,47 @@
 .aw-followups-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:68px;padding:12px 15px;color:#d0b9e4;font-size:.8rem}
 @media(max-width:639px){.aw-followups-page{gap:14px}.aw-followups-header{align-items:flex-start}.aw-followups-register{border-radius:9px}.aw-followups-table th,.aw-followups-table td{padding:12px}.aw-followups-pagination{gap:7px;padding:10px}.aw-followups-pagination button{padding:8px 10px}}
 @media(prefers-reduced-motion:reduce){.aw-followups-page .animate-spin{animation:none!important}}
+
+/* Follow-up action workspace: theme tokens shared with CRM, no extra phone-number width. */
+.aw-workspace .aw-followups-v2{gap:16px;min-width:0}
+.aw-workspace .aw-followup-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.aw-workspace .aw-followup-metric{display:grid;gap:5px;text-align:left;padding:13px 15px;border:1px solid var(--ui-border);border-radius:10px;background:var(--ui-surface);color:var(--ui-strong);min-width:0}
+.aw-workspace .aw-followup-metric span{font-size:12px;color:var(--ui-muted)}
+.aw-workspace .aw-followup-metric strong{font-size:1.5rem;font-weight:750;font-variant-numeric:tabular-nums}
+.aw-workspace .aw-followup-metric[aria-pressed="true"]{border-color:var(--ui-primary);box-shadow:inset 0 -2px 0 var(--ui-primary)}
+.aw-workspace .aw-followup-metric:hover{background:var(--ui-hover)}
+.aw-workspace .aw-followup-metric[data-bucket="overdue"] strong,.aw-workspace .aw-followup-due[data-bucket="overdue"]{color:var(--ui-danger)}
+.aw-workspace .aw-followup-metric[data-bucket="today"] strong,.aw-workspace .aw-followup-due[data-bucket="today"]{color:var(--ui-warning)}
+.aw-workspace .aw-followup-metric[data-bucket="upcoming"] strong,.aw-workspace .aw-followup-due[data-bucket="upcoming"]{color:var(--ui-primary)}
+.aw-followup-tools{display:grid;gap:10px;min-width:0}
+.aw-followup-tool-row,.aw-followup-presets,.aw-followup-view{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.aw-workspace .aw-followup-tool-row .field{width:auto;max-width:100%;min-width:0;min-height:40px}
+.aw-workspace .aw-followup-search{display:flex;align-items:center;gap:8px;flex:1 1 210px;min-width:0;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-input);padding:0 12px;color:var(--ui-muted);min-height:40px}
+.aw-followup-search input{width:100%;min-width:0;border:0;outline:none;background:transparent;color:var(--ui-strong);font-size:13px}
+.aw-followup-date{display:flex;align-items:center;gap:6px;color:var(--ui-muted);font-size:12px}
+.aw-followup-view button[aria-pressed="true"],.aw-followup-presets button[aria-pressed="true"]{box-shadow:inset 0 -2px 0 var(--ui-primary);border-color:var(--ui-primary)!important}
+.aw-followup-register-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:13px 15px;border-bottom:1px solid var(--ui-border)}
+.aw-followup-register-head span,.aw-followup-hint{font-size:12px;color:var(--ui-muted)}
+.aw-workspace .aw-followups-v2 .aw-followups-table{min-width:740px}
+.aw-workspace .aw-followups-v2 .aw-followups-table th,.aw-workspace .aw-followups-v2 .aw-followups-table td{padding:10px 12px}
+.aw-followup-due{display:block;font-size:11px;font-weight:600;margin-top:3px}
+.aw-workspace .aw-followup-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;border:1px solid var(--ui-border);background:var(--ui-raised);color:var(--ui-primary)}
+.aw-workspace .aw-followup-icon:hover{background:var(--ui-hover)}
+.aw-followups-v2 .aw-followups-business{display:inline-flex;align-items:center;gap:7px}
+.aw-followup-temp{display:inline-block;flex:0 0 8px;width:8px;height:8px;border-radius:50%;border:1px solid var(--ui-muted)}
+.aw-followup-temp[data-temperature="HOT"]{background:#f43f5e;border-color:#f43f5e}
+.aw-followup-temp[data-temperature="WARM"]{background:#eab308;border-color:#eab308}
+.aw-followup-temp[data-temperature="COLD"]{background:#3b82f6;border-color:#3b82f6}
+.aw-followup-note{min-width:180px;max-width:340px;white-space:pre-wrap;overflow-wrap:anywhere}
+.aw-followup-calendar{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;padding:12px;display:grid;gap:10px;min-width:0}
+.aw-followup-calendar-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.aw-followup-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.aw-followup-weekday{text-align:center;font-size:11px;color:var(--ui-muted);padding:3px}
+.aw-followup-day{display:flex;align-items:flex-start;justify-content:space-between;gap:2px;min-height:50px;padding:6px;border:1px solid var(--ui-border);background:var(--ui-raised);border-radius:6px;font-size:12px;color:var(--ui-strong)}
+.aw-followup-day[aria-current="date"],.aw-followup-day[aria-pressed="true"]{border-color:var(--ui-primary)}
+.aw-followup-day[aria-pressed="true"]{background:var(--ui-hover)}
+.aw-followup-day small{font-size:11px;color:var(--ui-primary);font-weight:750}
+.aw-followup-day small[data-bucket="overdue"]{color:var(--ui-danger)}
+.aw-followup-editor label{font-size:13px;font-weight:600}
+.aw-followup-editor .field{margin-top:5px}
+@media(max-width:700px){.aw-workspace .aw-followup-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.aw-followup-day{min-height:38px;padding:3px;flex-direction:column}.aw-followup-calendar{padding:8px}.aw-followup-date{flex:1 1 130px}.aw-followup-date .field{flex:1;width:0!important}}

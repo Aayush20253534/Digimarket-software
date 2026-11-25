@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { leadCreateSchema, leadUpdateSchema, leadAssignSchema, leadNoteSchema, leadDuplicateReviewSchema,
-  leadListQuerySchema, leadCycleQuerySchema, leadImportSchema, leadDeleteSchema, leadBulkDeleteSchema } from "@digimarket/contracts";
+  leadListQuerySchema, followUpListQuerySchema, leadCycleQuerySchema, leadImportSchema, leadDeleteSchema, leadBulkDeleteSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { LeadsService } from "./service";
@@ -42,9 +42,7 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
    res.set("Cache-Control","no-store");
    res.json({data:await svc.scheduledMeetings(actor(res),parse(meetingsQuery,req.query))});
  });
- const followUpsQuery=z.strictObject({
-   cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(20),
- });
+ const followUpsQuery=followUpListQuerySchema;
  app.get(root+"/follow-ups",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.scheduledFollowUps(actor(res),parse(followUpsQuery,req.query))});

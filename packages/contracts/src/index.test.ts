@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, leadStageSchema, clientServiceSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, followUpListQuerySchema, leadStageSchema, clientServiceSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
@@ -104,5 +104,14 @@ describe("lead temperature",()=>{
   }
   expect(leadUpdateSchema.safeParse({version:1,temperature:"UNKNOWN"}).success).toBe(false);
   expect(leadListQuerySchema.safeParse({temperature:"UNKNOWN"}).success).toBe(false);
+ });
+});
+
+describe("follow-up register filters",()=>{
+ it("validates all-cycle schedule filters and rejects acquisition-cycle filtering",()=>{
+  expect(followUpListQuerySchema.parse({view:"overdue",temperature:"HOT",from:"2026-11-01",to:"2026-11-25",month:"2026-11",limit:"20"})).toMatchObject({view:"overdue",temperature:"HOT",limit:20});
+  expect(followUpListQuerySchema.safeParse({from:"2026-12-01",to:"2026-11-01"}).success).toBe(false);
+  expect(followUpListQuerySchema.safeParse({month:"2026-13"}).success).toBe(false);
+  expect(followUpListQuerySchema.safeParse({cycle:"2026-10"}).success).toBe(false);
  });
 });

@@ -106,6 +106,14 @@ export type FinanceBreakdownQuery=z.infer<typeof financeBreakdownQuerySchema>;
 export const leadStageSchema = z.enum(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED"]);
 export const leadTemperatureSchema = z.enum(["UNCLASSIFIED","HOT","WARM","COLD"]);
 export type LeadTemperature = z.infer<typeof leadTemperatureSchema>;
+export const followUpListQuerySchema=z.strictObject({
+ cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(20),
+ view:z.enum(["all","overdue","today","upcoming"]).optional(),
+ q:z.string().trim().max(100).optional(),temperature:leadTemperatureSchema.optional(),
+ from:z.iso.date().optional(),to:z.iso.date().optional(),
+ month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+}).refine(q=>!q.from||!q.to||q.from<=q.to,"End date precedes start date");
+export type FollowUpListQuery=z.infer<typeof followUpListQuerySchema>;
 export const leadSourceSchema = z.enum(["COLD_CALL","META_LEADS","REFERRAL"]);
 export const leadCreateSchema = z.strictObject({
  phone:z.string().trim().min(7).max(40),

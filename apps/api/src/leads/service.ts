@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma, type PrismaClient } from "@digimarket/db";
-import {leadCycleTimestampRange} from "@digimarket/contracts";
-import type { LeadCreateInput, LeadUpdateInput, LeadListQuery, LeadBulkDeleteInput } from "@digimarket/contracts";
+import {leadCycleTimestampRange,agencyToday} from "@digimarket/contracts";
+import type { LeadCreateInput, LeadUpdateInput, LeadListQuery, LeadBulkDeleteInput, FollowUpListQuery, LeadTemperature } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 
@@ -261,19 +261,52 @@ export class LeadsService {
    const items=rows.slice(0,input.limit);
    return {items,total,nextCursor:hasMore?items.at(-1)?.id??null:null};
  }
- // Dated register for the sidebar. Fetch only the four requested display fields
- // and a stable id for navigation/pagination. Never load other tenants or cleared schedules.
- async scheduledFollowUps(a:Principal,input:{cursor?:string;limit:number}){
+ // All acquisition cycles share one live schedule. UTC calendar-day storage
+ // is deliberate: the date represents an Indian civil day, not an instant.
+ async scheduledFollowUps(a:Principal,input:FollowUpListQuery){
    deny(a,"leads.read");
-   const where:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,
-     status:"FOLLOW_UP",nextFollowUpAt:{not:null}};
-   const rows=await this.db.lead.findMany({where,take:input.limit+1,
-     ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
-     orderBy:[{nextFollowUpAt:"asc"},{id:"asc"}],
-     select:{id:true,nextFollowUpAt:true,phone:true,businessName:true,contactName:true}});
-   const hasMore=rows.length>input.limit;
-   const items=rows.slice(0,input.limit);
-   return {items,nextCursor:hasMore?items.at(-1)?.id??null:null};
+   const today=agencyToday(),start=new Date(today+"T00:00:00Z"),tomorrow=new Date(start.getTime()+86400000);
+   const base:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,status:"FOLLOW_UP",
+     nextFollowUpAt:{not:null},...(input.temperature?{temperature:input.temperature}:{}),
+     ...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},{contactName:{contains:input.q,mode:"insensitive"}},{phone:{contains:input.q}}]}:{})};
+   const range:Prisma.LeadWhereInput={nextFollowUpAt:{...(input.from?{gte:new Date(input.from+"T00:00:00Z")}:{}),
+     ...(input.to?{lt:new Date(new Date(input.to+"T00:00:00Z").getTime()+86400000)}:{})}};
+   const scoped:Prisma.LeadWhereInput={AND:[base,range]};
+   const overdue:Prisma.LeadWhereInput={nextFollowUpAt:{lt:start}};
+   const due:Prisma.LeadWhereInput={nextFollowUpAt:{gte:start,lt:tomorrow}};
+   const upcoming:Prisma.LeadWhereInput={nextFollowUpAt:{gte:tomorrow}};
+   const bucket=input.view==="overdue"?overdue:input.view==="today"?due:input.view==="upcoming"?upcoming:{};
+   const where:Prisma.LeadWhereInput={AND:[scoped,bucket]};
+   const priority:LeadTemperature[]=["HOT","WARM","COLD","UNCLASSIFIED"];
+   const anchor=input.cursor?await this.db.lead.findFirst({where:{AND:[where,{id:input.cursor}]},
+     select:{id:true,nextFollowUpAt:true,temperature:true}}):null;
+   // Four bounded streams avoid relying on enum declaration order or raw SQL.
+   // Merge globally by due date, temperature priority, then stable UUID.
+   const streams=await Promise.all(priority.map((temperature,i)=>{
+     if(input.temperature&&input.temperature!==temperature)return Promise.resolve([]);
+     const at=anchor?.nextFollowUpAt;
+     const after:Prisma.LeadWhereInput=at&&anchor?{OR:[{nextFollowUpAt:{gt:at}},
+       ...(i>priority.indexOf(anchor.temperature)?[{nextFollowUpAt:at}]:i===priority.indexOf(anchor.temperature)?[{nextFollowUpAt:at,id:{gt:anchor.id}}]:[])]}:{};
+     return this.db.lead.findMany({where:{AND:[where,{temperature},after]},take:input.limit+1,
+       orderBy:[{nextFollowUpAt:"asc"},{id:"asc"}],
+       select:{id:true,nextFollowUpAt:true,phone:true,businessName:true,contactName:true,stageNote:true,temperature:true,version:true,assignedToId:true,createdById:true}});
+   }));
+   const rows=streams.flat().sort((x,y)=>(x.nextFollowUpAt?.getTime()??0)-(y.nextFollowUpAt?.getTime()??0)
+     ||priority.indexOf(x.temperature)-priority.indexOf(y.temperature)||(x.id<y.id?-1:x.id>y.id?1:0));
+   const monthStart=input.month?new Date(input.month+"-01T00:00:00Z"):null;
+   const monthEnd=monthStart?new Date(Date.UTC(monthStart.getUTCFullYear(),monthStart.getUTCMonth()+1,1)):null;
+   const [total,all,overdueCount,todayCount,upcomingCount,days]=await Promise.all([
+     this.db.lead.count({where}),this.db.lead.count({where:scoped}),
+     this.db.lead.count({where:{AND:[scoped,overdue]}}),
+     this.db.lead.count({where:{AND:[scoped,due]}}),
+     this.db.lead.count({where:{AND:[scoped,upcoming]}}),
+     monthStart&&monthEnd?this.db.lead.groupBy({by:["nextFollowUpAt"],where:{AND:[base,{nextFollowUpAt:{gte:monthStart,lt:monthEnd}}]},_count:{_all:true}}):Promise.resolve([]),
+   ]);
+   const calendar:Record<string,number>={};
+   for(const day of days){const key=day.nextFollowUpAt?.toISOString().slice(0,10);if(key)calendar[key]=(calendar[key]??0)+day._count._all;}
+   const items=rows.slice(0,input.limit).map(row=>({...row,canEdit:this.canEdit(a,row)}));
+   return {items,total,today,summary:{all,overdue:overdueCount,today:todayCount,upcoming:upcomingCount},calendar,
+     nextCursor:rows.length>input.limit?items.at(-1)?.id??null:null};
  }
  // Exact scheduled-day query, independent of lead creation or last-update sorting.
  // Dates use the same UTC calendar-day representation as nextFollowUpAt.

@@ -771,20 +771,21 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("heading",{name:"Follow Ups"})).toBeVisible();
   const scheduledTable=page.getByRole("table",{name:"Follow-up register"});
   await expect(scheduledTable.getByRole("columnheader")).toHaveText([
-    "Follow-up date","Phone number","Business name","Contact name",
+    "Follow-up date","Call","Business name","Contact name","Short notes","Action",
   ]);
   await expect(scheduledTable.locator("tbody tr")).toHaveCount(1);
-  await expect(page.getByRole("region",{name:"Follow-up status on this page"})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Follow-up status across all cycles"})).toBeVisible();
   await expect(page.getByRole("group",{name:"Follow-up date filter"}).getByRole("button",{name:"All"}))
    .toHaveAttribute("aria-pressed","true");
-  await page.getByRole("textbox",{name:"Search visible follow-ups"}).fill("not-a-matching-client");
+  await page.getByRole("textbox",{name:"Search follow-ups"}).fill("not-a-matching-client");
   await expect(scheduledTable.locator("tbody tr")).toHaveCount(0);
-  await page.getByRole("textbox",{name:"Search visible follow-ups"}).fill("");
+  await page.getByRole("textbox",{name:"Search follow-ups"}).fill("");
   await expect(scheduledTable.locator("tbody tr")).toHaveCount(1);
   await expect(scheduledTable.locator("tbody tr time")).toHaveAttribute("dateTime",dueTomorrow);
-  await expect(scheduledTable.getByRole("link",{name:"9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
+  await expect(scheduledTable.getByRole("link",{name:"Call 9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
   await expect(scheduledTable.getByRole("link",{name:"Lead 9876543210"})).toBeVisible();
   await expect(scheduledTable.locator("tbody tr").getByText("Not recorded")).toBeVisible();
+  await expect(scheduledTable.getByRole("img",{name:"Lead temperature: Unclassified"})).toBeVisible();
   await visitWorkspace(page,"/app/leads");
   await expect(page.getByRole("table",{name:"Leads directory"})).toHaveAttribute("aria-busy","false");
   await page.getByRole("table",{name:"Leads directory"}).locator("tbody tr").first().click();
