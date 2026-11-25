@@ -154,7 +154,7 @@ export class ClientsService {
    if(fields.managerId&&!(await this.db.user.findFirst({where:{id:fields.managerId,organizationId:a.organizationId,status:"ACTIVE"},select:{id:true}})))throw invalid("Choose an active account manager from this organization");
    if(!status&&!privateFields.some(key=>fields[key]!==undefined)&&
      !["contractStartOn","contractEndOn","monthlyFee","monthlyAdBudget","health","managerId","onboarding"].some(key=>fields[key as keyof typeof fields]!==undefined))throw invalid("At least one change is required");
-   const data:Prisma.ClientUpdateManyMutationInput={version:{increment:1}};
+   const data:Prisma.ClientUncheckedUpdateManyInput={version:{increment:1}};
    for(const key of privateFields){
      const value=fields[key];
      if(value!==undefined){
