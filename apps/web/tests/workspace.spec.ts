@@ -424,7 +424,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(founderNav.getByRole("link",{name:"Finance",exact:true})).toBeVisible();
   await expect(founderNav.getByRole("link",{name:"Documents",exact:true})).toBeVisible();
   const founderSections=await founderNav.locator(".aw-nav-group").allTextContents();
-  expect(founderSections).toEqual(["Sales & CRM","Business","Communication","Administration"]);
+  expect(founderSections).toEqual(["Sales & CRM","Business","Administration"]);
+   const hiddenNav=page.getByRole("navigation",{name:"Workspace navigation"});
+   await expect(hiddenNav.getByRole("link",{name:"Messages",exact:true})).toHaveCount(0);
+   await expect(hiddenNav.getByRole("link",{name:"AI Review Cards",exact:true})).toHaveCount(0);
   await expect(founderNav.getByRole("link",{name:"Clients",exact:true})).toHaveCount(1);
   await expect(founderNav.getByRole("link",{name:"Client Deliveries",exact:true})).toHaveCount(0);
   for(const label of ["My notes","Content calendar","Quotations","Agreements","Task history","Approvals","Founders & responsibilities"])

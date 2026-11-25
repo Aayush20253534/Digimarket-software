@@ -4,8 +4,8 @@ import {useEffect,useState} from "react";
 import type {LucideIcon} from "lucide-react";
 import {
  BriefcaseBusiness,CalendarDays,CalendarClock,ChartNoAxesCombined,ChevronDown,
- FileStack,MessageCircle,
- Settings2,Users,Wallet,QrCode,Banknote
+ FileStack,
+ Settings2,Users,Wallet,Banknote
 } from "lucide-react";
 
 export type NavItem={label:string;href:string;icon:LucideIcon;permits?:readonly string[];roles?:readonly string[]};
@@ -18,7 +18,8 @@ const sections:readonly NavGroup[]=[
   {label:"Follow-ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
   {label:"Meetings",href:"/app/meetings",icon:CalendarDays,permits:["leads.read"]},
   {label:"Clients",href:"/app/clients",icon:Users,permits:["clients.read"]},
-  {label:"AI Review Cards",href:"/app/ai-review-cards",icon:QrCode,permits:["clients.read"]}
+  // Temporarily hidden from the page list. Route and API remain available.
+  // {label:"AI Review Cards",href:"/app/ai-review-cards",icon:QrCode,permits:["clients.read"]}
  ]},
  {title:"Business",items:[
   {label:"Finance",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]},
@@ -26,7 +27,8 @@ const sections:readonly NavGroup[]=[
   {label:"Documents",href:"/app/documents/quotations",icon:FileStack,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
- {title:"Communication",items:[{label:"Messages",href:"/app/messages",icon:MessageCircle}]},
+ // Temporarily hidden from the page list. Restore MessageCircle import when re-enabled.
+ // {title:"Communication",items:[{label:"Messages",href:"/app/messages",icon:MessageCircle}]},
  {title:"Administration",items:[
   {label:"Settings",href:"/app/settings",icon:Settings2,
    permits:["organization.settings.manage","founders.read","users.read"]}
@@ -61,6 +63,8 @@ export function currentSection(groups:NavGroup[],pathname:string){
  const item=chosen?.items.find(i=>matches(pathname,i.href));
  const titles:Record<string,{group:string;title:string}>={
   "/app/dashboard":{group:"Workspace",title:"Overview"},
+  "/app/messages":{group:"Communication",title:"Messages"},
+  "/app/ai-review-cards":{group:"Sales & CRM",title:"AI Review Cards"},
   "/app/approvals":{group:"Workspace",title:"Approval inbox"},
   "/app/notes":{group:"Workspace",title:"Notes"},
   "/app/notes/list":{group:"Workspace",title:"Notes"},
