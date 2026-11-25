@@ -191,6 +191,36 @@ export async function verifyAgreementExpiry(db: PrismaClient) {
   );
   await clients.update(actor, active.id, { version: 2, notes: "History remains accessible" });
   assert.equal((await clients.detail(actor, active.id)).status, "EXPIRED");
+  const overviewBefore=await clients.overview(actor,active.id);
+  assert.equal(overviewBefore.financial?.invoiceCount,0);
+  assert.equal((await clients.overview(reader,active.id)).financial,null);
+  await assert.rejects(()=>clients.overview(outsider,active.id),fail(404));
+  const register=await clients.list(actor,{workspace:"1",limit:1});
+  assert.equal(register.summary?.all,6);
+  assert.equal(register.items.length,1);
+  assert.equal((await clients.list(reader,{workspace:"1",limit:1})).summary?.monthlyFees,null);
+  assert.equal((await clients.list(reader,{limit:100})).items.every(c=>c.monthlyFee===null),true);
+  const beforeRenew=await clients.detail(actor,active.id);
+  const renew={version:beforeRenew.version,startOn:"2026-11-17",endOn:"2026-12-31",monthlyFee:"17000",monthlyAdBudget:"4000",reason:"Returning client"};
+  await assert.rejects(()=>clients.renew(reader,active.id,renew),fail(403));
+  await assert.rejects(()=>clients.renew(outsider,active.id,renew),fail(404));
+  await assert.rejects(()=>clients.renew(actor,active.id,{...renew,startOn:"2026-11-16"}),fail(422));
+  await clients.renew(actor,active.id,renew);
+  const renewed=await clients.detail(actor,active.id);
+  assert.equal(renewed.id,active.id);
+  assert.equal(renewed.contractStartOn?.toISOString().slice(0,10),"2026-10-22");
+  assert.equal(renewed.currentAgreementStartOn?.toISOString().slice(0,10),"2026-11-17");
+  assert.equal(renewed.agreementEndedOn,null);
+  assert.equal(renewed.agreementExpired,false);
+  assert.equal((await clients.overview(actor,active.id)).history.some(e=>e.action==="clients.reactivated"),true);
+  await assert.rejects(()=>clients.renew(actor,active.id,renew),fail(409));
+  const managed=await clients.update(actor,active.id,{version:renewed.version,health:"HEALTHY",managerId:user.id,onboarding:["AGREEMENT","BILLING"]});
+  assert.equal(managed.health,"HEALTHY");
+  assert.equal(managed.managerId,user.id);
+  await clients.saveService(actor,active.id,{name:"Meta Ads",status:"ACTIVE"});
+  await clients.saveService(actor,active.id,{name:"Meta Ads",status:"PAUSED"});
+  assert.equal((await clients.overview(actor,active.id)).services.filter(s=>s.name==="Meta Ads").length,1);
+  assert.equal((await clients.list(actor,{health:"HEALTHY",managerId:user.id,limit:10})).items[0]?.id,active.id);
   const nextDay = new ClientsService(db, () => "2026-11-18");
   assert.equal(
     (await nextDay.list(actor, { section: "expired", limit: 100 })).items.some(

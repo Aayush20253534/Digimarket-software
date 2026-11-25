@@ -944,7 +944,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Sales workspace sections"}).getByRole("link",{name:"Clients",exact:true}))
    .toHaveAttribute("aria-current","page");
-  await expect(page.getByRole("img",{name:/active, .* paused, .* archived/})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Client status across all cycles"})).toBeVisible();
   await page.getByRole("navigation",{name:"Client sections"}).getByRole("link",{name:"Past Clients",exact:true}).click();
   await expect(page).toHaveURL(/\/app\/clients\/expired$/);
   await expect(page.getByRole("heading",{name:"Past Clients",exact:true})).toBeVisible();
@@ -961,7 +961,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(workspace).toBeVisible();
   const clientTabs=workspace.getByRole("tablist",{name:"Client workspace sections"});
   await expect(clientTabs.getByRole("tab",{name:"Services"})).toHaveCount(0);
-  await expect(clientTabs.getByRole("tab",{name:"Agreement"})).toHaveAttribute("aria-selected","true");
+  await expect(clientTabs.getByRole("tab",{name:"Overview",exact:true})).toHaveAttribute("aria-selected","true");
   await expect(clientTabs.getByRole("tab",{name:"Delivery"})).toHaveCount(0);
   await clientTabs.getByRole("tab",{name:"Agreement"}).click();
   await expect(workspace.getByRole("heading",{name:"Client profile & agreement"})).toBeVisible();

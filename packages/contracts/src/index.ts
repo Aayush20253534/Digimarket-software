@@ -193,6 +193,8 @@ export type LeadListQuery = z.infer<typeof leadListQuerySchema>;
 
 // Module 8 client profile, relationship and conversion contracts.
 export const clientStatusSchema=z.enum(["ACTIVE","PAUSED","ARCHIVED","EXPIRED"]);
+export const clientHealthSchema=z.enum(["UNASSESSED","HEALTHY","NEEDS_ATTENTION","AT_RISK"]);
+export const clientOnboardingSchema=z.enum(["AGREEMENT","BRAND_ASSETS","ACCOUNT_ACCESS","STRATEGY","BILLING"]);
 export const clientServiceStatusSchema=z.enum(["ACTIVE","PAUSED","ENDED"]);
 const optionalClientUrl=z.union([z.url({protocol:/^https?$/}).max(500),z.literal("")]).optional();
 const optionalClientEmail=z.union([z.email().max(255),z.literal("")]).optional();
@@ -206,6 +208,7 @@ export const clientCreateSchema=z.strictObject({
 export type ClientCreateInput=z.infer<typeof clientCreateSchema>;
 export const clientUpdateSchema=clientCreateSchema.partial().extend({
  version:z.number().int().min(1),status:clientStatusSchema.optional(),
+ health:clientHealthSchema.optional(),managerId:z.uuid().nullable().optional(),onboarding:z.array(clientOnboardingSchema).max(5).optional(),
  contractStartOn:z.union([z.iso.date(),z.literal("")]).optional(),
  contractEndOn:z.union([z.iso.date(),z.literal("")]).optional(),
  monthlyFee:z.union([z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),z.literal("")]).optional(),
@@ -217,10 +220,18 @@ export const clientEndAgreementSchema=z.strictObject({
  version:z.number().int().min(1),endedOn:z.iso.date(),reason:z.string().trim().min(4).max(500),
 });
 export type ClientEndAgreementInput=z.infer<typeof clientEndAgreementSchema>;
+export const clientRenewSchema=z.strictObject({
+ version:z.number().int().min(1),startOn:z.iso.date(),endOn:z.iso.date(),
+ monthlyFee:z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),
+ monthlyAdBudget:z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:[.][0-9]{1,4})?$/),
+ reason:z.string().trim().min(4).max(500)
+}).refine(x=>x.startOn<=x.endOn,"End date precedes start date");
+export type ClientRenewInput=z.infer<typeof clientRenewSchema>;
 export const clientListQuerySchema=z.strictObject({
  q:z.string().trim().max(100).optional(),status:clientStatusSchema.optional(),
  section:z.enum(["current","expired","all"]).optional(),
- sort:z.enum(["businessName","businessType","location","status"]).optional(),
+ workspace:z.literal("1").optional(),expiring:z.literal("1").optional(),health:clientHealthSchema.optional(),managerId:z.uuid().optional(),
+ sort:z.enum(["businessName","businessType","location","status","contractEndOn"]).optional(),
  direction:z.enum(["asc","desc"]).optional(),
  cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(30),
 });

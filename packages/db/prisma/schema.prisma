@@ -319,6 +319,7 @@ model User {
   leadActivities LeadActivity[] @relation("LeadActivityActor")
   reviewedLeadDuplicates LeadDuplicateCandidate[] @relation("LeadDuplicateReviewer")
   clientsCreated Client[] @relation("ClientCreator")
+  clientsManaged Client[] @relation("ClientManager")
   videoWeeksUpdated ClientVideoWeek[] @relation("ClientVideoWeekUpdater")
   postWeeksUpdated ClientPostWeek[] @relation("ClientPostWeekUpdater")
   reviewCardsCreated ReviewCard[] @relation("ReviewCardCreator")
@@ -663,6 +664,10 @@ model Client {
   id String @id @default(uuid()) @db.Uuid
   organizationId String @db.Uuid
   sourceLeadId String? @unique @db.Uuid
+  managerId String? @db.Uuid
+  health String @default("UNASSESSED") @db.VarChar(24)
+  onboarding String[] @default([])
+  currentAgreementStartOn DateTime? @db.Date
   createdById String @db.Uuid
   businessName String @db.VarChar(180)
   businessType String? @db.VarChar(120)
@@ -685,6 +690,7 @@ model Client {
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   creator User @relation("ClientCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  manager User? @relation("ClientManager", fields:[managerId], references:[id], onDelete:SetNull)
   sourceLead Lead? @relation("ClientSourceLead", fields: [sourceLeadId], references: [id], onDelete: Restrict)
   contacts ClientContact[]
   services ClientService[]

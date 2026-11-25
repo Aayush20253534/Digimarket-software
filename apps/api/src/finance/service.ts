@@ -30,9 +30,9 @@ export class FinanceService {
     const periodEnd=new Date(range.lte.getTime()+86400000);
     const clients=await this.db.client.findMany({
       where:{organizationId:actor.organizationId,status:"ACTIVE",NOT:expiredAgreementWhere(this.today()),
-        OR:[{contractStartOn:null},{contractStartOn:{lt:periodEnd}}],
+        OR:[{currentAgreementStartOn:{lt:periodEnd}},{currentAgreementStartOn:null,OR:[{contractStartOn:null},{contractStartOn:{lt:periodEnd}}]}],
         AND:[{OR:[{contractEndOn:null},{contractEndOn:{gte:periodStart}}]}]},
-      select:{id:true,businessName:true,monthlyFee:true,monthlyAdBudget:true,contractStartOn:true,contractEndOn:true},
+      select:{id:true,businessName:true,monthlyFee:true,monthlyAdBudget:true,contractStartOn:true,currentAgreementStartOn:true,contractEndOn:true},
       orderBy:{businessName:"asc"},
     });
     const zero=new Prisma.Decimal(0);
@@ -42,7 +42,7 @@ export class FinanceService {
       serviceTotal=serviceTotal.add(service);adBudgetTotal=adBudgetTotal.add(ads);
       return {id:c.id,businessName:c.businessName,monthlyServiceCharge:service.toFixed(4),
         monthlyAdBudget:ads.toFixed(4),monthlyCombined:service.add(ads).toFixed(4),
-        contractStartOn:c.contractStartOn?.toISOString().slice(0,10)??null,
+        contractStartOn:(c.currentAgreementStartOn??c.contractStartOn)?.toISOString().slice(0,10)??null,
         contractEndOn:c.contractEndOn?.toISOString().slice(0,10)??null};
     });
     return {month:businessCycle(period.from).key,from:period.from,to:period.to,currency:"INR",items,

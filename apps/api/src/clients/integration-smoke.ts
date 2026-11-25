@@ -172,7 +172,9 @@ try{
  const updated=await clients.update(team,client.id,{version:1,businessName:"Agency Cafe Updated",businessType:"Hospitality"});
  assert.equal(updated.version,2);
  assert.equal(updated.businessType,"Hospitality");
- const agreement=await clients.update(team,client.id,{
+ await assert.rejects(()=>clients.update(team,client.id,{version:2,monthlyFee:"15000"}),fail(403));
+ const financeEditor={...team,permissions:new Set([...team.permissions,"finance.read.all"])};
+ const agreement=await clients.update(financeEditor,client.id,{
    version:2,contractStartOn:"2026-10-29",contractEndOn:"2026-11-28",
    monthlyFee:"15000.00",monthlyAdBudget:"3000.00",
  });
