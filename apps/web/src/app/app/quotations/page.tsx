@@ -50,8 +50,8 @@ export default function QuotationsPage(){
  const [mode,setMode]=useState<QuoteMode>("default");
  const [form,setForm]=useState<QuotationFields>(defaultForm);
  const [saving,setSaving]=useState(false),[downloading,setDownloading]=useState<string|null>(null),[loading,setLoading]=useState(false);
- const [error,setError]=useState(""),[notice,setNotice]=useState(""),[links,setLinks]=useState<DocumentLinks>({}),[previewOpen,setPreviewOpen]=useState(true);
- const restore=(payload:QuotationFields,refs:DocumentLinks)=>{setForm(payload);setMode(payload.mode==="default"?"default":"new");setLinks(refs)};
+ const [error,setError]=useState(""),[notice,setNotice]=useState(""),[links,setLinks]=useState<DocumentLinks>({}),[previewOpen,setPreviewOpen]=useState(true),[stage,setStage]=useState("all");
+ const restore=(payload:QuotationFields,refs:DocumentLinks)=>{setForm(payload);setMode(payload.mode==="default"?"default":"new");setLinks(refs);setStage("all")};
  const draft=useDocumentDraft("quotation",form,links,restore,permitted);
  const loadSource=useCallback(async()=>{if(!permitted)return;const p=new URLSearchParams(window.location.search),id=p.get("revision")??p.get("source");if(!id)return;setLoading(true);setError("");
  try{
@@ -66,7 +66,7 @@ export default function QuotationsPage(){
  });
  const changeMode=(next:QuoteMode)=>{
   if(next===mode||draft.dirty&&!window.confirm("Change template and discard unsaved changes?"))return;
-  setLinks({});setMode(next);setForm(next==="default"?defaultForm():initial());setError("");setNotice("");
+  setStage("all");setLinks({});setMode(next);setForm(next==="default"?defaultForm():initial());setError("");setNotice("");
  };
  const addCatalogueService=(service:Service)=>setForm(prev=>({
    ...prev,services:prev.services.length>=6?prev.services:[...prev.services,{...service}],
@@ -88,7 +88,7 @@ export default function QuotationsPage(){
   if(form.adBudgetMode==="not applicable"&&Number(form.adBudget)!==0){setError("Set the ad budget to zero when not applicable.");return;}
   setSaving(true);
   try {
-   const out=await request<SavedQuotation>("/quotations",{method:"POST",body:{...form,mode,quoteDate:makeDate(),links}});
+   const out=await request<SavedQuotation>("/quotations",{method:"POST",body:{...form,mode,links}});
    draft.markSaved();
    setNotice(out.quoteNumber+" saved. Your PDF has been prepared for download.");
    await download(out);
@@ -122,15 +122,16 @@ export default function QuotationsPage(){
     {(mode==="default"?[
       ["01","Package","#quote-package"],["02","Review & export","#quote-summary"]
      ]:[
-      ["01","Client","#quote-client"],["02","Services","#quote-services"],
+      ["01","Client","#quote-client-section"],["02","Services","#quote-services"],
       ["03","Charges","#quote-charges"],["04","Terms","#quote-terms"],
       ["05","Review & export","#quote-summary"]
-     ]).map(([n,title,href])=><a key={href} href={href}>
-       <span>{n}</span>{title}</a>)}
-   </nav>
-  <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(285px,.7fr)]" onSubmit={e=>void create(e)}>
+     ]).map(([n,title,href])=><button className="dc-step" type="button" key={href} aria-pressed={stage===href.slice(1)} onClick={()=>setStage(href.slice(1))}>
+       <span>{n}</span>{title}</button>)}
+    <button type="button" className="dc-step" aria-pressed={stage==="all"} onClick={()=>setStage("all")}>Show all</button>
+  </nav>
+  <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(285px,.7fr)]" onInvalidCapture={()=>setStage("all")} onSubmit={e=>void create(e)}>
    <div className="space-y-5">
-    {mode==="default"?<section id="quote-package" className={card}>
+    {mode==="default"?<section id="quote-package" hidden={stage!=="all"&&stage!=="quote-package"} className={card}>
      <div className="mb-5"><h2 className="text-xl font-bold text-[#F5E7FF]">Default marketing package</h2>
       <p className="mt-1 text-sm leading-6 text-[#C6ABD9]">Six included services and standard commercial terms. Monthly content starts at 8 reels and 8 posts, and both quantities are editable.</p></div>
      <div className="grid gap-4 sm:grid-cols-2">
@@ -158,7 +159,7 @@ export default function QuotationsPage(){
      </div>
      <p className="mt-5 text-xs leading-6 text-[#C4ACD4]">Monthly content: {form.reels} reels and {form.posts} posts. Commercial terms and the six service types remain fixed. The PDF date and quotation number are generated automatically.</p>
     </section>:<>
-    <section id="quote-client" className={card}>
+    <section id="quote-client-section" hidden={stage!=="all"&&stage!=="quote-client-section"} className={card}>
      <h2 className="mb-4 text-lg font-bold text-[#F4DFFF]">1. Client & quotation</h2>
      <div className="grid gap-4 sm:grid-cols-2">
       <div className="sm:col-span-2"><label className={label} htmlFor="quote-client">Client / business name *</label>
@@ -171,7 +172,7 @@ export default function QuotationsPage(){
       <div className="flex items-end pb-2 text-sm text-[#BDA7CD]">Quotation number is assigned when saved.</div>
      </div>
     </section>
-    <section id="quote-services" className={card}>
+    <section id="quote-services" hidden={stage!=="all"&&stage!=="quote-services"} className={card}>
      <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-bold text-[#F4DFFF]">2. Included services *</h2>
       <button type="button" className={action} disabled={form.services.length>=6}
        onClick={()=>patch("services",[...form.services,{name:"",description:""}])}><Plus size={15}/> Add custom service</button></div>
@@ -208,7 +209,7 @@ export default function QuotationsPage(){
        <input id="quote-posts" type="number" min={0} max={999} className={field} value={form.posts} onChange={e=>patch("posts",Number(e.target.value))}/></div>
      </div>
     </section>
-    <section id="quote-charges" className={card}>
+    <section id="quote-charges" hidden={stage!=="all"&&stage!=="quote-charges"} className={card}>
      <h2 className="mb-4 text-lg font-bold text-[#F4DFFF]">3. Fees, advertising & taxes</h2>
      <div className="grid gap-4 sm:grid-cols-2">
       <div><label className={label} htmlFor="quote-fee">Agency service fee (₹) *</label>
@@ -238,7 +239,7 @@ export default function QuotationsPage(){
      </div>
      <p className="mt-3 text-xs text-[#BDA7CD]">GST added separately is calculated on agency fees, not client-controlled advertising spend. Validate tax treatment before issuing a legal quotation.</p>
     </section>
-    <section id="quote-terms" className={card}>
+    <section id="quote-terms" hidden={stage!=="all"&&stage!=="quote-terms"} className={card}>
      <h2 className="mb-4 text-lg font-bold text-[#F4DFFF]">4. Payment & commercial terms</h2>
      <div className="grid gap-4 sm:grid-cols-2">
       <div><label className={label} htmlFor="quote-service-payment">Service fee payable</label>
@@ -282,9 +283,9 @@ export default function QuotationsPage(){
       <div className="flex justify-between text-sm"><span>Additional GST</span><strong>{money(totals.tax)}</strong></div>
       <div className="border-t border-[#553363] pt-3 text-[#F2D8FF]"><div className="flex items-center justify-between gap-3"><strong>Total package value</strong><strong className="text-xl">{money(totals.total)}</strong></div></div>
       <p className="text-xs text-[#C4A7DA]">Optional advertising spend is included in package value when entered, but remains optional under the payment terms.</p>
-      <button className="btn-primary w-full" type="submit" disabled={saving||!!downloading}>
+      <button className="btn-primary w-full" type="submit" disabled={loading||saving||!!downloading}>
        <Download size={16}/>{saving?"Saving quotation…":"Generate & download PDF"}</button>
-      <button type="button" className="btn-secondary w-full" onClick={()=>{if(draft.dirty&&!window.confirm("Clear unsaved changes?"))return;setLinks({});setForm(mode==="default"?defaultForm():initial());setNotice("");setError("");}} disabled={saving}>Clear form</button>
+      <button type="button" className="btn-secondary w-full" onClick={()=>{if(draft.dirty&&!window.confirm("Clear unsaved changes?"))return;setStage("all");setLinks({});setForm(mode==="default"?defaultForm():initial());setNotice("");setError("");}} disabled={saving}>Clear form</button>
      </div>
     </section>
     <button type="button" className="btn-secondary w-full" onClick={()=>setPreviewOpen(v=>!v)}>{previewOpen?"Hide preview":"Show preview"}</button>{previewOpen&&<DocumentPreview row={previewRow}/>}

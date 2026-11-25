@@ -1,4 +1,4 @@
-import {splitDocument,verifyLinks,registerDraftRoutes,listQuotes,registerDocumentLookup} from "../quotations/document-workspace";
+import {splitDocument,verifyLinks,registerDraftRoutes,listQuotes,registerDocumentLookup,validityEnd} from "../quotations/document-workspace";
 import type { Express, NextFunction, Request, Response } from "express";
 import { Prisma } from "@digimarket/db";
 import { z } from "zod";
@@ -150,7 +150,7 @@ export function registerQuotationRoutes(app: Express, auth: AuthService) {
           const quote = await tx.quotation.create({
             data: { organizationId: p.organizationId, createdById: p.userId,
               quoteNumber, clientName: input.clientName, quoteDate: new Date(input.quoteDate + "T00:00:00.000Z"),
-              ...priced, payload: input,...await verifyLinks(tx,p,"quotation",links) },
+              ...priced, validThrough:new Date(validityEnd(input.quoteDate,input.validityDays)+"T00:00:00Z"),payload: input,...await verifyLinks(tx,p,"quotation",links) },
           });
           await tx.auditLog.create({ data: { organizationId: p.organizationId, actorId: p.userId,
             action: "quotations.created", entityType: "Quotation", entityId: quote.id } });

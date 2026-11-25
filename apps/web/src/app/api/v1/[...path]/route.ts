@@ -344,7 +344,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if(q!==null)url.searchParams.set("q",q);
   }
   if(["quotations","agreements","quotations/contacts"].includes(path)){
-    for(const key of ["q","page","limit","from","to","status","mode","sort"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
+    for(const key of ["q","page","limit","from","to","status","mode","sort","relatedTo"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
   if(path==="reports/overview"){
     for(const key of ["from","to"]){

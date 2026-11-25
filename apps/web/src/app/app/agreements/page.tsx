@@ -40,8 +40,8 @@ export default function AgreementsPage(){
  const [mode,setMode]=useState<AgreementFields["mode"]>("default");
  const [form,setForm]=useState<AgreementFields>(()=>initial("default"));
  const [saving,setSaving]=useState(false),[downloading,setDownloading]=useState<string|null>(null),[loading,setLoading]=useState(false);
- const [error,setError]=useState(""),[notice,setNotice]=useState(""),[links,setLinks]=useState<DocumentLinks>({}),[previewOpen,setPreviewOpen]=useState(true);
- const restore=(payload:AgreementFields,refs:DocumentLinks)=>{setForm(payload);setMode(payload.mode);setLinks(refs)};
+ const [error,setError]=useState(""),[notice,setNotice]=useState(""),[links,setLinks]=useState<DocumentLinks>({}),[previewOpen,setPreviewOpen]=useState(true),[stage,setStage]=useState("all");
+ const restore=(payload:AgreementFields,refs:DocumentLinks)=>{setForm(payload);setMode(payload.mode);setLinks(refs);setStage("all")};
  const draft=useDocumentDraft("agreement",form,links,restore,permitted);
  const loadSource=useCallback(async()=>{if(!permitted)return;const p=new URLSearchParams(window.location.search),id=p.get("revision")??p.get("source"),quoteId=p.get("quotation");if(!id&&!quoteId)return;setLoading(true);setError("");
  try{if(quoteId){const source=await request<Quote>("/quotations/"+encodeURIComponent(quoteId));const q=source.payload;const start=today();setMode("custom");setForm({...initial("custom"),clientName:q.clientName,serviceFee:q.serviceFee,adBudget:q.adBudget,adBudgetMode:q.adBudgetMode,adPayment:q.adPayment,taxMode:q.taxMode,gstRate:q.gstRate,feePeriod:q.feePeriod,servicePayment:q.servicePayment==="monthly"?"monthly advance":"full advance",reels:q.reels,posts:q.posts,services:q.services.map(s=>({...s})),exclusions:q.exclusions,additionalTerms:"Source quotation: "+source.quoteNumber+"; quoted term: "+q.serviceTerm+". Review payment schedule and all terms before signing.",startDate:start,endDate:endOfMonthTerm(start)});setLinks({sourceQuotationId:source.id,clientId:source.clientId,leadId:source.leadId});setNotice("Commercial terms copied from "+source.quoteNumber+". Confirm dates, signatories and payment terms.");return;}
@@ -52,7 +52,7 @@ export default function AgreementsPage(){
    setForm(prev=>{const next={...prev,[key]:value};if(key==="startDate"&&(!prev.endDate||prev.endDate===endOfMonthTerm(prev.startDate)))next.endDate=endOfMonthTerm(String(value));if(next.mode==="default"&&(key==="reels"||key==="posts"))next.services=standardServices.map((s,i)=>i===7?{...s,description:`Production, editing and publishing of ${next.reels} reels and ${next.posts} branded posts each month.`}:{...s});return next});
  const switchMode=(next:AgreementFields["mode"])=>{
   if(next===mode||draft.dirty&&!window.confirm("Change template and discard unsaved changes?"))return;
-  setLinks({});setMode(next);setForm(initial(next));setError("");setNotice("");
+  setStage("all");setLinks({});setMode(next);setForm(initial(next));setError("");setNotice("");
  };
  const previewRow=useMemo<Agreement>(()=>{const fee=Number(form.serviceFee)||0,ads=form.adBudgetMode==="not applicable"?0:Number(form.adBudget)||0,tax=form.taxMode==="extra"?Math.round(fee*form.gstRate)/100:0;return {id:"draft",agreementNumber:"DRAFT",clientName:form.clientName||"Client name",agreementDate:form.agreementDate,startDate:form.startDate,endDate:form.endDate||form.startDate,payload:{...form,clientName:form.clientName||"Client name",endDate:form.endDate||form.startDate},serviceFee:fee.toFixed(2),adBudget:ads.toFixed(2),total:(fee+ads+tax).toFixed(2),createdAt:""}},[form]);
  async function download(item:SavedAgreement){
@@ -102,11 +102,12 @@ export default function AgreementsPage(){
     {([["01","Client","#agreement-client"],["02","Dates","#agreement-dates"],
       ["03","Services","#agreement-services"],["04","Charges","#agreement-charges"],
       ["05","Terms","#agreement-terms"],["06","Review","#agreement-summary"]] as const).map(([n,title,href])=>
-       <a key={href} href={href}><span>{n}</span>{title}</a>)}
-   </nav>
-  <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(285px,.7fr)]" onSubmit={e=>void create(e)}>
+       <button className="dc-step" type="button" key={href} aria-pressed={stage===href.slice(1)} onClick={()=>setStage(href.slice(1))}><span>{n}</span>{title}</button>)}
+    <button type="button" className="dc-step" aria-pressed={stage==="all"} onClick={()=>setStage("all")}>Show all</button>
+  </nav>
+  <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(285px,.7fr)]" onInvalidCapture={()=>setStage("all")} onSubmit={e=>void create(e)}>
    <div className="space-y-5">
-    <section id="agreement-client" className={panel}>
+    <section id="agreement-client" hidden={stage!=="all"&&stage!=="agreement-client"} className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">1. Client and representatives</h2>
      <div className={row}>
       <div className="sm:col-span-2"><label className={label} htmlFor="ag-client">Client / legal business name *</label>
@@ -125,7 +126,7 @@ export default function AgreementsPage(){
        <input className={input} id="ag-email" type="email" maxLength={200} value={form.clientEmail} onChange={e=>patch("clientEmail",e.target.value)}/></div>
      </div>
     </section>
-    <section id="agreement-dates" className={panel}>
+    <section id="agreement-dates" hidden={stage!=="all"&&stage!=="agreement-dates"} className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">2. Agreement dates and term</h2>
      <div className="grid gap-4 sm:grid-cols-3">
       <div><label className={label} htmlFor="ag-date">Agreement date *</label><input className={input} id="ag-date" type="date" required value={form.agreementDate} onChange={e=>patch("agreementDate",e.target.value)}/></div>
@@ -133,7 +134,7 @@ export default function AgreementsPage(){
       <div><label className={label} htmlFor="ag-end">End date *</label><input className={input} id="ag-end" type="date" min={form.startDate} required value={form.endDate} onChange={e=>patch("endDate",e.target.value)}/></div>
      </div>
     </section>
-    <section id="agreement-services" className={panel}>
+    <section id="agreement-services" hidden={stage!=="all"&&stage!=="agreement-services"} className={panel}>
      <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-bold text-[#F5E7FF]">3. Services and deliverables</h2>
       {mode==="custom"&&<button type="button" className="btn-secondary" disabled={form.services.length>=12} onClick={()=>patch("services",[...form.services,{name:"",description:""}])}><Plus size={16}/>Add service</button>}
      </div>
@@ -159,7 +160,7 @@ export default function AgreementsPage(){
       <div><label className={label} htmlFor="ag-posts">Posts per month</label><input className={input} id="ag-posts" type="number" min={0} max={999} value={form.posts} onChange={e=>patch("posts",Number(e.target.value))}/></div>
      </div>
     </section>
-    <section id="agreement-charges" className={panel}>
+    <section id="agreement-charges" hidden={stage!=="all"&&stage!=="agreement-charges"} className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">4. Charges and payment schedule</h2>
      <div className={row}>
       <div><label className={label} htmlFor="ag-fee">Agency service fee (₹) *</label><input className={input} id="ag-fee" required type="number" min={0} max={999999999} step=".01" value={form.serviceFee} onChange={e=>patch("serviceFee",e.target.value)}/></div>
@@ -175,7 +176,7 @@ export default function AgreementsPage(){
       {form.taxMode==="extra"&&<div><label className={label} htmlFor="ag-gst">GST rate (%)</label><input className={input} type="number" id="ag-gst" min={0} max={28} step=".01" value={form.gstRate} onChange={e=>patch("gstRate",Number(e.target.value))}/></div>}
      </div>
     </section>
-    <section id="agreement-terms" className={panel}>
+    <section id="agreement-terms" hidden={stage!=="all"&&stage!=="agreement-terms"} className={panel}>
      <h2 className="mb-4 text-lg font-bold text-[#F5E7FF]">5. Termination and additional conditions</h2>
      <div className={row}>
       <div><label className={label} htmlFor="ag-notice">Termination notice (days)</label><input className={input} id="ag-notice" type="number" min={0} max={90} value={form.noticeDays} onChange={e=>patch("noticeDays",Number(e.target.value))}/></div>
@@ -191,10 +192,10 @@ export default function AgreementsPage(){
      <div className="flex justify-between gap-3"><span>Agency fee</span><strong>{currency(form.serviceFee)}</strong></div>
      <div className="flex justify-between gap-3"><span>Ad budget</span><strong>{currency(form.adBudget)}</strong></div>
      <div className="flex justify-between gap-3"><span>Term</span><strong>{form.endDate&&form.startDate?form.startDate+" to "+form.endDate:"Select dates"}</strong></div>
-     <div className="border-t border-[#553363] pt-3"><span className="block text-xs">Taxes additional where selected</span></div>
+     <div className="border-t border-[#553363] pt-3"><div className="flex justify-between"><span>Package value</span><strong>{currency(previewRow.total)}</strong></div><span className="block text-xs">Taxes additional where selected</span></div>
     </div>
-    <button type="submit" className="btn-primary mt-5 w-full" disabled={saving||!!downloading}><Download size={16}/>{saving?"Saving…":"Generate & download PDF"}</button>
-    <button type="button" className="btn-secondary mt-3 w-full" disabled={saving} onClick={()=>{if(draft.dirty&&!window.confirm("Clear unsaved changes?"))return;setLinks({});setForm(initial(mode));setError("");setNotice("");}}>Clear form</button>
+    <button type="submit" className="btn-primary mt-5 w-full" disabled={loading||saving||!!downloading}><Download size={16}/>{saving?"Saving…":"Generate & download PDF"}</button>
+    <button type="button" className="btn-secondary mt-3 w-full" disabled={saving} onClick={()=>{if(draft.dirty&&!window.confirm("Clear unsaved changes?"))return;setStage("all");setLinks({});setForm(initial(mode));setError("");setNotice("");}}>Clear form</button>
    </section><button type="button" className="btn-secondary w-full" onClick={()=>setPreviewOpen(v=>!v)}>{previewOpen?"Hide preview":"Show preview"}</button>{previewOpen&&<DocumentPreview row={previewRow}/>}</aside>
   </form>
  </div>;

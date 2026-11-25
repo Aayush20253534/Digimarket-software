@@ -24,7 +24,7 @@ const fmt=(value:string)=>new Date(value.slice(0,10)+"T12:00:00Z")
   .toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"UTC"});
 type Painter={
  canvas:HTMLCanvasElement;g:CanvasRenderingContext2D;
- text:(value:string,x:number,y:number,size?:number,color?:string,bold?:boolean)=>void;
+ text:(value:string,x:number,y:number,size?:number,color?:string,bold?:boolean,maxWidth?:number)=>void;
  wrap:(value:string,x:number,y:number,width:number,size?:number,leading?:number,color?:string,bold?:boolean)=>number;
  line:(y:number)=>void;
  section:(title:string,y:number)=>number;
@@ -33,9 +33,9 @@ function painter():Painter{
  const canvas=document.createElement("canvas");canvas.width=PW*scale;canvas.height=PH*scale;
  const g=canvas.getContext("2d");if(!g)throw new Error("Canvas unavailable for agreement PDF.");
  g.scale(scale,scale);g.fillStyle="#FFFFFF";g.fillRect(0,0,PW,PH);
- const text=(v:string,x:number,y:number,size=9,color=muted,bold=false)=>{
+ const text=(v:string,x:number,y:number,size=9,color=muted,bold=false,maxWidth?:number)=>{
   g.fillStyle=color;g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
-  g.fillText(v,x,y);
+  if(maxWidth)g.fillText(v,x,y,maxWidth);else g.fillText(v,x,y);
  };
  const wrap=(v:string,x:number,y:number,width:number,size=9,leading=13,color=muted,bold=false)=>{
   g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
@@ -102,7 +102,7 @@ export async function renderAgreementPages(row:SavedAgreement):Promise<HTMLCanva
  const page1=pages[0];
  page1.text("CLIENT SERVICES / DIGITAL MARKETING",40,98,7.4,violet,true);
  page1.text("DIGITAL MARKETING SERVICES AGREEMENT",40,119,15,navy,true);
- page1.text("AmplifyWorld × "+p.clientName+"  |  "+servicePeriod,40,137,8,"#746688");
+ page1.text("AmplifyWorld × "+p.clientName+"  |  "+servicePeriod,40,137,8,"#746688",false,515);
  let y=151;
  y=rowBox(page1,"Client / business",p.clientName,y);
  y=rowBox(page1,"Service term",servicePeriod,y);
@@ -184,15 +184,15 @@ export async function renderAgreementPages(row:SavedAgreement):Promise<HTMLCanva
  const conditionY=Math.max(active(page4)===page4?652:140,y+24);
  y=flow(page4,"PAYMENT CONDITION: "+payment+". "+adsSentence+" Extra charges require written approval. "+tax+".",conditionY,51,492,8,11,violet);
  if(y>695){next(page4);y=140;}
- const signedY=Math.max(active(page4)===page4?706:145,y+16);
+ const signedY=Math.min(713,Math.max(active(page4)===page4?706:145,y+16));
  active(page4).text("FOR AMPLIFYWORLD",40,signedY,8,violet,true);
- active(page4).text("FOR "+p.clientName.toUpperCase(),311,signedY,8,violet,true);
+ active(page4).text("FOR "+p.clientName.toUpperCase(),311,signedY,8,violet,true,235);
  active(page4).text("Signature: _____________________",40,signedY+20,8,navy);
  active(page4).text("Signature: _____________________",311,signedY+20,8,navy);
- active(page4).text("Name: "+p.agencyRepresentative,40,signedY+39,8,navy);
- active(page4).text("Name: "+p.clientRepresentative,311,signedY+39,8,navy);
- active(page4).text("Role: "+(p.agencyDesignation||"Authorized Signatory"),40,signedY+56,8,navy);
- active(page4).text("Role: "+(p.clientDesignation||"Client / Authorized Signatory"),311,signedY+56,8,navy);
+ active(page4).text("Name: "+p.agencyRepresentative,40,signedY+39,8,navy,false,235);
+ active(page4).text("Name: "+p.clientRepresentative,311,signedY+39,8,navy,false,235);
+ active(page4).text("Role: "+(p.agencyDesignation||"Authorized Signatory"),40,signedY+56,8,navy,false,235);
+ active(page4).text("Role: "+(p.clientDesignation||"Client / Authorized Signatory"),311,signedY+56,8,navy,false,235);
  active(page4).text("Date: ______________________",40,signedY+73,8,navy);
  active(page4).text("Date: ______________________",311,signedY+73,8,navy);
  ordered.forEach((a,index)=>{

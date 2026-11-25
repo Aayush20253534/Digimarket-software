@@ -34,3 +34,5 @@
 .aw-workspace .dc-editor form>div{min-width:0}
 @media(max-width:900px){.aw-workspace .dc-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.aw-workspace .dc-panel,.aw-workspace .dc-preview{padding:12px}.aw-workspace .dc-filters select{flex:1;min-width:120px}.aw-workspace .dc-filters label:has(input[type=date]){flex:1;min-width:125px}.aw-workspace .dc-filters input[type=date]{width:100%}.aw-workspace .dc-preview-scroll{max-height:50vh}}
+
+.aw-workspace .dc-step{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ui-border);border-radius:8px;padding:7px 12px;color:var(--ui-muted);font-size:12px;cursor:pointer}.aw-workspace .dc-step[aria-pressed=true]{background:var(--ui-raised);color:var(--ui-strong);border-color:#9675d8}.aw-workspace .dc-editor [hidden]{display:none!important}.aw-workspace .dc-editor .dc-preview .dc-row{font-size:12px}.aw-workspace .dc-editor .dc-preview .btn-secondary{min-height:32px;padding:6px 8px}.aw-workspace .dc-draft .dc-actions{min-width:0}
