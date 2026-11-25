@@ -60,7 +60,7 @@ export class ClientsService {
    const finance=a.permissions.has("finance.read.all");
    const items=page.map(({monthlyFee,monthlyAdBudget,...row})=>({...row,monthlyFee:finance?monthlyFee:null,monthlyAdBudget:finance?monthlyAdBudget:null,agreementExpired:agreementExpired(row,today)}));
    const nextCursor=more?page.at(-1)?.id??null:null;
-   if(!input.workspace)return {items,nextCursor};
+   if(!input.workspace)return {items,nextCursor,summary:undefined};
    const org={organizationId:a.organizationId},active={...org,status:"ACTIVE" as const,NOT:expired};
    const [total,all,activeCount,paused,archived,past,ending,fees,managers]=await Promise.all([
      this.db.client.count({where}),this.db.client.count({where:org}),this.db.client.count({where:active}),

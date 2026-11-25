@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, followUpListQuerySchema, meetingListQuerySchema, meetingConflictQuerySchema, leadStageSchema, clientServiceSchema, clientRenewSchema, clientListQuerySchema, clientUpdateSchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
+import { apiHealthSchema, apiErrorSchema, leadCreateSchema, leadUpdateSchema, leadListQuerySchema, followUpListQuerySchema, meetingListQuerySchema, meetingConflictQuerySchema, leadStageSchema, clientServiceSchema, clientRenewSchema, clientListQuerySchema, financeEntryInputSchema, financeEntryAdminEditSchema } from "./index";
 
 describe("shared API contracts", () => {
   it("accepts a conforming API health response", () => {
