@@ -99,7 +99,11 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(statusMetrics.getByText("FOLLOW UP",{exact:true})).toBeVisible();
   await expect(statusMetrics.getByText("Conversion rate",{exact:true})).toHaveCount(0);
   await expect(statusMetrics.getByText("REJECTED",{exact:true})).toBeVisible();
-  await expect(statusMetrics.getByText("Pending",{exact:true})).toHaveCount(0);
+  await expect(statusMetrics.getByText("PENDING",{exact:true})).toBeVisible();
+  await expect(statusMetrics.getByText("CALL BUSY",{exact:true})).toBeVisible();
+  await expect(page.getByLabel("Lead cycle")).toBeVisible();
+  await page.getByRole("region",{name:"Lead business cycle"}).getByRole("button",{name:"Total",exact:true}).click();
+  await expect(page.getByLabel("Lead cycle")).toHaveValue("total");
   const leadsRegister=page.getByRole("table",{name:"Leads directory"});
   for(const heading of ["Call","Contact name","Business name","Business type","Source","Stage","Date added","Location","Meeting / status notes"])
     await expect(leadsRegister.getByRole("columnheader",{name:heading,exact:true})).toBeVisible();

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Prisma, type PrismaClient } from "@digimarket/db";
+import {leadCycleTimestampRange} from "@digimarket/contracts";
 import type { LeadCreateInput, LeadUpdateInput, LeadListQuery, LeadBulkDeleteInput } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
@@ -81,10 +82,10 @@ export class LeadsService {
      })),skipDuplicates:true});
    }
  }
- async metrics(a:Principal){
+ async metrics(a:Principal,cycle?:string){
    deny(a,"leads.read");
-   const where={organizationId:a.organizationId,deletedAt:null};
-   const [total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted]=await Promise.all([
+   const where={organizationId:a.organizationId,deletedAt:null,...(cycle?{createdAt:leadCycleTimestampRange(cycle)}:{})};
+   const [total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted,callNotPicking,callBusy]=await Promise.all([
      this.db.lead.count({where}),
      this.db.lead.count({where:{...where,status:"PENDING"}}),
      this.db.lead.count({where:{...where,status:"YET_TO_CALL"}}),
@@ -95,9 +96,11 @@ export class LeadsService {
      this.db.lead.count({where:{...where,status:"APPROVED"}}),
      this.db.lead.count({where:{...where,status:"REJECTED"}}),
      this.db.client.count({where:{organizationId:a.organizationId,
-       sourceLead:{deletedAt:null,status:"APPROVED"}}}),
+       sourceLead:{...where,status:"APPROVED"}}}),
+     this.db.lead.count({where:{...where,status:"CALL_NOT_PICKING"}}),
+     this.db.lead.count({where:{...where,status:"CALL_BUSY"}}),
    ]);
-   return {total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted,
+   return {total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted,callNotPicking,callBusy,
      conversionRatePercent:total?Math.round(converted/total*10000)/100:0};
  }
  async delete(a:Principal,id:string,version:number){
@@ -199,6 +202,7 @@ export class LeadsService {
    deny(a,"leads.read");
    const where:Prisma.LeadWhereInput={
      organizationId:a.organizationId,deletedAt:null,
+     ...(input.cycle?{createdAt:leadCycleTimestampRange(input.cycle)}:{}),
      ...(input.stage?{status:input.stage}:{}),
      ...(input.source?{source:input.source}:{}),
      ...(input.assignedToId?{assignedToId:input.assignedToId}:{}),
@@ -464,10 +468,10 @@ export class LeadsService {
    },{timeout:20000});}
    catch(e){if((e as {code?:string}).code==="P2002")throw new AuthError(409,"BATCH_ALREADY_USED","Import batch already exists");throw e;}
  }
- async export(a:Principal){
+ async export(a:Principal,cycle?:string){
    deny(a,"leads.bulk");
    deny(a,"leads.read");
-   const rows=await this.db.lead.findMany({where:{organizationId:a.organizationId,deletedAt:null},
+   const rows=await this.db.lead.findMany({where:{organizationId:a.organizationId,deletedAt:null,...(cycle?{createdAt:leadCycleTimestampRange(cycle)}:{})},
      orderBy:{createdAt:"desc"},take:5001,
      include:{assignee:{select:{loginId:true}}}});
    if(rows.length>5000)throw invalid("Export limit is 5,000 rows");
@@ -480,7 +484,7 @@ export class LeadsService {
    ].map(safeCSV).join(","))].join("\r\n")+"\r\n";
    await this.db.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
      action:"leads.exported",entityType:"LeadExport",entityId:a.userId,
-     afterRedacted:{count:rows.length}}});
-   return {filename:"digimarket-leads.csv",csv};
+     afterRedacted:{count:rows.length,cycle:cycle??"total"}}});
+   return {filename:cycle?"digimarket-leads-"+cycle+".csv":"digimarket-leads.csv",csv};
  }
 }

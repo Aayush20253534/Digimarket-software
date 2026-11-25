@@ -60,3 +60,19 @@ export function agencyTimestampRange(period: ReportingPeriod) {
 
 // Tasks are paused, not removed. Their schema, records and implementations remain intact.
 export const TASKS_ENABLED: boolean = false;
+
+/** Started lead acquisition cycles only, newest first; never manufacture future periods. */
+export function leadCycles(now = new Date()) {
+  const today=agencyToday(now);
+  const cycles:ReturnType<typeof businessCycle>[]=[];
+  for(let offset=0;;offset--){
+    const cycle=businessCycle(today,offset);
+    if(cycle.from<AGENCY_START_DATE)break;
+    cycles.push(cycle);
+  }
+  return cycles;
+}
+/** Missing cycle means the complete organization history, including legacy leads. */
+export const leadCycleKeySchema=z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).refine(key=>key>=AGENCY_START_DATE.slice(0,7)&&key<=businessCycle().key,"Choose a started business cycle");
+export const leadCycleQuerySchema=z.strictObject({cycle:leadCycleKeySchema.optional()});
+export function leadCycleTimestampRange(key:string){return agencyTimestampRange(businessCycle(key+"-22"));}

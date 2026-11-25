@@ -1,4 +1,5 @@
 export * from "./business-period";
+import {leadCycleKeySchema} from "./business-period";
 import { z } from "zod";
 
 export const apiHealthSchema = z.object({
@@ -146,6 +147,7 @@ export const leadBulkDeleteSchema = z.strictObject({
 export type LeadBulkDeleteInput = z.infer<typeof leadBulkDeleteSchema>;
 export const leadDuplicateReviewSchema = z.strictObject({resolution:z.enum(["CONFIRMED","DISMISSED"])});
 export const leadListQuerySchema = z.strictObject({
+  cycle:leadCycleKeySchema.optional(),
   stage:leadStageSchema.optional(),
   source:leadSourceSchema.optional(),
   sort:z.enum(["businessName","contactName","status","createdAt"]).optional(),

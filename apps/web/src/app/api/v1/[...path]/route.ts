@@ -450,10 +450,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if(date!==null)url.searchParams.set("date",date);
   }
   if (path === "leads") {
-    for (const key of ["stage","source","assignedToId","q","cursor","limit","sort","direction"]) {
+    for (const key of ["stage","source","assignedToId","q","cursor","limit","sort","direction","cycle"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
+  }
+  if(path==="leads/metrics"||path==="leads/export"){
+    const cycle=request.nextUrl.searchParams.get("cycle");
+    if(cycle!==null)url.searchParams.set("cycle",cycle);
   }
   const headers = new Headers({ "accept": "application/json", "origin": upstreamOrigin });
   const authorization = request.headers.get("authorization");

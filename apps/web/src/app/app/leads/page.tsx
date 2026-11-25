@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, MapPin, PhoneCall, Plus, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
+import {leadCycles,cycleLabel} from "@digimarket/contracts";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryModal } from "@/components/directory-modal";
 import { SalesWorkspaceNav } from "@/components/sales-workspace-nav";
@@ -19,7 +20,7 @@ type Lead={id:string;businessName:string;contactName:string|null;phone:string|nu
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean};
 type Page={items:Lead[];nextCursor:string|null;total:number};
-type Metrics={total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
+type Metrics={callNotPicking:number;callBusy:number;total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS"|"REFERRAL";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"},{value:"REFERRAL",label:"Referral"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value==="REFERRAL"?"Referral":value;
@@ -54,6 +55,11 @@ export default function LeadsPage(){
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [legacySort,setLegacySort]=useState(false);
  const [cursor,setCursor]=useState<string|null>(null);
+ const [cycles,setCycles]=useState(()=>leadCycles());
+ const [cycleChoice,setCycleChoice]=useState("current");
+ const cycleKey=cycleChoice==="total"?"":cycleChoice==="current"?(cycles[0]?.key??""):cycleChoice;
+ const cycleQuery=cycleKey?"?"+new URLSearchParams({cycle:cycleKey}):"";
+ useEffect(()=>{const refresh=()=>setCycles(previous=>{const next=leadCycles();return previous[0]?.key===next[0]?.key?previous:next;});const timer=window.setInterval(refresh,60_000);window.addEventListener("focus",refresh);return()=>{window.clearInterval(timer);window.removeEventListener("focus",refresh);};},[]);
  const [stage,setStage]=useState("");
  const [sourceFilter,setSourceFilter]=useState<""|LeadSource>("");
  const [search,setSearch]=useState("");
@@ -111,6 +117,8 @@ export default function LeadsPage(){
    catch{/* Optional view preferences. */}
  },[preferencesReady,session?.identity.userId,stage,sourceFilter,search,sortBy,descending]);
  useEffect(()=>{setCheckedLeads({});},[stage,sourceFilter,search,sortBy,descending,session?.identity.userId]);
+ const changeCycle=(choice:string)=>{loadSequence.current++;setCycleChoice(choice);setCursor(null);setHistory([]);setTotalLeads(null);setItems([]);setMetrics(null);setNextCursor(null);setCheckedLeads({});setStage("");setLoading(true);};
+ useEffect(()=>{setCursor(null);setHistory([]);setCheckedLeads({});},[cycleKey]);
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
    if(!preferencesReady)return;
@@ -118,6 +126,7 @@ export default function LeadsPage(){
    setLoading(true);
    try{
      const q=new URLSearchParams({limit:"10",sort:sortBy,direction:descending?"desc":"asc"});
+     if(cycleKey)q.set("cycle",cycleKey);
      if(stage)q.set("stage",stage);if(sourceFilter)q.set("source",sourceFilter);if(search.trim())q.set("q",search.trim());
      if(cursor)q.set("cursor",cursor);
      let result:Page;
@@ -129,12 +138,12 @@ export default function LeadsPage(){
      }
      if(sequence!==loadSequence.current)return;
      setItems(result.items);setNextCursor(result.nextCursor);setTotalLeads(result.total);setError("");
-     void request<Metrics>("/leads/metrics").then(result=>{
+     void request<Metrics>("/leads/metrics"+cycleQuery).then(result=>{
        if(sequence===loadSequence.current)setMetrics(result);
      }).catch(()=>{});
    }catch(e){if(sequence===loadSequence.current)setError(errText(e));}
    finally{if(sequence===loadSequence.current)setLoading(false);}
- },[canRead,preferencesReady,request,stage,sourceFilter,search,cursor,sortBy,descending]);
+ },[canRead,preferencesReady,request,stage,sourceFilter,search,cursor,sortBy,descending,cycleKey,cycleQuery]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const focusedRef=useRef(false);
@@ -265,10 +274,10 @@ export default function LeadsPage(){
  async function download(){
    setBusy(true);setError("");
    try{
-     const result=await request<{filename:string;csv:string}>("/leads/export");
+     const result=await request<{filename:string;csv:string}>("/leads/export"+cycleQuery);
      const u=URL.createObjectURL(new Blob([result.csv],{type:"text/csv;charset=utf-8"}));
      const a=document.createElement("a");a.href=u;a.download=result.filename;a.click();URL.revokeObjectURL(u);
-     setMessage("Organization CSV exported and recorded in audit history.");
+     setMessage("Selected cycle CSV exported and recorded in audit history.");
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  const leadsPage=history.length+1;
@@ -291,8 +300,15 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   {metrics&&<section aria-label="CRM pipeline summary" className="aw-crm-quick-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-     {([["Total leads",metrics.total,""],["Approved clients",metrics.converted,"APPROVED"],
+   <section aria-label="Lead business cycle" className="flex flex-wrap items-center gap-2">
+     <button type="button" className={cycleChoice==="total"?"btn-primary":"btn-secondary"} aria-pressed={cycleChoice==="total"} disabled={busy} onClick={()=>{if(cycleChoice!=="total")changeCycle("total");}}>Total</button>
+     <label className="text-sm">Business cycle <select className="field" aria-label="Lead cycle" value={cycleChoice==="total"?"total":cycleChoice==="current"?(cycles[0]?.key??"total"):cycleChoice} disabled={busy} onChange={e=>changeCycle(e.target.value===cycles[0]?.key?"current":e.target.value)}>
+       <option value="total">All cycles</option>{cycles.map((c,i)=><option key={c.key} value={c.key}>{cycleLabel(c.key)} · {i===0?"Current":"Completed"}</option>)}
+     </select></label>
+     <span className="text-xs">{cycleKey?"Live statuses · acquired in selected cycle":"All recorded leads, including legacy records"}</span>
+   </section>
+   {metrics&&<section aria-label="CRM pipeline summary" className="aw-crm-quick-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+     {([["Total leads",metrics.total,""],["Approved clients",metrics.approved,"APPROVED"],["PENDING",metrics.pending,"PENDING"],["CALL NOT PICKING",metrics.callNotPicking,"CALL_NOT_PICKING"],["CALL BUSY",metrics.callBusy,"CALL_BUSY"],
        ["YET TO CALL",metrics.yetToCall,"YET_TO_CALL"],["FOLLOW UP",metrics.followUp,"FOLLOW_UP"],
        ["MEETING PROCESS",metrics.meetingProcess,"MEETING_PROCESS"],["DECISION PENDING",metrics.decisionPending,"DECISION_PENDING"],
        ["AGREEMENT PENDING",metrics.agreementPending,"AGREEMENT_PENDING"],["REJECTED",metrics.rejected,"REJECTED"]] as const).map(([label,value,filter])=>
@@ -499,7 +515,7 @@ export default function LeadsPage(){
    {metrics&&<div className="aw-v3-lead-panels">
     <section className="aw-v3-chart-card" aria-label="Live sales pipeline distribution">
      <div className="aw-v3-chart-heading"><div><h2>Pipeline distribution</h2>
-      <p>Live stage counts across all accessible leads, not just the current table page.</p></div>
+      <p>Live stage counts for the selected acquisition cycle, not just the current table page.</p></div>
       <Link href="/app/reports" className="aw-v3-chart-action">Reporting</Link>
      </div>
      <div className="aw-v3-bars">
@@ -516,7 +532,7 @@ export default function LeadsPage(){
     </section>
     <section className="aw-v3-chart-card aw-v3-conversion-card" aria-label="Pipeline conversion summary">
      <div className="aw-v3-chart-heading"><div><h2>Conversion performance</h2>
-      <p>Based on the latest CRM metrics.</p></div></div>
+      <p>Based on live conversions for the selected acquisition cycle.</p></div></div>
      <div className="aw-v3-conversion-value">{Number(metrics.conversionRatePercent).toLocaleString("en-IN",{maximumFractionDigits:1})}%</div>
      <p className="aw-v3-conversion-detail">{metrics.converted} converted from {metrics.total} total leads</p>
      <div className="aw-v3-conversion-track"><span style={{width:Math.min(100,Math.max(0,Number(metrics.conversionRatePercent)))+"%"}}/></div>

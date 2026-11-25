@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from "vitest";
-import {agencyToday,agencyTimestampRange,businessCycle,dateOnlyRange,reportingPeriodQuerySchema,reportingPreset} from "./business-period";
+import {agencyToday,agencyTimestampRange,businessCycle,leadCycles,leadCycleTimestampRange,leadCycleQuerySchema,dateOnlyRange,reportingPeriodQuerySchema,reportingPreset} from "./business-period";
 import {leadBulkDeleteSchema} from "./index";
 
 afterEach(()=>vi.useRealTimers());
@@ -46,5 +46,21 @@ describe("bulk lead delete contract",()=>{
   expect(leadBulkDeleteSchema.safeParse({leads:[lead]}).success).toBe(true);
   for(const leads of [[],[lead,lead],[{...lead,version:0}],[{...lead,id:"all"}],Array(101).fill(lead)])
    expect(leadBulkDeleteSchema.safeParse({leads}).success).toBe(false);
+ });
+});
+
+describe("lead acquisition cycles",()=>{
+ it("offers only cycles already started, newest first",()=>{
+  expect(leadCycles(new Date("2026-11-21T18:29:59Z")).map(c=>c.key)).toEqual(["2026-10"]);
+  expect(leadCycles(new Date("2026-11-21T18:30:00Z")).map(c=>c.key)).toEqual(["2026-11","2026-10"]);
+  expect(leadCycles(new Date("2026-12-21T18:30:00Z")).map(c=>c.key)).toEqual(["2026-12","2026-11","2026-10"]);
+  expect(leadCycles(new Date("2026-10-20T00:00:00Z"))).toEqual([]);
+ });
+ it("uses exclusive Indian-midnight boundaries and validates cycle keys",()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date("2026-11-25T12:00:00Z"));
+  expect(leadCycleTimestampRange("2026-10")).toEqual({gte:new Date("2026-10-21T18:30:00Z"),lt:new Date("2026-11-21T18:30:00Z")});
+  expect(leadCycleQuerySchema.parse({})).toEqual({});
+  for(const cycle of ["2026-09","2026-12","2026-13","total"])expect(leadCycleQuerySchema.safeParse({cycle}).success).toBe(false);
+  expect(leadCycleQuerySchema.parse({cycle:"2026-10"})).toEqual({cycle:"2026-10"});
  });
 });
