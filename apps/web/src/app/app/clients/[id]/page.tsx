@@ -66,7 +66,7 @@ export default function ClientWorkspacePage(){
   e.preventDefault();if(!client||!form)return;
   const fields={businessName:form.businessName,businessType:form.businessType,phone:form.phone,email:form.email,location:form.location,notes:form.notes,
    contractStartOn:form.contractStartOn,contractEndOn:form.contractEndOn,status:form.status,version:client.version,websiteUrl:form.websiteUrl,instagramUrl:form.instagramUrl,facebookUrl:form.facebookUrl,
-   ...(canFinance?{monthlyFee:form.monthlyFee,monthlyAdBudget:form.monthlyAdBudget}:{})};
+   ...(canFinance&&!client.currentAgreementStartOn?{monthlyFee:form.monthlyFee,monthlyAdBudget:form.monthlyAdBudget}:{})};
   void execute(()=>request("/clients/"+id,{method:"PUT",body:fields}),"Client and agreement saved.");
  }
  function saveAccount(e:FormEvent){e.preventDefault();if(!client)return;void execute(()=>request("/clients/"+id,{method:"PUT",body:{version:client.version,health,managerId:managerId||null,onboarding,notes:accountNote}}),"Account details saved.");}
@@ -92,7 +92,7 @@ export default function ClientWorkspacePage(){
  <div className="aw-client-shortcuts">{client.phone&&<a className="aw-followup-icon" href={"tel:"+client.phone} aria-label="Call client"><PhoneCall size={16}/></a>}{client.email&&<a className="aw-followup-icon" href={"mailto:"+client.email} aria-label="Email client"><Mail size={16}/></a>}{([[client.websiteUrl,"Website",Globe],[client.instagramUrl,"Instagram",Instagram],[client.facebookUrl,"Facebook",Facebook],[client.sourceLead?.googleMapsUrl,"Map",MapPin]] as const).map(([url,label,Icon])=>url&&<a key={label} className="aw-followup-icon" href={url} target="_blank" rel="noopener noreferrer" aria-label={label}><Icon size={16}/></a>)}</div>
     </div>
     <div className="aw-client-hero-actions"><span className={"aw-client-status aw-client-status-"+(client.agreementExpired?"ended":client.status.toLowerCase())}>{client.agreementExpired?"EXPIRED":client.status}</span>
-     <button className="aw-client-btn" type="button" onClick={()=>void load()} disabled={busy}><RefreshCw size={15}/>Refresh</button>
+     <button className="aw-client-btn" type="button" onClick={()=>{void load();void loadOverview();}} disabled={busy}><RefreshCw size={15}/>Refresh</button>
     </div>
    </div>
    <div className="aw-client-statrow">
@@ -151,8 +151,8 @@ export default function ClientWorkspacePage(){
       <label>Status<select className="field" value={form.status} disabled={!!client.agreementEndedOn} onChange={e=>setForm(v=>v?{...v,status:e.target.value as Status}:v)}><option>ACTIVE</option><option>PAUSED</option><option>ARCHIVED</option>{client.status==="EXPIRED"&&<option>EXPIRED</option>}</select></label>
       <label>Agreement start<input className="field" type="date" disabled={!!client.currentAgreementStartOn} value={form.contractStartOn} onChange={e=>setForm(v=>v?{...v,contractStartOn:e.target.value}:v)}/></label>
       <label>Agreement end<input className="field" type="date" disabled={!!client.currentAgreementStartOn} min={form.contractStartOn||undefined} value={form.contractEndOn} onChange={e=>setForm(v=>v?{...v,contractEndOn:e.target.value}:v)}/></label>
-      {canFinance&&<><label>Monthly service charge only (₹)<input className="field" inputMode="decimal" type="number" min="0" step="0.0001" placeholder="15000" value={form.monthlyFee} onChange={e=>setForm(v=>v?{...v,monthlyFee:e.target.value}:v)}/></label>
-      <label>Monthly ad budget (₹)<input className="field" inputMode="decimal" type="number" min="0" step="0.0001" placeholder="3000" value={form.monthlyAdBudget} onChange={e=>setForm(v=>v?{...v,monthlyAdBudget:e.target.value}:v)}/></label>
+      {canFinance&&<><label>Monthly service charge only (₹)<input className="field" inputMode="decimal" type="number" disabled={!!client.currentAgreementStartOn} min="0" step="0.0001" placeholder="15000" value={form.monthlyFee} onChange={e=>setForm(v=>v?{...v,monthlyFee:e.target.value}:v)}/></label>
+      <label>Monthly ad budget (₹)<input className="field" inputMode="decimal" type="number" disabled={!!client.currentAgreementStartOn} min="0" step="0.0001" placeholder="3000" value={form.monthlyAdBudget} onChange={e=>setForm(v=>v?{...v,monthlyAdBudget:e.target.value}:v)}/></label>
       <div className="aw-client-wide"><strong>Monthly service charge + ad budget combined: {money(String(Number(form.monthlyFee||0)+Number(form.monthlyAdBudget||0)))}</strong><p>Projected agreement total only. Ad spend is not agency service income.</p></div></>}
       {(["websiteUrl","instagramUrl","facebookUrl"] as const).map(key=><label key={key}>{key==="websiteUrl"?"Website":key==="instagramUrl"?"Instagram":"Facebook"}<input className="field" type="url" value={form[key]} onChange={e=>setForm(v=>v?{...v,[key]:e.target.value}:v)}/></label>)}
  <label className="aw-client-wide">Client notes<textarea className="field" rows={4} value={form.notes} onChange={e=>setForm(v=>v?{...v,notes:e.target.value}:v)}/></label>

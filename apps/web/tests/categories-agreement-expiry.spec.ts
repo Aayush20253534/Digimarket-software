@@ -253,3 +253,24 @@ test("cycle-state completion cannot rewrite the category navigation URL",async({
     await expect(page.getByRole("region",{name:"Financial categories"}).getByText("Late-cycle regression",{exact:true})).toBeVisible();
   }finally{release();}
 });
+
+test("client overview and register use global summaries and permission-scoped workspace data",async({page})=>{
+ const {client}=await workspace(page);
+ const stock={videos:4,posts:8,festival:2,videosDelivered:3,postsDelivered:4,festivalDelivered:1};
+ await page.route("**/api/v1/clients?*",async route=>route.fulfill({json:{data:{items:[{...client,health:"UNASSESSED",readiness:stock}],nextCursor:null,total:1,today:"2026-11-17",cycle:{key:"2026-10"},summary:{all:5,active:3,paused:1,archived:0,past:1,expiring:1,monthlyFees:"47000"},managers:[]}}}));
+ await page.route("**/api/v1/clients/"+clientId+"/overview",async route=>route.fulfill({json:{data:{cycle:{key:"2026-10"},readiness:stock,services:[],managers:[],manager:null,financial:null,history:[]}}}));
+ await page.goto("/app/clients");
+ const metrics=page.getByRole("region",{name:"Client status across all cycles"});
+ await expect(metrics.getByRole("button",{name:"Total clients 5"})).toBeVisible();
+ await page.getByRole("button",{name:"Readiness",exact:true}).click();
+ const table=page.getByRole("table",{name:"Client content readiness"});
+ await expect(table.getByRole("row").filter({hasText:client.businessName})).toContainText("4");
+ await table.getByRole("link",{name:new RegExp(client.businessName)}).click();
+ await expect(page.getByRole("tab",{name:"Overview",exact:true})).toHaveAttribute("aria-selected","true");
+ await expect(page.getByLabel("Client health")).toHaveValue("UNASSESSED");
+ await expect(page.getByLabel("Agreement completed")).not.toBeChecked();
+ await page.getByRole("tab",{name:"Agreement",exact:true}).click();
+ await expect(page.getByRole("button",{name:"Renew agreement",exact:true})).toBeVisible();
+ await page.getByRole("button",{name:"Renew agreement",exact:true}).click();
+ await expect(page.getByRole("dialog",{name:"Renew agreement"})).toBeVisible();
+});

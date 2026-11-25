@@ -82,7 +82,7 @@ export class ClientsService {
    await this.existing(a,id);
    const client=await this.db.client.findFirstOrThrow({where:{id,organizationId:a.organizationId},
      include:{contacts:{orderBy:[{isPrimary:"desc"},{createdAt:"asc"}]},
-       sourceLead:{select:{id:true,businessName:true,status:true}}}});
+       sourceLead:{select:{id:true,businessName:true,status:true,googleMapsUrl:true}}}});
    const result={...client,agreementExpired:agreementExpired(client,this.today())};
    return a.permissions.has("finance.read.all")?result:{...result,monthlyFee:null,monthlyAdBudget:null};
  }
@@ -171,6 +171,7 @@ export class ClientsService {
    if(fields.monthlyFee!==undefined)data.monthlyFee=fields.monthlyFee||null;
    if(fields.monthlyAdBudget!==undefined)data.monthlyAdBudget=fields.monthlyAdBudget||null;
    const previous=await this.db.client.findUniqueOrThrow({where:{id}});
+   if(previous.currentAgreementStartOn&&((fields.monthlyFee!==undefined&&(fields.monthlyFee||null)!==(previous.monthlyFee?.toString()??null)&&(!previous.monthlyFee||!fields.monthlyFee||!previous.monthlyFee.equals(fields.monthlyFee)))||(fields.monthlyAdBudget!==undefined&&(fields.monthlyAdBudget||null)!==(previous.monthlyAdBudget?.toString()??null)&&(!previous.monthlyAdBudget||!fields.monthlyAdBudget||!previous.monthlyAdBudget.equals(fields.monthlyAdBudget)))))throw invalid("Use Renew agreement to change renewed commercial terms");
    if(previous.currentAgreementStartOn&&fields.contractStartOn!==undefined&&fields.contractStartOn!==(previous.contractStartOn?.toISOString().slice(0,10)??""))throw invalid("The original readiness anchor cannot change after renewal");
    if(previous.currentAgreementStartOn&&fields.contractEndOn!==undefined&&fields.contractEndOn!==(previous.contractEndOn?.toISOString().slice(0,10)??""))throw invalid("Use Renew agreement to change a renewed contract period");
    if(status==="EXPIRED"&&previous.status!=="EXPIRED")throw invalid("Use End agreement to record the end date and reason");
@@ -186,7 +187,7 @@ export class ClientsService {
      const updated=await tx.client.findUniqueOrThrow({where:{id}});
      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
        action:"clients.updated",entityType:"Client",entityId:id,
-       afterRedacted:{version:updated.version,status:updated.status}}});
+       afterRedacted:{version:updated.version,status:updated.status,health:updated.health,managerId:updated.managerId,onboarding:updated.onboarding}}});
      return a.permissions.has("finance.read.all")?updated:{...updated,monthlyFee:null,monthlyAdBudget:null};
    });
  }

@@ -42,11 +42,11 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
     q.delete("workspace");q.delete("sort");q.delete("direction");response=await request<Register>("/clients?"+q);setLegacy(true);
    }
    if(version===loadVersion.current){setRows(response.items);setNext(response.nextCursor);setError("");setSummary(response.summary??null);setTotal(response.total??null);setToday(response.today??agencyToday());setCycle(response.cycle?.key??"");setManagers(response.managers??[]);}
-  }catch(e){if(version===loadVersion.current)setError(readable(e));}finally{if(version===loadVersion.current)setLoading(false);}
+  }catch(e){if(version===loadVersion.current){setError(readable(e));setSummary(null);setTotal(null);}}finally{if(version===loadVersion.current)setLoading(false);}
  },[canRead,request,search,filter,cursor,sortBy,descending,scope,expiring,health,manager]);
- useEffect(()=>{void load();},[load]);
+ useEffect(()=>{void load();return()=>{loadVersion.current++;};},[load]);
  useEffect(()=>{setCursor(null);setHistory([]);setFilter("");setScope(section);setExpiring(false);},[section]);
- const choose=(key:string)=>{setCursor(null);setHistory([]);setFilter("");setExpiring(false);if(key==="past"){router.push("/app/clients/expired");return;}setScope(key==="all"?"all":"current");if(key==="expiring")setExpiring(true);else if(["ACTIVE","PAUSED","ARCHIVED"].includes(key))setFilter(key);};
+ const choose=(key:string)=>{setCursor(null);setHistory([]);setFilter("");setExpiring(false);if(key==="past"){setScope("expired");router.push("/app/clients/expired");return;}setScope(key==="all"?"all":"current");if(key==="expiring")setExpiring(true);else if(["ACTIVE","PAUSED","ARCHIVED"].includes(key))setFilter(key);};
  useEffect(()=>{
   const focus=new URLSearchParams(window.location.search).get("focus");
   if(focus&&/^[0-9a-f-]{36}$/i.test(focus))router.replace("/app/clients/"+focus);
@@ -65,8 +65,8 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
      <Link href="/app/clients/assets" className="aw-client-btn">Files & Assets</Link>}
     <button className="aw-client-btn" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
   <nav className="flex flex-wrap gap-3" aria-label="Client sections">
-   <Link className={section==="current"?"aw-client-primary":"aw-client-btn"} href="/app/clients" aria-current={section==="current"?"page":undefined} onClick={()=>{setScope("current");setFilter("");setExpiring(false);setCursor(null);setHistory([]);}}>Clients</Link>
-   <Link className={section==="expired"?"aw-client-primary":"aw-client-btn"} href="/app/clients/expired" aria-current={section==="expired"?"page":undefined}>Past Clients</Link>
+   <Link className={scope==="current"?"aw-client-primary":"aw-client-btn"} href="/app/clients" aria-current={scope==="current"?"page":undefined} onClick={()=>{setScope("current");setFilter("");setExpiring(false);setCursor(null);setHistory([]);}}>Clients</Link>
+   <Link className={scope==="expired"?"aw-client-primary":"aw-client-btn"} href="/app/clients/expired" aria-current={scope==="expired"?"page":undefined}>Past Clients</Link>
    <button type="button" className={scope==="all"?"aw-client-primary":"aw-client-btn"} onClick={()=>choose("all")}>All clients</button>
   </nav>
   <section className="aw-client-metrics" aria-label="Client status across all cycles">{([["all","Total clients",summary?.all],["ACTIVE","Active",summary?.active],["expiring","Expiring soon",summary?.expiring],["PAUSED","Paused",summary?.paused],["past","Past clients",summary?.past],["ARCHIVED","Archived",summary?.archived]] as const).map(([key,label,n])=><button type="button" className="aw-client-stat aw-client-metric" key={key} data-metric={key} aria-pressed={key==="all"?scope==="all":key==="past"?scope==="expired":key==="expiring"?expiring:filter===key} onClick={()=>choose(key)}><span>{label}</span><strong>{loading?"…":n??"—"}</strong></button>)}{canFinance&&<div className="aw-client-stat"><span>Active monthly service fees</span><strong>{loading?"…":money(summary?.monthlyFees)}</strong><small>Projection, not cash received</small></div>}</section>
