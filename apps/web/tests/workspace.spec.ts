@@ -466,12 +466,14 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("navigation",{name:"Documents sections"})).toBeVisible();
   await expect(page.getByRole("heading",{name:"Quotations",exact:true})).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Business workspace sections"})).toBeVisible();
+  await page.getByRole("link",{name:"New quotation"}).click();
   await expect(page.getByRole("navigation",{name:"Quotation sections"})).toBeVisible();
   await expect(page.getByLabel("Reels per month")).toHaveValue("8");
   await expect(page.getByLabel("Posts per month")).toHaveValue("8");
   await page.getByRole("navigation",{name:"Documents sections"}).getByRole("link",{name:"Agreements"}).click();
   await expect(page).toHaveURL(/\/app\/documents\/agreements$/);
   await expect(page.getByRole("heading",{name:"Agreements",exact:true})).toBeVisible();
+  await page.getByRole("link",{name:"New agreement"}).click();
   await expect(page.getByRole("navigation",{name:"Agreement sections"})).toBeVisible();
   await expect(page.locator("#agreement-summary")).toBeVisible();
   // Old bookmarks still load the same original workflows, not a deleted page.

@@ -1,6 +1,9 @@
 "use client";
+import Link from "next/link";
+import {agencyToday} from "@digimarket/contracts";
+import {ContactPicker,DocumentPreview,useDocumentDraft,type DocumentLinks,type Quote} from "@/components/documents/workspace";
 import {useCallback,useEffect,useMemo,useState,type FormEvent} from "react";
-import {Check,Download,FileText,Plus,RefreshCw,Trash2} from "lucide-react";
+import {Check,Download,FileText,Plus,Trash2} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {Spinner} from "@/components/ui";
 import {downloadQuotationPdf,type QuotationFields,type SavedQuotation} from "@/lib/quotation-pdf";
@@ -15,7 +18,7 @@ const standardServices=(reels=8,posts=8):Service[]=>[
  {name:"REELS: SHOOTING + EDITING",description:`Property showcase videos; ${reels} reels per month.`},
  {name:"BRANDED SOCIAL POSTS",description:`Graphic post creation and publishing; ${posts} posts per month.`},
 ];
-const makeDate=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");};
+const makeDate=agencyToday;
 const initial=():QuotationFields=>({
  mode:"new",clientName:"",packageTitle:"CUSTOM MARKETING PACKAGE",quoteDate:makeDate(),
  serviceFee:"",feePeriod:"monthly",servicePayment:"at signing",
@@ -46,10 +49,15 @@ export default function QuotationsPage(){
  const permitted=!!session?.identity.roles.some(role=>["FOUNDER","ADMIN","SUPER_ADMIN"].includes(role));
  const [mode,setMode]=useState<QuoteMode>("default");
  const [form,setForm]=useState<QuotationFields>(defaultForm);
- const [rows,setRows]=useState<SavedQuotation[]>([]);
- const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[downloading,setDownloading]=useState<string|null>(null);
- const [error,setError]=useState(""),[notice,setNotice]=useState("");
- const [search,setSearch]=useState("");
+ const [saving,setSaving]=useState(false),[downloading,setDownloading]=useState<string|null>(null),[loading,setLoading]=useState(false);
+ const [error,setError]=useState(""),[notice,setNotice]=useState(""),[links,setLinks]=useState<DocumentLinks>({}),[previewOpen,setPreviewOpen]=useState(true);
+ const restore=(payload:QuotationFields,refs:DocumentLinks)=>{setForm(payload);setMode(payload.mode==="default"?"default":"new");setLinks(refs)};
+ const draft=useDocumentDraft("quotation",form,links,restore,permitted);
+ const loadSource=useCallback(async()=>{if(!permitted)return;const p=new URLSearchParams(window.location.search),id=p.get("revision")??p.get("source");if(!id)return;setLoading(true);setError("");
+ try{
+ if(id){const source=await request<Quote>("/quotations/"+encodeURIComponent(id));const payload={...source.payload,quoteDate:makeDate()};setMode(payload.mode==="default"?"default":"new");setForm(payload);setLinks({clientId:source.clientId,leadId:source.leadId,revisionOfId:p.has("revision")?source.id:null});setNotice("Copied saved document into a new draft.");}
+ }catch(e){setError(reason(e))}finally{setLoading(false)}},[permitted,request]);
+ useEffect(()=>{void loadSource()},[loadSource]);
  const patch=<K extends keyof QuotationFields>(key:K,value:QuotationFields[K])=>setForm(prev=>{
   const next={...prev,[key]:value};
   return prev.mode==="default"&&(key==="reels"||key==="posts")
@@ -57,7 +65,8 @@ export default function QuotationsPage(){
     :next;
  });
  const changeMode=(next:QuoteMode)=>{
-  setMode(next);setForm(next==="default"?defaultForm():initial());setError("");setNotice("");
+  if(next===mode||draft.dirty&&!window.confirm("Change template and discard unsaved changes?"))return;
+  setLinks({});setMode(next);setForm(next==="default"?defaultForm():initial());setError("");setNotice("");
  };
  const addCatalogueService=(service:Service)=>setForm(prev=>({
    ...prev,services:prev.services.length>=6?prev.services:[...prev.services,{...service}],
@@ -65,15 +74,8 @@ export default function QuotationsPage(){
  const editService=(index:number,key:keyof Service,value:string)=>setForm(prev=>({
    ...prev,services:prev.services.map((s,i)=>i===index?{...s,[key]:value}:s),
  }));
- const load=useCallback(async()=>{
-  if(!permitted){setLoading(false);return;}
-  try{const out=await request<{items:SavedQuotation[]}>("/quotations");
-   setRows(out.items);setError("");}
-  catch(e){setError(reason(e));}finally{setLoading(false);}
- },[permitted,request]);
- useEffect(()=>{void load();},[load]);
  const totals=useMemo(()=>cost(form),[form]);
- const filtered=useMemo(()=>rows.filter(r=>[r.clientName,r.quoteNumber].join(" ").toLowerCase().includes(search.trim().toLowerCase())),[rows,search]);
+ const previewRow=useMemo<Quote>(()=>({id:"draft",quoteNumber:"DRAFT",clientName:form.clientName||"Client name",quoteDate:form.quoteDate,payload:{...form,clientName:form.clientName||"Client name"},serviceFee:totals.service.toFixed(2),adBudget:totals.ads.toFixed(2),taxAmount:totals.tax.toFixed(2),total:totals.total.toFixed(2),createdAt:""}),[form,totals]);
  async function download(row:SavedQuotation){
   setDownloading(row.id);setError("");
   try{await downloadQuotationPdf(row);}catch(e){setError("PDF export failed: "+reason(e));}
@@ -86,8 +88,8 @@ export default function QuotationsPage(){
   if(form.adBudgetMode==="not applicable"&&Number(form.adBudget)!==0){setError("Set the ad budget to zero when not applicable.");return;}
   setSaving(true);
   try {
-   const out=await request<SavedQuotation>("/quotations",{method:"POST",body:{...form,mode,quoteDate:makeDate()}});
-   setRows(prev=>[out,...prev]);
+   const out=await request<SavedQuotation>("/quotations",{method:"POST",body:{...form,mode,quoteDate:makeDate(),links}});
+   draft.markSaved();
    setNotice(out.quoteNumber+" saved. Your PDF has been prepared for download.");
    await download(out);
   } catch(e){setError(reason(e));}
@@ -95,14 +97,17 @@ export default function QuotationsPage(){
  }
  if(!session)return <Spinner label="Checking quotation access…"/>;
  if(!permitted)return <div className="p-6"><h1 className="text-xl font-bold">Quotations</h1><p>Only founder and administrator accounts can access quotations.</p></div>;
- return <div className="aw-quote-page aw-v5-document-page space-y-5" data-aw-module="quotations">
+ return <div className="aw-quote-page aw-v5-document-page dc-editor space-y-5" data-aw-module="quotations">
   <header className="flex flex-wrap items-start justify-between gap-4">
    <div><p className="text-xs font-bold uppercase tracking-[.2em] text-[#D65DEC]">AMPLIFYWORLD / SALES</p>
     <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#FBF4FF]">Quotations</h1>
     <p className="mt-2 max-w-2xl text-sm leading-6 text-[#C9B3D8]">Generate and save branded quotations. No income or invoice is created automatically.</p>
    </div>
-   <button className={action} type="button" onClick={()=>void load()} disabled={loading}><RefreshCw size={16}/>Refresh</button>
+   <Link className="btn-secondary" href="/app/documents/quotations">Back to register</Link>
   </header>
+  {loading&&<Spinner label="Loading document source…"/>}
+  {draft.controls}
+  <ContactPicker onSelect={c=>{setLinks(v=>({...v,clientId:c.kind==="client"?c.id:null,leadId:c.kind==="lead"?c.id:null}));patch("clientName",c.name.slice(0,80));}}/>
   {error&&<div role="alert" className="rounded-xl border border-[#BA485E] bg-[#3C1A2A] p-3 text-sm text-[#FFCFD7]">{error}</div>}
   {notice&&<div role="status" className="rounded-xl border border-[#6B398F] bg-[#29143A] p-3 text-sm text-[#F3D6FF]">{notice}</div>}
   <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label="Quotation type">
@@ -115,11 +120,11 @@ export default function QuotationsPage(){
   </div>
   <nav className="aw-v5-document-steps" aria-label="Quotation sections">
     {(mode==="default"?[
-      ["01","Package","#quote-package"],["02","Review & export","#quote-summary"],["03","Saved history","#quote-history"]
+      ["01","Package","#quote-package"],["02","Review & export","#quote-summary"]
      ]:[
       ["01","Client","#quote-client"],["02","Services","#quote-services"],
       ["03","Charges","#quote-charges"],["04","Terms","#quote-terms"],
-      ["05","Review & export","#quote-summary"],["06","Saved history","#quote-history"]
+      ["05","Review & export","#quote-summary"]
      ]).map(([n,title,href])=><a key={href} href={href}>
        <span>{n}</span>{title}</a>)}
    </nav>
@@ -279,26 +284,11 @@ export default function QuotationsPage(){
       <p className="text-xs text-[#C4A7DA]">Optional advertising spend is included in package value when entered, but remains optional under the payment terms.</p>
       <button className="btn-primary w-full" type="submit" disabled={saving||!!downloading}>
        <Download size={16}/>{saving?"Saving quotation…":"Generate & download PDF"}</button>
-      <button type="button" className="btn-secondary w-full" onClick={()=>{setForm(mode==="default"?defaultForm():initial());setNotice("");setError("");}} disabled={saving}>Clear form</button>
+      <button type="button" className="btn-secondary w-full" onClick={()=>{if(draft.dirty&&!window.confirm("Clear unsaved changes?"))return;setLinks({});setForm(mode==="default"?defaultForm():initial());setNotice("");setError("");}} disabled={saving}>Clear form</button>
      </div>
     </section>
+    <button type="button" className="btn-secondary w-full" onClick={()=>setPreviewOpen(v=>!v)}>{previewOpen?"Hide preview":"Show preview"}</button>{previewOpen&&<DocumentPreview row={previewRow}/>}
    </aside>
   </form>
-  <section id="quote-history" className={card}>
-   <div className="mb-4 flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-lg font-bold text-[#F4DFFF]">Quotation history</h2>
-    <p className="text-sm text-[#C4A7DA]">Saved quotations are immutable snapshots. Reuse as a new quotation to revise terms.</p></div>
-    <input aria-label="Search quotation history" className={field+" max-w-sm"} placeholder="Search name or quotation number" value={search} onChange={e=>setSearch(e.target.value)}/></div>
-   <p className="aw-v5-document-history-count" aria-live="polite">{filtered.length} of {rows.length} saved quotations shown</p>
-   {loading?<p role="status">Loading quotations…</p>:!filtered.length?<p className="py-8 text-center text-[#C4A7DA]">No quotations found.</p>:
-    <div className="overflow-x-auto"><table className="w-full text-left text-sm" aria-label="Quotation history">
-     <thead className="border-b bg-[#291639] text-[#F4DFFF]"><tr><th className="p-3">Quotation no.</th><th className="p-3">Client</th><th className="p-3">Date</th><th className="p-3">Total</th><th className="p-3">Actions</th></tr></thead>
-     <tbody>{filtered.map(row=><tr key={row.id} className="border-b border-[#442953]">
-      <td className="p-3 font-semibold text-[#F0C9FF]">{row.quoteNumber}</td><td className="p-3">{row.clientName}</td>
-      <td className="p-3">{row.quoteDate.slice(0,10)}</td><td className="p-3">{money(Number(row.total))}</td>
-      <td className="flex flex-wrap gap-2 p-3"><button className={action} disabled={!!downloading} onClick={()=>void download(row)} type="button">
-        <Download size={15}/>{downloading===row.id?"Preparing…":"PDF"}</button>
-       <button className={action} type="button" onClick={()=>{const selectedMode=row.payload.mode==="default"?"default":"new";setMode(selectedMode);setForm({...row.payload,mode:selectedMode,quoteDate:makeDate()});setNotice("Copied "+row.quoteNumber+" into a new, unsaved quotation.");window.scrollTo({top:0,behavior:"smooth"});}}>Reuse</button></td>
-     </tr>)}</tbody></table></div>}
-  </section>
  </div>;
 }
