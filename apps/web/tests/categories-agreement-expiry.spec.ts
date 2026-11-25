@@ -264,6 +264,17 @@ test("client overview and register use global summaries and permission-scoped wo
  await expect(metrics.getByRole("button",{name:"Total clients 5"})).toBeVisible();
  await expect(page.getByLabel("Client health filter")).toHaveCount(0);
  await expect(page.getByLabel("Account manager filter")).toHaveCount(0);
+ const search=page.getByRole("textbox",{name:"Search clients"});
+ const searchWrapper=search.locator("..");
+ await expect(searchWrapper).toHaveCSS("border-top-width","1px");
+ await expect(search).toHaveCSS("border-top-width","0px");
+ await expect(search).toHaveCSS("background-color","rgba(0, 0, 0, 0)");
+ await search.focus();
+ await expect(search).toHaveCSS("border-top-width","0px");
+ await expect(search).toHaveCSS("box-shadow","none");
+ await expect(searchWrapper).toHaveCSS("outline-width","2px");
+ await search.blur();
+
  await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Unassessed",{exact:true})).toHaveCount(0);
  for(const width of [1440,390]){
   await page.setViewportSize({width,height:900});

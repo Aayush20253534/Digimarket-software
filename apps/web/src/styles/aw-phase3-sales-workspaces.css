@@ -478,6 +478,16 @@
 .aw-workspace :is(.aw-client-directory,.aw-client-workspace) .field::placeholder{
  color:var(--ui-subtle)!important;
 }
+/* The directory search is a composite control: its wrapper owns the only border
+   and focus outline. Override the generic client field rules for this input. */
+.aw-workspace .aw-client-directory-v2 .aw-client-controls > .aw-v3-directory-search > .field,
+.aw-workspace .aw-client-directory-v2 .aw-client-controls > .aw-v3-directory-search > .field:focus{
+ flex:1 1 0;min-width:0;width:100%;min-height:40px!important;
+ background:transparent!important;border:0!important;border-radius:0!important;
+ box-shadow:none!important;outline:none!important;padding:9px 2px!important;
+}
+.aw-workspace .aw-client-directory-v2 .aw-client-controls > .aw-v3-directory-search > svg{flex-shrink:0;}
+
 .aw-workspace .aw-client-table-wrap{
  overflow:auto;background:var(--ui-surface)!important;
  border:1px solid var(--ui-border)!important;border-radius:10px!important;
