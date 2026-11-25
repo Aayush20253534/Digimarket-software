@@ -323,4 +323,36 @@ try{
  assert.equal((await crm.list(founder,{source:"REFERRAL",limit:30})).items[0]?.id,referral.id);
 
  console.info("Module 7 PASS: phone-only lead, shared editing, atomic Approved conversion, history, webhook dedupe, tenant isolation and import.");
+
+ // Cross-cycle follow-ups must be paginated in global date/temperature order.
+ const testSchedule="2026-11-25",scheduleEarlier="2026-11-24";
+ const tempCases=[["UNCLASSIFIED",testSchedule],["COLD",testSchedule],["WARM",testSchedule],["HOT",testSchedule],["COLD",scheduleEarlier]] as const;
+ const scheduledIds:string[]=[];
+ for(const [i,[temperature,followUpOn]] of tempCases.entries()){
+   const draft=await crm.create(founder,{phone:"91945670000"+i});
+   await db.lead.update({where:{id:draft.id},data:{createdAt:new Date(i%2?"2026-11-23T00:00:00Z":"2026-10-25T00:00:00Z")}});
+   const updated=await crm.update(founder,draft.id,{version:draft.version,status:"FOLLOW_UP",followUpOn,temperature,businessName:"Priority followup "+i});
+   scheduledIds.push(updated.id);
+ }
+ const expected=[scheduledIds[4],scheduledIds[3],scheduledIds[2],scheduledIds[1],scheduledIds[0]];
+ const seen:string[]=[];let cursor:string|undefined;
+ for(let i=0;i<3;i++){
+   const batch=await crm.scheduledFollowUps(founder,{limit:2,q:"Priority followup",cursor,month:"2026-11"});
+   assert.equal(batch.total,5);
+   assert.equal(batch.summary.all,5);
+   assert.equal(batch.calendar[testSchedule],4);
+   seen.push(...batch.items.map(row=>row.id));cursor=batch.nextCursor??undefined;
+ }
+ assert.deepEqual(seen,expected);assert.equal(cursor,undefined);
+ const hot=await crm.scheduledFollowUps(founder,{limit:20,q:"Priority followup",temperature:"HOT"});
+ assert.equal(hot.total,1);assert.equal(hot.items[0]?.id,scheduledIds[3]);
+ const original=await crm.detail(founder,scheduledIds[3]);
+ const moved=await crm.update(founder,original.id,{version:original.version,followUpOn:"2026-11-28",stageNote:"Rescheduled from register",temperature:"WARM"});
+ assert.equal(moved.status,"FOLLOW_UP");
+ assert.equal(moved.nextFollowUpAt?.toISOString().slice(0,10),"2026-11-28");
+ assert.equal(moved.stageNote,"Rescheduled from register");
+ assert.equal(moved.createdAt.toISOString(),original.createdAt.toISOString());
+ await assert.rejects(()=>crm.update(foreign,moved.id,{version:moved.version,followUpOn:"2026-11-29"}),fail(404));
+ await crm.update(founder,moved.id,{version:moved.version,status:"DECISION_PENDING"});
+ assert.equal((await crm.scheduledFollowUps(founder,{limit:20,q:"Priority followup"})).total,4);
 }finally{await db.$disconnect();}

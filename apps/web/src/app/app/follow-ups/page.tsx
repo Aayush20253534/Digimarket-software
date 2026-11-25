@@ -78,10 +78,11 @@ export default function FollowUpsPage(){
      if(view==="calendar")q.set("month",month);
      const data=await request<Result>("/leads/follow-ups?"+q);
      if(current!==sequence.current)return;
+     if(!data.summary||!data.today)throw new Error("Follow-up API is not updated yet. Refresh after deployment.");
      setRows(data.items);setNextCursor(data.nextCursor);setTotal(data.total);
      setSummary(data.summary);setCalendar(data.calendar??{});setToday(data.today);
    }catch(e){
-     if(current===sequence.current){setError(e instanceof Error?e.message:"Unable to load follow-ups.");setRows([]);setNextCursor(null);}
+     if(current===sequence.current){setError(e instanceof Error?e.message:"Unable to load follow-ups.");setRows([]);setNextCursor(null);setTotal(0);setSummary(emptySummary);setCalendar({});}
    }finally{if(current===sequence.current)setLoading(false);}
  },[canRead,cursor,request,dateView,search,temperature,from,to,view,month,rangeInvalid]);
  useEffect(()=>{void load();return()=>{sequence.current++;};},[load]);
@@ -152,7 +153,7 @@ export default function FollowUpsPage(){
       <strong>{new Date(month+"-01T12:00:00Z").toLocaleDateString("en-IN",{month:"long",year:"numeric",timeZone:"UTC"})}</strong><button type="button" className="btn-secondary" aria-label="Next month" onClick={()=>setMonth(m=>monthShift(m,1))}><ChevronRight size={17}/></button></div>
       <div className="aw-followup-calendar-grid">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(x=><span key={x} className="aw-followup-weekday">{x}</span>)}
       {Array.from({length:monthData.offset},(_,i)=><span key={"blank"+i}/>)}
-      {monthData.days.map(day=><button type="button" key={day} className="aw-followup-day" aria-label={formatDay(day)+": "+(calendar[day]??0)+" follow-ups"} aria-current={day===today?"date":undefined} aria-pressed={from===day&&to===day} disabled={loading||rangeInvalid} onClick={()=>{resetPage();setFrom(day);setTo(day);setDateView("all");}}><span>{Number(day.slice(8))}</span>{(calendar[day]??0)>0&&<small data-bucket={dueStatus(day,today)}>{calendar[day]}</small>}</button>)}</div>
+      {monthData.days.map(day=><button type="button" key={day} className="aw-followup-day" aria-label={formatDay(day)+": "+(calendar[day]??0)+" follow-ups"} aria-current={day===today?"date":undefined} aria-pressed={from===day&&to===day} disabled={loading||rangeInvalid} onClick={()=>{if(from===day&&to===day&&dateView==="all")return;resetPage();setFrom(day);setTo(day);setDateView("all");}}><span>{Number(day.slice(8))}</span>{(calendar[day]??0)>0&&<small data-bucket={dueStatus(day,today)}>{calendar[day]}</small>}</button>)}</div>
       <p className="aw-followup-hint">Select a day to filter the register below. Calendar counts include all scheduled dates in this month, matching search and temperature.</p>
     </section>}
     <section className="aw-followups-register" aria-label="Scheduled follow-ups">
@@ -164,7 +165,7 @@ export default function FollowUpsPage(){
        const day=lead.nextFollowUpAt?.slice(0,10)??today,temp=lead.temperature??"UNCLASSIFIED";
        return <tr key={lead.id}><td><time dateTime={day}>{formatDay(day)}</time><small className="aw-followup-due" data-bucket={dueStatus(day,today)}>{dueLabel(day,today)}</small></td>
        <td>{lead.phone?<a className="aw-followup-icon" href={callHref(lead.phone)} aria-label={"Call "+lead.phone} title={lead.phone}><PhoneCall size={17} aria-hidden="true"/></a>:"—"}</td>
-       <td><Link className="aw-followups-business" href={"/app/leads?focus="+encodeURIComponent(lead.id)}><span className="aw-followup-temp" data-temperature={temp} role="img" aria-label={"Lead temperature: "+labels[temp]} title={labels[temp]}/>{lead.businessName}</Link></td>
+       <td><Link className="aw-followups-business" aria-label={lead.businessName} href={"/app/leads?focus="+encodeURIComponent(lead.id)}><span className="aw-followup-temp" data-temperature={temp} role="img" aria-label={"Lead temperature: "+labels[temp]} title={labels[temp]}/>{lead.businessName}</Link></td>
        <td>{lead.contactName||"Not recorded"}</td><td className="aw-followup-note" title={lead.stageNote||undefined}>{lead.stageNote||"No notes yet"}</td>
        <td>{lead.canEdit&&!isAdmin?<button type="button" className="aw-followup-icon" aria-label={"Actions for "+lead.businessName} disabled={!!opening||loading} onClick={()=>void openEdit(lead)}><Ellipsis size={19}/></button>:<Link className="aw-followup-icon" aria-label={"Open lead "+lead.businessName} href={"/app/leads?focus="+encodeURIComponent(lead.id)}><ChevronRight size={17}/></Link>}</td></tr>;
      })}</tbody></table></div>

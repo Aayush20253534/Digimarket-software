@@ -341,3 +341,54 @@ test("lead temperature defaults to Unclassified, can be set and filtered",async(
  await page.getByRole("button",{name:"Clear filters"}).click();
  await expect(page.getByLabel("Filter by temperature")).toHaveValue("");
 });
+
+test("follow-up workspace searches globally, reschedules and updates lead details without leaving the register",async({page})=>{
+ await mockWorkspace(page);
+ const id="00000000-0000-4000-8000-000000000009";
+ let day="2026-11-15",note="Call to finalize",temperature="HOT",status="FOLLOW_UP",version=1;
+ const detail=()=>({id,businessName:"Earlier cycle prospect",contactName:"Contact",phone:"9000000000",nextFollowUpAt:day+"T12:00:00Z",temperature,stageNote:note,status,version,canEdit:true,meetingAt:null});
+ await page.route("**/api/v1/leads/follow-ups?*",async route=>{
+   const q=new URL(route.request().url()).searchParams;
+   expect(q.has("cycle")).toBe(false);
+   const active=status==="FOLLOW_UP",bucket=day<"2026-11-17"?"overdue":day==="2026-11-17"?"today":"upcoming";
+   const matches=active&&(!q.get("q")||"Earlier cycle prospect".toLowerCase().includes(q.get("q")!.toLowerCase()))&&(!q.get("temperature")||q.get("temperature")===temperature)&&(!q.get("from")||day>=q.get("from")!)&&(!q.get("to")||day<=q.get("to")!);
+   const filtered=matches&&(!q.get("view")||q.get("view")==="all"||q.get("view")===bucket);
+   await route.fulfill({json:{data:{items:filtered?[detail()]:[],nextCursor:null,total:filtered?1:0,today:"2026-11-17",summary:{all:matches?1:0,overdue:matches&&bucket==="overdue"?1:0,today:matches&&bucket==="today"?1:0,upcoming:matches&&bucket==="upcoming"?1:0},calendar:active?{[day]:1}:{}}}});
+ });
+ await page.route("**/api/v1/leads/"+id,async route=>{
+   if(route.request().method()==="PUT"){
+     const body=route.request().postDataJSON();
+     expect(body.version).toBe(version);
+     day=body.followUpOn??day;note=body.stageNote??note;temperature=body.temperature??temperature;status=body.status;version++;
+   }
+   await route.fulfill({json:{data:detail()}});
+ });
+ await page.goto("/app/follow-ups");
+ const table=page.getByRole("table",{name:"Follow-up register"});
+ await expect(table.getByText("2 days overdue")).toBeVisible();
+ await expect(table.getByRole("link",{name:"Call 9000000000"})).toHaveAttribute("href","tel:9000000000");
+ await expect(table.getByText("Call to finalize")).toBeVisible();
+ await page.getByRole("textbox",{name:"Search follow-ups"}).fill("does not exist");
+ await expect(table.locator("tbody tr")).toHaveCount(0);
+ await page.getByRole("textbox",{name:"Search follow-ups"}).fill("");
+ await expect(table.getByText("Earlier cycle prospect")).toBeVisible();
+ await page.getByRole("button",{name:"Actions for Earlier cycle prospect"}).click();
+ const editor=page.getByRole("dialog",{name:"Update follow-up"});
+ await editor.getByRole("button",{name:"Tomorrow"}).click();
+ await expect(editor.getByLabel("Follow-up date")).toHaveValue("2026-11-18");
+ await editor.getByLabel("Short notes").fill("Client requested tomorrow");
+ await editor.getByLabel("Lead temperature").selectOption("WARM");
+ await editor.getByRole("button",{name:"Save follow-up"}).click();
+ await expect(table.getByText("Client requested tomorrow")).toBeVisible();
+ await expect(table.getByRole("img",{name:"Lead temperature: Warm"})).toBeVisible();
+ await page.getByRole("button",{name:"Calendar",exact:true}).click();
+ const calendar=page.getByRole("region",{name:"Follow-up calendar"});
+ await expect(calendar.getByRole("button",{name:"18 Nov 2026: 1 follow-ups"})).toBeVisible();
+ await calendar.getByRole("button",{name:"18 Nov 2026: 1 follow-ups"}).click();
+ await expect(page.getByLabel("Follow-ups from")).toHaveValue("2026-11-18");
+ await page.getByRole("button",{name:"Actions for Earlier cycle prospect"}).click();
+ await editor.getByLabel("Lead stage").selectOption("DECISION_PENDING");
+ await editor.getByRole("button",{name:"Save follow-up"}).click();
+ await expect(table.locator("tbody tr")).toHaveCount(0);
+ await expect(page.getByText("Lead stage updated. Removed from scheduled follow-ups.")).toBeVisible();
+});
