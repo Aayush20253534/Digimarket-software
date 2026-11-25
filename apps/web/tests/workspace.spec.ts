@@ -944,7 +944,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Sales workspace sections"}).getByRole("link",{name:"Clients",exact:true}))
    .toHaveAttribute("aria-current","page");
-  await expect(page.getByRole("img",{name:/active, .* paused, .* archived/})).toBeVisible();
+  await expect(page.getByRole("region",{name:"Client status across all cycles"})).toBeVisible();
   await page.getByRole("navigation",{name:"Client sections"}).getByRole("link",{name:"Past Clients",exact:true}).click();
   await expect(page).toHaveURL(/\/app\/clients\/expired$/);
   await expect(page.getByRole("heading",{name:"Past Clients",exact:true})).toBeVisible();
