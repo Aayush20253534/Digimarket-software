@@ -450,7 +450,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     if(date!==null)url.searchParams.set("date",date);
   }
   if (path === "leads") {
-    for (const key of ["stage","source","assignedToId","q","cursor","limit","sort","direction","cycle"]) {
+    for (const key of ["stage","source","assignedToId","q","cursor","limit","sort","direction","cycle","temperature"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }

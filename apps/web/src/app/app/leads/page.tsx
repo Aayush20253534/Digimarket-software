@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, MapPin, PhoneCall, Plus, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
-import {leadCycles,cycleLabel} from "@digimarket/contracts";
+import {leadCycles,cycleLabel,type LeadTemperature} from "@digimarket/contracts";
 import { useAuth } from "@/components/auth-provider";
 import { DirectoryModal } from "@/components/directory-modal";
 import { SalesWorkspaceNav } from "@/components/sales-workspace-nav";
@@ -13,9 +13,11 @@ import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/com
 type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"FOLLOW_UP"|"MEETING_PROCESS"|"DECISION_PENDING"|"AGREEMENT_PENDING"|"APPROVED"|"REJECTED"|"EXPIRED";
 const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED"];
 const stageLabel=(s:Stage)=>s.replaceAll("_"," ");
+const temperatures:LeadTemperature[]=["UNCLASSIFIED","HOT","WARM","COLD"];
+const temperatureLabels:Record<LeadTemperature,string>={UNCLASSIFIED:"Unclassified",HOT:"Hot",WARM:"Warm",COLD:"Cold"};
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;googleMapsUrl:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
- status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;meetingAt:string|null;
+ status:Stage;temperature?:LeadTemperature;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;meetingAt:string|null;
  version:number;createdAt:string;canEdit?:boolean;assignee?:{displayName:string}|null};
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
 type Detail=Lead&{activities:Activity[];canEdit:boolean;canExpire?:boolean;linkedClientId?:string|null};
@@ -62,6 +64,7 @@ export default function LeadsPage(){
  useEffect(()=>{const refresh=()=>setCycles(previous=>{const next=leadCycles();return previous[0]?.key===next[0]?.key?previous:next;});const timer=window.setInterval(refresh,60_000);window.addEventListener("focus",refresh);return()=>{window.clearInterval(timer);window.removeEventListener("focus",refresh);};},[]);
  const [stage,setStage]=useState("");
  const [sourceFilter,setSourceFilter]=useState<""|LeadSource>("");
+ const [temperatureFilter,setTemperatureFilter]=useState<""|LeadTemperature>("");
  const [search,setSearch]=useState("");
  const [history,setHistory]=useState<string[]>([]);
  const [sortBy,setSortBy]=useState<SortKey>("createdAt"),[descending,setDescending]=useState(false);
@@ -79,6 +82,7 @@ export default function LeadsPage(){
  const [meetingOn,setMeetingOn]=useState("");
  const [meetingTime,setMeetingTime]=useState("");
  const [editSource,setEditSource]=useState<LeadSource>("COLD_CALL");
+ const [editTemperature,setEditTemperature]=useState<LeadTemperature>("UNCLASSIFIED");
  const [stageNote,setStageNote]=useState("");
  const [noteSaveState,setNoteSaveState]=useState<"idle"|"saving"|"saved"|"error">("idle");
  const noteWriteQueue=useRef<Promise<unknown>>(Promise.resolve());
@@ -102,6 +106,7 @@ export default function LeadsPage(){
          if(pref.stage===""||stages.includes(pref.stage as Stage))setStage(pref.stage as string);
          if(pref.sourceFilter===""||pref.sourceFilter==="COLD_CALL"||pref.sourceFilter==="META_LEADS"||pref.sourceFilter==="REFERRAL")
            setSourceFilter(pref.sourceFilter as ""|LeadSource);
+         setTemperatureFilter(temperatures.includes(pref.temperatureFilter as LeadTemperature)?pref.temperatureFilter as LeadTemperature:"");
          if(typeof pref.search==="string")setSearch(pref.search.slice(0,100));
          if(sortKeys.includes(pref.sortBy as SortKey))setSortBy(pref.sortBy as SortKey);
          if(typeof pref.descending==="boolean")setDescending(pref.descending);
@@ -113,10 +118,10 @@ export default function LeadsPage(){
  useEffect(()=>{
    if(!preferencesReady||!session?.identity.userId)return;
    try{window.localStorage.setItem(leadPreferencesKey(session.identity.userId),
-     JSON.stringify({stage,sourceFilter,search,sortBy,descending}));}
+     JSON.stringify({stage,sourceFilter,temperatureFilter,search,sortBy,descending}));}
    catch{/* Optional view preferences. */}
- },[preferencesReady,session?.identity.userId,stage,sourceFilter,search,sortBy,descending]);
- useEffect(()=>{setCheckedLeads({});},[stage,sourceFilter,search,sortBy,descending,session?.identity.userId]);
+ },[preferencesReady,session?.identity.userId,stage,sourceFilter,temperatureFilter,search,sortBy,descending]);
+ useEffect(()=>{setCheckedLeads({});},[stage,sourceFilter,temperatureFilter,search,sortBy,descending,session?.identity.userId]);
  const changeCycle=(choice:string)=>{if(choice===cycleChoice)return;loadSequence.current++;setCycleChoice(choice);setCursor(null);setHistory([]);setTotalLeads(null);setItems([]);setMetrics(null);setNextCursor(null);setCheckedLeads({});setStage("");setLoading(true);};
  useEffect(()=>{setCursor(null);setHistory([]);setCheckedLeads({});},[cycleKey]);
  const load=useCallback(async()=>{
@@ -127,6 +132,7 @@ export default function LeadsPage(){
    try{
      const q=new URLSearchParams({limit:"10",sort:sortBy,direction:descending?"desc":"asc"});
      if(cycleKey)q.set("cycle",cycleKey);
+     if(temperatureFilter)q.set("temperature",temperatureFilter);
      if(stage)q.set("stage",stage);if(sourceFilter)q.set("source",sourceFilter);if(search.trim())q.set("q",search.trim());
      if(cursor)q.set("cursor",cursor);
      let result:Page;
@@ -143,7 +149,7 @@ export default function LeadsPage(){
      }).catch(()=>{});
    }catch(e){if(sequence===loadSequence.current)setError(errText(e));}
    finally{if(sequence===loadSequence.current)setLoading(false);}
- },[canRead,preferencesReady,request,stage,sourceFilter,search,cursor,sortBy,descending,cycleKey,cycleQuery]);
+ },[canRead,preferencesReady,request,stage,sourceFilter,temperatureFilter,search,cursor,sortBy,descending,cycleKey,cycleQuery]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const focusedRef=useRef(false);
@@ -154,7 +160,7 @@ export default function LeadsPage(){
      const detail=await request<Detail>("/leads/"+id);
      activeLeadId.current=id;
      mobileScrollLeadId.current=scrollOnMobile?id:null;
-     setSelected(detail);setEditStage(detail.status);setFollowUpOn(detail.nextFollowUpAt?.slice(0,10)??"");
+     setSelected(detail);setEditTemperature(detail.temperature??"UNCLASSIFIED");setEditStage(detail.status);setFollowUpOn(detail.nextFollowUpAt?.slice(0,10)??"");
      const savedMeeting=detail.meetingAt?new Date(new Date(detail.meetingAt).getTime()+330*60_000).toISOString().slice(0,16):"";
      setMeetingOn(savedMeeting.slice(0,10));setMeetingTime(savedMeeting.slice(11,16));setEditSource(detail.source==="META_LEADS"||detail.source==="WHATSAPP"?"META_LEADS":detail.source==="REFERRAL"?"REFERRAL":"COLD_CALL");setOwner(detail.assignedToId??"");
      let draft:string|null=null;try{draft=window.localStorage.getItem(draftKey(id));}catch{ /* Browser storage may be unavailable. */ }
@@ -220,6 +226,7 @@ export default function LeadsPage(){
    try{
      await noteWriteQueue.current;
      await request("/leads/"+selected.id,{method:"PUT",body:{...updating,source:editSource,status:editStage,
+       ...(editTemperature!==(selected.temperature??"UNCLASSIFIED")?{temperature:editTemperature}:{}),
        followUpOn:editStage==="FOLLOW_UP"?followUpOn:null,
        meetingOn:editStage==="MEETING_PROCESS"?meetingOn:null,
        meetingTime:editStage==="MEETING_PROCESS"?meetingTime:null,
@@ -331,13 +338,16 @@ export default function LeadsPage(){
            <select aria-label="Filter by stage" className="field" value={stage} onChange={e=>{setStage(e.target.value);setTotalLeads(null);setCursor(null);setHistory([]);}}>
              <option value="">ALL STAGES</option>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}
            </select>
+           <select aria-label="Filter by temperature" className="field" value={temperatureFilter} onChange={e=>{setTemperatureFilter(e.target.value as ""|LeadTemperature);setTotalLeads(null);setCursor(null);setHistory([]);}}>
+             <option value="">All temperatures</option>{temperatures.map(x=><option key={x} value={x}>{temperatureLabels[x]}</option>)}
+           </select>
            <select aria-label="Filter by lead source" className="field" value={sourceFilter} onChange={e=>{setSourceFilter(e.target.value as ""|LeadSource);setTotalLeads(null);setCursor(null);setHistory([]);}}>
              <option value="">All sources</option>{leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
            </select>
 <select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setTotalLeads(null);setCursor(null);setHistory([]);}}>
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="status">Stage</option><option value="createdAt">Created</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setTotalLeads(null);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
-           <button type="button" className="btn-secondary" disabled={!stage&&!sourceFilter&&!search} onClick={()=>{setStage("");setSourceFilter("");setSearch("");setTotalLeads(null);setCursor(null);setHistory([]);}}>Clear filters</button>
+           <button type="button" className="btn-secondary" disabled={!stage&&!sourceFilter&&!temperatureFilter&&!search} onClick={()=>{setStage("");setSourceFilter("");setTemperatureFilter("");setSearch("");setTotalLeads(null);setCursor(null);setHistory([]);}}>Clear filters</button>
          </div>
          {canDelete&&<div className="mt-3 flex flex-wrap items-center gap-3" aria-label="Bulk lead actions">
            <span role="status">{selectedCount} selected · up to 100 across pages</span>
@@ -373,7 +383,7 @@ export default function LeadsPage(){
              <td className="aw-crm-phone-cell">{l.phone?<a href={callHref(l.phone)} className="aw-lead-action" aria-label={"Call "+l.phone}
                title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
                <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>
-             <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
+             <td>{l.contactName||"Name pending"}</td><td><span className="aw-crm-business-temperature"><span className="aw-crm-temperature-dot" data-temperature={l.temperature??"UNCLASSIFIED"} role="img" aria-label={"Lead temperature: "+temperatureLabels[l.temperature??"UNCLASSIFIED"]} title={temperatureLabels[l.temperature??"UNCLASSIFIED"]}/>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</span></td>
              <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular uppercase/></td>
              <td><time dateTime={l.createdAt} title="Automatically recorded when this lead was created">{fmt(l.createdAt)}</time></td>
              <td className="aw-crm-location-cell">{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
@@ -452,6 +462,9 @@ export default function LeadsPage(){
                <select id="edit-source" className="field" value={editSource} onChange={e=>setEditSource(e.target.value as LeadSource)}>
                  {leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
                </select>
+             </FormField>
+             <FormField id="edit-temperature" label="Lead temperature" help="Optional qualification. Leave Unclassified until you know the prospect’s interest.">
+               <select id="edit-temperature" className="field" value={editTemperature} onChange={e=>setEditTemperature(e.target.value as LeadTemperature)}>{temperatures.map(x=><option key={x} value={x}>{temperatureLabels[x]}</option>)}</select>
              </FormField>
              <FormField id="edit-stage" label="Lead status" help={selected.status==="APPROVED"?(selected.canExpire?"Agreement ended. You can now select Expired and save.":"End this client's agreement in Clients to unlock Expired."):selected.status==="EXPIRED"?"This former client remains recorded in its original acquisition cycle.":undefined}><select id="edit-stage" className="field" value={editStage} disabled={selected.status==="EXPIRED"}
                onChange={e=>setEditStage(e.target.value as Stage)}>{(selected.status==="APPROVED"?["APPROVED","EXPIRED"] as const:selected.status==="EXPIRED"?["EXPIRED"] as const:stages.filter(x=>x!=="EXPIRED")).map(x=><option key={x} value={x} disabled={x==="EXPIRED"&&selected.status==="APPROVED"&&!selected.canExpire}>{stageLabel(x)}</option>)}</select></FormField>
