@@ -961,7 +961,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(workspace).toBeVisible();
   const clientTabs=workspace.getByRole("tablist",{name:"Client workspace sections"});
   await expect(clientTabs.getByRole("tab",{name:"Services"})).toHaveCount(0);
-  await expect(clientTabs.getByRole("tab",{name:"Agreement"})).toHaveAttribute("aria-selected","true");
+  await expect(clientTabs.getByRole("tab",{name:"Overview",exact:true})).toHaveAttribute("aria-selected","true");
   await expect(clientTabs.getByRole("tab",{name:"Delivery"})).toHaveCount(0);
   await clientTabs.getByRole("tab",{name:"Agreement"}).click();
   await expect(workspace.getByRole("heading",{name:"Client profile & agreement"})).toBeVisible();
