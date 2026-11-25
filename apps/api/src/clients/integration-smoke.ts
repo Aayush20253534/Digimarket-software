@@ -208,5 +208,31 @@ try{
  assert.equal((await clients.list(manager,{limit:30,status:"PAUSED"})).items.length,0);
  assert.equal((await db.client.count({where:{sourceLeadId:created.id}})),1);
  assert.equal((await db.outboxEvent.count({where:{eventKey:"lead-converted:"+created.id}})),1);
+
+ const anniversaryClient=await db.client.create({data:{organizationId:org.id,createdById:owner.id,businessName:"Anniversary CI",contractStartOn:new Date("2026-11-25T00:00:00Z"),contractEndOn:new Date("2027-01-24T00:00:00Z")}});
+ await videos.saveWeek(manager,anniversaryClient.id,"2026-11",1,{readyAdded:7,delivered:2,version:0});
+ await posts.saveWeek(manager,anniversaryClient.id,"2026-12",4,{readyAdded:5,delivered:2,festivalReadyAdded:3,festivalDelivered:1,version:0});
+ const savedVideo=await db.clientVideoWeek.findFirstOrThrow({where:{clientId:anniversaryClient.id}});
+ const savedPost=await db.clientPostWeek.findFirstOrThrow({where:{clientId:anniversaryClient.id}});
+ const firstCycle=await videos.clientCycle(manager,anniversaryClient.id,"2026-11","2026-12-25");
+ assert.equal(firstCycle.remainingStock,5);
+ assert.equal(firstCycle.totalStock,5);
+ const nextCycle=await videos.clientCycle(manager,anniversaryClient.id,"2026-12","2026-12-25");
+ const slot=nextCycle.weeks.find(w=>!w.legacy)!;
+ assert.equal(slot.from,"2026-12-30");
+ assert.equal(slot.to,"2026-12-31");
+ await videos.saveWeek(manager,anniversaryClient.id,slot.storageMonth,slot.storageWeek,{readyAdded:2,delivered:1,version:0},true);
+ const sameSlot=(await posts.clientCycle(manager,anniversaryClient.id,"2026-12")).weeks.find(w=>w.storageMonth===slot.storageMonth&&w.storageWeek===slot.storageWeek)!;
+ assert.equal(sameSlot.from,slot.from);
+ await posts.saveWeek(manager,anniversaryClient.id,slot.storageMonth,slot.storageWeek,{readyAdded:1,delivered:1,festivalReadyAdded:2,festivalDelivered:0,version:0},true);
+ const finalVideo=await videos.clientCycle(manager,anniversaryClient.id,"2026-12");
+ const finalPost=await posts.clientCycle(manager,anniversaryClient.id,"2026-12");
+ assert.equal(finalVideo.totalStock,6);
+ assert.equal(finalPost.totalStock,3);
+ assert.equal(finalPost.festivalTotalStock,4);
+ assert.deepEqual(await db.clientVideoWeek.findUniqueOrThrow({where:{id:savedVideo.id}}),savedVideo);
+ assert.deepEqual(await db.clientPostWeek.findUniqueOrThrow({where:{id:savedPost.id}}),savedPost);
+ await assert.rejects(()=>videos.saveWeek(manager,anniversaryClient.id,"2026-12",5,{readyAdded:1,delivered:0,version:0}),fail(422));
+ await assert.rejects(()=>videos.saveWeek(external,anniversaryClient.id,slot.storageMonth,slot.storageWeek,{readyAdded:0,delivered:0,version:1},true),fail(404));
  console.info("Module 8 PASS: no manual clients, automatic lead approval, common tenant visibility and safe client editing.");
 }finally{await db.$disconnect();}
