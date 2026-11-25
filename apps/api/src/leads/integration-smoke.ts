@@ -72,6 +72,14 @@ try{
  assert.equal(scheduled.items[0]?.contactName,null);
  assert.equal(scheduled.items[0]?.nextFollowUpAt?.toISOString().slice(0,10),followUpOn);
  assert.equal(scheduled.nextCursor,null);
+ assert.equal(scheduled.total,1);
+ assert.equal(scheduled.summary.all,1);
+ assert.equal(scheduled.items[0]?.temperature,"UNCLASSIFIED");
+ assert.equal(scheduled.items[0]?.stageNote,"Call again on Tuesday");
+ assert.equal((await crm.scheduledFollowUps(founder,{limit:20,q:"no-matching-lead"})).total,0);
+ assert.equal((await crm.scheduledFollowUps(founder,{limit:20,temperature:"HOT"})).total,0);
+ assert.equal((await crm.scheduledFollowUps(founder,{limit:20,month:followUpOn.slice(0,7)})).calendar[followUpOn],1);
+ assert.equal((await crm.scheduledFollowUps(founder,{limit:20,from:otherDay,to:otherDay})).total,0);
  assert.equal((await crm.scheduledFollowUps(foreign,{limit:20})).items.length,0);
  await assert.rejects(()=>crm.scheduledFollowUps(actor(owner.id,org.id,[],[]),{limit:20}),fail(403));
  assert.equal((await crm.followUpsOn(founder,otherDay)).total,0);
