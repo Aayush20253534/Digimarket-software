@@ -63,7 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const root=document.documentElement;
   root.dataset.awTheme=theme;
   const meta=document.querySelector('meta[name="theme-color"]');
-  meta?.setAttribute("content",theme==="dark"?"#0B0B0C":"#F6F6F7");
+  meta?.setAttribute("content",theme==="dark"?"#160D24":"#F6F6F7");
   return()=>{
    if(root.dataset.awTheme===theme)delete root.dataset.awTheme;
    meta?.setAttribute("content","#0B0B0C");
@@ -144,7 +144,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
  const current=currentSection(groups,pathname);
  const canSearch=!isAdmin&&session.identity.permissions.includes("search.read");
  const name=session.user.displayName;
- const brand=<Link href="/app/dashboard" aria-label="AmplifyWorld Workspace overview" className="aw-work-brand">
+ const brand=<Link href={groups[0]?.items[0]?.href??"/app/profile"} aria-label="AmplifyWorld Workspace home" className="aw-work-brand">
   <BrandLogo compact workspace/>
  </Link>;
  return <div className="aw-theme aw-workspace" data-theme={theme} data-collapsed={collapsed?"true":"false"} data-dashboard={pathname==="/app/dashboard"?"true":"false"} data-restyled={["/app/messages","/app/finance","/app/billing","/app/quotations","/app/agreements","/app/reports","/app/settings","/app/integrations/chatgpt","/app/team/users","/app/founders","/app/assets","/app/profile","/app/search","/app/notes","/app/documents","/app/clients/assets","/app/task-history","/app/salary","/app/follow-ups","/app/meetings"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"} data-workstream={["/app/leads","/app/clients","/app/projects","/app/tasks","/app/content","/app/approvals"].some(p=>pathname===p||pathname.startsWith(p+"/"))?"true":"false"}>

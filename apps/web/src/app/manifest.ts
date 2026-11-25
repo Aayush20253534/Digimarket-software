@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "AmplifyWorld Workspace",
     short_name: "AmplifyWorld",
     description: "Private agency operations: tasks, clients, projects, leads, finance and approvals.",
-    start_url: "/app/dashboard",
+    start_url: "/app/leads",
     scope: "/",
     display: "standalone",
     orientation: "any",

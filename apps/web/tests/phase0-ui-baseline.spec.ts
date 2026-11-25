@@ -125,8 +125,8 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
    bodyBackground:getComputedStyle(document.body).backgroundColor,
    scrollbar:getComputedStyle(document.documentElement).scrollbarColor,
  }));
- expect(darkRoot.background).toBe("rgb(11, 11, 12)");
- expect(darkRoot.bodyBackground).toBe("rgb(11, 11, 12)");
+ expect(darkRoot.background).toBe("rgb(22, 13, 36)");
+ expect(darkRoot.bodyBackground).toBe("rgb(22, 13, 36)");
  expect(darkRoot.scrollbar).not.toBe("auto");
  const captures:Captured[]=[];
  // Verify the existing theme control and browser storage behavior without

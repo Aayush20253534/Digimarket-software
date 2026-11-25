@@ -4,7 +4,7 @@ import {useEffect,useState} from "react";
 import type {LucideIcon} from "lucide-react";
 import {
  BriefcaseBusiness,CalendarDays,CalendarClock,ChartNoAxesCombined,ChevronDown,
- FileStack,LayoutDashboard,MessageCircle,
+ FileStack,MessageCircle,
  Settings2,Users,Wallet,QrCode,Banknote
 } from "lucide-react";
 
@@ -13,7 +13,6 @@ export type NavGroup={title:string;items:readonly NavItem[]};
 
 // Phase 2 navigation only; existing feature URLs and their API permissions stay intact.
 const sections:readonly NavGroup[]=[
- {title:"Workspace",items:[{label:"Overview",href:"/app/dashboard",icon:LayoutDashboard}]},
  {title:"Sales & CRM",items:[
   {label:"Leads CRM",href:"/app/leads",icon:BriefcaseBusiness,permits:["leads.read"]},
   {label:"Follow-ups",href:"/app/follow-ups",icon:CalendarClock,permits:["leads.read"]},
@@ -61,6 +60,7 @@ export function currentSection(groups:NavGroup[],pathname:string){
  const chosen=groups.find(group=>group.items.some(item=>matches(pathname,item.href)));
  const item=chosen?.items.find(i=>matches(pathname,i.href));
  const titles:Record<string,{group:string;title:string}>={
+  "/app/dashboard":{group:"Workspace",title:"Overview"},
   "/app/approvals":{group:"Workspace",title:"Approval inbox"},
   "/app/notes":{group:"Workspace",title:"Notes"},
   "/app/notes/list":{group:"Workspace",title:"Notes"},

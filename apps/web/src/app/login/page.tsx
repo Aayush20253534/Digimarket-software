@@ -26,12 +26,12 @@ export default function LoginPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
 
   useEffect(() => {
-    if (status === "authenticated") router.replace("/app/dashboard");
+    if (status === "authenticated") router.replace("/app/leads");
   }, [router, status]);
 
   async function finish(payload: SessionPayload) {
     await completeLogin(payload);
-    router.replace("/app/dashboard");
+    router.replace("/app/leads");
   }
 
   async function submitCredentials(event: FormEvent) {

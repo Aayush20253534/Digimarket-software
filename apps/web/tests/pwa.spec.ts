@@ -6,7 +6,7 @@ test("PWA manifest, icons, service worker and safe offline shell are served", as
   const manifest = await manifestResponse.json();
   expect(manifest.name).toBe("AmplifyWorld Workspace");
   expect(manifest.display).toBe("standalone");
-  expect(manifest.start_url).toBe("/app/dashboard");
+  expect(manifest.start_url).toBe("/app/leads");
   expect(manifest.icons).toEqual(expect.arrayContaining([
     expect.objectContaining({ src: "/pwa-icon/192?v=white-a-2", sizes: "192x192", type: "image/png", purpose: "any" }),
     expect.objectContaining({ src: "/pwa-icon/512?v=white-a-2", sizes: "512x512", type: "image/png", purpose: "maskable" }),

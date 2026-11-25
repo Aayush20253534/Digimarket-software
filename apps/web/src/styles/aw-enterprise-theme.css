@@ -1,6 +1,6 @@
 /*
  * DigiMarket UI v2 / Phase 1
- * One monochrome token system for the authenticated application.
+ * One shared purple-dark and neutral-light token system for the authenticated application.
  * Earlier route-level CSS remains for geometry and functional layouts until
  * its owner page is migrated in later phases. This is the only colour layer.
  * Keep semantic status/validation colours and the original brand assets.
@@ -10,10 +10,10 @@
    belongs to <html> outside .aw-workspace. Nested scrollbars inherit tokens. */
 html[data-aw-theme="dark"] {
   color-scheme:dark;
-  background:#0B0B0C;
-  --mono-scroll-track:#151517;
-  --mono-scroll-thumb:#49494D;
-  --mono-scroll-hover:#747478;
+  background:#160D24;
+  --mono-scroll-track:#211630;
+  --mono-scroll-thumb:#68517D;
+  --mono-scroll-hover:#9479B1;
 }
 html[data-aw-theme="light"] {
   color-scheme:light;
@@ -33,7 +33,7 @@ html[data-aw-theme] body {
   scrollbar-color:var(--mono-scroll-thumb) var(--mono-scroll-track);
 }
 html[data-aw-theme="dark"] body:has(.aw-workspace) {
-  background:#0B0B0C!important;
+  background:#160D24!important;
 }
 html[data-aw-theme="light"] body:has(.aw-workspace) {
   background:#F6F6F7!important;
@@ -59,17 +59,17 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
 
 .aw-workspace[data-theme="dark"] {
   color-scheme:dark;
-  --ui-canvas:#0B0B0C;--ui-surface:#171719;--ui-raised:#202022;
-  --ui-hover:#2A2A2C;--ui-border:#343436;--ui-strong:#F5F5F5;
-  --ui-muted:#A6A6AA;--ui-subtle:#8D8D92;--ui-primary:#FFFFFF;
-  --ui-action-text:#101011;--ui-input:#1C1C1E;--ui-side:#111113;
-  --ui-nav-active:#28282B;--ui-nav-text:#B7B7BB;--ui-grid:#343436;
-  --ui-scrollbar:#49494D;--ui-track:#303034;--ui-shadow:0 4px 18px #00000026;
+  --ui-canvas:#160D24;--ui-surface:#211630;--ui-raised:#2C1D3F;
+  --ui-hover:#38244D;--ui-border:#46345C;--ui-strong:#F5F5F5;
+  --ui-muted:#BCAED1;--ui-subtle:#A99ABD;--ui-primary:#B99AFB;
+  --ui-action-text:#211230;--ui-input:#291B3A;--ui-side:#1B112B;
+  --ui-nav-active:#392653;--ui-nav-text:#CCBCE0;--ui-grid:#46345C;
+  --ui-scrollbar:#68517D;--ui-track:#37264B;--ui-shadow:0 4px 18px #00000026;
   --ui-danger:#FDA4AF;--ui-warning:#FCD34D;--ui-success:#86EFAC;
-  --ui-focus:#D1D1D6;
-  --aw-chart-1:#E4E4E7;--aw-chart-2:#B7B7BC;--aw-chart-3:#88888D;
-  --aw-chart-4:#68686D;--aw-chart-5:#C9C9CD;--aw-chart-6:#9F9FA4;
-  --aw-chart-7:#77777C;--aw-chart-8:#D7D7DB;--aw-chart-9:#ABABB0;--aw-chart-10:#56565C;
+  --ui-focus:#D6BDFF;
+  --aw-chart-1:#E4D7FF;--aw-chart-2:#B99AFB;--aw-chart-3:#9975D8;
+  --aw-chart-4:#7956B4;--aw-chart-5:#D3B9F9;--aw-chart-6:#AE89DC;
+  --aw-chart-7:#9271C2;--aw-chart-8:#C8AEF8;--aw-chart-9:#B79BD6;--aw-chart-10:#755C9B;
 }
 .aw-workspace[data-theme="light"] {
   color-scheme:light;
@@ -693,7 +693,7 @@ html[data-aw-theme] ::-webkit-scrollbar-corner {background:var(--mono-scroll-tra
 /* Semantic status tones replace the former neon/magenta/violet badges.
    Colour communicates workflow state, not decorative branding. */
 .aw-workspace[data-theme="dark"] {
-  --stage-neutral-bg:#28282B;--stage-neutral-fg:#E4E4E7;--stage-neutral-border:#515156;
+  --stage-neutral-bg:#392653;--stage-neutral-fg:#E4D7FF;--stage-neutral-border:#624B7C;
   --stage-success-bg:#143126;--stage-success-fg:#86EFAC;--stage-success-border:#28573E;
   --stage-info-bg:#172D43;--stage-info-fg:#93C5FD;--stage-info-border:#2E577D;
   --stage-warning-bg:#362B17;--stage-warning-fg:#FCD34D;--stage-warning-border:#725923;
