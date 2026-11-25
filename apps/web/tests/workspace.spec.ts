@@ -101,6 +101,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(statusMetrics.getByText("REJECTED",{exact:true})).toBeVisible();
   await expect(statusMetrics.getByText("Pending",{exact:true})).toHaveCount(0);
   const leadsRegister=page.getByRole("table",{name:"Leads directory"});
+  for(const heading of ["Phone / call","Contact name","Business name","Business type","Source","Stage","Date added","Location","Meeting / status notes"])
+    await expect(leadsRegister.getByRole("columnheader",{name:heading,exact:true})).toBeVisible();
   await expect(leadsRegister).toBeVisible();
   await expect(leadsRegister).toHaveAttribute("aria-busy","false");
   await expect(leadsRegister.getByRole("columnheader",{name:"Date added"})).toBeVisible();

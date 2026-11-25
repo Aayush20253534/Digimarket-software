@@ -281,59 +281,34 @@ export default function LeadsPage(){
  }):items,[items,sortBy,descending,legacySort]);
  if(!session)return <Spinner label="Checking CRM access…"/>;
  if(!canRead)return <><PageHeader title="Leads access denied"/><Notice kind="error">Your account cannot view shared leads.</Notice></>;
- return <div data-aw-module="leads" className="aw-module-root space-y-7">
+ return <div data-aw-module="leads" className="aw-module-root space-y-4">
    <SalesWorkspaceNav/>
    <PageHeader eyebrow="Sales pipeline" title="Leads CRM"
-     description="Track Cold Call, Meta Leads and Referral separately. New WhatsApp leads are automatically classified as Meta Leads."
+     description="Manage calls, follow-ups, meetings and prospects in one shared register."
      actions={<div className="flex flex-wrap gap-2">
        {canCreate&&<button className="btn-primary" type="button" onClick={()=>setCreating(x=>!x)} aria-expanded={creating}>
         <Plus className="h-4 w-4"/>{creating?"Hide lead form":"Add lead"}</button>}
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   {metrics&&<section aria-label="CRM pipeline summary" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-8">
-     {([["Total leads",metrics.total],["Approved clients",metrics.converted],
-       ["REJECTED",metrics.rejected],["YET TO CALL",metrics.yetToCall],
-       ["MEETING PROCESS",metrics.meetingProcess],["DECISION PENDING",metrics.decisionPending],
-       ["AGREEMENT PENDING",metrics.agreementPending],["FOLLOW UP",metrics.followUp]] as const).map(([label,value])=>
-       <div key={label} className="aw-v3-pipeline-metric">
+   {metrics&&<section aria-label="CRM pipeline summary" className="aw-crm-quick-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+     {([["Total leads",metrics.total,""],["Approved clients",metrics.converted,"APPROVED"],
+       ["YET TO CALL",metrics.yetToCall,"YET_TO_CALL"],["FOLLOW UP",metrics.followUp,"FOLLOW_UP"],
+       ["MEETING PROCESS",metrics.meetingProcess,"MEETING_PROCESS"],["DECISION PENDING",metrics.decisionPending,"DECISION_PENDING"],
+       ["AGREEMENT PENDING",metrics.agreementPending,"AGREEMENT_PENDING"],["REJECTED",metrics.rejected,"REJECTED"]] as const).map(([label,value,filter])=>
+       <button type="button" key={label} className="aw-v3-pipeline-metric" aria-pressed={stage===filter}
+         title={filter==="APPROVED"?"Show approved leads":filter?"Filter register by "+label:"Show all stages"}
+         onClick={()=>{setStage(filter);setTotalLeads(null);setCursor(null);setHistory([]);}}>
          <p className="text-xs text-slate-500">{label}</p>
          <p className="mt-1 text-xl font-semibold">{value}</p>
-       </div>)}
+       </button>)}
    </section>}
-   {metrics&&<div className="aw-v3-lead-panels">
-    <section className="aw-v3-chart-card" aria-label="Live sales pipeline distribution">
-     <div className="aw-v3-chart-heading"><div><h2>Pipeline distribution</h2>
-      <p>Live stage counts across all accessible leads, not just the current table page.</p></div>
-      <Link href="/app/reports" className="aw-v3-chart-action">Reporting</Link>
-     </div>
-     <div className="aw-v3-bars">
-      {([["Follow up",metrics.followUp],["Meeting process",metrics.meetingProcess],
-        ["Decision pending",metrics.decisionPending],["Agreement pending",metrics.agreementPending],
-        ["Approved",metrics.approved]] as const).map(([label,value])=>
-       <div className="aw-v3-bar-row" key={label}>
-        <span className="aw-v3-bar-label">{label}</span>
-        <span className="aw-v3-bar-track" role="img" aria-label={label+": "+value+" leads"}>
-         <span style={{width:(metrics.total?value/metrics.total*100:0)+"%"}}/>
-        </span><strong>{value}</strong>
-       </div>)}
-     </div>
-    </section>
-    <section className="aw-v3-chart-card aw-v3-conversion-card" aria-label="Pipeline conversion summary">
-     <div className="aw-v3-chart-heading"><div><h2>Conversion performance</h2>
-      <p>Based on the latest CRM metrics.</p></div></div>
-     <div className="aw-v3-conversion-value">{Number(metrics.conversionRatePercent).toLocaleString("en-IN",{maximumFractionDigits:1})}%</div>
-     <p className="aw-v3-conversion-detail">{metrics.converted} converted from {metrics.total} total leads</p>
-     <div className="aw-v3-conversion-track"><span style={{width:Math.min(100,Math.max(0,Number(metrics.conversionRatePercent)))+"%"}}/></div>
-     <div className="aw-v3-chart-links"><Link href="/app/follow-ups">Follow-ups</Link><Link href="/app/meetings">Meetings</Link><Link href="/app/clients">Clients</Link></div>
-    </section>
-   </div>}
    {!loading&&<div className="aw-module-meta"><span className="aw-module-pill">Leads pipeline</span><span className="aw-module-count">{items.length} on this page</span><span className="aw-module-pill aw-module-pill-muted">{stage?stageLabel(stage as Stage):"ALL STAGES"}</span></div>}
    {error&&<Notice kind="error">{error}</Notice>}
    {message&&<Notice kind="success">{message}</Notice>}
    <div className="aw-directory-layout">
      <div className="space-y-5">
-       <Card title="Lead register" description="Ten leads per page, with automatic creation dates and click-to-open rows. Use Next page for more leads.">
+       <Card title="Lead register" description="Select any row to edit details. Call, location, short notes and scheduled actions stay visible.">
          <div className="aw-lead-toolbar">
            <input aria-label="Search leads" className="field min-w-[175px] flex-1" value={search}
              onChange={e=>{setSearch(e.target.value);setTotalLeads(null);setCursor(null);setHistory([]);}} placeholder="Search name, business or phone"/>
@@ -346,6 +321,7 @@ export default function LeadsPage(){
 <select className="field" aria-label="Sort leads on this page" value={sortBy} onChange={e=>{setSortBy(e.target.value as typeof sortBy);setTotalLeads(null);setCursor(null);setHistory([]);}}>
   <option value="businessName">Business</option><option value="contactName">Contact</option><option value="status">Stage</option><option value="createdAt">Created</option>
  </select><button type="button" className="btn-secondary" aria-label="Reverse lead sort" onClick={()=>{setDescending(x=>!x);setTotalLeads(null);setCursor(null);setHistory([]);}}>{descending?"Descending ↓":"Ascending ↑"}</button>
+           <button type="button" className="btn-secondary" disabled={!stage&&!sourceFilter&&!search} onClick={()=>{setStage("");setSourceFilter("");setSearch("");setTotalLeads(null);setCursor(null);setHistory([]);}}>Clear filters</button>
          </div>
          {canDelete&&<div className="mt-3 flex flex-wrap items-center gap-3" aria-label="Bulk lead actions">
            <span role="status">{selectedCount} selected · up to 100 across pages</span>
@@ -365,7 +341,7 @@ export default function LeadsPage(){
               ref={node=>{if(node)node.indeterminate=items.some(lead=>checkedLeads[lead.id]!==undefined)&&!items.every(lead=>checkedLeads[lead.id]!==undefined);}}
               onChange={e=>{const checked=e.target.checked;setCheckedLeads(previous=>{
                 const next={...previous};for(const lead of items){if(checked&&Object.keys(next).length<100)next[lead.id]=lead.version;else if(!checked)delete next[lead.id];}return next;
-              });}}/></th>}<th>Call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
+              });}}/></th>}<th>Phone / call</th><th>Contact name</th><th>Business name</th><th>Business type</th><th>Source</th><th>Stage</th><th>Date added</th><th>Location</th><th>Meeting / status notes</th></tr></thead>
            <tbody>{loading&&!items.length?
              Array.from({length:5},(_,i)=><tr key={"loading-"+i} aria-hidden="true" className="aw-lead-loading-row">
                {Array.from({length:canDelete?10:9},(_,j)=><td key={j}><div className="aw-lead-skeleton"/></td>)}
@@ -378,17 +354,19 @@ export default function LeadsPage(){
              {canDelete&&<td onClick={e=>e.stopPropagation()}><input type="checkbox" aria-label={"Select lead "+(l.contactName||l.businessName)}
                checked={checkedLeads[l.id]!==undefined} disabled={busy||loading||(selectedCount>=100&&checkedLeads[l.id]===undefined)}
                onChange={e=>selectLead(l,e.target.checked)}/></td>}
-             <td>{l.phone?<a href={callHref(l.phone)} className="aw-lead-action" aria-label={"Call "+l.phone}
+             <td className="aw-crm-phone-cell">{l.phone?<a href={callHref(l.phone)} className="aw-lead-action aw-crm-phone-link" aria-label={"Call "+l.phone}
                title={"Call "+l.phone} onClick={e=>e.stopPropagation()}>
-               <PhoneCall size={17} aria-hidden="true"/></a>:<span title="No phone number">—</span>}</td>
+               <PhoneCall size={15} aria-hidden="true"/><span>{l.phone}</span></a>:<span title="No phone number">—</span>}</td>
              <td>{l.contactName||"Name pending"}</td><td>{l.businessName.startsWith("Lead ")?"Business pending":l.businessName}</td>
              <td>{l.businessType||"Not recorded"}</td><td>{sourceLabel(l.source)}</td><td><StatusBadge status={l.status} rectangular uppercase/></td>
              <td><time dateTime={l.createdAt} title="Automatically recorded when this lead was created">{fmt(l.createdAt)}</time></td>
-             <td>{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
+             <td className="aw-crm-location-cell"><div className="aw-crm-location">{l.googleMapsUrl?<a href={l.googleMapsUrl} target="_blank" rel="noopener noreferrer"
                className="aw-lead-action" aria-label={"Open Google Maps for "+(l.contactName||l.businessName)}
                title="Open location in Google Maps" onClick={e=>e.stopPropagation()}>
-               <MapPin size={18} aria-hidden="true"/></a>:<span className="aw-lead-no-location" title="Location link not added"><MapPin size={17} aria-hidden="true"/></span>}</td>
-             <td className="aw-lead-notes-cell"><div className={"aw-lead-notes-preview"+(!l.stageNote?.trim()?" aw-lead-notes-empty":"")} title={l.stageNote||"No notes yet"}>{l.stageNote?.trim()||"No notes yet"}</div></td>
+               <MapPin size={16} aria-hidden="true"/></a>:null}<span title={l.location||undefined}>{l.location?.trim()||(l.googleMapsUrl?"Map link":"Not recorded")}</span></div></td>
+             <td className="aw-lead-notes-cell"><div className={"aw-lead-notes-preview"+(!l.stageNote?.trim()?" aw-lead-notes-empty":"")} title={l.stageNote||"No notes yet"}>{l.stageNote?.trim()||"No notes yet"}</div>
+               {l.status==="FOLLOW_UP"&&l.nextFollowUpAt&&<div className="aw-crm-next-action" data-overdue={l.nextFollowUpAt.slice(0,10)<new Date(Date.now()+330*60_000).toISOString().slice(0,10)}>Follow-up: {new Date(l.nextFollowUpAt.slice(0,10)+"T12:00:00Z").toLocaleDateString("en-IN",{timeZone:"UTC",dateStyle:"medium"})}</div>}
+               {l.status==="MEETING_PROCESS"&&l.meetingAt&&<div className="aw-crm-next-action">Meeting: {new Date(l.meetingAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",dateStyle:"medium",timeStyle:"short"})}</div>}</td>
            </tr>)}</tbody></table></div>
          <div className="mt-4 flex items-center justify-between gap-3">
            <button type="button" className="btn-secondary" aria-label="Previous leads page" disabled={!history.length||loading} onClick={()=>{setCursor(history[history.length-1]||null);setHistory(h=>h.slice(0,-1));}}>Previous</button>
@@ -467,7 +445,7 @@ export default function LeadsPage(){
                    aria-label="Follow-up date" value={followUpOn}
                    onChange={e=>setFollowUpOn(e.target.value)}/>
                </FormField>
-               <p>Shown in Overview only on the selected calendar date. Change this date to reschedule.</p>
+               <p>See scheduled follow-ups in the Follow-ups workspace. Change this date to reschedule.</p>
              </section>}
              {editStage==="MEETING_PROCESS"&&<section className="aw-lead-meeting-field" aria-label="Meeting schedule">
                <FormField id="lead-meeting-on" label="Meeting date">
@@ -478,7 +456,7 @@ export default function LeadsPage(){
                  <input id="lead-meeting-time" type="time" className="field" required
                    aria-label="Meeting time" value={meetingTime} onChange={e=>setMeetingTime(e.target.value)}/>
                </FormField>
-               <p>India Standard Time (IST). This meeting appears in Overview only on its scheduled date.</p>
+               <p>India Standard Time (IST). See scheduled meetings in the Meetings workspace.</p>
              </section>}
              <FormField id="lead-status-note" label={"Note for "+stageLabel(editStage)}>
                <textarea id="lead-status-note" className="field min-h-20" maxLength={2000}
@@ -518,5 +496,32 @@ export default function LeadsPage(){
 
      </div>
    </div>
+   {metrics&&<div className="aw-v3-lead-panels">
+    <section className="aw-v3-chart-card" aria-label="Live sales pipeline distribution">
+     <div className="aw-v3-chart-heading"><div><h2>Pipeline distribution</h2>
+      <p>Live stage counts across all accessible leads, not just the current table page.</p></div>
+      <Link href="/app/reports" className="aw-v3-chart-action">Reporting</Link>
+     </div>
+     <div className="aw-v3-bars">
+      {([["Follow up",metrics.followUp],["Meeting process",metrics.meetingProcess],
+        ["Decision pending",metrics.decisionPending],["Agreement pending",metrics.agreementPending],
+        ["Approved",metrics.approved]] as const).map(([label,value])=>
+       <div className="aw-v3-bar-row" key={label}>
+        <span className="aw-v3-bar-label">{label}</span>
+        <span className="aw-v3-bar-track" role="img" aria-label={label+": "+value+" leads"}>
+         <span style={{width:(metrics.total?value/metrics.total*100:0)+"%"}}/>
+        </span><strong>{value}</strong>
+       </div>)}
+     </div>
+    </section>
+    <section className="aw-v3-chart-card aw-v3-conversion-card" aria-label="Pipeline conversion summary">
+     <div className="aw-v3-chart-heading"><div><h2>Conversion performance</h2>
+      <p>Based on the latest CRM metrics.</p></div></div>
+     <div className="aw-v3-conversion-value">{Number(metrics.conversionRatePercent).toLocaleString("en-IN",{maximumFractionDigits:1})}%</div>
+     <p className="aw-v3-conversion-detail">{metrics.converted} converted from {metrics.total} total leads</p>
+     <div className="aw-v3-conversion-track"><span style={{width:Math.min(100,Math.max(0,Number(metrics.conversionRatePercent)))+"%"}}/></div>
+     <div className="aw-v3-chart-links"><Link href="/app/follow-ups">Follow-ups</Link><Link href="/app/meetings">Meetings</Link><Link href="/app/clients">Clients</Link></div>
+    </section>
+   </div>}
  </div>;
 }
