@@ -75,7 +75,7 @@ function money(value:string|number|null|undefined){
 }
 function readable(error:unknown){return error instanceof ApiError?error.message:"Could not complete the finance operation.";}
 export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directExpense=false,onExpenseSaved}:{section:"entries"|"ads"|"categories"|"settlements"|"agreements";categoryType?:Kind;directExpense?:boolean;onExpenseSaved?:()=>void}){
-  const windowState=useFinanceWindow();
+  const windowState=useFinanceWindow({syncUrl:section!=="categories"});
   const {period,setPeriod,view,setView,ready}=windowState;
   const [page,setPage]=useState(1),[total,setTotal]=useState(0),[categoryFilter,setCategoryFilter]=useState("");
   const [categoryPurpose,setCategoryPurpose]=useState<"GENERAL"|"META_ADS">("GENERAL");

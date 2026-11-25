@@ -256,9 +256,15 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.setViewportSize({width:1366,height:768});
   await visitWorkspace(page,"/app/finance/categories");
   await expect(page.getByRole("heading",{name:"Finance categories"})).toBeVisible();
-  await page.getByRole("link",{name:/Expense categories Operating costs/}).click();
+  const expenseCategoryLink=page.getByRole("navigation",{name:"Category types"}).getByRole("link",{name:/Expense categories Operating costs/});
+  await expect(expenseCategoryLink).toContainText(/\d+ active · \d+ inactive/,{timeout:20000});
+  await expenseCategoryLink.click();
+  await expect(page).toHaveURL(/\/app\/finance\/categories\/expenses(?:\?|$)/,{timeout:20000});
+  await expect(page.getByRole("heading",{name:"Expense categories",exact:true})).toBeVisible({timeout:20000});
+  await expect(page.getByRole("heading",{name:"Manage expense categories",exact:true})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
+  await expect(page.getByRole("button",{name:"Add category"})).toBeEnabled({timeout:20000});
   const addCategoryResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/finance/categories"&&r.request().method()==="POST");
   await page.getByRole("button",{name:"Add category"}).click();
   expect((await addCategoryResponse).status()).toBe(201);

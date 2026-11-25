@@ -20,7 +20,7 @@ export function money(value: string | number | null | undefined) {
   );
 }
 export type FinanceCycleState = { current: ReportingPeriod; history: (ReportingPeriod & {closedAt: string})[]; closePeriod: ReportingPeriod; canClose: boolean; plannedThrough: string };
-export function useFinanceWindow() {
+export function useFinanceWindow({ syncUrl = true }: { syncUrl?: boolean } = {}) {
   const { session, request } = useAuth();
   const [cycleState, setCycleState] = useState<FinanceCycleState | null>(null);
   const [cycleError, setCycleError] = useState("");
@@ -68,13 +68,15 @@ export function useFinanceWindow() {
   }, [session, request]);
   const query = new URLSearchParams({ ...period, view, ...(cycleContext?{cycle:"1"}:{}) }).toString();
   useEffect(() => {
-    if (!ready) return;
+    // Category management is cycle-independent. Do not rewrite the router
+    // URL from a late cycle-state response while a category link is navigating.
+    if (!ready || !syncUrl) return;
     const q = new URLSearchParams(window.location.search);
     q.set("from", period.from);
     q.set("to", period.to);
     q.set("view", view);
     window.history.replaceState(null, "", window.location.pathname + "?" + q.toString());
-  }, [ready, period, view]);
+  }, [ready, period, view, syncUrl]);
   return { period, setPeriod, view, setView, query, ready, cycleState, cycleError, cycleContext };
 }
 export function FinanceFrame({

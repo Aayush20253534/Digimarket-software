@@ -224,3 +224,32 @@ test("read-only client access does not expose agreement termination", async ({ p
     0,
   );
 });
+
+test("cycle-state completion cannot rewrite the category navigation URL",async({page})=>{
+  await workspace(page);
+  let release!:()=>void;
+  const gate=new Promise<void>(resolve=>{release=resolve;});
+  let requested!:()=>void;
+  const started=new Promise<void>(resolve=>{requested=resolve;});
+  let first=true;
+  await page.route("**/api/v1/finance/cycle-state",async route=>{
+    if(first){first=false;requested();await gate;}
+    await route.fulfill({json:{data:{current:{from:"2026-10-22",to:"2026-11-21"},history:[],closePeriod:{from:"2026-10-22",to:"2026-11-21"},canClose:false,plannedThrough:"2026-11-21"}}}).catch(()=>{});
+  });
+  try{
+    await page.goto("/app/finance/categories");
+    await started;
+    const link=page.getByRole("navigation",{name:"Category types"}).getByRole("link",{name:/Expense categories/});
+    await expect(link).toContainText("1 active · 0 inactive");
+    const href=await link.getAttribute("href");
+    await link.click();
+    await expect(page.getByRole("heading",{name:"Expense categories",exact:true})).toBeVisible();
+    release();
+    await expect(page.getByRole("region",{name:"Financial categories"}).getByText("Travel",{exact:true})).toBeVisible();
+    await expect(page.getByRole("button",{name:"Add category",exact:true})).toBeVisible();
+    expect(new URL(page.url()).pathname+new URL(page.url()).search).toBe(href);
+    await page.getByLabel("Category name",{exact:true}).fill("Late-cycle regression");
+    await page.getByRole("button",{name:"Add category",exact:true}).click();
+    await expect(page.getByRole("region",{name:"Financial categories"}).getByText("Late-cycle regression",{exact:true})).toBeVisible();
+  }finally{release();}
+});
