@@ -205,6 +205,7 @@ export class LeadsService {
      organizationId:a.organizationId,deletedAt:null,
      ...(input.cycle?{createdAt:leadCycleTimestampRange(input.cycle)}:{}),
      ...(input.stage?{status:input.stage}:{}),
+     ...(input.temperature?{temperature:input.temperature}:{}),
      ...(input.source?{source:input.source}:{}),
      ...(input.assignedToId?{assignedToId:input.assignedToId}:{}),
      ...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},
@@ -218,7 +219,7 @@ export class LeadsService {
      ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
      orderBy:[{[input.sort??"createdAt"]:input.direction??"desc"} as Prisma.LeadOrderByWithRelationInput,{id:input.direction??"desc"}],
      select:{id:true,businessName:true,contactName:true,phone:true,businessType:true,location:true,
-       websiteUrl:true,instagramUrl:true,googleMapsUrl:true,source:true,status:true,stageNote:true,assignedToId:true,createdById:true,
+       websiteUrl:true,instagramUrl:true,googleMapsUrl:true,source:true,status:true,temperature:true,stageNote:true,assignedToId:true,createdById:true,
        nextFollowUpAt:true,meetingAt:true,version:true,createdAt:true,updatedAt:true,
        assignee:{select:{displayName:true}},_count:{select:{duplicateMatches:true,duplicateCandidates:true}}}}),
    ]);
@@ -347,6 +348,7 @@ export class LeadsService {
    if(changes.googleMapsUrl!==undefined)data.googleMapsUrl=urlOrNull(changes.googleMapsUrl);
    if(changes.source!==undefined)data.source=changes.source;
    if(changes.status!==undefined)data.status=changes.status;
+   if(changes.temperature!==undefined)data.temperature=changes.temperature;
    // Store selected YYYY-MM-DD at UTC noon to preserve the calendar day across browsers.
    // Leaving FOLLOW_UP removes its schedule, so it cannot appear on a later overview.
    if(targetStatus==="FOLLOW_UP")data.nextFollowUpAt=new Date(scheduledOn!+"T12:00:00.000Z");
@@ -369,6 +371,7 @@ export class LeadsService {
        kind:stageChanged?"STAGE_CHANGED":scheduleChanged?"FOLLOW_UP_SET":stageNote?.trim()?"NOTE":"DETAILS_UPDATED",
        note:stageNote?.trim()||null,
        metadata:{fromStatus:current.status,toStatus:changed.status,version:changed.version,
+         ...(changes.temperature!==undefined&&current.temperature!==changed.temperature?{fromTemperature:current.temperature,toTemperature:changed.temperature}:{}),
          ...(scheduleChanged?{followUpOn:changed.nextFollowUpAt?.toISOString().slice(0,10)??null}:{}),
          ...(meetingChanged?{meetingOn:changed.meetingAt?meetingLocal(changed.meetingAt).on:null,
            meetingTime:changed.meetingAt?meetingLocal(changed.meetingAt).time:null}:{})}}});
@@ -394,7 +397,8 @@ export class LeadsService {
      await this.flagDuplicates(tx,a.organizationId,id,changed.normalizedPhone,changed.normalizedBusinessName);
      await tx.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
        action:"leads.updated",entityType:"Lead",entityId:id,
-       afterRedacted:{stage:changed.status,version:changed.version}}});
+       afterRedacted:{stage:changed.status,version:changed.version,
+         ...(changes.temperature!==undefined?{temperature:changed.temperature}:{})}}});
      return changed;
    });
  }
@@ -489,11 +493,11 @@ export class LeadsService {
      include:{assignee:{select:{loginId:true}}}});
    if(rows.length>5000)throw invalid("Export limit is 5,000 rows");
    const head=["id","business_name","contact_name","phone","business_type","location","website_url","instagram_url",
-     "source","stage","assigned_login","next_follow_up","created_at"];
+     "source","stage","assigned_login","next_follow_up","created_at","temperature"];
    const csv=[head.join(","),...rows.map(r=>[
      r.id,r.businessName,r.contactName??"",r.phone??"",r.businessType??"",r.location??"",r.websiteUrl??"",
      r.instagramUrl??"",r.source??"",r.status,r.assignee?.loginId??"",r.nextFollowUpAt?.toISOString()??"",
-     r.createdAt.toISOString(),
+     r.createdAt.toISOString(),r.temperature??"UNCLASSIFIED",
    ].map(safeCSV).join(","))].join("\r\n")+"\r\n";
    await this.db.auditLog.create({data:{organizationId:a.organizationId,actorId:a.userId,
      action:"leads.exported",entityType:"LeadExport",entityId:a.userId,

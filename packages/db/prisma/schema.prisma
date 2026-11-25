@@ -93,6 +93,12 @@ enum LeadStage {
   FOLLOW_UP
   EXPIRED
 }
+enum LeadTemperature {
+  UNCLASSIFIED
+  HOT
+  WARM
+  COLD
+}
 enum LeadActivityKind {
   CREATED
   NOTE
@@ -591,6 +597,7 @@ model Lead {
   source            String?     @db.VarChar(120)
   stageNote         String      @default("") @db.Text
   status            LeadStage   @default(PENDING)
+  temperature       LeadTemperature @default(UNCLASSIFIED)
   assignedToId      String?     @db.Uuid
   createdById       String      @db.Uuid
   nextFollowUpAt    DateTime?   @db.Timestamptz(6)

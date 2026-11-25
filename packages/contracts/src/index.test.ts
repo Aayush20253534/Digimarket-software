@@ -94,3 +94,15 @@ describe("Meta Ads financial entry ownership",()=>{
     expect(financeEntryAdminEditSchema.parse({...edit,clientId:null}).clientId).toBeNull();
   });
 });
+
+describe("lead temperature",()=>{
+ it("accepts optional explicit qualification and rejects unsupported classifications",()=>{
+  expect(leadUpdateSchema.parse({version:1}).temperature).toBeUndefined();
+  for(const temperature of ["HOT","WARM","COLD","UNCLASSIFIED"]){
+   expect(leadUpdateSchema.parse({version:1,temperature}).temperature).toBe(temperature);
+   expect(leadListQuerySchema.parse({temperature}).temperature).toBe(temperature);
+  }
+  expect(leadUpdateSchema.safeParse({version:1,temperature:"UNKNOWN"}).success).toBe(false);
+  expect(leadListQuerySchema.safeParse({temperature:"UNKNOWN"}).success).toBe(false);
+ });
+});
