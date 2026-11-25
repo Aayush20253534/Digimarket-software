@@ -72,7 +72,7 @@ export function clientReadinessPlan(c:ClientSchedule,entries:StoredWeek[],reques
      for(const w of monthWeeks(m,c.contractStartOn,null)){
        if(w.to>legacyEnd||(end&&w.from>end))continue;
        const legacy={storageMonth:m,storageWeek:w.week,from:w.from,to:w.to,legacy:true};
-       if(!weeks.has(keyOf(legacy)))add(legacy);
+       if(!weeks.has(keyOf(legacy))&&!stored.some(old=>old.from<=legacy.to&&old.to>=legacy.from))add(legacy);
      }
    }
  }

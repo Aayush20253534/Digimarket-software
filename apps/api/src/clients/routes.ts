@@ -37,10 +37,10 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  });
  // Stored week keys remain unchanged; cycle views return the original save keys.
  const month=z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/);
- const weekNumber=z.coerce.number().int().min(1).max(5);
+ const weekNumber=z.coerce.number().int().min(1).max(36);
  const videoWeekInput=z.strictObject({month,readyAdded:z.number().int().min(0).max(10000),
   delivered:z.number().int().min(0).max(10000),
-  note:z.string().trim().max(500).optional(),version:z.number().int().min(0)});
+  note:z.string().trim().max(500).optional(),version:z.number().int().min(0),clientCycle:z.literal(true).optional()});
  const postWeekInput=videoWeekInput.safeExtend({
   festivalReadyAdded:z.number().int().min(0).max(10000).optional(),
   festivalDelivered:z.number().int().min(0).max(10000).optional(),
@@ -48,24 +48,28 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  });
  app.get(root+"/:id/video-readiness",authenticated,async(req,res)=>{
   res.set("Cache-Control","no-store");
-  const basis=parse(z.enum(["calendar","cycle"]).default("calendar"),req.query.basis);
-  res.json({data:await videos[basis==="cycle"?"cycle":"monthly"](actor(res),parse(id,req.params.id),parse(month,req.query.month))});
+  const basis=parse(z.enum(["calendar","cycle","client"]).default("calendar"),req.query.basis);
+  const clientId=parse(id,req.params.id);
+  if(basis==="client"){res.json({data:await videos.clientCycle(actor(res),clientId,parse(month.optional(),req.query.month))});return;}
+  res.json({data:await videos[basis==="cycle"?"cycle":"monthly"](actor(res),clientId,parse(month,req.query.month))});
  });
  app.put(root+"/:id/video-readiness/:week",authenticated,async(req,res)=>{
   const body=parse(videoWeekInput,req.body);
   res.json({data:await videos.saveWeek(actor(res),parse(id,req.params.id),body.month,
-   parse(weekNumber,req.params.week),body)});
+   parse(weekNumber,req.params.week),body,body.clientCycle===true)});
  });
  // Post readiness uses the same week buckets as videos but independent stock.
  app.get(root+"/:id/post-readiness",authenticated,async(req,res)=>{
   res.set("Cache-Control","no-store");
-  const basis=parse(z.enum(["calendar","cycle"]).default("calendar"),req.query.basis);
-  res.json({data:await posts[basis==="cycle"?"cycle":"monthly"](actor(res),parse(id,req.params.id),parse(month,req.query.month))});
+  const basis=parse(z.enum(["calendar","cycle","client"]).default("calendar"),req.query.basis);
+  const clientId=parse(id,req.params.id);
+  if(basis==="client"){res.json({data:await posts.clientCycle(actor(res),clientId,parse(month.optional(),req.query.month))});return;}
+  res.json({data:await posts[basis==="cycle"?"cycle":"monthly"](actor(res),clientId,parse(month,req.query.month))});
  });
  app.put(root+"/:id/post-readiness/:week",authenticated,async(req,res)=>{
   const body=parse(postWeekInput,req.body);
   res.json({data:await posts.saveWeek(actor(res),parse(id,req.params.id),body.month,
-   parse(weekNumber,req.params.week),body)});
+   parse(weekNumber,req.params.week),body,body.clientCycle===true)});
  });
  app.get(root+"/:id/overview",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
