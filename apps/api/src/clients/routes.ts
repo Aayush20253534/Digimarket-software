@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { clientUpdateSchema,clientListQuerySchema,clientEndAgreementSchema,
-  clientContactSchema } from "@digimarket/contracts";
+  clientContactSchema,clientRenewSchema,clientServiceSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { ClientsService } from "./service";
@@ -66,6 +66,16 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
   const body=parse(postWeekInput,req.body);
   res.json({data:await posts.saveWeek(actor(res),parse(id,req.params.id),body.month,
    parse(weekNumber,req.params.week),body)});
+ });
+ app.get(root+"/:id/overview",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.overview(actor(res),parse(id,req.params.id))});
+ });
+ app.post(root+"/:id/renew",authenticated,async(req,res)=>{
+   res.json({data:await svc.renew(actor(res),parse(id,req.params.id),parse(clientRenewSchema,req.body))});
+ });
+ app.post(root+"/:id/services",authenticated,async(req,res)=>{
+   res.json({data:await svc.saveService(actor(res),parse(id,req.params.id),parse(clientServiceSchema,req.body))});
  });
  app.get(root+"/:id",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");

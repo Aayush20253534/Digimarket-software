@@ -162,6 +162,8 @@ const projectMilestonePattern = /^projects\/[0-9a-fA-F-]{36}\/milestones\/[0-9a-
 const projectDeliverablePattern = /^projects\/[0-9a-fA-F-]{36}\/deliverables\/[0-9a-fA-F-]{36}$/;
 const projectDeliverableSubmitPattern = /^projects\/[0-9a-fA-F-]{36}\/deliverables\/[0-9a-fA-F-]{36}\/submit$/;
 const clientDetailPattern = /^clients\/[0-9a-fA-F-]{36}$/;
+const clientOverviewPattern = /^clients\/[0-9a-fA-F-]{36}\/overview$/;
+const clientManagementPattern = /^clients\/[0-9a-fA-F-]{36}\/(renew|services)$/;
 const clientEndAgreementPattern = /^clients\/[0-9a-fA-F-]{36}\/end-agreement$/;
 // Allow only the client-scoped video readiness read and weekly update routes.
 const clientVideoReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness$/;
@@ -235,6 +237,8 @@ function permitted(path: string, method: string): boolean {
   if (clientVideoWeekPattern.test(path)) return method === "PUT";
   if (clientPostReadinessPattern.test(path)) return method === "GET";
   if (clientPostWeekPattern.test(path)) return method === "PUT";
+  if (clientOverviewPattern.test(path)) return method === "GET";
+  if (clientManagementPattern.test(path)) return method === "POST";
   if (clientDetailPattern.test(path)) return ["GET","PUT"].includes(method);
   if (clientEndAgreementPattern.test(path)) return method === "POST";
   if (clientChildrenPattern.test(path)) return method === "POST";
@@ -424,9 +428,10 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (clientVideoReadinessPattern.test(path) || clientPostReadinessPattern.test(path)) {
     const month = request.nextUrl.searchParams.get("month");
     if (month !== null) url.searchParams.set("month", month);
+    const basis=request.nextUrl.searchParams.get("basis");if(basis!==null)url.searchParams.set("basis",basis);
   }
   if (path === "clients") {
-    for (const key of ["status","section","q","cursor","limit","sort","direction"]) {
+    for (const key of ["status","section","q","cursor","limit","sort","direction","workspace","expiring","health","managerId"]) {
       const value=request.nextUrl.searchParams.get(key);
       if(value!==null)url.searchParams.set(key,value);
     }
