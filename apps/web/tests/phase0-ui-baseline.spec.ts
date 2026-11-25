@@ -116,9 +116,20 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  await page.getByRole("button",{name:"Sign in",exact:true}).click();
  await expect(page.locator(".aw-workspace")).toBeVisible({timeout:30000});
  // Approved Phase 1 behaviour: dark is the default without a stored choice.
+ // Wait for the register's initial request to finish before a full document
+ // navigation: the auth provider rotates its HttpOnly cookie on each reload.
+ const workspace=page.locator(".aw-workspace");
+ const register=page.getByRole("table",{name:"Leads directory"});
+ async function settledLeadWorkspace(){
+   await expect(workspace).toBeVisible({timeout:30000});
+   await expect(register).toHaveAttribute("aria-busy","false",{timeout:30000});
+   await expect(page.getByRole("region",{name:"CRM pipeline summary"})).toBeVisible({timeout:30000});
+ }
+ await settledLeadWorkspace();
  await page.evaluate(()=>localStorage.removeItem("aw-workspace-theme"));
  await page.reload();
- await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","dark");
+ await settledLeadWorkspace();
+ await expect(workspace).toHaveAttribute("data-theme","dark");
  await expect(page.locator("html")).toHaveAttribute("data-aw-theme","dark");
  const darkRoot=await page.evaluate(()=>({
    background:getComputedStyle(document.documentElement).backgroundColor,
@@ -131,9 +142,8 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  const captures:Captured[]=[];
  // Verify the existing theme control and browser storage behavior without
  // modifying application code. Phase 1 is allowed to replace its CSS.
- await page.evaluate(()=>localStorage.setItem("aw-workspace-theme","dark"));
- await page.reload();
- await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","dark");
+ // The default appearance is already verified above. Toggle using the
+ // actual control rather than forcing a second immediate dark reload.
  await page.getByRole("button",{name:"Switch to light theme"}).click();
  await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","light");
  await expect(page.locator("html")).toHaveAttribute("data-aw-theme","light");
@@ -147,10 +157,14 @@ test("Phase 0 capture: existing admin navigation, two themes, and responsive sur
  expect(lightRoot.scrollbar).not.toBe("auto");
  expect(lightRoot.scrollbar).not.toBe(darkRoot.scrollbar);
  expect(await page.evaluate(()=>localStorage.getItem("aw-workspace-theme"))).toBe("light");
+ await settledLeadWorkspace();
  await page.reload();
- await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","light");
+ await settledLeadWorkspace();
+ await expect(workspace).toHaveAttribute("data-theme","light");
  await page.getByRole("button",{name:"Switch to dark theme"}).click();
- await expect(page.locator(".aw-workspace")).toHaveAttribute("data-theme","dark");
+ await expect(workspace).toHaveAttribute("data-theme","dark");
+ await expect(page.locator("html")).toHaveAttribute("data-aw-theme","dark");
+ expect(await page.evaluate(()=>localStorage.getItem("aw-workspace-theme"))).toBe("dark");
 
  // Diagnostic screenshots are best-effort, unlike the functional workflow
  // test immediately before this run. If a long sequence loses its isolated
