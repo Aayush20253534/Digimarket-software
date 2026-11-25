@@ -256,9 +256,15 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.setViewportSize({width:1366,height:768});
   await visitWorkspace(page,"/app/finance/categories");
   await expect(page.getByRole("heading",{name:"Finance categories"})).toBeVisible();
-  await page.getByRole("link",{name:/Expense categories Operating costs/}).click();
+  const expenseCategoryLink=page.getByRole("navigation",{name:"Category types"}).getByRole("link",{name:/Expense categories Operating costs/});
+  await expect(expenseCategoryLink).toContainText(/\d+ active · \d+ inactive/,{timeout:20000});
+  await expenseCategoryLink.click();
+  await expect(page).toHaveURL(/\/app\/finance\/categories\/expenses(?:\?|$)/,{timeout:20000});
+  await expect(page.getByRole("heading",{name:"Expense categories",exact:true})).toBeVisible({timeout:20000});
+  await expect(page.getByRole("heading",{name:"Manage expense categories",exact:true})).toBeVisible();
   await expect(page.getByRole("button",{name:"Add category"})).toBeVisible();
   await page.getByLabel("Category name",{exact:true}).fill("CI Admin Category");
+  await expect(page.getByRole("button",{name:"Add category"})).toBeEnabled({timeout:20000});
   const addCategoryResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/finance/categories"&&r.request().method()==="POST");
   await page.getByRole("button",{name:"Add category"}).click();
   expect((await addCategoryResponse).status()).toBe(201);
@@ -849,15 +855,16 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page).toHaveURL(/\/app\/meetings$/);
   const meetingRegister=page.getByRole("table",{name:"Meetings register"});
   await expect(meetingRegister.getByRole("columnheader")).toHaveText([
-    "Meeting date","Meeting time","Business name","Contact name","Phone number","Address",
+    "Date & time","Call","Business name","Contact name","Map / join","Short notes","Action",
   ]);
   await expect(meetingRegister.locator("tbody tr")).toHaveCount(1);
   await expect(meetingRegister.locator("tbody tr time").first()).toHaveAttribute("dateTime",/20\d{2}-/);
   await expect(meetingRegister.locator("tbody tr time").nth(1)).toContainText(/2:30/i);
   await expect(meetingRegister.getByRole("link",{name:"Founder CI Lead",exact:true})).toBeVisible();
   await expect(meetingRegister.getByText("CI Contact")).toBeVisible();
-  await expect(meetingRegister.getByRole("link",{name:"9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
-  await expect(meetingRegister.getByText("17 Civil Lines, Prayagraj")).toBeVisible();
+  await expect(meetingRegister.getByRole("link",{name:"Call 9876543210",exact:true})).toHaveAttribute("href","tel:9876543210");
+  await expect(meetingRegister.getByRole("link",{name:"Open Google Maps for Founder CI Lead"})).toHaveAttribute("title","17 Civil Lines, Prayagraj");
+  await expect(meetingRegister.getByText("Initial meeting scheduled")).toBeVisible();
   await expect(meetingRegister.getByRole("link",{name:"Open Google Maps for Founder CI Lead"}))
     .toHaveAttribute("href","https://maps.app.goo.gl/abcdEFG123");
   await visitWorkspace(page,"/app/leads");

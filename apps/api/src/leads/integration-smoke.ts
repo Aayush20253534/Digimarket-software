@@ -306,7 +306,15 @@ try{
  assert.equal(secondMeetings.nextCursor,null);
  assert.equal((await crm.scheduledMeetings(foreign,{limit:20})).total,0);
  await assert.rejects(()=>crm.scheduledMeetings(actor(owner.id,org.id,[],[]),{limit:20}),fail(403));
- const removedMeeting=await crm.update(founder,morning.id,{version:morning.version,status:"DECISION_PENDING"});
+ assert.equal((await crm.scheduledMeetings(founder,{limit:20,q:"Morning",from:"2026-10-27",to:"2026-10-27",month:"2026-10"})).calendar["2026-10-27"],1);
+ assert.equal((await crm.scheduledMeetings(founder,{limit:20,q:"not found"})).total,0);
+ assert.equal((await crm.meetingConflicts(founder,{id:afternoon.id,on:"2026-10-27",time:"09:30",duration:60})).count,1);
+ assert.equal((await crm.meetingConflicts(founder,{id:afternoon.id,on:"2026-10-27",time:"10:15",duration:60})).count,0);
+ const removedMeeting=await crm.update(founder,morning.id,{version:morning.version,status:"DECISION_PENDING",meetingOutcome:"DECISION_PENDING",stageNote:"Meeting completed"});
+ const history=await crm.meetingHistory(founder,{limit:20,q:"Morning"});
+ assert.equal(history.total,1);
+ assert.equal((history.items[0]?.metadata as {meetingOutcome:string}).meetingOutcome,"DECISION_PENDING");
+ assert.equal((await crm.meetingHistory(foreign,{limit:20})).total,0);
  assert.equal(removedMeeting.meetingAt,null);
  assert.equal((await crm.scheduledMeetings(founder,{limit:20})).total,1);
 

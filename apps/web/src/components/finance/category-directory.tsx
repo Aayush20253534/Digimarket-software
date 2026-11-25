@@ -8,7 +8,7 @@ import { useFinanceWindow } from "./shared";
 
 export function FinanceCategoryDirectory() {
   const { session, request } = useAuth(),
-    w = useFinanceWindow();
+    w = useFinanceWindow({ syncUrl: false });
   const [categories, setCategories] = useState<
     { kind: "INCOME" | "EXPENSE"; active: boolean }[] | null
   >(null);

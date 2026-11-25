@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma, type PrismaClient } from "@digimarket/db";
 import {leadCycleTimestampRange,agencyToday} from "@digimarket/contracts";
-import type { LeadCreateInput, LeadUpdateInput, LeadListQuery, LeadBulkDeleteInput, FollowUpListQuery, LeadTemperature } from "@digimarket/contracts";
+import type { LeadCreateInput, LeadUpdateInput, LeadListQuery, LeadBulkDeleteInput, FollowUpListQuery, LeadTemperature, MeetingListQuery, MeetingConflictQuery } from "@digimarket/contracts";
 import type { Principal } from "../auth/service";
 import { AuthError, forbidden, invalid } from "../auth/errors";
 
@@ -245,21 +245,50 @@ export class LeadsService {
  }
  // Full scheduled-meeting register for the sidebar. Sorted by meeting date and
  // time (IST), independent of lead creation time; read permission and tenant scoped.
- async scheduledMeetings(a:Principal,input:{cursor?:string;limit:number}){
+ async scheduledMeetings(a:Principal,input:MeetingListQuery){
    deny(a,"leads.read");
-   const where:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,
-     status:"MEETING_PROCESS",meetingAt:{not:null}};
-   const [total,rows]=await Promise.all([
-     this.db.lead.count({where}),
-     this.db.lead.findMany({where,take:input.limit+1,
-       ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
-       orderBy:[{meetingAt:"asc"},{id:"asc"}],
-       select:{id:true,meetingAt:true,businessName:true,contactName:true,
-         phone:true,location:true,googleMapsUrl:true}}),
+   const now=new Date(),today=agencyToday(now),tomorrow=new Date(new Date(today+"T00:00:00+05:30").getTime()+86400000);
+   const base:Prisma.LeadWhereInput={organizationId:a.organizationId,deletedAt:null,status:"MEETING_PROCESS",meetingAt:{not:null},
+     ...(input.temperature?{temperature:input.temperature}:{}),...(input.type?{meetingType:input.type}:{}),
+     ...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},{contactName:{contains:input.q,mode:"insensitive"}},{location:{contains:input.q,mode:"insensitive"}},{phone:{contains:input.q}}]}:{})};
+   const range:Prisma.LeadWhereInput={meetingAt:{...(input.from?{gte:new Date(input.from+"T00:00:00+05:30")}:{}),...(input.to?{lt:new Date(new Date(input.to+"T00:00:00+05:30").getTime()+86400000)}:{})}};
+   const scoped:Prisma.LeadWhereInput={AND:[base,range]};
+   // Mutually exclusive buckets: today's elapsed appointments need an outcome.
+   const overdue:Prisma.LeadWhereInput={meetingAt:{lt:now}},due:Prisma.LeadWhereInput={meetingAt:{gte:now,lt:tomorrow}},upcoming:Prisma.LeadWhereInput={meetingAt:{gte:tomorrow}};
+   const bucket=input.view==="overdue"?overdue:input.view==="today"?due:input.view==="upcoming"?upcoming:{};
+   const where:Prisma.LeadWhereInput={AND:[scoped,bucket]};
+   const monthStart=input.month?new Date(input.month+"-01T00:00:00+05:30"):null;
+   const nextMonth=input.month?new Date(Date.UTC(Number(input.month.slice(0,4)),Number(input.month.slice(5,7)),1)).toISOString().slice(0,10):null;
+   const monthEnd=nextMonth?new Date(nextMonth+"T00:00:00+05:30"):null;
+   const [total,all,late,day,future,rows,days]=await Promise.all([
+     this.db.lead.count({where}),this.db.lead.count({where:scoped}),this.db.lead.count({where:{AND:[scoped,overdue]}}),
+     this.db.lead.count({where:{AND:[scoped,due]}}),this.db.lead.count({where:{AND:[scoped,upcoming]}}),
+     this.db.lead.findMany({where,take:input.limit+1,...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),
+       orderBy:[{meetingAt:"asc"},{id:"asc"}],select:{id:true,meetingAt:true,businessName:true,contactName:true,phone:true,location:true,googleMapsUrl:true,stageNote:true,temperature:true,version:true,assignedToId:true,createdById:true,meetingType:true,meetingJoinUrl:true,meetingDurationMinutes:true}}),
+     monthStart&&monthEnd?this.db.lead.groupBy({by:["meetingAt"],where:{AND:[base,{meetingAt:{gte:monthStart,lt:monthEnd}}]},_count:{_all:true}}):Promise.resolve([]),
    ]);
-   const hasMore=rows.length>input.limit;
+   const calendar:Record<string,number>={};
+   for(const row of days){if(row.meetingAt){const key=agencyToday(row.meetingAt);calendar[key]=(calendar[key]??0)+row._count._all;}}
+   const items=rows.slice(0,input.limit).map(row=>({...row,canEdit:this.canEdit(a,row)}));
+   return {items,total,today,now:now.toISOString(),summary:{all,overdue:late,today:day,upcoming:future},calendar,nextCursor:rows.length>input.limit?items.at(-1)?.id??null:null};
+ }
+ // History is stored in the existing immutable activity trail, in the same
+ // transaction as the versioned lead change. No invented historical outcomes.
+ async meetingHistory(a:Principal,input:MeetingListQuery){
+   deny(a,"leads.read");
+   const where:Prisma.LeadActivityWhereInput={metadata:{path:["meetingEvent"],equals:"recorded"},
+     lead:{organizationId:a.organizationId,deletedAt:null,...(input.q?{OR:[{businessName:{contains:input.q,mode:"insensitive"}},{contactName:{contains:input.q,mode:"insensitive"}},{location:{contains:input.q,mode:"insensitive"}},{phone:{contains:input.q}}]}:{})},
+     ...(input.from||input.to?{createdAt:{...(input.from?{gte:new Date(input.from+"T00:00:00+05:30")}:{}),...(input.to?{lt:new Date(new Date(input.to+"T00:00:00+05:30").getTime()+86400000)}:{})}}:{})};
+   const [total,rows]=await Promise.all([this.db.leadActivity.count({where}),this.db.leadActivity.findMany({where,take:input.limit+1,
+     ...(input.cursor?{cursor:{id:input.cursor},skip:1}:{}),orderBy:[{createdAt:"desc"},{id:"desc"}],select:{id:true,leadId:true,createdAt:true,note:true,metadata:true,lead:{select:{businessName:true,contactName:true,status:true}}}})]);
    const items=rows.slice(0,input.limit);
-   return {items,total,nextCursor:hasMore?items.at(-1)?.id??null:null};
+   return {items,total,nextCursor:rows.length>input.limit?items.at(-1)?.id??null:null};
+ }
+ async meetingConflicts(a:Principal,input:MeetingConflictQuery){
+   const lead=await this.find(a,input.id);if(!this.canEdit(a,lead))throw forbidden();
+   const start=meetingInstant(input.on,input.time),end=new Date(start.getTime()+input.duration*60000);
+   const rows=await this.db.lead.findMany({where:{organizationId:a.organizationId,deletedAt:null,status:"MEETING_PROCESS",id:{not:input.id},meetingAt:{gt:new Date(start.getTime()-480*60000),lt:end}},select:{meetingAt:true,meetingDurationMinutes:true}});
+   return {count:rows.filter(row=>row.meetingAt&&row.meetingAt.getTime()+row.meetingDurationMinutes*60000>start.getTime()).length};
  }
  // All acquisition cycles share one live schedule. UTC calendar-day storage
  // is deliberate: the date represents an Indian civil day, not an instant.
@@ -345,7 +374,7 @@ export class LeadsService {
  async update(a:Principal,id:string,input:LeadUpdateInput){
    const current=await this.find(a,id);
    if(!this.canEdit(a,current))throw forbidden();
-   const {version,stageNote,followUpOn,meetingOn:meetingOnInput,meetingTime:meetingTimeInput,...changes}=input;
+   const {version,stageNote,followUpOn,meetingOn:meetingOnInput,meetingTime:meetingTimeInput,meetingOutcome,...changes}=input;
    const stageChanged=changes.status!==undefined&&changes.status!==current.status;
    const targetStatus=changes.status??current.status;
    // A follow-up is a calendar-day appointment. Do not accept a status without a date.
@@ -360,6 +389,13 @@ export class LeadsService {
      throw invalid("Choose both a meeting date and time before saving Meeting Process status");
    if(targetStatus!=="MEETING_PROCESS"&&(meetingOnInput||meetingTimeInput))
      throw invalid("A meeting schedule requires Meeting Process status");
+   if(meetingOutcome){
+     if(current.status!=="MEETING_PROCESS"||!current.meetingAt)throw invalid("An outcome requires an existing scheduled meeting");
+     const expected=meetingOutcome==="RESCHEDULED"?"MEETING_PROCESS":meetingOutcome==="NO_SHOW"?"FOLLOW_UP":meetingOutcome;
+     if(targetStatus!==expected)throw invalid("Meeting outcome and lead stage do not match");
+     if(meetingOutcome==="RESCHEDULED"&&(!meetingOnInput||!meetingTimeInput||meetingInstant(meetingOnInput,meetingTimeInput).getTime()===current.meetingAt.getTime()))throw invalid("Choose a different meeting date or time");
+   }
+   if(targetStatus!=="MEETING_PROCESS"&&(changes.meetingType!==undefined||changes.meetingJoinUrl!==undefined||changes.meetingDurationMinutes!==undefined))throw invalid("Meeting details require Meeting Process status");
    if(current.status==="EXPIRED"&&stageChanged)
      throw new AuthError(409,"LEAD_EXPIRED","Expired leads cannot return to the pipeline");
    if(current.status==="APPROVED"&&stageChanged&&targetStatus!=="EXPIRED")
@@ -386,8 +422,15 @@ export class LeadsService {
    // Leaving FOLLOW_UP removes its schedule, so it cannot appear on a later overview.
    if(targetStatus==="FOLLOW_UP")data.nextFollowUpAt=new Date(scheduledOn!+"T12:00:00.000Z");
    else if(current.nextFollowUpAt)data.nextFollowUpAt=null;
-   if(targetStatus==="MEETING_PROCESS")data.meetingAt=meetingInstant(meetingOn!,meetingTime!);
-   else if(current.meetingAt)data.meetingAt=null;
+   if(targetStatus==="MEETING_PROCESS"){
+     data.meetingAt=meetingInstant(meetingOn!,meetingTime!);
+     if(changes.meetingType!==undefined)data.meetingType=changes.meetingType;
+     if(changes.meetingDurationMinutes!==undefined)data.meetingDurationMinutes=changes.meetingDurationMinutes;
+     const type=changes.meetingType??current.meetingType;
+     if(changes.meetingJoinUrl&&type!=="GOOGLE_MEET")throw invalid("A joining link requires Google Meet");
+     if(changes.meetingJoinUrl!==undefined)data.meetingJoinUrl=urlOrNull(changes.meetingJoinUrl);
+     if(type!=="GOOGLE_MEET"&&current.meetingJoinUrl)data.meetingJoinUrl=null;
+   }else if(current.meetingAt){data.meetingAt=null;data.meetingType="UNSPECIFIED";data.meetingJoinUrl=null;data.meetingDurationMinutes=60;}
    if(stageNote!==undefined)data.stageNote=stageNote;
    return this.db.$transaction(async tx=>{
      if(stageChanged&&targetStatus==="EXPIRED"){
@@ -406,6 +449,12 @@ export class LeadsService {
        metadata:{fromStatus:current.status,toStatus:changed.status,version:changed.version,
          ...(changes.temperature!==undefined&&current.temperature!==changed.temperature?{fromTemperature:current.temperature,toTemperature:changed.temperature}:{}),
          ...(scheduleChanged?{followUpOn:changed.nextFollowUpAt?.toISOString().slice(0,10)??null}:{}),
+         ...(current.status==="MEETING_PROCESS"&&current.meetingAt&&(meetingChanged||meetingOutcome)?{
+           meetingEvent:"recorded",scheduledAt:current.meetingAt.toISOString(),meetingType:current.meetingType??"UNSPECIFIED",
+           meetingDurationMinutes:current.meetingDurationMinutes??60,
+           meetingOutcome:meetingOutcome??(changed.meetingAt?"RESCHEDULED":"STAGE_CHANGED"),
+           nextMeetingAt:changed.meetingAt?.toISOString()??null,temperature:changed.temperature??"UNCLASSIFIED",
+         }:{}),
          ...(meetingChanged?{meetingOn:changed.meetingAt?meetingLocal(changed.meetingAt).on:null,
            meetingTime:changed.meetingAt?meetingLocal(changed.meetingAt).time:null}:{})}}});
      if(changes.status==="APPROVED"){

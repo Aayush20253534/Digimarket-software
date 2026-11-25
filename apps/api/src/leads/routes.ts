@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { leadCreateSchema, leadUpdateSchema, leadAssignSchema, leadNoteSchema, leadDuplicateReviewSchema,
-  leadListQuerySchema, followUpListQuerySchema, leadCycleQuerySchema, leadImportSchema, leadDeleteSchema, leadBulkDeleteSchema } from "@digimarket/contracts";
+  leadListQuerySchema, meetingListQuerySchema, meetingConflictQuerySchema, followUpListQuerySchema, leadCycleQuerySchema, leadImportSchema, leadDeleteSchema, leadBulkDeleteSchema } from "@digimarket/contracts";
 import { AuthService, type Principal } from "../auth/service";
 import { AuthError, unauthorized } from "../auth/errors";
 import { LeadsService } from "./service";
@@ -35,12 +35,18 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
  app.post(root,authenticated,async(req,res)=>{
    res.status(201).json({data:await svc.create(actor(res),parse(leadCreateSchema,req.body))});
  });
- const meetingsQuery=z.strictObject({
-   cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(20),
- });
+ const meetingsQuery=meetingListQuerySchema;
  app.get(root+"/meetings",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.scheduledMeetings(actor(res),parse(meetingsQuery,req.query))});
+ });
+ app.get(root+"/meetings/history",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.meetingHistory(actor(res),parse(meetingListQuerySchema,req.query))});
+ });
+ app.get(root+"/meetings/conflicts",authenticated,async(req,res)=>{
+   res.set("Cache-Control","no-store");
+   res.json({data:await svc.meetingConflicts(actor(res),parse(meetingConflictQuerySchema,req.query))});
  });
  const followUpsQuery=followUpListQuerySchema;
  app.get(root+"/follow-ups",authenticated,async(req,res)=>{
