@@ -617,7 +617,7 @@ export class FinanceService {
       ...(method?[{method}]:[]),
     ]}: {};
     return {period,where:{...period,...(input.day?{occurredOn:new Date(input.day+"T00:00:00.000Z")}:{}) ,
-      ...(input.personId?{enteredById:input.personId}:{}),...search}};
+      ...(input.personId?{enteredById:input.personId}:{}),...(input.categoryId?{categoryId:input.categoryId}:{}),...search}};
   }
   async breakdown(actor:Principal,input:FinanceBreakdownQuery){
     const {period,where}=this.breakdownScope(actor,input);

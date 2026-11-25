@@ -4,7 +4,7 @@ import type {Principal} from "../auth/service";
 import {forbidden,invalid} from "../auth/errors";
 
 export type LeadAnalyticsQuery={
- from:string;to:string;source?:"META_LEADS"|"COLD_CALL"|"REFERRAL";stage?:string;
+ from:string;to:string;source?:"META_LEADS"|"COLD_CALL"|"REFERRAL"|"OTHER";stage?:string;
  assignedToId?:string;businessType?:string;location?:string;q?:string;
  page:number;limit:number;
 };
@@ -34,7 +34,7 @@ export class LeadAnalyticsService{
   return {organizationId:a.organizationId,deletedAt:null,
    createdAt:agencyTimestampRange(q),
    ...(q.source?{AND:[{OR:q.source==="META_LEADS"?[{source:"META_LEADS"},{source:"WHATSAPP"}]:
-     q.source==="COLD_CALL"?[{source:"COLD_CALL"},{source:null}]:[{source:"REFERRAL"}]}]}:{}),
+     q.source==="COLD_CALL"?[{source:"COLD_CALL"},{source:null}]:q.source==="REFERRAL"?[{source:"REFERRAL"}]:[{source:{notIn:["META_LEADS","WHATSAPP","COLD_CALL","REFERRAL"]}}]}]}:{}),
    ...(q.stage?{status:q.stage as Prisma.EnumLeadStageFilter["equals"]}:{}),
    ...(q.assignedToId?{assignedToId:q.assignedToId}:{}),
    ...(q.businessType?{businessType:q.businessType}:{}),

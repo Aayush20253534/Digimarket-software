@@ -76,3 +76,16 @@ export function leadCycles(now = new Date()) {
 export const leadCycleKeySchema=z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).refine(key=>key>=AGENCY_START_DATE.slice(0,7)&&key<=businessCycle().key,"Choose a started business cycle");
 export const leadCycleQuerySchema=z.strictObject({cycle:leadCycleKeySchema.optional()});
 export function leadCycleTimestampRange(key:string){return agencyTimestampRange(businessCycle(key+"-22"));}
+
+/** Compare full completed cycles or equal elapsed days of an open cycle. */
+export function comparisonPeriod(period:ReportingPeriod,today=agencyToday()):{current:ReportingPeriod;previous:ReportingPeriod}|null{
+ const cycle=businessCycle(period.from);
+ if(cycle.from!==period.from||cycle.to!==period.to||period.from>today)return null;
+ const previous=businessCycle(period.from,-1);
+ if(previous.from<AGENCY_START_DATE)return null;
+ if(period.to<=today)return {current:period,previous};
+ const days=Math.round((Date.parse(today)-Date.parse(period.from))/86400000);
+ const end=new Date(Date.parse(previous.from)+days*86400000).toISOString().slice(0,10);
+ if(end>previous.to)return null;
+ return {current:{from:period.from,to:today},previous:{from:previous.from,to:end}};
+}

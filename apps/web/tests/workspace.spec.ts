@@ -234,6 +234,13 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByText("0 matching")).toBeVisible();
   await page.getByRole("link",{name:"Back to Reports"}).click();
   await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
+  const deliveryResponse=page.waitForResponse(res=>res.url().includes("/api/v1/reports/client-delivery")&&res.request().method()==="GET");
+  await page.getByRole("link",{name:"Client Delivery",exact:true}).click();
+  expect((await deliveryResponse).status()).toBe(200);
+  await expect(page.getByRole("heading",{name:"Client delivery",exact:true})).toBeVisible();
+  await expect(page.getByRole("table").first()).toBeVisible();
+  await page.getByRole("link",{name:"Overview",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Performance reports"})).toBeVisible();
   const desktopZoom=await page.locator(".aw-workspace").evaluate(
     element=>Number.parseFloat(getComputedStyle(element).zoom)
   );

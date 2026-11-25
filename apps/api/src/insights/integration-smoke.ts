@@ -117,6 +117,12 @@ try{
  assert.equal(typeof (report.sections.leads as {conversionRatePercent:number}).conversionRatePercent,"number");
  assert.equal((report.sections.leads as {followUp:number}).followUp,0);
  const privileged=await insights.report(admin,"2026-10-01","2026-11-30");
+ assert.equal(report.cashTrend,undefined);
+ assert.ok(Array.isArray(privileged.cashTrend));
+ const delivery=await insights.clientDelivery(admin);
+ assert.ok(Array.isArray(delivery.items));
+ const foreignDelivery=await insights.clientDelivery(external);
+ assert.ok(foreignDelivery.items.every(row=>!delivery.items.some(other=>other.id===row.id)));
  assert.equal((privileged.sections.projects as {active:number}).active,2);
  assert.equal((privileged.sections.invoices as {unpaidCount:number}).unpaidCount,1);
  const privilegedForeign=await insights.report(external,"2026-10-01","2026-11-30");

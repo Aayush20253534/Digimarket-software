@@ -64,3 +64,18 @@ describe("lead acquisition cycles",()=>{
   expect(leadCycleQuerySchema.parse({cycle:"2026-10"})).toEqual({cycle:"2026-10"});
  });
 });
+
+import {comparisonPeriod} from "./business-period";
+
+describe("report comparison",()=>{
+ it("compares equal elapsed days in an open cycle",()=>{
+  expect(comparisonPeriod({from:"2026-11-22",to:"2026-12-21"},"2026-11-26")).toEqual({current:{from:"2026-11-22",to:"2026-11-26"},previous:{from:"2026-10-22",to:"2026-10-26"}});
+ });
+ it("compares complete historical cycles",()=>{
+  expect(comparisonPeriod({from:"2026-11-22",to:"2026-12-21"},"2026-12-22")?.previous).toMatchObject({from:"2026-10-22",to:"2026-11-21"});
+ });
+ it("does not invent pre-launch or custom comparisons",()=>{
+  expect(comparisonPeriod({from:"2026-10-22",to:"2026-11-21"},"2026-11-22")).toBeNull();
+  expect(comparisonPeriod({from:"2026-11-23",to:"2026-12-21"},"2026-11-26")).toBeNull();
+ });
+});
