@@ -315,3 +315,29 @@ test("lead cycle controls align on desktop and wrap on small screens",async({pag
  expect(bounds).not.toBeNull();expect(control).not.toBeNull();
  expect(control!.x+control!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width+2);
 });
+
+test("lead temperature defaults to Unclassified, can be set and filtered",async({page})=>{
+ await mockWorkspace(page);
+ const id="00000000-0000-4000-8000-000000000001";
+ let temperature="UNCLASSIFIED";
+ const detail=()=>({id,businessName:"Business 1",contactName:"Contact 1",phone:"9000000000",businessType:null,location:null,googleMapsUrl:null,websiteUrl:null,instagramUrl:null,source:"COLD_CALL",status:"PENDING",temperature,stageNote:"",assignedToId:null,createdById:"user",nextFollowUpAt:null,meetingAt:null,version:1,createdAt:"2026-11-10T10:00:00Z",canEdit:true,activities:[]});
+ await page.route("**/api/v1/leads/"+id,async route=>{
+  if(route.request().method()==="PUT"){temperature=route.request().postDataJSON().temperature;expect(temperature).toBe("HOT");}
+  await route.fulfill({json:{data:detail()}});
+ });
+ await page.goto("/app/leads");
+ const row=page.getByRole("table",{name:"Leads directory"}).getByRole("row").filter({hasText:"Business 1"}).first();
+ await expect(row.getByRole("img",{name:"Lead temperature: Unclassified"})).toBeVisible();
+ await row.getByText("Business 1",{exact:true}).click();
+ const picker=page.getByLabel("Lead temperature",{exact:true});
+ await expect(picker).toHaveValue("UNCLASSIFIED");
+ await picker.selectOption("HOT");
+ await page.getByRole("button",{name:"Save details and stage"}).click();
+ await expect(page.getByText("Shared lead and status note saved.")).toBeVisible();
+ await expect(picker).toHaveValue("HOT");
+ const filtered=page.waitForRequest(req=>new URL(req.url()).pathname==="/api/v1/leads"&&new URL(req.url()).searchParams.get("temperature")==="HOT");
+ await page.getByLabel("Filter by temperature").selectOption("HOT");
+ await filtered;
+ await page.getByRole("button",{name:"Clear filters"}).click();
+ await expect(page.getByLabel("Filter by temperature")).toHaveValue("");
+});

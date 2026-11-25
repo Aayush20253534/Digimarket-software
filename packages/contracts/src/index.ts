@@ -104,6 +104,8 @@ export type FinanceBreakdownQuery=z.infer<typeof financeBreakdownQuerySchema>;
 
 // A phone number is all that is required to create a prospect.
 export const leadStageSchema = z.enum(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED"]);
+export const leadTemperatureSchema = z.enum(["UNCLASSIFIED","HOT","WARM","COLD"]);
+export type LeadTemperature = z.infer<typeof leadTemperatureSchema>;
 export const leadSourceSchema = z.enum(["COLD_CALL","META_LEADS","REFERRAL"]);
 export const leadCreateSchema = z.strictObject({
  phone:z.string().trim().min(7).max(40),
@@ -129,6 +131,7 @@ export const leadUpdateSchema = z.strictObject({
  googleMapsUrl:leadGoogleMapsUrlSchema.optional(),
  source:leadSourceSchema.optional(),
  status:leadStageSchema.optional(),
+ temperature:leadTemperatureSchema.optional(),
  // Calendar date, not browser-local timestamp; persisted in the existing nextFollowUpAt field.
  followUpOn:z.iso.date().nullable().optional(),
  // India-local calendar date and 24-hour time, converted to UTC by the API.
@@ -149,6 +152,7 @@ export const leadDuplicateReviewSchema = z.strictObject({resolution:z.enum(["CON
 export const leadListQuerySchema = z.strictObject({
   cycle:leadCycleKeySchema.optional(),
   stage:leadStageSchema.optional(),
+  temperature:leadTemperatureSchema.optional(),
   source:leadSourceSchema.optional(),
   sort:z.enum(["businessName","contactName","status","createdAt"]).optional(),
   direction:z.enum(["asc","desc"]).optional(),

@@ -35,3 +35,9 @@ describe("lead acquisition cycle scope",()=>{
   expect(client.count).toHaveBeenCalledWith({where:{organizationId:actor.organizationId,sourceLead:{...scope,status:{in:["APPROVED","EXPIRED"]}}}});
  });
 });
+
+it("filters temperature across the selected acquisition cycle and pages",async()=>{
+ const {service,lead}=fixture();
+ await service.list(actor,{limit:10,cycle:"2026-10",temperature:"UNCLASSIFIED",stage:"FOLLOW_UP"});
+ expect(lead.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{organizationId:actor.organizationId,deletedAt:null,createdAt:range,temperature:"UNCLASSIFIED",status:"FOLLOW_UP"}}));
+});
