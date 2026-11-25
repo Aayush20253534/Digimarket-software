@@ -114,6 +114,18 @@ export const followUpListQuerySchema=z.strictObject({
  month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
 }).refine(q=>!q.from||!q.to||q.from<=q.to,"End date precedes start date");
 export type FollowUpListQuery=z.infer<typeof followUpListQuerySchema>;
+export const meetingTypeSchema=z.enum(["UNSPECIFIED","PHYSICAL","GOOGLE_MEET","PHONE"]);
+export const meetingJoinUrlSchema=z.union([z.literal(""),z.url({protocol:/^https$/}).max(1000).refine(value=>{const u=new URL(value);return u.hostname==="meet.google.com"&&!u.username&&!u.password&&!u.port;},"Enter a valid Google Meet link")]);
+export const meetingOutcomeSchema=z.enum(["RESCHEDULED","NO_SHOW","DECISION_PENDING","AGREEMENT_PENDING","FOLLOW_UP","APPROVED","REJECTED"]);
+export const meetingListQuerySchema=z.strictObject({
+ cursor:z.uuid().optional(),limit:z.coerce.number().int().min(1).max(100).default(20),
+ view:z.enum(["all","overdue","today","upcoming"]).optional(),q:z.string().trim().max(100).optional(),
+ temperature:leadTemperatureSchema.optional(),type:meetingTypeSchema.optional(),
+ from:z.iso.date().optional(),to:z.iso.date().optional(),month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+}).refine(q=>!q.from||!q.to||q.from<=q.to,"End date precedes start date");
+export const meetingConflictQuerySchema=z.strictObject({id:z.uuid(),on:z.iso.date(),time:z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),duration:z.coerce.number().int().min(15).max(480)});
+export type MeetingListQuery=z.infer<typeof meetingListQuerySchema>;
+export type MeetingConflictQuery=z.infer<typeof meetingConflictQuerySchema>;
 export const leadSourceSchema = z.enum(["COLD_CALL","META_LEADS","REFERRAL"]);
 export const leadCreateSchema = z.strictObject({
  phone:z.string().trim().min(7).max(40),
@@ -145,6 +157,10 @@ export const leadUpdateSchema = z.strictObject({
  // India-local calendar date and 24-hour time, converted to UTC by the API.
  meetingOn:z.iso.date().nullable().optional(),
  meetingTime:z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+ meetingType:meetingTypeSchema.optional(),
+ meetingJoinUrl:meetingJoinUrlSchema.optional(),
+ meetingDurationMinutes:z.number().int().min(15).max(480).optional(),
+ meetingOutcome:meetingOutcomeSchema.optional(),
  stageNote:z.string().trim().max(2000).optional(),
 });
 export type LeadUpdateInput = z.infer<typeof leadUpdateSchema>;

@@ -602,6 +602,9 @@ model Lead {
   createdById       String      @db.Uuid
   nextFollowUpAt    DateTime?   @db.Timestamptz(6)
   meetingAt         DateTime?   @db.Timestamptz(6)
+  meetingType       String      @default("UNSPECIFIED") @db.VarChar(24)
+  meetingJoinUrl    String?     @db.VarChar(1000)
+  meetingDurationMinutes Int    @default(60)
   importKey         String?     @db.Uuid
   deletedAt         DateTime?   @db.Timestamptz(6)
   deletedById       String?     @db.Uuid
