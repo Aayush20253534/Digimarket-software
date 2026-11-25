@@ -1,3 +1,4 @@
+import {splitDocument,verifyLinks,registerDraftRoutes,listAgreements} from "../quotations/document-workspace";
 import type { Express, NextFunction, Request, Response } from "express";
 import { Prisma } from "@digimarket/db";
 import { z } from "zod";
@@ -50,7 +51,7 @@ function paisa(value:string) {
   const [whole, decimals=""] = value.split(".");
   return Number(whole)*100 + Number(decimals.padEnd(2,"0"));
 }
-function validate(input: unknown): AgreementInput {
+export function validate(input: unknown): AgreementInput {
   const parsed=inputSchema.safeParse(input);
   if (!parsed.success) {
     const fields=[...new Set(parsed.error.issues.map(issue=>issue.path.join(".")||"request"))].slice(0,8);
@@ -58,7 +59,7 @@ function validate(input: unknown): AgreementInput {
   }
   const raw=parsed.data;
   const value:AgreementInput=raw.mode==="default"
-    ? {...raw,feePeriod:"monthly",services:standardServices.map(service=>({...service})),reels:8,posts:8}
+    ? {...raw,feePeriod:"monthly",services:standardServices.map((service,i)=>i===7?{...service,description:`Production, editing and publishing of ${raw.reels} reels and ${raw.posts} branded posts each month.`}:{...service})}
     : raw;
   if (value.startDate>value.endDate) throw new AuthError(422,"VALIDATION_ERROR","End date must be on or after start date.");
   if (value.adBudgetMode==="not applicable" && paisa(value.adBudget)!==0) throw new AuthError(422,"VALIDATION_ERROR","Advertising budget must be zero when not applicable.");
@@ -84,13 +85,8 @@ export function registerAgreementRoutes(app:Express,auth:AuthService) {
   };
   const principal=(res:Response)=>res.locals.principal as Principal;
   const base="/api/v1/agreements";
-  app.get(base,authenticate,async (_req,res)=>{
-    const rows=await db.agreement.findMany({
-      where:{organizationId:principal(res).organizationId},
-      orderBy:[{createdAt:"desc"},{id:"desc"}],take:150,
-    });
-    res.set("Cache-Control","no-store").json({data:{items:rows}});
-  });
+  registerDraftRoutes(app,db,base,authenticate,"agreement");
+  app.get(base,authenticate,async(req,res)=>{res.set("Cache-Control","no-store").json({data:await listAgreements(db,principal(res),req.query)});});
   app.get(base+"/:id",authenticate,async (req,res)=>{
     const id=z.uuid().safeParse(req.params.id);
     if(!id.success) throw new AuthError(422,"VALIDATION_ERROR","Invalid agreement identifier.");
@@ -99,7 +95,8 @@ export function registerAgreementRoutes(app:Express,auth:AuthService) {
     res.set("Cache-Control","no-store").json({data:row});
   });
   app.post(base,authenticate,async (req,res)=>{
-    const input=validate(req.body);
+    const {payload,links}=splitDocument(req.body);
+    const input=validate(payload);
     const actor=principal(res);
     const service=paisa(input.serviceFee);
     const ads=input.adBudgetMode==="not applicable"?0:paisa(input.adBudget);
@@ -122,7 +119,7 @@ export function registerAgreementRoutes(app:Express,auth:AuthService) {
             startDate:new Date(input.startDate+"T00:00:00.000Z"),
             endDate:new Date(input.endDate+"T00:00:00.000Z"),
             serviceFee:(service/100).toFixed(2),adBudget:(ads/100).toFixed(2),total:((service+ads+tax)/100).toFixed(2),
-            payload:input,
+            payload:input,...await verifyLinks(tx,actor,"agreement",links),
           }});
           await tx.auditLog.create({data:{
             organizationId:actor.organizationId,actorId:actor.userId,
