@@ -106,7 +106,7 @@ export default function ClientWorkspacePage(){
     {client.agreementExpired&&<div className="aw-client-callout" role="status"><div><strong>Agreement expired</strong>
       <p>Excluded from projected income. {client.agreementEndedOn?"Ended on "+client.agreementEndedOn.slice(0,10)+". ":""}{client.agreementEndReason}</p></div>
       <Link href="/app/clients/expired" className="aw-client-btn">View expired agreements</Link></div>}
-    {canEdit&&!client.agreementExpired&&client.status!=="EXPIRED"&&client.status!=="ARCHIVED"&&<div className="aw-client-actions mb-4">
+    {canEdit&&!client.agreementEndedOn&&client.status!=="ARCHIVED"&&<div className="aw-client-actions mb-4">
       <EndClientAgreement client={client} onEnded={async()=>{await load();setSuccess("Agreement ended. Client moved to Expired and removed from projected income.");}}/>
     </div>}
     {client.sourceLead&&<p className="aw-client-muted">Converted from approved lead: {client.sourceLead.businessName}</p>}

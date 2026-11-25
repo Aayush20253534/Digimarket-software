@@ -271,3 +271,47 @@ test("purple and light theme choices persist through full CRM reloads",async({pa
  await page.reload();
  await expect(workspace).toHaveAttribute("data-theme","dark");
 });
+
+test("Expired is offered only after approval and enabled only after manual agreement termination",async({page})=>{
+ await mockWorkspace(page);
+ const id="00000000-0000-4000-8000-000000000001";
+ let status="PENDING",ended=false,saved=false;
+ const detail=()=>({id,businessName:"Business 1",contactName:"Contact 1",phone:"9000000000",businessType:null,location:null,googleMapsUrl:null,websiteUrl:null,instagramUrl:null,source:"COLD_CALL",status,stageNote:"",assignedToId:null,createdById:"user",nextFollowUpAt:null,meetingAt:null,version:1,createdAt:"2026-11-10T10:00:00Z",canEdit:true,canExpire:ended,linkedClientId:"00000000-0000-4000-8000-000000000099",activities:[]});
+ await page.route("**/api/v1/leads/"+id,async route=>{
+  if(route.request().method()==="PUT"){const body=route.request().postDataJSON();expect(body.status).toBe("EXPIRED");status="EXPIRED";saved=true;}
+  await route.fulfill({json:{data:detail()}});
+ });
+ await page.goto("/app/leads");
+ const row=page.getByRole("table",{name:"Leads directory"}).getByText("Business 1",{exact:true});
+ await row.click();
+ const select=page.getByLabel("Lead status");
+ await expect(select.locator("option[value=EXPIRED]")).toHaveCount(0);
+ status="APPROVED";await row.click();
+ await expect(select).toHaveValue("APPROVED");
+ await expect(select.locator("option[value=EXPIRED]")).toBeDisabled();
+ ended=true;await row.click();
+ await expect(select.locator("option[value=EXPIRED]")).toBeEnabled();
+ await select.selectOption("EXPIRED");
+ await page.getByRole("button",{name:"Save details and stage"}).click();
+ await expect(page.getByText("Lead moved to Expired. Original conversion preserved.")).toBeVisible();
+ expect(saved).toBe(true);
+ await expect(select).toBeDisabled();
+});
+
+test("lead cycle controls align on desktop and wrap on small screens",async({page})=>{
+ await mockWorkspace(page);
+ await page.setViewportSize({width:1440,height:900});
+ await page.goto("/app/leads");
+ const bar=page.getByRole("region",{name:"Lead business cycle"});
+ const button=bar.getByRole("button",{name:"Total",exact:true});
+ const picker=bar.getByLabel("Lead cycle");
+ await expect(picker).toBeVisible();
+ const a=await button.boundingBox(),b=await picker.boundingBox();
+ expect(a).not.toBeNull();expect(b).not.toBeNull();
+ expect(Math.abs((a!.y+a!.height/2)-(b!.y+b!.height/2))).toBeLessThanOrEqual(2);
+ await page.setViewportSize({width:390,height:844});
+ await expect(picker).toBeVisible();
+ const bounds=await bar.boundingBox(),control=await picker.boundingBox();
+ expect(bounds).not.toBeNull();expect(control).not.toBeNull();
+ expect(control!.x+control!.width).toBeLessThanOrEqual(bounds!.x+bounds!.width+2);
+});

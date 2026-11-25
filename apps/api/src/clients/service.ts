@@ -107,7 +107,7 @@ export class ClientsService {
      const previous=await tx.client.findFirst({where:{id,organizationId:a.organizationId}});
      if(!previous)throw missing();
      if(previous.version!==input.version)throw conflict();
-     if(previous.agreementEndedOn||previous.status==="EXPIRED")throw new AuthError(409,"AGREEMENT_ENDED","This agreement has already ended");
+     if(previous.agreementEndedOn)throw new AuthError(409,"AGREEMENT_ENDED","This agreement has already been manually ended");
      if(previous.status==="ARCHIVED")throw invalid("Archived clients cannot end an agreement");
      const endedOn=new Date(input.endedOn+"T00:00:00Z");
      if(previous.contractStartOn&&endedOn<previous.contractStartOn)throw invalid("The end date cannot precede the agreement start");
