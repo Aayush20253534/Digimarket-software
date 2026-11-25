@@ -89,9 +89,9 @@ export class InsightsService{
     const scope={organizationId:org,deletedAt:null,createdAt:timestampRange};
     const [created,converted,rejected,approved,pending,meetingProcess,decisionPending,agreementPending,followUp,overdue]=await Promise.all([
       this.db.lead.count({where:scope}),
-      this.db.client.count({where:{organizationId:org,sourceLead:{...scope,status:"APPROVED"}}}),
+      this.db.client.count({where:{organizationId:org,sourceLead:{...scope,status:{in:["APPROVED","EXPIRED"]}}}}),
       this.db.lead.count({where:{...scope,status:"REJECTED"}}),
-      this.db.lead.count({where:{...scope,status:"APPROVED"}}),
+      this.db.lead.count({where:{...scope,status:{in:["APPROVED","EXPIRED"]}}}),
       this.db.lead.count({where:{...scope,status:"PENDING"}}),
       this.db.lead.count({where:{...scope,status:"MEETING_PROCESS"}}),
       this.db.lead.count({where:{...scope,status:"DECISION_PENDING"}}),

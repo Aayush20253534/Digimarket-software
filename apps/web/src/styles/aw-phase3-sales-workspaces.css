@@ -749,3 +749,14 @@
 .aw-workspace [data-aw-module="leads"] :is(.aw-crm-phone-cell,.aw-crm-location-cell){width:1%;white-space:nowrap;text-align:center;}
 .aw-workspace [data-aw-module="leads"] .aw-crm-next-action{font-size:11px;margin-top:5px;color:var(--ui-muted);font-weight:600;}
 .aw-workspace [data-aw-module="leads"] .aw-crm-next-action[data-overdue="true"]{color:var(--ui-danger);}
+
+/* Keep cycle controls aligned on one baseline and wrap cleanly on narrow screens. */
+.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-bar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;min-width:0;}
+.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-select{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;font-size:12px;font-weight:600;}
+.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-select>span{white-space:nowrap;color:var(--ui-muted);}
+.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-select .field{width:auto;max-width:100%;min-width:0;margin:0;height:44px;}
+.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-bar>button{height:44px;min-height:44px;align-self:center;}
+.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-context{font-size:12px;line-height:1.4;color:var(--ui-muted);}
+.aw-workspace [data-aw-module="leads"] .aw-crm-quick-metrics{grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));}
+@media(max-width:640px){.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-select{flex:1 1 230px;}.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-select .field{flex:1;width:0;}.aw-workspace [data-aw-module="leads"] .aw-crm-cycle-context{flex-basis:100%;}}
+.aw-workspace [data-aw-module="leads"] .aw-status-expired{background:var(--stage-neutral-bg)!important;color:var(--stage-neutral-fg)!important;border:1px solid var(--stage-neutral-border)!important;}

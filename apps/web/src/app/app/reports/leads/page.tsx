@@ -180,7 +180,7 @@ export default function LeadBreakdownPage(){
      <option value="">All sources</option><option value="META_LEADS">Meta Leads</option><option value="COLD_CALL">Cold Calls</option><option value="REFERRAL">Referral</option>
     </select></label>
     <label>Status<select aria-label="Lead stage filter" value={stage} onChange={e=>{setStage(e.target.value);setPage(1);}}>
-     <option value="">All statuses</option>{["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"].map(v=><option key={v} value={v}>{label(v)}</option>)}
+     <option value="">All statuses</option>{["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED","NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"].map(v=><option key={v} value={v}>{label(v)}</option>)}
     </select></label>
     <label>Assignee<select aria-label="Lead assignee filter" value={owner} onChange={e=>{setOwner(e.target.value);setPage(1);}}>
      <option value="">All assignees</option>{options?.assignees.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}

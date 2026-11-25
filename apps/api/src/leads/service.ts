@@ -85,7 +85,7 @@ export class LeadsService {
  async metrics(a:Principal,cycle?:string){
    deny(a,"leads.read");
    const where={organizationId:a.organizationId,deletedAt:null,...(cycle?{createdAt:leadCycleTimestampRange(cycle)}:{})};
-   const [total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted,callNotPicking,callBusy]=await Promise.all([
+   const [total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted,callNotPicking,callBusy,expired]=await Promise.all([
      this.db.lead.count({where}),
      this.db.lead.count({where:{...where,status:"PENDING"}}),
      this.db.lead.count({where:{...where,status:"YET_TO_CALL"}}),
@@ -96,11 +96,12 @@ export class LeadsService {
      this.db.lead.count({where:{...where,status:"APPROVED"}}),
      this.db.lead.count({where:{...where,status:"REJECTED"}}),
      this.db.client.count({where:{organizationId:a.organizationId,
-       sourceLead:{...where,status:"APPROVED"}}}),
+       sourceLead:{...where,status:{in:["APPROVED","EXPIRED"]}}}}),
      this.db.lead.count({where:{...where,status:"CALL_NOT_PICKING"}}),
      this.db.lead.count({where:{...where,status:"CALL_BUSY"}}),
+     this.db.lead.count({where:{...where,status:"EXPIRED"}}),
    ]);
-   return {total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted,callNotPicking,callBusy,
+   return {total,pending,yetToCall,meetingProcess,decisionPending,agreementPending,followUp,approved,rejected,converted,callNotPicking,callBusy,expired,
      conversionRatePercent:total?Math.round(converted/total*10000)/100:0};
  }
  async delete(a:Principal,id:string,version:number){
@@ -292,7 +293,9 @@ export class LeadsService {
  async detail(a:Principal,id:string){
    const lead=await this.find(a,id);
    const editable=this.canEdit(a,lead);
-   const basic={...lead,canEdit:editable};
+   const mayExpire=editable&&a.permissions.has("clients.read")&&a.permissions.has("clients.edit")&&lead.status==="APPROVED";
+   const client=mayExpire?await this.db.client.findFirst({where:{organizationId:a.organizationId,sourceLeadId:id},select:{id:true,status:true,agreementEndedOn:true}}):null;
+   const basic={...lead,canEdit:editable,canExpire:!!(client?.status==="EXPIRED"&&client.agreementEndedOn),linkedClientId:client?.id??null};
    if(!editable)return {...basic,activities:[],duplicates:[]};
    const [activities,duplicates]=await Promise.all([
      this.db.leadActivity.findMany({where:{leadId:id},
@@ -323,8 +326,14 @@ export class LeadsService {
      throw invalid("Choose both a meeting date and time before saving Meeting Process status");
    if(targetStatus!=="MEETING_PROCESS"&&(meetingOnInput||meetingTimeInput))
      throw invalid("A meeting schedule requires Meeting Process status");
-   if(current.status==="APPROVED"&&stageChanged)
+   if(current.status==="EXPIRED"&&stageChanged)
+     throw new AuthError(409,"LEAD_EXPIRED","Expired leads cannot return to the pipeline");
+   if(current.status==="APPROVED"&&stageChanged&&targetStatus!=="EXPIRED")
      throw new AuthError(409,"ALREADY_APPROVED","Approved leads cannot return to the lead pipeline");
+   if(stageChanged&&targetStatus==="EXPIRED"){
+     if(current.status!=="APPROVED")throw invalid("Only approved leads can become Expired");
+     deny(a,"clients.read");deny(a,"clients.edit");
+   }
    if(changes.status==="APPROVED"&&!a.permissions.has("leads.convert"))throw forbidden();
    if(Object.keys(changes).length===0&&followUpOn===undefined&&meetingOnInput===undefined&&meetingTimeInput===undefined&&!stageNote?.trim())throw invalid("No changes provided");
    const data:Prisma.LeadUpdateManyMutationInput={version:{increment:1}};
@@ -346,6 +355,10 @@ export class LeadsService {
    else if(current.meetingAt)data.meetingAt=null;
    if(stageNote!==undefined)data.stageNote=stageNote;
    return this.db.$transaction(async tx=>{
+     if(stageChanged&&targetStatus==="EXPIRED"){
+       const ended=await tx.client.findFirst({where:{organizationId:a.organizationId,sourceLeadId:id,status:"EXPIRED",agreementEndedOn:{not:null}},select:{id:true}});
+       if(!ended)throw new AuthError(409,"AGREEMENT_NOT_ENDED","Manually end the linked client agreement before marking the lead Expired");
+     }
      const changedCount=await tx.lead.updateMany({where:{id,organizationId:a.organizationId,deletedAt:null,version},data});
      if(changedCount.count!==1)throw clash();
      const changed=await tx.lead.findUniqueOrThrow({where:{id}});

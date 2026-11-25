@@ -35,7 +35,7 @@ export function registerInsightsRoutes(app:Express,auth:AuthService){
   from:z.iso.date(),to:z.iso.date(),
   source:z.enum(["META_LEADS","COLD_CALL","REFERRAL"]).optional(),
   stage:z.enum(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP",
-    "MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED",
+    "MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED",
     "NEW","CONTACTED","QUALIFIED","PROPOSAL","WON","LOST"]).optional(),
   assignedToId:z.uuid().optional(),businessType:z.string().trim().max(120).optional(),
   location:z.string().trim().max(240).optional(),q:z.string().trim().max(100).optional(),
