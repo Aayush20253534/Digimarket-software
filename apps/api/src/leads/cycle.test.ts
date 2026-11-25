@@ -20,7 +20,7 @@ describe("lead acquisition cycle scope",()=>{
   expect(result.conversionRatePercent).toBe(50);
   expect(lead.count).toHaveBeenCalledWith({where:{...scope,status:"APPROVED"}});
   expect(lead.count).toHaveBeenCalledWith({where:{...scope,status:"CALL_BUSY"}});
-  expect(client.count).toHaveBeenCalledWith({where:{organizationId:actor.organizationId,sourceLead:{...scope,status:"APPROVED"}}});
+  expect(client.count).toHaveBeenCalledWith({where:{organizationId:actor.organizationId,sourceLead:{...scope,status:{in:["APPROVED","EXPIRED"]}}}});
   const csv=await service.export(actor,"2026-10");
   expect(csv.filename).toBe("digimarket-leads-2026-10.csv");
   expect(lead.findMany).toHaveBeenLastCalledWith(expect.objectContaining({where:scope}));
@@ -32,6 +32,6 @@ describe("lead acquisition cycle scope",()=>{
   await service.export(actor);
   const scope={organizationId:actor.organizationId,deletedAt:null};
   expect(lead.findMany).toHaveBeenLastCalledWith(expect.objectContaining({where:scope}));
-  expect(client.count).toHaveBeenCalledWith({where:{organizationId:actor.organizationId,sourceLead:{...scope,status:"APPROVED"}}});
+  expect(client.count).toHaveBeenCalledWith({where:{organizationId:actor.organizationId,sourceLead:{...scope,status:{in:["APPROVED","EXPIRED"]}}}});
  });
 });

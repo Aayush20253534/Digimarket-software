@@ -8,7 +8,7 @@ export type LeadAnalyticsQuery={
  assignedToId?:string;businessType?:string;location?:string;q?:string;
  page:number;limit:number;
 };
-const STAGES=["YET_TO_CALL","PENDING","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED"];
+const STAGES=["YET_TO_CALL","PENDING","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED"];
 const ACTIVE=new Set(["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","NEW","CONTACTED","QUALIFIED","PROPOSAL"]);
 const percentage=(part:number,total:number)=>total?Math.round(part/total*10000)/100:0;
 const isoDay=agencyToday;
@@ -77,8 +77,8 @@ export class LeadAnalyticsService{
    reached.get(activity.leadId)?.add(stage);
    if(stage==="APPROVED"&&!approvalAt.has(activity.leadId))approvalAt.set(activity.leadId,activity.createdAt);
   }
-  const approved=leads.filter(x=>x.status==="APPROVED");
-  const converted=leads.filter(x=>x.status==="APPROVED"&&!!x.convertedClient);
+  const approved=leads.filter(x=>(x.status==="APPROVED"||x.status==="EXPIRED"));
+  const converted=leads.filter(x=>(x.status==="APPROVED"||x.status==="EXPIRED")&&!!x.convertedClient);
   const inPipeline=leads.filter(x=>ACTIVE.has(x.status));
   const overdue=inPipeline.filter(x=>x.nextFollowUpAt&&x.nextFollowUpAt<now).length;
   const upcoming=inPipeline.filter(x=>x.nextFollowUpAt&&x.nextFollowUpAt>=now&&x.nextFollowUpAt<=new Date(now.getTime()+7*dayMs)).length;
@@ -105,8 +105,8 @@ export class LeadAnalyticsService{
   };
   const sources=["META_LEADS","COLD_CALL","REFERRAL","OTHER"].map(name=>{
    const items=leads.filter(x=>acquisition(x.source)===name);
-   const aCount=items.filter(x=>x.status==="APPROVED").length;
-   const cCount=items.filter(x=>x.status==="APPROVED"&&x.convertedClient).length;
+   const aCount=items.filter(x=>(x.status==="APPROVED"||x.status==="EXPIRED")).length;
+   const cCount=items.filter(x=>(x.status==="APPROVED"||x.status==="EXPIRED")&&x.convertedClient).length;
    return {name,total:items.length,approved:aCount,converted:cCount,
     approvalRate:percentage(aCount,items.length),conversionRate:percentage(cCount,items.length)};
   });
@@ -117,8 +117,8 @@ export class LeadAnalyticsService{
   for(const lead of leads){
    const id=lead.assignedToId??"unassigned",name=lead.assignee?.displayName??"Unassigned";
    const found=byAssignee.get(id)??{id:lead.assignedToId,name,total:0,approved:0,converted:0,meetings:0};
-   found.total++;if(lead.status==="APPROVED")found.approved++;
-   if(lead.status==="APPROVED"&&lead.convertedClient)found.converted++;
+   found.total++;if((lead.status==="APPROVED"||lead.status==="EXPIRED"))found.approved++;
+   if((lead.status==="APPROVED"||lead.status==="EXPIRED")&&lead.convertedClient)found.converted++;
    if(reached.get(lead.id)?.has("MEETING_PROCESS"))found.meetings++;
    byAssignee.set(id,found);
   }
@@ -133,7 +133,7 @@ export class LeadAnalyticsService{
    assignedToId:x.assignedToId,assignee:x.assignee?.displayName??"Unassigned",
    createdAt:x.createdAt.toISOString(),updatedAt:x.updatedAt.toISOString(),
    nextFollowUpAt:x.nextFollowUpAt?.toISOString()??null,
-   approved:x.status==="APPROVED",converted:x.status==="APPROVED"&&!!x.convertedClient,
+   approved:(x.status==="APPROVED"||x.status==="EXPIRED"),converted:(x.status==="APPROVED"||x.status==="EXPIRED")&&!!x.convertedClient,
    ageDays:Math.max(0,Math.floor((now.getTime()-x.createdAt.getTime())/dayMs)),
   }));
   return {from:q.from,to:q.to,asOf:now.toISOString(),
@@ -152,8 +152,8 @@ export class LeadAnalyticsService{
    totalPages:Math.max(1,Math.ceil(total/q.limit)),page:q.page,limit:q.limit,hasMore:start+q.limit<total,items,
    definitions:{
     cohort:"Non-deleted leads created during the inclusive Asia/Kolkata date range. All filters apply to cards, charts and table.",
-    approved:"Leads whose current status is APPROVED.",
-    converted:"APPROVED leads linked to a client record, counted separately.",
+    approved:"Leads whose current status is APPROVED or EXPIRED (previously approved).",
+    converted:"Approved and expired leads linked to a client record, preserving historical conversions.",
     funnel:"Each stage counts leads with a recorded stage transition or matching current stage. Stages can be skipped, so counts are not necessarily decreasing.",
     timing:"Approval duration uses a recorded APPROVED transition or linked client creation date. Leads without such timestamps are excluded.",
     followups:"Follow-up buckets use the current follow-up schedule for open leads in this cohort, not a historical snapshot.",
@@ -165,7 +165,7 @@ export class LeadAnalyticsService{
   const head=["Business","Contact","Phone","Source","Status","Client Converted","Type","Location","Assignee","Created","Last Updated","Next Follow-up"];
   const csv=[head.map(safeCsv).join(","),...rows.map(x=>[
    x.businessName,x.contactName,x.phone,acquisition(x.source),x.status,
-   x.status==="APPROVED"&&!!x.convertedClient?"Yes":"No",x.businessType,x.location,
+   (x.status==="APPROVED"||x.status==="EXPIRED")&&!!x.convertedClient?"Yes":"No",x.businessType,x.location,
    x.assignee?.displayName??"Unassigned",x.createdAt.toISOString(),x.updatedAt.toISOString(),
    x.nextFollowUpAt?.toISOString()??"",
   ].map(safeCsv).join(","))].join("\r\n");

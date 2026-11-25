@@ -14,6 +14,7 @@ export function EndClientAgreement({
     version: number;
     contractStartOn: string | null;
     contractEndOn: string | null;
+    agreementExpired?: boolean;
   };
   onEnded: () => Promise<void>;
 }) {
@@ -27,6 +28,7 @@ export function EndClientAgreement({
     client.contractEndOn && client.contractEndOn.slice(0, 10) < agencyToday()
       ? client.contractEndOn.slice(0, 10)
       : agencyToday();
+  const action = client.agreementExpired ? "Confirm agreement end" : "End agreement early";
   return (
     <>
       <button
@@ -38,7 +40,7 @@ export function EndClientAgreement({
           dialog.current?.showModal();
         }}
       >
-        End agreement early
+        {action}
       </button>
       <dialog
         ref={dialog}
@@ -49,7 +51,7 @@ export function EndClientAgreement({
         }}
       >
         <h2 id="end-agreement-title" className="text-lg font-semibold">
-          End agreement early
+          {action}
         </h2>
         <p className="mt-2 text-sm text-slate-400">
           {client.businessName} will move to Expired and stop contributing to projected income.

@@ -91,6 +91,7 @@ enum LeadStage {
   CALL_NOT_PICKING
   CALL_BUSY
   FOLLOW_UP
+  EXPIRED
 }
 enum LeadActivityKind {
   CREATED

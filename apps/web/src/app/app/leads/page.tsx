@@ -10,17 +10,17 @@ import { SalesWorkspaceNav } from "@/components/sales-workspace-nav";
 import { ApiError, type StaffUser } from "@/lib/api";
 import { Card, FormField, Notice, PageHeader, Spinner, StatusBadge } from "@/components/ui";
 
-type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"FOLLOW_UP"|"MEETING_PROCESS"|"DECISION_PENDING"|"AGREEMENT_PENDING"|"APPROVED"|"REJECTED";
-const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED"];
+type Stage="PENDING"|"YET_TO_CALL"|"CALL_NOT_PICKING"|"CALL_BUSY"|"FOLLOW_UP"|"MEETING_PROCESS"|"DECISION_PENDING"|"AGREEMENT_PENDING"|"APPROVED"|"REJECTED"|"EXPIRED";
+const stages:Stage[]=["PENDING","YET_TO_CALL","CALL_NOT_PICKING","CALL_BUSY","FOLLOW_UP","MEETING_PROCESS","DECISION_PENDING","AGREEMENT_PENDING","APPROVED","REJECTED","EXPIRED"];
 const stageLabel=(s:Stage)=>s.replaceAll("_"," ");
 type Lead={id:string;businessName:string;contactName:string|null;phone:string|null;businessType:string|null;
  location:string|null;googleMapsUrl:string|null;websiteUrl:string|null;instagramUrl:string|null;source:string|null;
  status:Stage;stageNote?:string;assignedToId:string|null;createdById:string;nextFollowUpAt:string|null;meetingAt:string|null;
  version:number;createdAt:string;canEdit?:boolean;assignee?:{displayName:string}|null};
 type Activity={id:string;kind:string;note:string|null;createdAt:string;actor:{displayName:string}};
-type Detail=Lead&{activities:Activity[];canEdit:boolean};
+type Detail=Lead&{activities:Activity[];canEdit:boolean;canExpire?:boolean;linkedClientId?:string|null};
 type Page={items:Lead[];nextCursor:string|null;total:number};
-type Metrics={callNotPicking:number;callBusy:number;total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
+type Metrics={expired?:number;callNotPicking:number;callBusy:number;total:number;pending:number;yetToCall:number;meetingProcess:number;decisionPending:number;agreementPending:number;followUp:number;approved:number;rejected:number;converted:number;conversionRatePercent:number};
 type LeadSource="COLD_CALL"|"META_LEADS"|"REFERRAL";
 const leadSources:{value:LeadSource;label:string}[]=[{value:"COLD_CALL",label:"Cold Call"},{value:"META_LEADS",label:"Meta Leads"},{value:"REFERRAL",label:"Referral"}];
 const sourceLabel=(value:string|null)=>value==="META_LEADS"||value==="WHATSAPP"?"Meta Leads":value==="COLD_CALL"||!value?"Cold Call":value==="REFERRAL"?"Referral":value;
@@ -225,7 +225,7 @@ export default function LeadsPage(){
        meetingTime:editStage==="MEETING_PROCESS"?meetingTime:null,
        stageNote,version:selected.version}});
      try{window.localStorage.removeItem(draftKey(selected.id));}catch{ /* Browser storage may be unavailable. */ }
-     setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":"Shared lead and status note saved.");await open(selected.id);await load();
+     setMessage(editStage==="APPROVED"?"Lead approved and automatically added to Clients.":editStage==="REJECTED"?"Lead marked Rejected.":editStage==="EXPIRED"?"Lead moved to Expired. Original conversion preserved.":"Shared lead and status note saved.");await open(selected.id);await load();
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function deleteLead(){
@@ -300,15 +300,15 @@ export default function LeadsPage(){
        {canBulk&&<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void download()}><Download className="h-4 w-4"/>Export</button>}
        <button className="btn-secondary" type="button" onClick={()=>void load()}><RefreshCw className="h-4 w-4"/>Refresh</button>
      </div>}/>
-   <section aria-label="Lead business cycle" className="flex flex-wrap items-center gap-2">
+   <section aria-label="Lead business cycle" className="aw-crm-cycle-bar">
      <button type="button" className={cycleChoice==="total"?"btn-primary":"btn-secondary"} aria-pressed={cycleChoice==="total"} disabled={busy} onClick={()=>{if(cycleChoice!=="total")changeCycle("total");}}>Total</button>
-     <label className="text-sm">Business cycle <select className="field" aria-label="Lead cycle" value={cycleChoice==="total"?"total":cycleChoice==="current"?(cycles[0]?.key??"total"):cycleChoice} disabled={busy} onChange={e=>changeCycle(e.target.value===cycles[0]?.key?"current":e.target.value)}>
+     <label className="aw-crm-cycle-select"><span>Business cycle</span><select className="field" aria-label="Lead cycle" value={cycleChoice==="total"?"total":cycleChoice==="current"?(cycles[0]?.key??"total"):cycleChoice} disabled={busy} onChange={e=>changeCycle(e.target.value===cycles[0]?.key?"current":e.target.value)}>
        <option value="total">All cycles</option>{cycles.map((c,i)=><option key={c.key} value={c.key}>{cycleLabel(c.key)} · {i===0?"Current":"Completed"}</option>)}
      </select></label>
-     <span className="text-xs">{cycleKey?"Live statuses · acquired in selected cycle":"All recorded leads, including legacy records"}</span>
+     <span className="aw-crm-cycle-context">{cycleKey?"Live statuses · acquired in selected cycle":"All recorded leads, including legacy records"}</span>
    </section>
    {metrics&&<section aria-label="CRM pipeline summary" className="aw-crm-quick-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
-     {([["Total leads",metrics.total,""],["Approved clients",metrics.approved,"APPROVED"],["PENDING",metrics.pending,"PENDING"],["CALL NOT PICKING",metrics.callNotPicking??0,"CALL_NOT_PICKING"],["CALL BUSY",metrics.callBusy??0,"CALL_BUSY"],
+     {([["Total leads",metrics.total,""],["Approved clients",metrics.approved,"APPROVED"],["Expired clients",metrics.expired??0,"EXPIRED"],["PENDING",metrics.pending,"PENDING"],["CALL NOT PICKING",metrics.callNotPicking??0,"CALL_NOT_PICKING"],["CALL BUSY",metrics.callBusy??0,"CALL_BUSY"],
        ["YET TO CALL",metrics.yetToCall,"YET_TO_CALL"],["FOLLOW UP",metrics.followUp,"FOLLOW_UP"],
        ["MEETING PROCESS",metrics.meetingProcess,"MEETING_PROCESS"],["DECISION PENDING",metrics.decisionPending,"DECISION_PENDING"],
        ["AGREEMENT PENDING",metrics.agreementPending,"AGREEMENT_PENDING"],["REJECTED",metrics.rejected,"REJECTED"]] as const).map(([label,value,filter])=>
@@ -424,7 +424,7 @@ export default function LeadsPage(){
              <p className="aw-lead-followup-scheduled">Follow-up scheduled for <strong>{new Date(selected.nextFollowUpAt.slice(0,10)+"T12:00:00Z").toLocaleDateString("en-IN",{timeZone:"UTC",dateStyle:"long"})}</strong></p>}
            {selected.status==="MEETING_PROCESS"&&selected.meetingAt&&
              <p className="aw-lead-meeting-scheduled">Meeting scheduled for <strong>{new Date(selected.meetingAt).toLocaleString("en-IN",{timeZone:"Asia/Kolkata",dateStyle:"long",timeStyle:"short"})} IST</strong></p>}
-           {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href="/app/clients">client record</Link>.</p>}
+           {selected.status==="APPROVED"&&<p className="text-sm">Approved. This phone is now linked to a <Link className="underline" href={selected.linkedClientId?"/app/clients/"+selected.linkedClientId:"/app/clients"}>client record</Link>.</p>}
            {selected.canEdit&&!isAdmin?<form onSubmit={edit} className="space-y-3">
              {(["contactName","businessName","businessType"] as const).map(k=>
                <FormField key={k} id={"edit-"+k} label={k==="contactName"?"Contact name":k==="businessName"?"Business name":"Business type"}>
@@ -453,8 +453,8 @@ export default function LeadsPage(){
                  {leadSources.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
                </select>
              </FormField>
-             <FormField id="edit-stage" label="Lead status"><select id="edit-stage" className="field" value={editStage} disabled={selected.status==="APPROVED"}
-               onChange={e=>setEditStage(e.target.value as Stage)}>{stages.map(x=><option key={x} value={x}>{stageLabel(x)}</option>)}</select></FormField>
+             <FormField id="edit-stage" label="Lead status" help={selected.status==="APPROVED"?(selected.canExpire?"Agreement ended. You can now select Expired and save.":"End this client's agreement in Clients to unlock Expired."):selected.status==="EXPIRED"?"This former client remains recorded in its original acquisition cycle.":undefined}><select id="edit-stage" className="field" value={editStage} disabled={selected.status==="EXPIRED"}
+               onChange={e=>setEditStage(e.target.value as Stage)}>{(selected.status==="APPROVED"?["APPROVED","EXPIRED"] as const:selected.status==="EXPIRED"?["EXPIRED"] as const:stages.filter(x=>x!=="EXPIRED")).map(x=><option key={x} value={x} disabled={x==="EXPIRED"&&selected.status==="APPROVED"&&!selected.canExpire}>{stageLabel(x)}</option>)}</select></FormField>
              {editStage==="FOLLOW_UP"&&<section className="aw-lead-followup-field" aria-label="Follow-up schedule">
                <FormField id="lead-follow-up-on" label="Follow-up date">
                  <input id="lead-follow-up-on" className="field" type="date" required
@@ -521,7 +521,7 @@ export default function LeadsPage(){
      <div className="aw-v3-bars">
       {([["Follow up",metrics.followUp],["Meeting process",metrics.meetingProcess],
         ["Decision pending",metrics.decisionPending],["Agreement pending",metrics.agreementPending],
-        ["Approved",metrics.approved]] as const).map(([label,value])=>
+        ["Approved",metrics.approved],["Expired",metrics.expired??0]] as const).map(([label,value])=>
        <div className="aw-v3-bar-row" key={label}>
         <span className="aw-v3-bar-label">{label}</span>
         <span className="aw-v3-bar-track" role="img" aria-label={label+": "+value+" leads"}>

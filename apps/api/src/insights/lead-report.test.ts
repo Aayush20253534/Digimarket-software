@@ -55,6 +55,16 @@ describe("Lead Analytics",()=>{
   })}));
   expect(findActivity).toHaveBeenCalled();
  });
+ it("keeps expired former clients in original approval and conversion statistics",async()=>{
+  const {subject,findMany}=service();
+  findMany.mockResolvedValueOnce([{...rows[0],status:"EXPIRED"}]);
+  const result=await subject.report(actor(["reports.business.read","leads.read"]),query);
+  expect(result.summary.converted).toBe(1);
+  expect(result.summary.approved).toBe(1);
+  expect(result.stages.find(x=>x.name==="EXPIRED")?.count).toBe(1);
+  expect(result.stages.find(x=>x.name==="APPROVED")?.count).toBe(0);
+  expect(result.items[0].converted).toBe(true);
+ });
  it("paginates the register without changing summary totals",async()=>{
   const {subject}=service();
   const result=await subject.report(actor(["reports.business.read","leads.read"]),{...query,page:2,limit:2});
