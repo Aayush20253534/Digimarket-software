@@ -167,9 +167,9 @@ const clientManagementPattern = /^clients\/[0-9a-fA-F-]{36}\/(renew|services)$/;
 const clientEndAgreementPattern = /^clients\/[0-9a-fA-F-]{36}\/end-agreement$/;
 // Allow only the client-scoped video readiness read and weekly update routes.
 const clientVideoReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness$/;
-const clientVideoWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness\/[1-5]$/;
+const clientVideoWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/video-readiness\/(?:[1-9]|[12][0-9]|3[0-6])$/;
 const clientPostReadinessPattern = /^clients\/[0-9a-fA-F-]{36}\/post-readiness$/;
-const clientPostWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/post-readiness\/[1-5]$/;
+const clientPostWeekPattern = /^clients\/[0-9a-fA-F-]{36}\/post-readiness\/(?:[1-9]|[12][0-9]|3[0-6])$/;
 const clientChildrenPattern = /^clients\/[0-9a-fA-F-]{36}\/contacts$/;
 const clientConvertPattern = /^leads\/[0-9a-fA-F-]{36}\/convert$/;
 const assetIdPattern = /^assets\/[0-9a-fA-F-]{36}$/;

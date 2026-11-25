@@ -1547,6 +1547,8 @@ model ClientVideoWeek {
   clientId String @db.Uuid
   month String @db.VarChar(7)
   week Int
+  periodFrom DateTime? @db.Date
+  periodTo DateTime? @db.Date
   readyAdded Int @default(0)
   delivered Int @default(0)
   note String? @db.VarChar(500)
@@ -1568,6 +1570,8 @@ model ClientPostWeek {
   clientId String @db.Uuid
   month String @db.VarChar(7)
   week Int
+  periodFrom DateTime? @db.Date
+  periodTo DateTime? @db.Date
   readyAdded Int @default(0)
   delivered Int @default(0)
   note String? @db.VarChar(500)

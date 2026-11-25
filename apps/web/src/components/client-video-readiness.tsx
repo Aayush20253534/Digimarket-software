@@ -1,22 +1,20 @@
 "use client";
-import {businessCycle,cycleLabel} from "@digimarket/contracts";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {CalendarDays,Check,PackageCheck,RefreshCw,Send,Video} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {Spinner} from "@/components/ui";
 
 type VideoWeek={
- week:number;storageMonth?:string;storageWeek?:number;from:string;to:string;readyAdded:number;delivered:number;
+ week:number;storageMonth?:string;storageWeek?:number;legacy?:boolean;from:string;to:string;readyAdded:number;delivered:number;
  availableBefore:number;remainingStock:number;version:number;note:string;
  updatedAt:string|null;updatedBy:string|null;
 };
 type Monthly={
- clientId:string;clientName:string;month:string;openingStock:number;
+ clientId:string;clientName:string;month:string;openingStock:number;from?:string|null;to?:string|null;legacyThrough?:string|null;
  contractStartOn:string|null;contractEndOn:string|null;agreementAligned:boolean;
  readyThisMonth:number;deliveredThisMonth:number;remainingStock:number;weeks:VideoWeek[];
 };
 type Draft={readyAdded:string;delivered:string;note:string};
-const currentMonth=()=>businessCycle().key;
 const validCount=(value:string)=>/^(0|[1-9][0-9]{0,4})$/.test(value)&&Number(value)<=10000;
 const count=(x:number)=>new Intl.NumberFormat("en-IN").format(x);
 const draftsFrom=(value:Monthly)=>Object.fromEntries(value.weeks.map(w=>[w.week,{
@@ -31,20 +29,22 @@ export function ClientVideoReadiness({clientId,month:externalMonth,onMonthChange
 }){
  const {session,request}=useAuth();
  const canEdit=!!session?.identity.permissions.includes("clients.edit");
- const [internalMonth,setInternalMonth]=useState(currentMonth);
- const month=externalMonth??internalMonth;
+ const [internalMonth,setInternalMonth]=useState("");
+ const requestedMonth=externalMonth??internalMonth;
  const [data,setData]=useState<Monthly|null>(null);
+ const month=requestedMonth||data?.month||"";
  const [drafts,setDrafts]=useState<Record<number,Draft>>({});
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState<number|null>(null);
  const [error,setError]=useState(""),[success,setSuccess]=useState("");
  const load=useCallback(async()=>{
   setLoading(true);setError("");
   try{
-   const result=await request<Monthly>("/clients/"+clientId+"/video-readiness?month="+encodeURIComponent(month)+"&basis=cycle");
+   const result=await request<Monthly>("/clients/"+clientId+"/video-readiness?basis=client"+(requestedMonth?"&month="+encodeURIComponent(requestedMonth):""));
+   if(!Object.prototype.hasOwnProperty.call(result,"from"))throw Error("Client-cycle API update required. Refresh once the backend deploys.");
    setData(result);setDrafts(draftsFrom(result));
   }catch(e){setError(e instanceof Error?e.message:"Could not load video stock");setData(null);}
   finally{setLoading(false);}
- },[clientId,month,request]);
+ },[clientId,requestedMonth,request]);
  useEffect(()=>{if(session)void load();},[session,load]);
  const anyStock=useMemo(()=>data?.weeks.some(w=>w.version>0)??false,[data]);
  const changeMonth=(next:string)=>{
@@ -65,7 +65,7 @@ export function ClientVideoReadiness({clientId,month:externalMonth,onMonthChange
   setSaving(w.week);setError("");setSuccess("");
   try{
    await request("/clients/"+clientId+"/video-readiness/"+(w.storageWeek??w.week),{method:"PUT",body:{
-    month:w.storageMonth??month,readyAdded:Number(v.readyAdded),delivered:Number(v.delivered),
+    month:w.storageMonth??month,clientCycle:true,readyAdded:Number(v.readyAdded),delivered:Number(v.delivered),
     note:v.note.trim(),version:w.version
    }});
    await load();
@@ -79,21 +79,21 @@ export function ClientVideoReadiness({clientId,month:externalMonth,onMonthChange
    <div><h2 className="flex items-center gap-2"><Video size={21}/>Video Readiness</h2>
     <p>Track newly edited videos ready for future posting and videos delivered each week. Remaining stock carries forward into the next cycle.</p></div>
    <div className="flex items-end gap-2 flex-wrap">
-    <label className="text-sm space-y-1"><span className="block">Cycle start month</span>
-     <input type="month" className="field" value={month} min="2026-10" max="2099-12" onChange={e=>changeMonth(e.target.value)}/></label>
+    <label className="text-sm space-y-1"><span className="block">Client cycle start month</span>
+     <input type="month" className="field" value={month} min={data?.contractStartOn?.slice(0,7)??"2026-10"} max="2099-12" onChange={e=>changeMonth(e.target.value)}/></label>
     <button className="aw-client-btn" type="button" disabled={loading||saving!==null} onClick={()=>void load()}>
      <RefreshCw size={15}/>Refresh
     </button>
    </div>
   </div>
-  <p className="aw-client-muted text-sm">Work cycle: {cycleLabel(month)}. The closing 22nd starts the next cycle. Each full contract week belongs to the cycle containing its start date.</p>
+  <div className="aw-client-cycle-summary"><strong>{data?.from&&data.to?formatDate(data.from)+" – "+formatDate(data.to):"Client service cycle"}</strong><span>Monthly anniversary · Independent of agency finance cycles</span>{data?.legacyThrough&&<small>Historical weeks retain their saved dates; any crossing week is shown in its start cycle.</small>}</div>
   {error&&<p className="aw-client-alert" role="alert">{error}</p>}
   {success&&<p className="aw-client-success" role="status">{success}</p>}
   {loading?<Spinner label="Loading weekly video status…"/>:data&&<>
    <p className="aw-client-muted text-sm">
     {data.agreementAligned
-     ?"Agreement period: "+formatDate(data.contractStartOn!)+" to "+(data.contractEndOn?formatDate(data.contractEndOn):"open-ended")+". Weeks run from the start date."
-     :"Contract start date is missing from this client profile. Calendar-month weeks are shown until it is configured."}
+     ?"Agreement period: "+formatDate(data.contractStartOn!)+" to "+(data.contractEndOn?formatDate(data.contractEndOn):"open-ended")+". Monthly weeks restart on the agreement anniversary."
+     :"Contract start date is missing from this client profile. Set the agreement start date to enable client-cycle editing. Existing stock is retained."}
    </p>
    <div className="aw-client-statrow">
     <div className="aw-client-stat"><PackageCheck size={18}/><span>Ready stock for upcoming</span><strong>{count(data.remainingStock)}</strong></div>
@@ -101,7 +101,7 @@ export function ClientVideoReadiness({clientId,month:externalMonth,onMonthChange
     <div className="aw-client-stat"><Send size={18}/><span>Delivered this cycle</span><strong>{count(data.deliveredThisMonth)}</strong></div>
     <div className="aw-client-stat"><CalendarDays size={18}/><span>Carried from earlier cycles</span><strong>{count(data.openingStock)}</strong></div>
    </div>
-   {data.weeks.length===0&&<p className="aw-client-muted text-sm">No agreement week starts in this cycle. Weeks that cross cycle boundaries appear in the cycle in which they start.</p>}
+   {data.weeks.length===0&&<p className="aw-client-muted text-sm">No editable weekly intervals start in this cycle. Saved stock remains carried forward.</p>}
    <div className="overflow-x-auto">
     <table className="aw-client-table w-full" aria-label={"Video readiness weeks for "+data.clientName+" "+month}>
      <thead><tr>
@@ -112,7 +112,7 @@ export function ClientVideoReadiness({clientId,month:externalMonth,onMonthChange
       const draft=drafts[w.week]??{readyAdded:String(w.readyAdded),delivered:String(w.delivered),note:w.note};
       return <tr key={w.week}>
        <td className="min-w-28"><strong>Week {w.week}</strong>
-        <small className="block opacity-70">{range(w)}</small></td>
+        <small className="block opacity-70">{range(w)}</small>{w.legacy&&<small className="aw-client-legacy-week">Preserved week</small>}</td>
        <td className="font-semibold">{count(w.availableBefore)}</td>
        <td>{canEdit?<input className="field w-24" aria-label={"Ready videos week "+w.week} type="number" min="0" max="10000" step="1"
         value={draft.readyAdded} onChange={e=>update(w.week,"readyAdded",e.target.value)}/>:count(w.readyAdded)}</td>
@@ -130,7 +130,7 @@ export function ClientVideoReadiness({clientId,month:externalMonth,onMonthChange
     </table>
    </div>
    <div className="aw-client-muted text-sm space-y-1">
-    <p>Weeks are consecutive seven-day periods from the contract start, ending at the contract end date where provided. A week crossing the 22nd stays in the cycle in which it starts. Without a contract start date, the original calendar weeks are grouped into these cycles.</p>
+    <p>New weeks restart at the client’s monthly anniversary and end at the cycle or agreement boundary. Previously recorded weeks keep their original dates and quantities. Unused stock carries forward.</p>
     <p><strong>Stock calculation:</strong> Opening stock + newly ready videos − delivered videos. A video is counted as ready only when it enters stock; delivery reduces that stock. This tracker is manually maintained and does not automatically read video files or social media posts.</p>
     {!anyStock&&data.weeks.length>0&&<p>No video quantities recorded for this cycle. Enter the first ready or delivered counts and save that week.</p>}
    </div>

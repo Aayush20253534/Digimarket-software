@@ -39,3 +39,17 @@ describe("client content work cycles",()=>{
   expect(await service.cycle(actor,"client","2026-11")).toMatchObject({openingStock:3,festivalOpeningStock:2,festivalRemainingStock:2});
  });
 });
+
+describe("client anniversary stock preservation",()=>{
+ it("counts every legacy movement exactly once, with a shared dated grid",async()=>{
+  const db=fixture();
+  const v=new ClientVideoReadinessService(db),p=new ClientPostReadinessService(db);
+  const old=await v.clientCycle(actor,"client","2026-10","2026-11-25");
+  const current=await v.clientCycle(actor,"client","2026-11","2026-11-25");
+  expect(old).toMatchObject({from:"2026-10-22",to:"2026-11-21",remainingStock:3,totalStock:6});
+  expect(current).toMatchObject({openingStock:3,remainingStock:6,totalStock:6});
+  expect(current.weeks[0]).toMatchObject({from:"2026-11-26",storageMonth:"2026-11",storageWeek:4,legacy:true});
+  expect(current.weeks[1]?.from).toBe("2026-12-03");
+  expect(await p.clientCycle(actor,"client","2026-11","2026-11-25")).toMatchObject({festivalOpeningStock:2,festivalRemainingStock:2,festivalTotalStock:2});
+ });
+});

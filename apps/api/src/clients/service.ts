@@ -71,12 +71,12 @@ export class ClientsService {
    ]);
    const cycle=businessCycle(today),withStock: (typeof items[number]&{readiness:Awaited<ReturnType<ClientsService["readiness"]>>})[]=[];
    // Bounded fan-out reuses the canonical stock calculations.
-   for(let i=0;i<items.length;i+=4)withStock.push(...await Promise.all(items.slice(i,i+4).map(async row=>({...row,readiness:await this.readiness(a,row.id,cycle.key)}))));
+   for(let i=0;i<items.length;i+=4)withStock.push(...await Promise.all(items.slice(i,i+4).map(async row=>({...row,readiness:await this.readiness(a,row.id,today)}))));
    return {items:withStock,nextCursor,total,today,cycle,managers,summary:{all,active:activeCount,paused,archived,past,expiring:ending,monthlyFees:fees?fees._sum.monthlyFee?.toFixed(4)??"0.0000":null}};
  }
- private async readiness(a:Principal,id:string,key:string){
-   const [v,p]=await Promise.all([new ClientVideoReadinessService(this.db).cycle(a,id,key),new ClientPostReadinessService(this.db).cycle(a,id,key)]);
-   return {videos:v.remainingStock,posts:p.remainingStock,festival:p.festivalRemainingStock,videosDelivered:v.deliveredThisMonth,postsDelivered:p.deliveredThisMonth,festivalDelivered:p.festivalDeliveredThisMonth};
+ private async readiness(a:Principal,id:string,today:string){
+   const [v,p]=await Promise.all([new ClientVideoReadinessService(this.db).clientCycle(a,id,undefined,today),new ClientPostReadinessService(this.db).clientCycle(a,id,undefined,today)]);
+   return {from:v.from,to:v.to,videos:v.totalStock,posts:p.totalStock,festival:p.festivalTotalStock,videosDelivered:v.deliveredThisMonth,postsDelivered:p.deliveredThisMonth,festivalDelivered:p.festivalDeliveredThisMonth};
  }
  async detail(a:Principal,id:string){
    await this.existing(a,id);
@@ -90,7 +90,7 @@ export class ClientsService {
    const client=await this.existing(a,id),cycle=businessCycle(this.today());
    const finance=a.permissions.has("finance.read.all");
    const [readiness,services,managers,history]=await Promise.all([
-     this.readiness(a,id,cycle.key),this.db.clientService.findMany({where:{clientId:id},orderBy:{name:"asc"}}),
+     this.readiness(a,id,this.today()),this.db.clientService.findMany({where:{clientId:id},orderBy:{name:"asc"}}),
      this.db.user.findMany({where:{organizationId:a.organizationId,status:"ACTIVE"},select:{id:true,displayName:true},orderBy:{displayName:"asc"}}),
      this.db.auditLog.findMany({where:{organizationId:a.organizationId,entityType:"Client",entityId:id},orderBy:[{createdAt:"desc"},{id:"desc"}],take:100,select:{id:true,action:true,createdAt:true,beforeRedacted:true,afterRedacted:true,actor:{select:{displayName:true}}}})
    ]);
@@ -172,6 +172,10 @@ export class ClientsService {
    if(fields.monthlyAdBudget!==undefined)data.monthlyAdBudget=fields.monthlyAdBudget||null;
    const previous=await this.db.client.findUniqueOrThrow({where:{id}});
    if(previous.currentAgreementStartOn&&((fields.monthlyFee!==undefined&&(fields.monthlyFee||null)!==(previous.monthlyFee?.toString()??null)&&(!previous.monthlyFee||!fields.monthlyFee||!previous.monthlyFee.equals(fields.monthlyFee)))||(fields.monthlyAdBudget!==undefined&&(fields.monthlyAdBudget||null)!==(previous.monthlyAdBudget?.toString()??null)&&(!previous.monthlyAdBudget||!fields.monthlyAdBudget||!previous.monthlyAdBudget.equals(fields.monthlyAdBudget)))))throw invalid("Use Renew agreement to change renewed commercial terms");
+   if(previous.contractStartOn&&fields.contractStartOn!==undefined&&fields.contractStartOn!==previous.contractStartOn.toISOString().slice(0,10)){
+     const [videos,posts]=await Promise.all([this.db.clientVideoWeek.count({where:{organizationId:a.organizationId,clientId:id}}),this.db.clientPostWeek.count({where:{organizationId:a.organizationId,clientId:id}})]);
+     if(videos||posts)throw invalid("Agreement start cannot change after readiness records have been created");
+   }
    if(previous.currentAgreementStartOn&&fields.contractStartOn!==undefined&&fields.contractStartOn!==(previous.contractStartOn?.toISOString().slice(0,10)??""))throw invalid("The original readiness anchor cannot change after renewal");
    if(previous.currentAgreementStartOn&&fields.contractEndOn!==undefined&&fields.contractEndOn!==(previous.contractEndOn?.toISOString().slice(0,10)??""))throw invalid("Use Renew agreement to change a renewed contract period");
    if(status==="EXPIRED"&&previous.status!=="EXPIRED")throw invalid("Use End agreement to record the end date and reason");
