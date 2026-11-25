@@ -117,7 +117,7 @@ export default function LeadsPage(){
    catch{/* Optional view preferences. */}
  },[preferencesReady,session?.identity.userId,stage,sourceFilter,search,sortBy,descending]);
  useEffect(()=>{setCheckedLeads({});},[stage,sourceFilter,search,sortBy,descending,session?.identity.userId]);
- const changeCycle=(choice:string)=>{loadSequence.current++;setCycleChoice(choice);setCursor(null);setHistory([]);setTotalLeads(null);setItems([]);setMetrics(null);setNextCursor(null);setCheckedLeads({});setStage("");setLoading(true);};
+ const changeCycle=(choice:string)=>{if(choice===cycleChoice)return;loadSequence.current++;setCycleChoice(choice);setCursor(null);setHistory([]);setTotalLeads(null);setItems([]);setMetrics(null);setNextCursor(null);setCheckedLeads({});setStage("");setLoading(true);};
  useEffect(()=>{setCursor(null);setHistory([]);setCheckedLeads({});},[cycleKey]);
  const load=useCallback(async()=>{
    if(!canRead){setLoading(false);return;}
@@ -207,7 +207,7 @@ export default function LeadsPage(){
    try{
      const data=await request<Lead>("/leads",{method:"POST",body:created});
      setCreated(blank);setCreating(false);setMessage("Lead added to PENDING as "+sourceLabel(created.source)+".");
-     setCursor(null);await load();await open(data.id);
+     if(cycleChoice!=="current"&&cycleChoice!=="total")changeCycle("current");else{setCursor(null);await load();}await open(data.id);
    }catch(e){setError(errText(e));}finally{setBusy(false);}
  }
  async function edit(e:FormEvent){
@@ -308,7 +308,7 @@ export default function LeadsPage(){
      <span className="text-xs">{cycleKey?"Live statuses · acquired in selected cycle":"All recorded leads, including legacy records"}</span>
    </section>
    {metrics&&<section aria-label="CRM pipeline summary" className="aw-crm-quick-metrics grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
-     {([["Total leads",metrics.total,""],["Approved clients",metrics.approved,"APPROVED"],["PENDING",metrics.pending,"PENDING"],["CALL NOT PICKING",metrics.callNotPicking,"CALL_NOT_PICKING"],["CALL BUSY",metrics.callBusy,"CALL_BUSY"],
+     {([["Total leads",metrics.total,""],["Approved clients",metrics.approved,"APPROVED"],["PENDING",metrics.pending,"PENDING"],["CALL NOT PICKING",metrics.callNotPicking??0,"CALL_NOT_PICKING"],["CALL BUSY",metrics.callBusy??0,"CALL_BUSY"],
        ["YET TO CALL",metrics.yetToCall,"YET_TO_CALL"],["FOLLOW UP",metrics.followUp,"FOLLOW_UP"],
        ["MEETING PROCESS",metrics.meetingProcess,"MEETING_PROCESS"],["DECISION PENDING",metrics.decisionPending,"DECISION_PENDING"],
        ["AGREEMENT PENDING",metrics.agreementPending,"AGREEMENT_PENDING"],["REJECTED",metrics.rejected,"REJECTED"]] as const).map(([label,value,filter])=>

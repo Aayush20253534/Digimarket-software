@@ -193,7 +193,7 @@ test("ending an agreement moves the client to Expired and removes the projection
   );
   await page.getByRole("link", { name: "View expired agreements", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Expired agreements", exact: true }),
+    page.getByRole("heading", { name: "Past Clients", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("table", { name: "Clients directory" })).toContainText(
     client.businessName,

@@ -745,8 +745,8 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const yetToCallBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-yet-to-call");
   await expect(yetToCallBadge).toHaveText("YET TO CALL");
-  await expect(yetToCallBadge).toHaveCSS("background-color","rgb(40, 40, 43)");
-  await expect(yetToCallBadge).toHaveCSS("color","rgb(228, 228, 231)");
+  await expect(yetToCallBadge).toHaveCSS("background-color","rgb(57, 38, 83)");
+  await expect(yetToCallBadge).toHaveCSS("color","rgb(228, 215, 255)");
   await page.getByLabel("Lead status").selectOption("FOLLOW_UP");
   await expect(page.getByLabel("Follow-up date")).toBeVisible();
   const agencyDay=(offset:number)=>new Intl.DateTimeFormat("en-CA",{
@@ -814,7 +814,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   const notPickingBadge=page.getByRole("table",{name:"Leads directory"})
     .locator("tbody tr").filter({has:page.locator(".aw-lead-action")}).locator(".aw-status-not-picking");
   await expect(notPickingBadge).toHaveText("CALL NOT PICKING");
-  await expect(notPickingBadge).toHaveCSS("background-color","rgb(40, 40, 43)");
+  await expect(notPickingBadge).toHaveCSS("background-color","rgb(57, 38, 83)");
   await page.getByLabel("Lead status").selectOption("REJECTED");
   await page.getByRole("button",{name:"Save details and stage"}).click();
   const rejectedBadge=page.getByRole("table",{name:"Leads directory"})
