@@ -62,7 +62,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await finishPasswordRotation(page,UPDATED);
   // Admin now signs in with credentials alone; no authenticator challenge remains.
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
-  await expect(page).toHaveURL(/\/app\/dashboard/);
+  await expect(page).toHaveURL(/\/app\/leads/);
+  await expect(page.getByRole("navigation",{name:"Workspace navigation"}).getByRole("link",{name:"Overview",exact:true})).toHaveCount(0);
+  await visitWorkspace(page,"/app/dashboard");
   await expect(page.getByTestId("amplifyworld-dashboard")).toBeVisible();
   await expect(page.getByTestId("amplifyworld-dashboard")).toHaveAttribute("data-dashboard-role","admin");
   // Dashboard cards load asynchronously: Playwright's computed-style
@@ -232,7 +234,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   expect(desktopZoom,"Comfortable desktop workspace must render at 100% scale").toBe(1);
   const pageBackground=await page.evaluate(()=>getComputedStyle(document.body).backgroundColor);
   expect(pageBackground,"Reports must preserve an explicit dark document background")
-    .toBe("rgb(11, 11, 12)");
+    .toBe("rgb(22, 13, 36)");
   const desktopBounds=await page.evaluate(()=>({
     doc:document.documentElement.scrollWidth,
     client:document.documentElement.clientWidth,
@@ -403,9 +405,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await login(page,"ci-founder",founderInitial);
   const founderPassword="CI-Founder-"+Date.now().toString(36)+"#2026";
   await finishPasswordRotation(page,founderPassword);
-  await expect(page).toHaveURL(/\/app\/dashboard/);
+  await expect(page).toHaveURL(/\/app\/leads/);
   await expect(page.getByRole("heading",{name:"Enable two-factor security"})).toHaveCount(0);
   await expect(page.getByTestId("client-deliveries-overview")).toHaveCount(0);
+  await visitWorkspace(page,"/app/dashboard");
   await capturePhase0Role(page,"founder");
   await expect(page.locator('[data-dashboard-role="founder"]')).toBeVisible();
   await expect(page.getByRole("navigation",{name:"Workspace quick actions"}).getByRole("link",{name:/Follow-ups/})).toBeVisible();
@@ -415,7 +418,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(founderNav.getByRole("link",{name:"Finance",exact:true})).toBeVisible();
   await expect(founderNav.getByRole("link",{name:"Documents",exact:true})).toBeVisible();
   const founderSections=await founderNav.locator(".aw-nav-group").allTextContents();
-  expect(founderSections).toEqual(["Workspace","Sales & CRM","Business","Communication","Administration"]);
+  expect(founderSections).toEqual(["Sales & CRM","Business","Communication","Administration"]);
   await expect(founderNav.getByRole("link",{name:"Clients",exact:true})).toHaveCount(1);
   await expect(founderNav.getByRole("link",{name:"Client Deliveries",exact:true})).toHaveCount(0);
   for(const label of ["My notes","Content calendar","Quotations","Agreements","Task history","Approvals","Founders & responsibilities"])
@@ -489,7 +492,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   if(await page.getByRole("button",{name:"Switch to dark theme"}).count()){
    await page.getByRole("button",{name:"Switch to dark theme"}).click();
   }
-  await expect(page.locator(".aw-chat-directory")).toHaveCSS("background-color","rgb(23, 23, 25)");
+  await expect(page.locator(".aw-chat-directory")).toHaveCSS("background-color","rgb(33, 22, 48)");
   await page.getByRole("button",{name:"Switch to light theme"}).click();
   await expect(page.locator(".aw-chat-directory")).toHaveCSS("background-color","rgb(255, 255, 255)");
   await page.getByRole("button",{name:"Switch to dark theme"}).click();
@@ -968,8 +971,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await login(page,"ci-employee",employeeInitial);
   const employeePassword="CI-Employee-"+Date.now().toString(36)+"#2026";
   await finishPasswordRotation(page,employeePassword);
-  await expect(page).toHaveURL(/\/app\/dashboard/);
+  await expect(page).toHaveURL(/\/app\/leads/);
   await expect(page.getByTestId("client-deliveries-overview")).toHaveCount(0);
+  await visitWorkspace(page,"/app/dashboard");
   await capturePhase0Role(page,"employee");
   // Phase 7: a slow search response cannot replace newer results. This uses
   // only the isolated CI account, and mocks reads without mutating records.
@@ -1038,10 +1042,10 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
     });
   });
   expect(taskCardStyles).toEqual([
-    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(252, 211, 77)"},
-    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(147, 197, 253)"},
-    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(134, 239, 172)"},
-    {background:"rgb(23, 23, 25)",text:"rgb(245, 245, 245)",status:"rgb(253, 164, 175)"},
+    {background:"rgb(33, 22, 48)",text:"rgb(245, 245, 245)",status:"rgb(252, 211, 77)"},
+    {background:"rgb(33, 22, 48)",text:"rgb(245, 245, 245)",status:"rgb(147, 197, 253)"},
+    {background:"rgb(33, 22, 48)",text:"rgb(245, 245, 245)",status:"rgb(134, 239, 172)"},
+    {background:"rgb(33, 22, 48)",text:"rgb(245, 245, 245)",status:"rgb(253, 164, 175)"},
   ]);
   }
   await visitWorkspace(page,"/app/dashboard");
@@ -1130,7 +1134,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.setViewportSize({width:1366,height:768});
   await page.getByRole("button",{name:"Sign out"}).click();
   await login(page,"admin-e2e",UPDATED);
-  await expect(page).toHaveURL(/\/app\/dashboard/);
+  await expect(page).toHaveURL(/\/app\/leads/);
   await visitWorkspace(page,"/app/finance/entries");
   // Register filters reach the API and keep agency records separate from client ads.
   await expect(page.getByRole("button",{name:"Agency totals & register"})).toHaveClass(/btn-primary/);
