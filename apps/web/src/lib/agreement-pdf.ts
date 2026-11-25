@@ -1,3 +1,4 @@
+import {savePdf} from "./document-pdf";
 /** Client-side four-page A4 agreement matching the approved AmplifyWorld legal template. */
 export type AgreementFields={
  mode:"default"|"custom";
@@ -52,61 +53,30 @@ function painter():Painter{
  const section=(title:string,y:number)=>{text(title.toUpperCase(),40,y,10,purple,true);return y+18;};
  return {canvas,g,text,wrap,line,section};
 }
-function pdfFromCanvases(canvases:HTMLCanvasElement[]):Uint8Array{
- const encoder=new TextEncoder(),pieces:Uint8Array[]=[];const positions:number[]=[0];let length=0;
- const write=(s:string)=>{const bytes=encoder.encode(s);pieces.push(bytes);length+=bytes.length;};
- const raw=(a:Uint8Array)=>{pieces.push(a);length+=a.length;};
- const obj=(id:number,body:string)=>{positions[id]=length;write(id+" 0 obj\n"+body+"\nendobj\n");};
- const count=canvases.length;
- write("%PDF-1.4\n");
- obj(1,"<< /Type /Catalog /Pages 2 0 R >>");
- obj(2,"<< /Type /Pages /Count "+count+" /Kids ["+canvases.map((_,i)=>(3+i)+" 0 R").join(" ")+"] >>");
- for(let i=0;i<count;i++){
-  const imageId=3+count+i,contentId=3+2*count+i;
-  obj(3+i,"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 "+imageId+" 0 R >> >> /Contents "+contentId+" 0 R >>");
- }
- for(let i=0;i<count;i++){
-  const jpeg=atob(canvases[i].toDataURL("image/jpeg",.95).split(",")[1]);
-  const bytes=new Uint8Array(jpeg.length);for(let j=0;j<jpeg.length;j++)bytes[j]=jpeg.charCodeAt(j);
-  const id=3+count+i;positions[id]=length;
-  write(id+" 0 obj\n<< /Type /XObject /Subtype /Image /Width "+canvases[i].width+" /Height "+canvases[i].height+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+bytes.length+" >>\nstream\n");
-  raw(bytes);write("\nendstream\nendobj\n");
- }
- for(let i=0;i<count;i++){
-  const stream="q\n595 0 0 842 0 0 cm\n/Im0 Do\nQ\n";
-  obj(3+2*count+i,"<< /Length "+encoder.encode(stream).length+" >>\nstream\n"+stream+"endstream");
- }
- const offset=length,totalObjects=2+3*count;
- write("xref\n0 "+(totalObjects+1)+"\n0000000000 65535 f \n");
- for(let i=1;i<=totalObjects;i++)write(String(positions[i]).padStart(10,"0")+" 00000 n \n");
- write("trailer\n<< /Size "+(totalObjects+1)+" /Root 1 0 R >>\nstartxref\n"+offset+"\n%%EOF");
- const all=new Uint8Array(length);let n=0;for(const item of pieces){all.set(item,n);n+=item.length;}
- return all;
-}
-
-export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
+export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{savePdf(await renderAgreementPages(row),row.agreementNumber,row.clientName);}
+export async function renderAgreementPages(row:SavedAgreement):Promise<HTMLCanvasElement[]>{
  const p=row.payload;
  const pages=[painter(),painter(),painter(),painter()];
+ const ordered:Painter[]=[...pages];
+ const current=new Map<Painter,Painter>(pages.map(p=>[p,p]));
  const navy="#39204F", lavender="#F3ECF8", violet="#7225BB", pale="#EEDFF8";
  const brand=new Image();brand.decoding="async";brand.src="/brand/amplifyworld-quotation-wordmark.svg";
  let branded=false;
  try{await brand.decode();branded=true;}catch{/* Keep text fallback for offline PDFs. */}
- pages.forEach((a,index)=>{
-  a.g.fillStyle=violet;a.g.fillRect(0,0,PW,7);
-  if(branded){
-   const ratio=brand.naturalWidth/brand.naturalHeight||4.5;
-   const width=Math.min(190,ratio*40);
-   a.g.drawImage(brand,40,19,width,width/ratio);
-  }else a.text("AmplifyWorld",40,49,24,navy,true);
-  a.text("STRATEGY / TECHNOLOGY / MARKETING",40,67,7,violet,true);
-  a.g.fillStyle="#DABBEA";a.g.fillRect(40,79,515,.8);
-  a.g.fillRect(40,790,515,.8);
-  a.text("amplifyworld.in  |  amplifyworld.official@gmail.com  |  +91 89318 01405",40,807,7,"#736681");
-  a.text("PAGE "+(index+1)+" / 4",510,807,7,navy,true);
- });
- const paragraph=(a:Painter,value:string,y:number)=>a.wrap(value,40,y,515,8.8,12.4,navy)+7;
+ const active=(a:Painter)=>current.get(a)??a;
+ const next=(logical:Painter)=>{const prior=active(logical),page=painter();ordered.splice(ordered.indexOf(prior)+1,0,page);current.set(logical,page);page.text("AGREEMENT / CONTINUATION",40,111,13,navy,true);return page;};
+ const flow=(logical:Painter,value:string,y:number,x=40,width=515,size=8.8,leading=12.4,color=navy,bold=false)=>{
+  let page=active(logical);page.g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
+  const lines:string[]=[];let line="";
+  for(const token of value.split(/\s+/)){let word=token;while(page.g.measureText(word).width>width){let n=1;while(n<word.length&&page.g.measureText(word.slice(0,n+1)).width<=width)n++;if(line){lines.push(line);line=""}lines.push(word.slice(0,n));word=word.slice(n);}
+   if(!word)continue;const candidate=line?line+" "+word:word;if(page.g.measureText(candidate).width>width&&line){lines.push(line);line=word}else line=candidate;}
+  if(line)lines.push(line);
+  for(const text of lines){if(y>767){page=next(logical);y=140;}page.text(text,x,y,size,color,bold);y+=leading;}return y;
+ };
+ const paragraph=(a:Painter,value:string,y:number)=>flow(a,value,y)+7;
  const heading=(a:Painter,number:string,title:string,y:number)=>{
-  a.text(number+"  "+title.toUpperCase(),40,y,10,violet,true);
+  if(y>735){next(a);y=140;}
+  active(a).text(number+"  "+title.toUpperCase(),40,y,10,violet,true);
   return y+18;
  };
  const section=(a:Painter,number:string,title:string,value:string,y:number)=>{
@@ -114,11 +84,8 @@ export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
   return paragraph(a,value,top)+4;
  };
  const rowBox=(a:Painter,label:string,value:string,y:number,height=28)=>{
-  a.g.fillStyle=y%2<1?lavender:"#F9F5FC";
-  a.g.fillRect(40,y,515,height-1);
-  a.text(label.toUpperCase(),51,y+height/2+3,7.3,"#58446F",true);
-  a.wrap(value,248,y+height/2+3,295,8.4,10.5,navy,true);
-  return y+height;
+  let page=active(a);page.g.font="700 8.4px Arial, Helvetica, sans-serif";let lines=1,line="";for(const word of value.split(/\s+/)){const candidate=line?line+" "+word:word;if(page.g.measureText(candidate).width>295&&line){lines++;line=word}else line=candidate;}
+  const needed=Math.max(height,lines*10.5+14);if(y+needed>765){page=next(a);y=140;}page.g.fillStyle=y%2<1?lavender:"#F9F5FC";page.g.fillRect(40,y,515,needed-1);page.text(label.toUpperCase(),51,y+14,7.3,"#58446F",true);const end=flow(a,value,y+14,248,295,8.4,10.5,navy,true);return end<y?end+5:Math.max(y+needed,end+5);
  };
  const tax=p.taxMode==="inclusive"?"Applicable taxes included in quoted fees":p.taxMode==="extra"?"GST at "+p.gstRate+"% extra on agency charges":"No taxes charged";
  const serviceFee=money(row.serviceFee),ads=money(row.adBudget),total=money(row.total);
@@ -144,9 +111,10 @@ export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
  y=rowBox(page1,"Illustrative package value",total+" | "+tax,y);
  y=rowBox(page1,"Payment terms",payment,y,36);
  y=rowBox(page1,"Effective / start date",fmt(p.startDate)+" | Agreement dated "+fmt(p.agreementDate),y);
- page1.g.fillStyle=pale;page1.g.fillRect(40,y+13,515,49);
- page1.text("PAYMENT CLARITY:",52,y+30,8,violet,true);
- page1.wrap("The Agency fee is "+serviceFee+" ("+p.feePeriod+"). Initial payment: "+money(p.advanceAmount)+". "+adsSentence+" No additional fee is payable without the Client's written approval.",52,y+43,490,8,11,violet);
+ if(y+90>760){next(page1);y=140;}
+ active(page1).g.fillStyle=pale;active(page1).g.fillRect(40,y+13,515,49);
+ active(page1).text("PAYMENT CLARITY:",52,y+30,8,violet,true);
+ active(page1).wrap("The Agency fee is "+serviceFee+" ("+p.feePeriod+"). Initial payment: "+money(p.advanceAmount)+". "+adsSentence+" No additional fee is payable without the Client's written approval.",52,y+43,490,8,11,violet);
  y+=82;
  y=section(page1,"01","Parties and appointment",
   "This Digital Marketing Services Agreement (the Agreement) is entered into by AmplifyWorld, a marketing service provider operating in Prayagraj, Uttar Pradesh (the Agency), represented by "+p.agencyRepresentative+", and "+p.clientName+" (the Client), represented by "+p.clientRepresentative+". The Client appoints the Agency to perform the agreed services in Schedule A.",y);
@@ -156,7 +124,7 @@ export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
   "The Agency fee is "+serviceFee+" "+(p.feePeriod==="monthly"?"per month":"on a one-time basis")+
   ". "+payment+". An initial payment of "+money(p.advanceAmount)+" is agreed. "+
   adsSentence+" The illustrative package value is "+total+". "+tax+". Any additional work or charge requires prior written approval.",y);
- if(y>770)throw new Error("Agreement opening content exceeds page one. Shorten the payment schedule.");
+
  const page2=pages[1];
  page2.text("SERVICES, CAMPAIGNS & CLIENT RESPONSIBILITIES",40,111,14,navy,true);
  y=140;
@@ -172,7 +140,7 @@ export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
   "The Client is responsible for the accuracy, ownership and legality of supplied product claims, images, offers and testimonials. Campaign performance, reach and approval times depend on external platforms and market conditions; forecasts are planning estimates rather than guaranteed outcomes.",y);
  y=section(page2,"08","Reporting, enquiries and account access",
   "The Agency will provide relevant activity and campaign summaries based on available records. The Client remains responsible for responding to customer enquiries and providing its products or services. Account access shall be shared securely and returned or revoked when no longer required.",y);
- if(y>770)throw new Error("Service descriptions exceed page two. Shorten the service scope.");
+
  const page3=pages[2];
  page3.text("RIGHTS, EXIT & GENERAL TERMS",40,111,14,navy,true);
  y=140;
@@ -189,10 +157,10 @@ export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
  y=section(page3,"14","Notices, governing law and entire agreement",
   "Written communications may be made using acknowledged email or WhatsApp. The parties will first seek resolution through good-faith discussion for 30 days. Indian law governs this agreement, and competent courts in Prayagraj, Uttar Pradesh have jurisdiction, subject to mandatory rules. Schedule A forms part of the agreement; amendments require mutual written consent.",y);
  if(p.additionalTerms)y=section(page3,"15","Additional agreed terms",p.additionalTerms,y);
- if(y>770)throw new Error("Legal terms exceed page three. Shorten additional terms or exclusions.");
+
  const page4=pages[3];
- page4.text("SCHEDULE A / COMMERCIAL TERMS & SIGNATURES",40,111,11,violet,true);
- page4.text("To be completed and accepted by both parties before execution.",40,133,8,"#746688");
+ active(page4).text("SCHEDULE A / COMMERCIAL TERMS & SIGNATURES",40,111,11,violet,true);
+ active(page4).text("To be completed and accepted by both parties before execution.",40,133,8,"#746688");
  y=147;
  y=rowBox(page4,"Client / business",p.clientName,y,24);
  y=rowBox(page4,"Registered legal name",p.clientName,y,24);
@@ -205,32 +173,40 @@ export async function downloadAgreementPdf(row:SavedAgreement):Promise<void>{
  y=rowBox(page4,"Tax treatment",tax,y,24);
  y=rowBox(page4,"Payment at signing",money(p.advanceAmount)+" | "+payment,y,31);
  y=rowBox(page4,"Monthly deliverables",p.reels+" reels + "+p.posts+" posts (where applicable)",y,24);
- page4.text("INCLUDED SERVICES AND DELIVERABLES",40,y+18,9,violet,true);
+ if(y>715){next(page4);y=140;}active(page4).text("INCLUDED SERVICES AND DELIVERABLES",40,y+18,9,violet,true);
  y+=34;
  for(let i=0;i<p.services.length;i++){
   const s=p.services[i];
-  y=page4.wrap(String(i+1).padStart(2,"0")+"  "+s.name+" - "+s.description,42,y,509,8,10,navy)+3;
+  y=flow(page4,String(i+1).padStart(2,"0")+"  "+s.name+" - "+s.description,y,42,509,8,10,navy)+3;
  }
- if(y>632)throw new Error("Schedule A exceeds page four. Shorten services or descriptions.");
- page4.g.fillStyle=pale;page4.g.fillRect(40,Math.max(638,y+10),515,45);
- const conditionY=Math.max(652,y+24);
- page4.wrap("PAYMENT CONDITION: "+payment+". "+adsSentence+" Extra charges require written approval. "+tax+".",51,conditionY,492,8,11,violet);
- const signedY=Math.max(706,y+87);
- if(signedY>717)throw new Error("Signature section exceeds page four.");
- page4.text("FOR AMPLIFYWORLD",40,signedY,8,violet,true);
- page4.text("FOR "+p.clientName.toUpperCase(),311,signedY,8,violet,true);
- page4.text("Signature: _____________________",40,signedY+20,8,navy);
- page4.text("Signature: _____________________",311,signedY+20,8,navy);
- page4.text("Name: "+p.agencyRepresentative,40,signedY+39,8,navy);
- page4.text("Name: "+p.clientRepresentative,311,signedY+39,8,navy);
- page4.text("Role: "+(p.agencyDesignation||"Authorized Signatory"),40,signedY+56,8,navy);
- page4.text("Role: "+(p.clientDesignation||"Client / Authorized Signatory"),311,signedY+56,8,navy);
- page4.text("Date: ______________________",40,signedY+73,8,navy);
- page4.text("Date: ______________________",311,signedY+73,8,navy);
- const pdf=pdfFromCanvases(pages.map(a=>a.canvas));
- const blob=new Blob([new Uint8Array(pdf).buffer],{type:"application/pdf"}),url=URL.createObjectURL(blob);
- const a=document.createElement("a");a.href=url;
- a.download=row.agreementNumber+"-"+row.clientName.replace(/[^a-z0-9-_]+/gi,"-")+".pdf";
- document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),20000);
+
+ if(y>620){next(page4);y=140;}
+ const conditionY=Math.max(active(page4)===page4?652:140,y+24);
+ y=flow(page4,"PAYMENT CONDITION: "+payment+". "+adsSentence+" Extra charges require written approval. "+tax+".",conditionY,51,492,8,11,violet);
+ if(y>695){next(page4);y=140;}
+ const signedY=Math.max(active(page4)===page4?706:145,y+16);
+ active(page4).text("FOR AMPLIFYWORLD",40,signedY,8,violet,true);
+ active(page4).text("FOR "+p.clientName.toUpperCase(),311,signedY,8,violet,true);
+ active(page4).text("Signature: _____________________",40,signedY+20,8,navy);
+ active(page4).text("Signature: _____________________",311,signedY+20,8,navy);
+ active(page4).text("Name: "+p.agencyRepresentative,40,signedY+39,8,navy);
+ active(page4).text("Name: "+p.clientRepresentative,311,signedY+39,8,navy);
+ active(page4).text("Role: "+(p.agencyDesignation||"Authorized Signatory"),40,signedY+56,8,navy);
+ active(page4).text("Role: "+(p.clientDesignation||"Client / Authorized Signatory"),311,signedY+56,8,navy);
+ active(page4).text("Date: ______________________",40,signedY+73,8,navy);
+ active(page4).text("Date: ______________________",311,signedY+73,8,navy);
+ ordered.forEach((a,index)=>{
+  a.g.fillStyle=violet;a.g.fillRect(0,0,PW,7);
+  if(branded){
+   const ratio=brand.naturalWidth/brand.naturalHeight||4.5;
+   const width=Math.min(190,ratio*40);
+   a.g.drawImage(brand,40,19,width,width/ratio);
+  }else a.text("AmplifyWorld",40,49,24,navy,true);
+  a.text("STRATEGY / TECHNOLOGY / MARKETING",40,67,7,violet,true);
+  a.g.fillStyle="#DABBEA";a.g.fillRect(40,79,515,.8);
+  a.g.fillRect(40,790,515,.8);
+  a.text("amplifyworld.in  |  amplifyworld.official@gmail.com  |  +91 89318 01405",40,807,7,"#736681");
+  a.text("PAGE "+(index+1)+" / "+ordered.length,510,807,7,navy,true);
+ });
+ return ordered.map(a=>a.canvas);
 }
