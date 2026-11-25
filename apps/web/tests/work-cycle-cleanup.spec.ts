@@ -256,3 +256,18 @@ test("lead cycle scopes the register and metrics together and Total includes ear
  await expect(picker).toHaveValue("total");
  await expect.poll(()=>requests.some(r=>r.path==="/leads/metrics"&&r.cycle===null)).toBe(true);
 });
+
+test("purple and light theme choices persist through full CRM reloads",async({page})=>{
+ await mockWorkspace(page);
+ await page.goto("/app/leads");
+ const workspace=page.locator(".aw-workspace");
+ await expect(workspace).toHaveAttribute("data-theme","dark");
+ await page.getByRole("button",{name:"Switch to light theme"}).click();
+ await expect(workspace).toHaveAttribute("data-theme","light");
+ await page.reload();
+ await expect(workspace).toHaveAttribute("data-theme","light");
+ await page.getByRole("button",{name:"Switch to dark theme"}).click();
+ await expect(workspace).toHaveAttribute("data-theme","dark");
+ await page.reload();
+ await expect(workspace).toHaveAttribute("data-theme","dark");
+});
