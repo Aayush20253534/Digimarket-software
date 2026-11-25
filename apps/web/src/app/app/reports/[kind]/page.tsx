@@ -1,11 +1,11 @@
 "use client";
 import {businessCycle,cycleLabel,reportingPreset} from "@digimarket/contracts";
 import Link from "next/link";
-import {ReportTabs} from "../report-controls";
+import {ReportTabs,ReportToolbar} from "../report-controls";
 import {useParams} from "next/navigation";
 import {useAuth} from "@/components/auth-provider";
 import {Notice,PageHeader,Spinner} from "@/components/ui";
-import {ArrowDownToLine,ArrowLeft,ArrowRight,CalendarRange,Filter,RefreshCcw,Search,TrendingUp,Wallet} from "lucide-react";
+import {ArrowDownToLine,ArrowLeft,ArrowRight,Filter,Search,TrendingUp,Wallet} from "lucide-react";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 
 type Kind="INCOME"|"EXPENSE";
@@ -23,7 +23,7 @@ const money=(value:string)=>{
  const isNegative=value.startsWith("-"),raw=isNegative?value.slice(1):value;
  const [whole,dec=""]=raw.split("."),padded=dec.padEnd(3,"0");
  const cents=BigInt(whole||"0")*100n+BigInt(padded.slice(0,2))+(Number(padded[2])>=5?1n:0n);
- const digits=(cents/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,",");
+ const digits=new Intl.NumberFormat("en-IN").format(cents/100n);
  return (isNegative?"−":"")+"₹"+digits+"."+(cents%100n).toString().padStart(2,"0");
 };
 const pretty=(value:string)=>new Date(value+"T00:00:00Z").toLocaleDateString("en-IN",
@@ -79,9 +79,6 @@ export default function FinanceBreakdownPage(){
    setFrom(start);setTo(end);setPage(1);
    setSelectedMonth(null);setSelectedDay(null);setSelectedPersonId(null);setSelectedCategoryId(null);
  };
- const preset=(mode:"current"|"three"|"year"|"all")=>{
-   const period=reportingPreset(mode);changePeriod(period.from,period.to);
- };
  const exportCsv=async()=>{
   if(!records||!allowed||!kind||exporting||from>to)return;
   setExporting(true);setError("");
@@ -134,23 +131,7 @@ export default function FinanceBreakdownPage(){
     title={isIncome?"Income Breakdown":"Expense Breakdown"}
     description="Verified posted transactions, matched to the selected Reports period. Pending, rejected and cancelled entries are excluded."/>
   <ReportTabs from={from} to={to}/>
-  <section className="aw-report-breakdown-filter" aria-label="Financial breakdown filters">
-   <div className="flex items-center gap-2 font-bold"><CalendarRange size={17}/>Reporting period</div>
-   <div className="aw-report-preset-row">
-    <button type="button" onClick={()=>preset("current")}>Current cycle</button>
-    <button type="button" onClick={()=>preset("three")}>Last 3 cycles</button>
-    <button type="button" onClick={()=>preset("year")}>Work year</button>
-    <button type="button" onClick={()=>preset("all")}>Since start</button>
-   </div>
-   <div className="aw-report-breakdown-fields">
-    <label>From<input aria-label="Breakdown from date" className="field" type="date"
-      value={from} max={to} onChange={e=>changePeriod(e.target.value,to)}/></label>
-    <label>Through<input aria-label="Breakdown to date" className="field" type="date"
-      value={to} min={from} onChange={e=>changePeriod(from,e.target.value)}/></label>
-    <button type="button" className="aw-report-primary" disabled={busy}
-      onClick={()=>void refresh()}><RefreshCcw size={16}/>Refresh</button>
-   </div>
-  </section>
+  <ReportToolbar value={{from,to}} onChange={p=>changePeriod(p.from,p.to)} busy={busy} onRefresh={()=>void refresh()} fromLabel="Breakdown from date" toLabel="Breakdown to date"/>
   {error&&<Notice kind="error">{error}</Notice>}
   {busy&&!records&&<Spinner label="Calculating financial breakdown…"/>}
   {records&&<>
@@ -164,9 +145,9 @@ export default function FinanceBreakdownPage(){
       <strong>{records.transactionCount.toLocaleString("en-IN")}</strong>
       <span>Unique financial entries, excluding pending</span>
     </article>
-    <article className="aw-finance-stat"><p>DATE RANGE</p>
-      <strong className="aw-finance-stat-range">{pretty(records.from)} → {pretty(records.to)}</strong>
-      <span>Same inclusive UTC dates as Reports</span>
+    <article className="aw-finance-stat"><p>AVERAGE TRANSACTION</p>
+      <strong>{records.transactionCount?new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(records.total)/records.transactionCount):"—"}</strong>
+      <span>{pretty(records.from)} – {pretty(records.to)}</span>
     </article>
    </section>
    <div className="aw-finance-panels">
@@ -197,6 +178,7 @@ export default function FinanceBreakdownPage(){
     <section className="aw-finance-panel" aria-label="Category financial breakdown">
       <div className="aw-finance-panel-heading"><Filter size={17}/><h2>Category-wise breakdown</h2></div>
       <p className="aw-finance-panel-caption">Every category contributes to the total above, including archived categories.</p>
+      <div className="rp-category-distribution" role="img" aria-label={records.categories.map(c=>c.name+": "+money(c.total)).join("; ")}>{records.categories.map((c,i)=><span key={c.id} title={c.name+": "+money(c.total)} style={{width:(Number(records.total)>0?Number(c.total)/Number(records.total)*100:0)+"%",background:["#9675d8","#389b9a","#ce9d58","#7084b1","#8a9f79"][i%5]}}/>)}</div>
       <div className="aw-finance-categories">
        {records.categories.length===0&&<p>No posted entries in this period.</p>}
        {records.categories.map(c=><div className="aw-finance-category" key={c.id}>

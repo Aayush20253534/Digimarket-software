@@ -1,9 +1,9 @@
 "use client";
 import {reportingPreset,cycleLabel} from "@digimarket/contracts";
 import Link from "next/link";
-import {ReportTabs} from "../report-controls";
+import {ReportTabs,ReportToolbar} from "../report-controls";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-import {ArrowDownToLine,ArrowLeft,ArrowRight,CalendarRange,ChartNoAxesCombined,Clock3,Filter,RefreshCcw,Search,ShieldCheck,TrendingUp,Users} from "lucide-react";
+import {ArrowDownToLine,ArrowLeft,ArrowRight,ChartNoAxesCombined,Clock3,Filter,Search,TrendingUp,Users} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 import {Notice,PageHeader,Spinner} from "@/components/ui";
 
@@ -129,9 +129,6 @@ export default function LeadBreakdownPage(){
  },[allowed,ready,session,request,query,from,to,options]);
  useEffect(()=>{void refresh();return()=>{sequence.current+=1;};},[refresh]);
  const applyPeriod=(start:string,end:string)=>{setFrom(start);setTo(end);setPage(1);};
- const preset=(kind:"month"|"three"|"year"|"all")=>{
-  const period=reportingPreset(kind==="month"?"current":kind);applyPeriod(period.from,period.to);
- };
  const clear=()=>{setSource("");setStage("");setOwner("");setCategory("");setLocation("");setSearch("");setPage(1);};
  const download=async()=>{
   if(!allowed||!report||exporting)return;
@@ -162,19 +159,9 @@ export default function LeadBreakdownPage(){
   <PageHeader eyebrow="AGENCY LEAD INTELLIGENCE" title="Leads Breakdown"
    description="Actual CRM records, funnel history and conversion outcomes. All numbers respect the selected reporting filters."/>
   <ReportTabs from={from} to={to}/>
+  <ReportToolbar value={{from,to}} onChange={p=>applyPeriod(p.from,p.to)} busy={busy} onRefresh={()=>void refresh()} fromLabel="Leads from date" toLabel="Leads through date"/>
   <section className="aw-lead-filter">
-   <div className="aw-lead-filter-head"><strong><CalendarRange size={18}/>Reporting period</strong>
-    <span><ShieldCheck size={15}/> Live, permission-protected</span></div>
-   <div className="aw-lead-presets">{([["month","Current cycle"],["three","Last 3 cycles"],["year","Work year"],["all","Since start"]] as const).map(([key,value])=>
-    <button type="button" key={key} onClick={()=>preset(key)}>{value}</button>)}</div>
-   <div className="aw-lead-filter-row">
-    <label>From<input className="field" type="date" aria-label="Leads from date" value={from} max={to}
-     onChange={e=>applyPeriod(e.target.value,to)}/></label>
-    <label>Through<input className="field" type="date" aria-label="Leads through date" value={to} min={from}
-     onChange={e=>applyPeriod(from,e.target.value)}/></label>
-    <button type="button" className="aw-lead-primary" disabled={busy} onClick={()=>void refresh()}>
-     <RefreshCcw size={16} className={busy?"animate-spin":""}/>Refresh</button>
-   </div>
+   {(source||stage||owner||category||location||search)&&<div className="rp-line"><p className="rp-muted">Active filters: {[source&&label(source),stage&&label(stage),owner&&options?.assignees.find(x=>x.id===owner)?.name,category,location,search].filter(Boolean).join(" · ")}</p><button type="button" className="btn-secondary" onClick={clear}>Clear all</button></div>}
    <details className="rp-advanced"><summary>Advanced filters</summary>
    <div className="aw-lead-filter-head"><strong><Filter size={17}/>Filter all analytics</strong>
     <button type="button" className="aw-lead-reset" onClick={clear}>Clear filters</button></div>
