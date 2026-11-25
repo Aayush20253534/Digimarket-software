@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import {compatibleFollowUps} from "@/lib/followup-compatibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -478,10 +479,14 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
 
   try {
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: request.method, headers, body,
       cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(folderArchivePattern.test(path)?55000:12000),
     });
+    if(path==="leads/follow-ups"&&request.method==="GET"){
+      const signal=AbortSignal.timeout(12000);
+      response=await compatibleFollowUps(url,response,target=>fetch(target,{headers,cache:"no-store",redirect:"manual",signal}));
+    }
     // The Render free backend may lag Vercel because automatic deployment is disabled.
     if(response.status===404&&(path==="reports/leads"||path==="reports/leads/export")){
       const payload=await response.clone().json().catch(()=>null) as

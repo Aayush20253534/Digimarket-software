@@ -12,9 +12,9 @@ import {DirectoryModal} from "@/components/directory-modal";
 type Stage=typeof leadStageSchema.options[number];
 type DateView="all"|"overdue"|"today"|"upcoming";
 type FollowUp={id:string;nextFollowUpAt:string|null;phone:string|null;businessName:string;contactName:string|null;
- stageNote:string;temperature:LeadTemperature;version:number;canEdit:boolean};
+ stageNote:string;temperature:LeadTemperature;version:number;canEdit?:boolean};
 type LeadDetail=FollowUp&{status:Stage;meetingAt:string|null};
-type Result={items:FollowUp[];nextCursor:string|null;total:number;today:string;summary:Record<DateView,number>;calendar:Record<string,number>};
+type Result={items:FollowUp[];nextCursor:string|null;total:number;today:string;summary:Record<DateView,number>;calendar:Record<string,number>;compatibilityMode?:boolean};
 const temperatures:LeadTemperature[]=["UNCLASSIFIED","HOT","WARM","COLD"];
 const labels:Record<LeadTemperature,string>={UNCLASSIFIED:"Unclassified",HOT:"Hot",WARM:"Warm",COLD:"Cold"};
 const dateLabels:Record<DateView,string>={all:"Total",overdue:"Overdue",today:"Due today",upcoming:"Upcoming"};
@@ -35,12 +35,15 @@ export default function FollowUpsPage(){
  const canRead=!!session?.identity.permissions.includes("leads.read");
  const isAdmin=!!session?.identity.roles.some(r=>r==="ADMIN"||r==="SUPER_ADMIN");
  const canConvert=!!session?.identity.permissions.includes("leads.convert");
+ const canEdit=!!session?.identity.permissions.some(p=>p==="leads.edit"||p==="leads.edit.own");
  const [rows,setRows]=useState<FollowUp[]>([]);
  const [cursor,setCursor]=useState<string|null>(null);
  const [history,setHistory]=useState<(string|null)[]>([]);
  const [nextCursor,setNextCursor]=useState<string|null>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
+ const [compatibilityMode,setCompatibilityMode]=useState(false);
+ const [loaded,setLoaded]=useState(false);
  const [message,setMessage]=useState("");
  const [query,setQuery]=useState("");
  const [search,setSearch]=useState("");
@@ -70,7 +73,8 @@ export default function FollowUpsPage(){
    const current=++sequence.current;
    setLoading(true);setError("");
    try{
-     const q=new URLSearchParams({limit:"20",view:dateView});
+     const q=new URLSearchParams({limit:"20"});
+     if(dateView!=="all")q.set("view",dateView);
      if(cursor)q.set("cursor",cursor);
      if(search)q.set("q",search);
      if(temperature)q.set("temperature",temperature);
@@ -80,9 +84,9 @@ export default function FollowUpsPage(){
      if(current!==sequence.current)return;
      if(!data.summary||!data.today)throw new Error("Follow-up API is not updated yet. Refresh after deployment.");
      setRows(data.items);setNextCursor(data.nextCursor);setTotal(data.total);
-     setSummary(data.summary);setCalendar(data.calendar??{});setToday(data.today);
+     setSummary(data.summary);setCalendar(data.calendar??{});setToday(data.today);setCompatibilityMode(!!data.compatibilityMode);setLoaded(true);
    }catch(e){
-     if(current===sequence.current){setError(e instanceof Error?e.message:"Unable to load follow-ups.");setRows([]);setNextCursor(null);setTotal(0);setSummary(emptySummary);setCalendar({});}
+     if(current===sequence.current){setError(e instanceof Error?e.message:"Unable to load follow-ups.");setRows([]);setNextCursor(null);setTotal(0);setSummary(emptySummary);setCalendar({});setLoaded(false);}
    }finally{if(current===sequence.current)setLoading(false);}
  },[canRead,cursor,request,dateView,search,temperature,from,to,view,month,rangeInvalid]);
  useEffect(()=>{void load();return()=>{sequence.current++;};},[load]);
@@ -130,7 +134,7 @@ export default function FollowUpsPage(){
    {!canRead&&<AWNotice tone="error">You do not have permission to view leads.</AWNotice>}
    {canRead&&<>
     <section className="aw-followup-metrics" aria-label="Follow-up status across all cycles">
-     {(["all","overdue","today","upcoming"] as const).map(key=><button type="button" className="aw-followup-metric" data-bucket={key} key={key} aria-pressed={dateView===key&&!from&&!to} onClick={()=>chooseDate(key)}><span>{dateLabels[key]}</span><strong>{loading?"…":summary[key]}</strong></button>)}
+     {(["all","overdue","today","upcoming"] as const).map(key=><button type="button" className="aw-followup-metric" data-bucket={key} key={key} aria-pressed={dateView===key&&!from&&!to} onClick={()=>chooseDate(key)}><span>{dateLabels[key]}</span><strong>{loading?"…":loaded?summary[key]:"—"}</strong></button>)}
     </section>
     <div className="aw-followup-tools">
      <div className="aw-followup-tool-row">
@@ -147,6 +151,7 @@ export default function FollowUpsPage(){
     </div>
     {rangeInvalid&&<AWNotice tone="error">End date must be on or after start date.</AWNotice>}
     {error&&<AWNotice tone="error">{error}</AWNotice>}
+    {compatibilityMode&&loaded&&<p className="aw-followup-hint">Compatibility mode · Full schedule loaded from the existing Leads API while the backend updates.</p>}
     {message&&<AWNotice tone="success">{message}</AWNotice>}
     {view==="calendar"&&<section className="aw-followup-calendar" aria-label="Follow-up calendar">
       <div className="aw-followup-calendar-head"><button type="button" className="btn-secondary" aria-label="Previous month" onClick={()=>setMonth(m=>monthShift(m,-1))}><ChevronLeft size={17}/></button>
@@ -157,7 +162,7 @@ export default function FollowUpsPage(){
       <p className="aw-followup-hint">Select a day to filter the register below. Calendar counts include all scheduled dates in this month, matching search and temperature.</p>
     </section>}
     <section className="aw-followups-register" aria-label="Scheduled follow-ups">
-     <div className="aw-followup-register-head"><strong>Follow-up register</strong><span>{loading?"Loading…":total+" matching follow-ups · Oldest due first"}</span></div>
+     <div className="aw-followup-register-head"><strong>Follow-up register</strong><span>{loading?"Loading…":loaded?total+" matching follow-ups · Oldest due first":"Schedule unavailable"}</span></div>
      {loading&&<p className="aw-followups-loading" role="status">Loading scheduled follow-ups…</p>}
      <div className="aw-followups-scroll"><table className="aw-followups-table" aria-label="Follow-up register" aria-busy={loading}><thead><tr>
        <th scope="col">Follow-up date</th><th scope="col">Call</th><th scope="col">Business name</th><th scope="col">Contact name</th><th scope="col">Short notes</th><th scope="col">Action</th>
@@ -167,7 +172,7 @@ export default function FollowUpsPage(){
        <td>{lead.phone?<a className="aw-followup-icon" href={callHref(lead.phone)} aria-label={"Call "+lead.phone} title={lead.phone}><PhoneCall size={17} aria-hidden="true"/></a>:"—"}</td>
        <td><Link className="aw-followups-business" aria-label={lead.businessName} href={"/app/leads?focus="+encodeURIComponent(lead.id)}><span className="aw-followup-temp" data-temperature={temp} role="img" aria-label={"Lead temperature: "+labels[temp]} title={labels[temp]}/>{lead.businessName}</Link></td>
        <td>{lead.contactName||"Not recorded"}</td><td className="aw-followup-note" title={lead.stageNote||undefined}>{lead.stageNote||"No notes yet"}</td>
-       <td>{lead.canEdit&&!isAdmin?<button type="button" className="aw-followup-icon" aria-label={"Actions for "+lead.businessName} disabled={!!opening||loading} onClick={()=>void openEdit(lead)}><Ellipsis size={19}/></button>:<Link className="aw-followup-icon" aria-label={"Open lead "+lead.businessName} href={"/app/leads?focus="+encodeURIComponent(lead.id)}><ChevronRight size={17}/></Link>}</td></tr>;
+       <td>{(lead.canEdit??canEdit)&&!isAdmin?<button type="button" className="aw-followup-icon" aria-label={"Actions for "+lead.businessName} disabled={!!opening||loading} onClick={()=>void openEdit(lead)}><Ellipsis size={19}/></button>:<Link className="aw-followup-icon" aria-label={"Open lead "+lead.businessName} href={"/app/leads?focus="+encodeURIComponent(lead.id)}><ChevronRight size={17}/></Link>}</td></tr>;
      })}</tbody></table></div>
      {!loading&&!error&&!rangeInvalid&&rows.length===0&&<p className="aw-followups-empty">No scheduled follow-ups match these filters.</p>}
      <nav className="aw-followups-pagination" aria-label="Follow-up pages"><button type="button" onClick={previous} disabled={loading||!history.length}><ChevronLeft size={16}/>Previous</button><span>Page {history.length+1} · {rows.length} of {total}</span><button type="button" onClick={next} disabled={loading||!nextCursor}>Next<ChevronRight size={16}/></button></nav>
