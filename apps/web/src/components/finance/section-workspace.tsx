@@ -303,6 +303,9 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
 
   async function submit(e:FormEvent){
     e.preventDefault();
+    if(busy||loading)return;
+    const submitter=(e.nativeEvent as SubmitEvent).submitter;
+    const addAnother=compact&&submitter instanceof HTMLButtonElement&&submitter.value==="another";
     if(!categoryId){setError("Select a category before saving this entry.");return;}
     if(salarySelected){setError("Record salaries in the Salary module; linked expenses will appear here automatically.");return;}
     if(metaAdsSelected&&adFunding==="CLIENT"&&!clientId){setError("Select the client paying for this Meta Ads expense.");return;}
@@ -340,9 +343,10 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
         :(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals."));
       setAmount("");setSource("");setDescription("");setReceipt(null);setReceiptKey(v=>v+1);setEntryKey(crypto.randomUUID());
        if(compact){try{localStorage.setItem("aw-finance-method",method);}catch{/* optional preference */}}
-      setCategoryId("");setAdFunding("SELF");setClientId("");
+      if(!addAnother){setCategoryId("");setAdFunding("SELF");setClientId("");}
       onExpenseSaved?.();context?.onMutation();
       await reload();
+      if(addAnother)document.getElementById("finance-amount")?.focus();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
   }
   useEffect(()=>{
@@ -450,7 +454,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     setBusy(true);setError("");setSuccess("");
     try{
       await request("/finance/entries/"+row.id,{method:"DELETE"});
-      setSuccess(row.kind==="INCOME"
+      context?.onMutation();setSuccess(row.kind==="INCOME"
         ?"Income cancelled and excluded from finance totals. Audit history retained."
         :"Expense cancelled and excluded from finance totals. Audit history retained.");
       await reload();
@@ -556,7 +560,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
           </div>
           </div>
           <div className="sm:col-span-2 flex flex-wrap gap-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||salarySelected||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
-            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?(compact?(kind==="EXPENSE"?"Save expense":"Save income"):directExpense?"Save expense":"Save entry"):"Submit for approval"}</button>{compact&&<span className="text-xs text-slate-400 self-center">Save clears the form so you can add another entry.</span>}</div>
+            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?(compact?(kind==="EXPENSE"?"Save expense":"Save income"):directExpense?"Save expense":"Save entry"):"Submit for approval"}</button>{compact&&<button type="submit" value="another" className="btn-secondary" disabled={busy||loading||!categoryId||(!isFounder&&!financeReady)}>{isFounder?"Save & add another":"Submit & add another"}</button>}</div>
         </form>
       </Card>;
   if(!session)return <Spinner label="Checking finance access…"/>;

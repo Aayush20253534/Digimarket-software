@@ -236,7 +236,7 @@ export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
     ...(cycleDetails?[{
       title:"Salaries",description:"Salary expenses funded or paid in the selected cycle",
       href:"/app/finance/total-expenses?type=SALARY",
-      amount:totalExpense?.breakdown.SALARY,metricLabel:"Paid / funded this cycle",icon:ReceiptText,
+      amount:totalExpense?.breakdown?.SALARY,metricLabel:"Paid / funded this cycle",icon:ReceiptText,
     }]:[]),
     ...(all&&!cycleDetails
       ? [
@@ -272,7 +272,7 @@ export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
   return (
     <>
       {error && <Notice kind="error">{error}</Notice>}
-      {!cycleDetails&&<p className="text-sm text-slate-400">Work cycles restart transaction totals only after a manual close. Remaining balances carry over. Internal settlements debit and credit founder balances without changing agency income or expense totals.</p>}
+      {!cycleDetails&&<p className="text-sm text-slate-400">Posted totals follow your work cycle. Balances carry forward; settlements do not change agency income or expense totals.</p>}
       {!cycleDetails&&<div className="grid gap-3 sm:grid-cols-3" aria-label="Finance overview totals">
         {w.view==="mine"&&founder&&<PersonalNetAfterSettlements period={w.period}/>}
         {[

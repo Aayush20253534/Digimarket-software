@@ -32,7 +32,7 @@ async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
   }else if(path==="/finance/cycle-state")data=cycleClosed?{current:{from:"2026-11-22",to:"2026-12-21"},history:[{from:"2026-10-22",to:"2026-11-21",closedAt:"2026-11-22"}],plannedThrough:"2026-12-21",canClose:false}:{current:{from:"2026-10-22",to:"2026-11-21"},history:[],plannedThrough:"2026-11-21",canClose:false};
   else if(path==="/finance/categories")data=[{id:"cat1",kind:"EXPENSE",name:"Travel",active:true,purpose:"GENERAL"},{id:"cat2",kind:"INCOME",name:"Service fees",active:true,purpose:"GENERAL"}];
   else if(path==="/finance/expenses/mine")data={status:"POSTED"};
-  else if(path==="/finance/activity")data={items:[],total:0,page:1,limit:25};
+  else if(path==="/finance/activity"){const type=url.searchParams.get("type");const items=[{id:"a1",date:"2026-11-17",type:"SELF_ADS",category:"Meta Ads",person:"Test Founder",client:"",description:"Agency campaign",amount:"50.0000",status:"POSTED",method:"UPI",direction:"OUTGOING",reversal:false},{id:"a2",date:"2026-11-17",type:"CLIENT_ADS",category:"Meta Ads",person:"Test Founder",client:"Example Cafe",description:"Client campaign",amount:"100.0000",status:"POSTED",method:"UPI",direction:"OUTGOING",reversal:false},{id:"a3",date:"2026-11-16",type:"SETTLEMENT",category:"Internal settlement",person:"Founder A → Founder B",client:"",description:"Reimbursement",amount:"25.0000",status:"POSTED",method:"UPI",direction:"INCOMING",reversal:false}].filter(r=>!type||type==="ALL"||r.type===type);data={items,total:items.length,page:1,limit:25};}
   else if(path==="/finance/register")data={items:[],total:0,page:1,limit:25};
   else if(path==="/finance/summary")data=url.searchParams.get("from")==="2026-11-22"
     ? {...totals,postedIncome:"0",postedExpense:"0",postedNet:"0"}:totals;
@@ -124,7 +124,13 @@ test("unified Finance keeps quick entry, classification and shared work cycle",a
  await page.getByRole("link",{name:"← Finance overview"}).click();
  await page.getByRole("navigation",{name:"Finance workspace sections"}).getByRole("button",{name:"Transactions",exact:true}).click();
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
- await expect(page.getByRole("region",{name:"Unified transaction register"})).toBeVisible();
+ const unified=page.getByRole("region",{name:"Unified transaction register"});
+ await expect(unified).toBeVisible();
+ await expect(unified.getByText("Agency Meta Ads",{exact:false}).first()).toBeVisible();
+ await expect(unified.getByText("Example Cafe",{exact:false})).toBeVisible();
+ await unified.getByLabel("Transaction type").selectOption("SETTLEMENT");
+ await expect(unified.getByText("Founder A → Founder B")).toBeVisible();
+ await expect(unified.getByText("Example Cafe",{exact:false})).toHaveCount(0);
  await page.getByRole("group",{name:"Transaction classification"}).getByRole("button",{name:"Income & operating expenses"}).click();
  await expect.poll(()=>requests.some(row=>row.path==="/salary/summary"&&row.from==="2026-10-22")).toBe(true);
  await page.getByRole("navigation",{name:"Finance workspace sections"}).getByRole("button",{name:"Salary",exact:true}).click();

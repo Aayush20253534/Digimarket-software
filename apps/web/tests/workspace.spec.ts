@@ -1272,6 +1272,15 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expenseEdit.getByLabel("Amount (INR)").fill("20.00");
   await expenseEdit.getByRole("button",{name:"Save expense"}).click();
   await expect(page.getByText("Finance entry updated. User-wise totals now reflect the assigned user, and the original submitter is preserved in the audit history.")).toBeVisible();
+  // Audit every primary workspace surface in the real authenticated application.
+  await page.setViewportSize({width:390,height:844});
+  for(const route of ["/app/dashboard","/app/leads","/app/follow-ups","/app/meetings","/app/clients","/app/finance","/app/finance?tab=salary","/app/documents","/app/documents/quotations","/app/documents/agreements","/app/reports","/app/reports/client-delivery","/app/settings","/app/profile"]){
+   await visitWorkspace(page,route);
+   await expect(page.locator(".aw-work-content")).toBeVisible();
+   await expect(page.getByText("This page couldn’t load",{exact:true})).toHaveCount(0);
+   await page.evaluate(()=>document.fonts.ready);
+   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+2),{message:"Mobile viewport containment: "+route}).toBe(true);
+  }
 });
 test("unauthenticated dashboard access is denied",async({page})=>{
   await page.goto("/app/dashboard");await expect(page).toHaveURL(/\/login/);

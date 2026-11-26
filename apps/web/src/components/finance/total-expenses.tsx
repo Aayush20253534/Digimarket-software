@@ -91,7 +91,7 @@ export function TotalExpenses({initialType="ALL"}:{initialType?:"ALL"|ExpenseTyp
     return () => {
       active = false;
     };
-  }, [w.ready, permitted, query, request, refresh]);
+  }, [w.ready, permitted, query, request, refresh,context?.refresh]);
 
   async function deleteExpense(row: Records["items"][number]) {
     if (!canEdit || !row.id.startsWith("finance:") || row.reversal || editSaving) return;
@@ -100,7 +100,7 @@ export function TotalExpenses({initialType="ALL"}:{initialType?:"ALL"|ExpenseTyp
     try {
       await request("/finance/entries/" + encodeURIComponent(row.id.slice("finance:".length)), { method: "DELETE" });
       setNotice("Expense deleted from financial totals.");
-      setPage(1); setRefresh(v => v + 1);
+      setPage(1); setRefresh(v => v + 1);context?.onMutation();
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to delete expense."); }
     finally { setEditSaving(false); }
   }
@@ -165,7 +165,7 @@ export function TotalExpenses({initialType="ALL"}:{initialType?:"ALL"|ExpenseTyp
       });
       setEditing(null);setEditOptions(null);
       setNotice("Expense updated. User-wise totals reflect the assigned user; agency totals are unaffected by reassignment.");
-      setRefresh(value => value + 1);
+      setRefresh(value => value + 1);context?.onMutation();
     } catch(e) {
       setError(e instanceof Error ? e.message : "Unable to save the expense.");
     } finally {

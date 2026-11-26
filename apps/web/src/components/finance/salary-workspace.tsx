@@ -49,7 +49,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly
  const [voidId,setVoidId]=useState<string|null>(null),[voidReason,setVoidReason]=useState("");
 
  const load=useCallback(async()=>{
-  if(!session||context&&!context.window.ready)return;
+  if(!session)return;
   setLoading(true);setError("");
   try{
    const params=new URLSearchParams(context?.window.period??{from:dateFrom,to:dateTo}).toString();
@@ -100,7 +100,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly
  const monthMax=Math.max(1,...(overview?.monthly||[]).map(x=>Number(x.amount)));
  const isLoading=!session||loading&&!payments.length&&!accounts.length;
  if(!session)return <Spinner label="Checking salary access…"/>;
- return <main className="aw-salary-page space-y-6" data-aw-module="salary">
+ return <section className="aw-salary-page space-y-6" data-aw-module="salary">
   {!context&&<><BusinessWorkspaceNav/>
   <PageHeader eyebrow="TEAM & PAYROLL" title={founder?"Salary & founder funding":"My salary"}
    description={founder?"Record salary payments funded directly from each founder’s remaining Finance balance. Split across multiple funding sources without creating a second wallet.":
@@ -175,7 +175,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly
    <div className="grid gap-5 lg:grid-cols-2">
     <section className="rounded-xl border border-white/10 p-5 space-y-4">
      <h2 className="font-semibold text-lg flex gap-2 items-center"><Wallet size={19}/>Founder funding accounts</h2>
-     <p className="text-sm opacity-70">Create source labels (UPI, bank, cash). All sources owned by the same founder share that founder's posted Finance remaining balance.</p>
+     <p className="text-sm opacity-70">Source labels (UPI, bank, cash) share the owning founder’s balance.</p>
      <label className="block text-sm space-y-1">Founder<select className="field w-full" value={accountFounder} onChange={e=>setAccountFounder(e.target.value)}>
       <option value="">Select founder</option>{founders.map(x=><option key={x.id} value={x.id}>{x.displayName}</option>)}
      </select></label>
@@ -270,5 +270,5 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly
   </section>}
   {!paymentOnly&&founder&&<p className="flex items-start gap-2 text-sm opacity-65"><ShieldCheck size={18} className="shrink-0"/>
    Company salary totals count each payment once. Funding splits are displayed separately by founder. Neither employee salary receipts nor founder deposits are added to ordinary Finance income.</p>}
- </main>;
+ </section>;
 }
