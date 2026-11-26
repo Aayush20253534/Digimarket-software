@@ -5,8 +5,8 @@ import {Download,Eye,Plus,RefreshCcw,Search,Copy,FileText,FileSignature} from "l
 import {agencyToday} from "@digimarket/contracts";
 import {useAuth} from "@/components/auth-provider";
 import {Spinner,Notice} from "@/components/ui";
-import {downloadQuotationPdf,renderQuotationPages,type SavedQuotation} from "@/lib/quotation-pdf";
-import {downloadAgreementPdf,renderAgreementPages,type SavedAgreement} from "@/lib/agreement-pdf";
+import type {SavedQuotation} from "@/lib/quotation-pdf";
+import type {SavedAgreement} from "@/lib/agreement-pdf";
 export type DocumentLinks={clientId?:string|null;leadId?:string|null;revisionOfId?:string|null;sourceQuotationId?:string|null};
 export type Quote=SavedQuotation&DocumentLinks;
 export type Agreement=SavedAgreement&DocumentLinks;
@@ -29,7 +29,7 @@ export function statusOf(r:DocRow,today=agencyToday()){
 }
 export function DocumentPreview({row}:{row:DocRow}){
  const [images,setImages]=useState<string[]>([]),[error,setError]=useState(""),[zoom,setZoom]=useState(100),[index,setIndex]=useState(0),[busy,setBusy]=useState(true);
- useEffect(()=>{let cancelled=false;setBusy(true);setError("");const t=setTimeout(()=>{void (isQuote(row)?renderQuotationPages(row):renderAgreementPages(row)).then(pages=>{if(!cancelled){setImages(pages.map(c=>c.toDataURL("image/png")));setIndex(i=>Math.min(i,pages.length-1));}}).catch(e=>{if(!cancelled){setImages([]);setError(e instanceof Error?e.message:"Preview unavailable")}}).finally(()=>{if(!cancelled)setBusy(false)})},220);return()=>{cancelled=true;clearTimeout(t)}},[row]);
+ useEffect(()=>{let cancelled=false;setBusy(true);setError("");const t=setTimeout(()=>{void (isQuote(row)?import("@/lib/quotation-pdf").then(m=>m.renderQuotationPages(row)):import("@/lib/agreement-pdf").then(m=>m.renderAgreementPages(row))).then(pages=>{if(!cancelled){setImages(pages.map(c=>c.toDataURL("image/png")));setIndex(i=>Math.min(i,pages.length-1));}}).catch(e=>{if(!cancelled){setImages([]);setError(e instanceof Error?e.message:"Preview unavailable")}}).finally(()=>{if(!cancelled)setBusy(false)})},220);return()=>{cancelled=true;clearTimeout(t)}},[row]);
  return <div className="dc-preview"><div className="dc-row"><strong>PDF preview</strong><span className="dc-muted">{busy?"Updating…":images.length+" page"+(images.length===1?"":"s")}</span></div>{error&&<Notice kind="error">{error}</Notice>}{images.length>0&&<><div className="dc-preview-scroll"><img src={images[index]} alt={"Document preview page "+(index+1)} style={{width:zoom+"%",maxWidth:"none"}}/></div><div className="dc-row"><button type="button" className="btn-secondary" disabled={index===0} onClick={()=>setIndex(i=>i-1)}>Previous</button><span>{index+1} / {images.length}</span><button type="button" className="btn-secondary" disabled={index>=images.length-1} onClick={()=>setIndex(i=>i+1)}>Next</button></div><div className="dc-row"><button type="button" className="btn-secondary" disabled={zoom<=50} onClick={()=>setZoom(v=>v-25)}>−</button><button className="btn-secondary" type="button" onClick={()=>setZoom(100)}>{zoom}% · Fit</button><button type="button" className="btn-secondary" disabled={zoom>=200} onClick={()=>setZoom(v=>v+25)}>+</button></div></>}</div>;
 }
 export function PreviewDialog({row,onClose}:{row:DocRow;onClose:()=>void}){
@@ -74,12 +74,12 @@ export function DocumentRegister({kind}:{kind?:DocKind}){
  const [q,setQ]=useState(""),[status,setStatus]=useState("all"),[mode,setMode]=useState("all"),[sort,setSort]=useState("newest"),[from,setFrom]=useState(""),[to,setTo]=useState(""),[page,setPage]=useState(1),[type,setType]=useState<"all"|DocKind>("all"),[relatedTo,setRelatedTo]=useState("");
  const [quotes,setQuotes]=useState<List<Quote>|null>(null),[agreements,setAgreements]=useState<List<Agreement>|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[preview,setPreview]=useState<DocRow|null>(null),[downloading,setDownloading]=useState(false);
  const seq=useRef(0);
- const load=useCallback(async()=>{if(!allowed)return;const id=++seq.current;setBusy(true);setError("");
+ const load=useCallback(async(force=true)=>{if(!allowed)return;const id=++seq.current;setBusy(true);setError("");
  try{const params=new URLSearchParams({q,status,mode,sort,page:String(kind?page:1),limit:kind?"20":"10"});if(from)params.set("from",from);if(to)params.set("to",to);if(relatedTo&&kind)params.set("relatedTo",relatedTo);
  const filters={q,status,mode,sort,page:kind?page:1,limit:kind?20:10,from,to,relatedTo};
  const [a,b]=await Promise.allSettled([
-  kind==="agreement"?Promise.resolve(null):request<unknown>("/quotations?"+params).then(raw=>normalizeList<Quote>(raw,"quotation",filters)),
-  kind==="quotation"?Promise.resolve(null):request<unknown>("/agreements?"+params).then(raw=>normalizeList<Agreement>(raw,"agreement",filters))
+  kind==="agreement"?Promise.resolve(null):request<unknown>("/quotations?"+params,{cache:force?"reload":"prefer"}).then(raw=>normalizeList<Quote>(raw,"quotation",filters)),
+  kind==="quotation"?Promise.resolve(null):request<unknown>("/agreements?"+params,{cache:force?"reload":"prefer"}).then(raw=>normalizeList<Agreement>(raw,"agreement",filters))
  ]);
  if(seq.current===id){
   setQuotes(a.status==="fulfilled"?a.value:null);setAgreements(b.status==="fulfilled"?b.value:null);
@@ -87,13 +87,13 @@ export function DocumentRegister({kind}:{kind?:DocKind}){
   setError(failures.join(" · "));
  }
  }catch(e){if(seq.current===id){setError(e instanceof Error?e.message:"Unable to load documents");setQuotes(null);setAgreements(null)}}finally{if(seq.current===id)setBusy(false)}},[allowed,kind,request,q,status,mode,sort,page,from,to,relatedTo]);
- useEffect(()=>{const t=setTimeout(()=>void load(),200);return()=>{clearTimeout(t);seq.current++}},[load]);
+ useEffect(()=>{const t=setTimeout(()=>void load(false),200);return()=>{clearTimeout(t);seq.current++}},[load]);
  if(!session)return <Spinner label="Checking document access…"/>;if(!allowed)return <Notice kind="error">Documents require founder or administrator access.</Notice>;
  const rows:DocRow[]=[...(type==="agreement"&&!kind?[]:quotes?.items??[]),...(type==="quotation"&&!kind?[]:agreements?.items??[])].sort((a,b)=>sort==="newest"?b.createdAt.localeCompare(a.createdAt):a.createdAt.localeCompare(b.createdAt)).slice(0,kind?20:10);
  const data=kind==="quotation"?quotes:agreements;
  const create=(k:DocKind)=>"/app/documents/"+(k==="quotation"?"quotations":"agreements")+"/new";
  const change=(fn:()=>void)=>{fn();setPage(1)};
- const download=async(r:DocRow)=>{setDownloading(true);setError("");try{if(isQuote(r))await downloadQuotationPdf(r);else await downloadAgreementPdf(r)}catch(e){setError(e instanceof Error?e.message:"PDF failed")}finally{setDownloading(false)}};
+ const download=async(r:DocRow)=>{setDownloading(true);setError("");try{if(isQuote(r))await (await import("@/lib/quotation-pdf")).downloadQuotationPdf(r);else await (await import("@/lib/agreement-pdf")).downloadAgreementPdf(r)}catch(e){setError(e instanceof Error?e.message:"PDF failed")}finally{setDownloading(false)}};
  const source=async(kind:DocKind,id:string)=>{try{setPreview(await request<DocRow>("/"+(kind==="quotation"?"quotations":"agreements")+"/"+id))}catch(e){setError(e instanceof Error?e.message:"Source unavailable")}};
  return <div className="dc-page space-y-5" data-aw-module={kind==="quotation"?"quotations":kind==="agreement"?"agreements":"documents"}>
  <header className="dc-row"><div><h1>{kind==="quotation"?"Quotations":kind==="agreement"?"Agreements":"Documents"}</h1><p className="dc-muted">{kind?"Search and manage immutable saved documents.":"Commercial documents, drafts and recent activity."}</p></div><div className="dc-actions">{kind?<Link className="btn-primary" href={create(kind)}><Plus size={16}/>New {kind}</Link>:<><Link className="btn-primary" href={create("quotation")}><Plus size={16}/>New quotation</Link><Link className="btn-secondary" href={create("agreement")}><Plus size={16}/>New agreement</Link></>}<button className="btn-secondary" type="button" disabled={busy} onClick={()=>void load()}><RefreshCcw size={15}/>Refresh</button></div></header>

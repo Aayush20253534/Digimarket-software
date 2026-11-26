@@ -348,6 +348,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if(["quotations","agreements","quotations/contacts"].includes(path)){
     for(const key of ["q","page","limit","from","to","status","mode","sort","relatedTo"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
+  if(path==="reports/client-delivery"&&request.nextUrl.searchParams.get("fresh")==="1")url.searchParams.set("fresh","1");
   if(path==="reports/overview"){
     for(const key of ["from","to"]){
       const v=request.nextUrl.searchParams.get(key);
@@ -497,6 +498,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   }
 
   try {
+    const upstreamStarted=performance.now();
     const response = await fetch(url, {
       method: request.method, headers, body,
       cache: "no-store", redirect: "manual", signal: AbortSignal.timeout(folderArchivePattern.test(path)?55000:12000),
@@ -531,6 +533,8 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       }
     }
     const responseHeaders = new Headers({ "Cache-Control": "no-store" });
+    const requestId=response.headers.get("x-request-id");
+    if(requestId)responseHeaders.set("x-request-id",requestId);
     const contentType = response.headers.get("content-type");
     if (contentType?.startsWith("application/json")) responseHeaders.set("content-type", "application/json");
     if (folderArchivePattern.test(path) && contentType?.startsWith("application/zip")){
@@ -539,9 +543,9 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
       if(disposition)responseHeaders.set("content-disposition",disposition);
     }
     for (const value of response.headers.getSetCookie()) responseHeaders.append("set-cookie", value);
-    return new NextResponse(response.status === 204 ? null : await response.arrayBuffer(), {
-      status: response.status, headers: responseHeaders,
-    });
+    const payload=response.status===204?null:await response.arrayBuffer();
+    responseHeaders.set("Server-Timing","upstream;dur="+Math.round(performance.now()-upstreamStarted));
+    return new NextResponse(payload, {status:response.status,headers:responseHeaders});
   } catch {
     return NextResponse.json({ error: { code: "UPSTREAM_UNAVAILABLE", message: "Service temporarily unavailable" } }, { status: 503 });
   }

@@ -1,5 +1,4 @@
-import {ClientPostReadinessService} from "../clients/post-readiness-service";
-import {ClientVideoReadinessService} from "../clients/video-readiness-service";
+import {bulkClientReadiness} from "../clients/bulk-readiness";
 import {expiredAgreementWhere} from "../clients/agreement-status";
 import {agencyToday,agencyTimestampRange,TASKS_ENABLED} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
@@ -86,16 +85,12 @@ export class InsightsService{
   requireGrant(a,"clients.read");
   const today=agencyToday();
   const clients=await this.db.client.findMany({where:{organizationId:a.organizationId,status:"ACTIVE",NOT:expiredAgreementWhere(today)},select:{id:true,businessName:true,contractEndOn:true},orderBy:[{businessName:"asc"},{id:"asc"}]});
-  const posts=new ClientPostReadinessService(this.db),videos=new ClientVideoReadinessService(this.db);
-  const items=[];
-  for(let i=0;i<clients.length;i+=4){
-   const batch=await Promise.all(clients.slice(i,i+4).map(async client=>{
-    const [p,v]=await Promise.all([posts.clientCycle(a,client.id,undefined,today),videos.clientCycle(a,client.id,undefined,today)]);
-    return {id:client.id,name:client.businessName,from:p.from,to:p.to,agreementEnd:client.contractEndOn?.toISOString().slice(0,10)??null,
-     posts:p.totalStock,videos:v.totalStock,festival:p.festivalTotalStock,postsDelivered:p.from?p.deliveredThisMonth:null,videosDelivered:v.from?v.deliveredThisMonth:null,festivalDelivered:p.from?p.festivalDeliveredThisMonth:null};
-   }));
-   items.push(...batch);
-  }
+  const stock=await bulkClientReadiness(this.db,a,clients.map(client=>client.id),today);
+  const items=clients.map(client=>{
+   const {p,v}=stock.get(client.id)!;
+   return {id:client.id,name:client.businessName,from:p.from,to:p.to,agreementEnd:client.contractEndOn?.toISOString().slice(0,10)??null,
+    posts:p.totalStock,videos:v.totalStock,festival:p.festivalTotalStock,postsDelivered:p.from?p.deliveredThisMonth:null,videosDelivered:v.from?v.deliveredThisMonth:null,festivalDelivered:p.from?p.festivalDeliveredThisMonth:null};
+  });
   return {asOf:today,items};
  }
  async report(a:Principal,from:string,to:string){

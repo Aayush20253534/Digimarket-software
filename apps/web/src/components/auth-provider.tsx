@@ -1,6 +1,13 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {affectedReadGroups,readFreshness,readGroup} from "@/lib/read-policy";
+
+// Refresh cookies are shared between tabs. Serialize rotations where Web Locks is available.
+async function withSessionLock<T>(work:()=>Promise<T>):Promise<T>{
+  if(typeof navigator!=="undefined"&&navigator.locks)return await navigator.locks.request("aw-session-rotation",work);
+  return await work();
+}
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   apiRequest, ApiError, type ApiOptions, type Identity, type LoginUser,
@@ -23,6 +30,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0, gcTime: 0 } } }));
   const generation = useRef(0);
+  const groupVersions = useRef(new Map<string,number>());
+  const channel = useRef<BroadcastChannel|null>(null);
   const sessionEpoch = useRef(0);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [session, setSession] = useState<Session | null>(null);
@@ -32,12 +41,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const saveSession = useCallback((value: Session | null) => {
     if (identityKey(sessionRef.current) !== identityKey(value)) {
       generation.current++;
+      groupVersions.current.clear();
       queryClient.clear();
     }
     sessionRef.current = value;
     setSession(value);
     setStatus(value ? "authenticated" : "unauthenticated");
   }, [queryClient]);
+
+  const invalidate = useCallback((groups:string[]|null) => {
+    if(groups===null){generation.current++;groupVersions.current.clear();}
+    else for(const group of groups)groupVersions.current.set(group,(groupVersions.current.get(group)??0)+1);
+    queryClient.removeQueries({queryKey:["workspace"],type:"inactive",predicate:q=>groups===null||groups.includes(String(q.queryKey[3]))});
+  },[queryClient]);
+
+  useEffect(()=>{
+    if(typeof BroadcastChannel==="undefined")return;
+    const bus=new BroadcastChannel("aw-workspace-session");channel.current=bus;
+    bus.onmessage=event=>{
+      if(event.data?.type==="logout"){sessionEpoch.current++;saveSession(null);}
+      else if(event.data?.type==="invalidate"){
+        const groups=event.data.groups;
+        if(groups===null||(Array.isArray(groups)&&groups.every(g=>typeof g==="string")))invalidate(groups);
+      }
+    };
+    return()=>{channel.current=null;bus.close();};
+  },[invalidate,saveSession]);
 
   const establish = useCallback(async (accessToken: string, user: LoginUser, bundled?: Identity, epoch = sessionEpoch.current) => {
     const identity = bundled ?? await apiRequest<Identity>("/me", { token: accessToken });
@@ -52,7 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const epoch = sessionEpoch.current;
     const work = (async () => {
       try {
-        const payload = await apiRequest<SessionPayload>("/auth/refresh", { method: "POST" });
+        const payload = await withSessionLock(()=>{
+          if(epoch!==sessionEpoch.current)throw new ApiError(401,"UNAUTHORIZED","Session changed");
+          return apiRequest<SessionPayload>("/auth/refresh", { method: "POST" });
+        });
         return await establish(payload.accessToken, payload.user, payload.identity, epoch) ? payload.accessToken : null;
       } catch (error) {
         if (epoch !== sessionEpoch.current) return null;
@@ -75,8 +107,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const completeLogin = useCallback(async (payload: SessionPayload) => {
     sessionEpoch.current++;
+    generation.current++;
+    queryClient.clear();
     await establish(payload.accessToken, payload.user, payload.identity);
-  }, [establish]);
+  }, [establish,queryClient]);
 
   const request = useCallback(async <T,>(path: string, options: RequestOptions = {}): Promise<T> => {
     const current = sessionRef.current;
@@ -109,29 +143,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Only opted-in reads retain results. Ordinary GETs and finance remain live.
     // An explicit caller AbortSignal or GET body cannot safely share a request.
     if ((options.method ?? "GET") === "GET" && !options.signal && options.body === undefined) {
+      const group=readGroup(path),freshness=readFreshness(path);
       return queryClient.fetchQuery<T>({
-        queryKey: ["workspace", scope, generation.current, path],
+        queryKey: ["workspace", scope, generation.current, group, groupVersions.current.get(group)??0, path],
         queryFn: ({ signal }) => execute(signal),
-        staleTime: cache === "prefer" ? 20_000 : 0,
-        gcTime: cache ? 300_000 : 0,
+        staleTime: cache === "prefer" ? freshness : 0,
+        gcTime: cache && freshness ? 120_000 : 0,
       });
     }
     try {
       return await execute(options.signal);
     } finally {
       if ((options.method ?? "GET") !== "GET") {
-        generation.current++;
-        // Writes can affect more than one module, including failed/ambiguous requests.
-        queryClient.removeQueries({ queryKey: ["workspace"], type: "inactive" });
+        // Writes can affect multiple modules; ambiguous outcomes invalidate as well.
+        const groups=affectedReadGroups(path);invalidate(groups);
+        channel.current?.postMessage({type:"invalidate",groups});
       }
     }
-  }, [queryClient, refresh]);
+  }, [queryClient, refresh,invalidate]);
 
   const logout = useCallback(async () => {
     // Do not claim logout when server failed to revoke its HttpOnly refresh cookie.
-    await apiRequest<void>("/auth/logout", { method: "POST" });
-    sessionEpoch.current++;
-    saveSession(null);
+    await withSessionLock(async()=>{
+      await apiRequest<void>("/auth/logout", { method: "POST" });
+      sessionEpoch.current++;
+      saveSession(null);
+      channel.current?.postMessage({type:"logout"});
+    });
   }, [saveSession]);
 
   return <QueryClientProvider client={queryClient}><AuthContext.Provider value={{ status, session, completeLogin, request, refresh, logout }}>

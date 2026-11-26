@@ -5,7 +5,7 @@
 # Migrations + permission seeding run in startCommand because Render Free
 # does not provide a pre-deploy command. Initial admin bootstrap remains
 # guarded by the temporary BOOTSTRAP_* secrets documented in docs/29.
-# The API does not need Redis. BullMQ background jobs will not run.
+# Upstash REST caching is optional. BullMQ background jobs will not run on this blueprint.
 services:
   - type: web
     name: digimarket-api
@@ -45,6 +45,10 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: OPS_MONITOR_TOKEN
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
       - key: GROQ_API_KEY
         sync: false

@@ -77,8 +77,8 @@ export function currentSection(groups:NavGroup[],pathname:string){
   title:item?.label??titles[pathname]?.title??"Workspace"};
 }
 const STORE="aw-sidebar-groups-v2";
-export function WorkspaceNav({groups,pathname,compact=false,onNavigate}:{
- groups:NavGroup[];pathname:string;compact?:boolean;onNavigate?:()=>void
+export function WorkspaceNav({groups,pathname,compact=false,onNavigate,onPrefetch}:{
+ groups:NavGroup[];pathname:string;compact?:boolean;onNavigate?:()=>void;onPrefetch?:(href:string)=>void
 }){
  const [closed,setClosed]=useState<Record<string,boolean>>({});
  useEffect(()=>{
@@ -110,7 +110,7 @@ export function WorkspaceNav({groups,pathname,compact=false,onNavigate}:{
     <div id={"aw-nav-items-"+i} className="aw-nav-group-items" hidden={!expanded} data-active={active?"true":"false"}>
      {group.items.map(({label,href,icon:Icon})=>{
       const selected=matches(pathname,href);
-      return <Link key={href} href={href} onClick={onNavigate}
+      return <Link key={href} href={href} onClick={onNavigate} onPointerEnter={e=>{if(e.pointerType==="mouse")onPrefetch?.(href)}}
        title={compact?label:undefined} aria-label={compact?label:undefined}
        aria-current={selected?"page":undefined}
        className={"aw-nav-item"+(selected?" aw-nav-selected":"")}>

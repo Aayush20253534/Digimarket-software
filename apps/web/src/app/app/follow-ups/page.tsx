@@ -65,7 +65,7 @@ export default function FollowUpsPage(){
  const resetPage=()=>{sequence.current++;setCursor(null);setHistory([]);setNextCursor(null);};
  useEffect(()=>{const timer=window.setTimeout(()=>{setSearch(query.trim());setCursor(null);setHistory([]);},200);return()=>window.clearTimeout(timer);},[query]);
  const rangeInvalid=!!(from&&to&&from>to);
- const load=useCallback(async()=>{
+ const load=useCallback(async(force=true)=>{
    if(!canRead||rangeInvalid){setLoading(false);return;}
    const current=++sequence.current;
    setLoading(true);setError("");
@@ -76,7 +76,7 @@ export default function FollowUpsPage(){
      if(temperature)q.set("temperature",temperature);
      if(from)q.set("from",from);if(to)q.set("to",to);
      if(view==="calendar")q.set("month",month);
-     const data=await request<Result>("/leads/follow-ups?"+q);
+     const data=await request<Result>("/leads/follow-ups?"+q,{cache:force?"reload":"prefer"});
      if(current!==sequence.current)return;
      if(!data.summary||!data.today)throw new Error("Follow-up API is not updated yet. Refresh after deployment.");
      setRows(data.items);setNextCursor(data.nextCursor);setTotal(data.total);
@@ -85,7 +85,7 @@ export default function FollowUpsPage(){
      if(current===sequence.current){setError(e instanceof Error?e.message:"Unable to load follow-ups.");setRows([]);setNextCursor(null);setTotal(0);setSummary(emptySummary);setCalendar({});}
    }finally{if(current===sequence.current)setLoading(false);}
  },[canRead,cursor,request,dateView,search,temperature,from,to,view,month,rangeInvalid]);
- useEffect(()=>{void load();return()=>{sequence.current++;};},[load]);
+ useEffect(()=>{void load(false);return()=>{sequence.current++;};},[load]);
  useEffect(()=>{const refresh=()=>{if(agencyToday()!==today)void load();};const timer=window.setInterval(refresh,60_000);window.addEventListener("focus",refresh);return()=>{window.clearInterval(timer);window.removeEventListener("focus",refresh);};},[today,load]);
  const chooseDate=(key:DateView)=>{if(dateView===key&&!from&&!to)return;resetPage();setDateView(key);setFrom("");setTo("");};
  const clearFilters=()=>{if(!query&&!search&&!temperature&&!from&&!to&&dateView==="all")return;resetPage();setQuery("");setSearch("");setTemperature("");setFrom("");setTo("");setDateView("all");};

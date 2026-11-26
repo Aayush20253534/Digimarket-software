@@ -1,3 +1,4 @@
+import {workspaceReadCache} from "../cache/upstash";
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { clientUpdateSchema,clientListQuerySchema,clientEndAgreementSchema,
@@ -55,8 +56,10 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  });
  app.put(root+"/:id/video-readiness/:week",authenticated,async(req,res)=>{
   const body=parse(videoWeekInput,req.body);
-  res.json({data:await videos.saveWeek(actor(res),parse(id,req.params.id),body.month,
-   parse(weekNumber,req.params.week),body,body.clientCycle===true)});
+  const data=await videos.saveWeek(actor(res),parse(id,req.params.id),body.month,
+   parse(weekNumber,req.params.week),body,body.clientCycle===true);
+   await workspaceReadCache().invalidateOrganization(actor(res).organizationId);
+   res.json({data});
  });
  // Post readiness uses the same week buckets as videos but independent stock.
  app.get(root+"/:id/post-readiness",authenticated,async(req,res)=>{
@@ -68,15 +71,19 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
  });
  app.put(root+"/:id/post-readiness/:week",authenticated,async(req,res)=>{
   const body=parse(postWeekInput,req.body);
-  res.json({data:await posts.saveWeek(actor(res),parse(id,req.params.id),body.month,
-   parse(weekNumber,req.params.week),body,body.clientCycle===true)});
+  const data=await posts.saveWeek(actor(res),parse(id,req.params.id),body.month,
+   parse(weekNumber,req.params.week),body,body.clientCycle===true);
+   await workspaceReadCache().invalidateOrganization(actor(res).organizationId);
+   res.json({data});
  });
  app.get(root+"/:id/overview",authenticated,async(req,res)=>{
    res.set("Cache-Control","no-store");
    res.json({data:await svc.overview(actor(res),parse(id,req.params.id))});
  });
  app.post(root+"/:id/renew",authenticated,async(req,res)=>{
-   res.json({data:await svc.renew(actor(res),parse(id,req.params.id),parse(clientRenewSchema,req.body))});
+   const data=await svc.renew(actor(res),parse(id,req.params.id),parse(clientRenewSchema,req.body));
+   await workspaceReadCache().invalidateOrganization(actor(res).organizationId);
+   res.json({data});
  });
  app.post(root+"/:id/services",authenticated,async(req,res)=>{
    res.json({data:await svc.saveService(actor(res),parse(id,req.params.id),parse(clientServiceSchema,req.body))});
@@ -86,10 +93,14 @@ export function registerClientRoutes(app:Express,auth:AuthService) {
    res.json({data:await svc.detail(actor(res),parse(id,req.params.id))});
  });
  app.put(root+"/:id",authenticated,async(req,res)=>{
-   res.json({data:await svc.update(actor(res),parse(id,req.params.id),parse(clientUpdateSchema,req.body))});
+   const data=await svc.update(actor(res),parse(id,req.params.id),parse(clientUpdateSchema,req.body));
+   await workspaceReadCache().invalidateOrganization(actor(res).organizationId);
+   res.json({data});
  });
  app.post(root+"/:id/end-agreement",authenticated,async(req,res)=>{
-   res.json({data:await svc.endAgreement(actor(res),parse(id,req.params.id),parse(clientEndAgreementSchema,req.body))});
+   const data=await svc.endAgreement(actor(res),parse(id,req.params.id),parse(clientEndAgreementSchema,req.body));
+   await workspaceReadCache().invalidateOrganization(actor(res).organizationId);
+   res.json({data});
  });
  app.post(root+"/:id/contacts",authenticated,async(req,res)=>{
    res.status(201).json({data:await svc.addContact(actor(res),parse(id,req.params.id),

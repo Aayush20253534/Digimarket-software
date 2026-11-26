@@ -3,6 +3,7 @@ import type {PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {ClientVideoReadinessService} from "./video-readiness-service";
 import {ClientPostReadinessService} from "./post-readiness-service";
+import {bulkClientReadiness} from "./bulk-readiness";
 const actor={organizationId:"org",permissions:new Set(["clients.read"])} as Principal;
 const movements=[
  {month:"2026-10",week:1,readyAdded:4,delivered:0,festivalReadyAdded:3,festivalDelivered:0},
@@ -51,5 +52,27 @@ describe("client anniversary stock preservation",()=>{
   expect(current.weeks[0]).toMatchObject({from:"2026-11-26",storageMonth:"2026-11",storageWeek:4,legacy:true});
   expect(current.weeks[1]?.from).toBe("2026-12-03");
   expect(await p.clientCycle(actor,"client","2026-11","2026-11-25")).toMatchObject({festivalOpeningStock:2,festivalRemainingStock:2,festivalTotalStock:2});
+ });
+});
+
+describe("bulk readiness parity",()=>{
+ it("matches single-client reads and uses three queries for a batch",async()=>{
+  const db=fixture();
+  const client={id:"client",businessName:"Cafe",contractStartOn:new Date("2026-10-22T00:00:00Z"),contractEndOn:null};
+  const second={...client,id:"other",businessName:"Other",contractStartOn:new Date("2026-10-25T00:00:00Z")};
+  const v=await new ClientVideoReadinessService(db).clientCycle(actor,"client",undefined,"2026-11-25");
+  const p=await new ClientPostReadinessService(db).clientCycle(actor,"client",undefined,"2026-11-25");
+  const bulkDb={client:{findMany:vi.fn().mockResolvedValue([client,second])},
+   clientVideoWeek:{findMany:vi.fn().mockResolvedValue(movements.map(row=>({...row,clientId:"client"})))},
+   clientPostWeek:{findMany:vi.fn().mockResolvedValue(movements.map(row=>({...row,clientId:"client"})))}};
+  const result=await bulkClientReadiness(bulkDb as unknown as PrismaClient,actor,["client","other"],"2026-11-25");
+  expect(result.get("client")).toEqual({v,p});
+  expect(result.get("other")?.v.totalStock).toBe(0);
+  expect(result.get("other")?.p.festivalTotalStock).toBe(0);
+  for(const model of Object.values(bulkDb))expect(model.findMany).toHaveBeenCalledTimes(1);
+  expect(bulkDb.client.findMany).toHaveBeenCalledWith(expect.objectContaining({where:{organizationId:"org",id:{in:["client","other"]}}}));
+ });
+ it("denies access before database reads",async()=>{
+  await expect(bulkClientReadiness({} as PrismaClient,{...actor,permissions:new Set()},["client"],"2026-11-25")).rejects.toMatchObject({status:403});
  });
 });

@@ -2,11 +2,13 @@ import {businessCycle,agencyToday} from "@digimarket/contracts";
 import {Prisma,type PrismaClient} from "@digimarket/db";
 import type {Principal} from "../auth/service";
 import {AuthError,forbidden} from "../auth/errors";
-import {monthWeeks,clientReadinessPlan,datedStoredWeek,compareStoredWeeks,shiftMonth} from "./readiness-weeks";
+import {monthWeeks,clientReadinessPlan,datedStoredWeek,compareStoredWeeks,shiftMonth,type StoredWeek} from "./readiness-weeks";
 export {monthWeeks} from "./readiness-weeks";
 
 const clientMissing=()=>new AuthError(404,"NOT_FOUND","Client not found");
 const conflict=()=>new AuthError(409,"POST_WEEK_CONFLICT","Post readiness changed. Refresh and retry.");
+export const postCycleSelect={id:true,month:true,week:true,periodFrom:true,periodTo:true,readyAdded:true,delivered:true,note:true,version:true,updatedAt:true,updatedBy:{select:{displayName:true}},festivalReadyAdded:true,festivalDelivered:true,festivalNote:true} as const;
+export type PostCycleRow=Prisma.ClientPostWeekGetPayload<{select:typeof postCycleSelect}>;
 export type PostWeekInput={
  readyAdded:number;delivered:number;note?:string|null;version:number;
  festivalReadyAdded?:number;festivalDelivered?:number;festivalNote?:string|null;
@@ -112,9 +114,14 @@ export class ClientPostReadinessService{
   const client=await this.allowed(actor,clientId);
   const where={organizationId:actor.organizationId,clientId,month:{lte:"9999-12"}};
   const [entries,other]=await Promise.all([
-   this.db.clientPostWeek.findMany({where,select:{id:true,month:true,week:true,periodFrom:true,periodTo:true,readyAdded:true,delivered:true,note:true,version:true,updatedAt:true,updatedBy:{select:{displayName:true}},festivalReadyAdded:true,festivalDelivered:true,festivalNote:true}}),
+   this.db.clientPostWeek.findMany({where,select:postCycleSelect}),
    this.db.clientVideoWeek.findMany({where,select:{month:true,week:true,periodFrom:true,periodTo:true}})
   ]);
+  return this.calculateClientCycle(client,entries,other,month,today);
+ }
+ /** Pure calculation shared by single-client and batched reads; no storage writes. */
+ calculateClientCycle(client:Awaited<ReturnType<ClientPostReadinessService["allowed"]>>,entries:PostCycleRow[],other:StoredWeek[],month:string|undefined,today:string){
+  const clientId=client.id;
   const plan=clientReadinessPlan(client,[...entries,...other],month,today);
   const before=entries.filter(row=>!plan.from||datedStoredWeek(row,client).from<plan.from);
   const openingStock=before.reduce((n,r)=>n+r.readyAdded-r.delivered,0);

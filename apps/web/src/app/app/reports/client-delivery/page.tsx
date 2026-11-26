@@ -12,8 +12,8 @@ export default function ClientDelivery(){
  const {session,request}=useAuth(),allowed=!!session?.identity.permissions.includes("reports.business.read")&&!!session?.identity.permissions.includes("clients.read");
  const [report,setReport]=useState<Report|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[search,setSearch]=useState(""),[period,setPeriod]=useState(()=>reportingPreset("current"));
  useEffect(()=>{const q=new URLSearchParams(window.location.search),from=q.get("from"),to=q.get("to");if(from&&to&&/^\d{4}-\d{2}-\d{2}$/.test(from)&&/^\d{4}-\d{2}-\d{2}$/.test(to)&&from<=to)setPeriod({from,to})},[]);
- const load=useCallback(async()=>{if(!allowed)return;setBusy(true);setError("");try{setReport(await request<Report>("/reports/client-delivery"))}catch(e){setReport(null);setError(e instanceof Error?e.message:"Client report unavailable")}finally{setBusy(false)}},[allowed,request]);
- useEffect(()=>{void load()},[load]);
+ const load=useCallback(async(force=true)=>{if(!allowed)return;setBusy(true);setError("");try{setReport(await request<Report>(force?"/reports/client-delivery?fresh=1":"/reports/client-delivery",{cache:force?"reload":"prefer"}))}catch(e){setReport(null);setError(e instanceof Error?e.message:"Client report unavailable")}finally{setBusy(false)}},[allowed,request]);
+ useEffect(()=>{void load(false)},[load]);
  if(!session)return <Spinner label="Checking access…"/>;if(!allowed)return <Notice kind="error">Business reporting and client reading permissions are required.</Notice>;
  const rows=report?.items.filter(x=>x.name.toLowerCase().includes(search.trim().toLowerCase()))??[];
  const total=(key:"posts"|"videos"|"festival"|"postsDelivered"|"videosDelivered"|"festivalDelivered")=>rows.reduce((sum,r)=>sum+(r[key]??0),0);

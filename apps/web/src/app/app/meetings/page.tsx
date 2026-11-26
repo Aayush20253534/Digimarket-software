@@ -57,18 +57,18 @@ export default function MeetingsPage(){
  const reset=()=>{setCursor(null);setPages([]);setNextCursor(null);};
  const rangeInvalid=!!(from&&to&&from>to);
  useEffect(()=>{const timer=window.setTimeout(()=>{setSearch(query.trim());setCursor(null);setPages([]);},200);return()=>window.clearTimeout(timer);},[query]);
- const load=useCallback(async()=>{
+ const load=useCallback(async(force=true)=>{
    if(!canRead||rangeInvalid){setLoading(false);return;}
    const seq=++sequence.current;setLoading(true);setError("");
    try{
      const q=new URLSearchParams({limit:"20"});if(cursor)q.set("cursor",cursor);if(search)q.set("q",search);if(from)q.set("from",from);if(to)q.set("to",to);
      if(mode==="history"){
-       const data=await request<HistoryResult>("/leads/meetings/history?"+q);
+       const data=await request<HistoryResult>("/leads/meetings/history?"+q,{cache:force?"reload":"prefer"});
        if(seq!==sequence.current)return;
        setEvents(data.items);setTotal(data.total);setNextCursor(data.nextCursor);
      }else{
        if(bucket!=="all")q.set("view",bucket);if(temperature)q.set("temperature",temperature);if(kind)q.set("type",kind);if(mode==="calendar")q.set("month",month);
-       const data=await request<Result>("/leads/meetings?"+q);
+       const data=await request<Result>("/leads/meetings?"+q,{cache:force?"reload":"prefer"});
        if(seq!==sequence.current)return;
        if(!data.summary||!data.now)throw Error("Meeting API update is not deployed yet. Refresh after the backend deployment.");
        setRows(data.items);setSummary(data.summary);setTotal(data.total);setNextCursor(data.nextCursor);setToday(data.today);setNow(data.now);setCalendar(data.calendar??{});
@@ -76,7 +76,7 @@ export default function MeetingsPage(){
    }catch(e){if(seq===sequence.current){setError(e instanceof Error?e.message:"Unable to load meetings.");setRows([]);setEvents([]);setSummary(null);setTotal(null);setNextCursor(null);setCalendar({});}}
    finally{if(seq===sequence.current)setLoading(false);}
  },[canRead,rangeInvalid,cursor,search,from,to,mode,bucket,temperature,kind,month,request]);
- useEffect(()=>{void load();return()=>{sequence.current++;};},[load]);
+ useEffect(()=>{void load(false);return()=>{sequence.current++;};},[load]);
  useEffect(()=>{if(mode==="history")return;const refresh=()=>{if(!document.hidden)void load();};const timer=window.setInterval(refresh,60000);return()=>window.clearInterval(timer);},[load,mode]);
  const choose=(key:Bucket)=>{reset();setBucket(key);setFrom("");setTo("");};
  const chooseMode=(value:typeof mode)=>{if(mode===value)return;reset();setMode(value);setFrom("");setTo("");setBucket("all");setTemperature("");setKind("");};

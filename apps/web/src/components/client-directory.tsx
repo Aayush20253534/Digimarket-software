@@ -22,14 +22,16 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
  const canRead=!!session?.identity.permissions.includes("clients.read"),canFinance=!!session?.identity.permissions.includes("finance.read.all");
  const [scope,setScope]=useState<"current"|"expired"|"all">(section),[expiring,setExpiring]=useState(false),[summary,setSummary]=useState<Summary|null>(null),[total,setTotal]=useState<number|null>(null),[today,setToday]=useState(agencyToday),[view,setView]=useState<"register"|"readiness">("register");
  const [rows,setRows]=useState<Client[]>([]),[search,setSearch]=useState(""),[filter,setFilter]=useState(""),[cursor,setCursor]=useState<string|null>(null),[next,setNext]=useState<string|null>(null);
+ const [debouncedSearch,setDebouncedSearch]=useState("");
+ useEffect(()=>{const timer=window.setTimeout(()=>setDebouncedSearch(search),200);return()=>window.clearTimeout(timer);},[search]);
  const [history,setHistory]=useState<string[]>([]),[sortBy,setSortBy]=useState<"businessName"|"businessType"|"location"|"status"|"contractEndOn">("businessName"),[descending,setDescending]=useState(false),[legacy,setLegacy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState("");
- const load=useCallback(async(force=false)=>{
+ const load=useCallback(async(force=true)=>{
   if(!canRead){setLoading(false);return;}
   const version=++loadVersion.current;
   setLoading(true);setRows([]);setNext(null);
   try{
    const q=new URLSearchParams({limit:"30",section:scope,sort:sortBy,direction:descending?"desc":"asc",workspace:"1"});
-   if(search.trim())q.set("q",search.trim());
+   if(debouncedSearch.trim())q.set("q",debouncedSearch.trim());
    if(filter)q.set("status",filter);
    if(expiring)q.set("expiring","1");
    if(cursor)q.set("cursor",cursor);
@@ -41,8 +43,8 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
    }
    if(version===loadVersion.current){setRows(response.items);setNext(response.nextCursor);setError("");setSummary(response.summary??null);setTotal(response.total??null);setToday(response.today??agencyToday());}
   }catch(e){if(version===loadVersion.current){setError(readable(e));setSummary(null);setTotal(null);}}finally{if(version===loadVersion.current)setLoading(false);}
- },[canRead,request,search,filter,cursor,sortBy,descending,scope,expiring]);
- useEffect(()=>{void load();return()=>{loadVersion.current++;};},[load]);
+ },[canRead,request,debouncedSearch,filter,cursor,sortBy,descending,scope,expiring]);
+ useEffect(()=>{void load(false);return()=>{loadVersion.current++;};},[load]);
  useEffect(()=>{setCursor(null);setHistory([]);setFilter("");setScope(section);setExpiring(false);},[section]);
  const choose=(key:string)=>{setCursor(null);setHistory([]);setFilter("");setExpiring(false);if(key==="past"){setScope("expired");router.push("/app/clients/expired");return;}setScope(key==="all"?"all":"current");if(key==="expiring")setExpiring(true);else if(["ACTIVE","PAUSED","ARCHIVED"].includes(key))setFilter(key);};
  useEffect(()=>{

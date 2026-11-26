@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 import { timingSafeEqual } from "node:crypto";
+import {recordLatency,performanceSnapshot} from "./runtime/performance";
+import {workspaceReadCache} from "./cache/upstash";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -45,11 +47,15 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     res.set("X-Request-ID",id);
     const start=process.hrtime.bigint();
     res.on("finish",()=>{
-      if(res.statusCode>=500){
-        const elapsed=Number(process.hrtime.bigint()-start)/1e6;
+      const elapsed=Number(process.hrtime.bigint()-start)/1e6;
+      const route=typeof req.route?.path==="string"?req.route.path:"other";
+      const method=["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS"].includes(req.method)?req.method:"OTHER";
+      recordLatency(method+" "+route,elapsed,res.statusCode>=500);
+      if(res.statusCode>=500||elapsed>=1000){
         // Never log Authorization, cookies, request/query bodies or billing data.
-        console.error(JSON.stringify({level:"error",kind:"http",requestId:id,
-          method:req.method,status:res.statusCode,elapsedMs:Math.round(elapsed)}));
+        const entry=JSON.stringify({level:res.statusCode>=500?"error":"warn",kind:"http",requestId:id,
+          method,route,status:res.statusCode,elapsedMs:Math.round(elapsed)});
+        if(res.statusCode>=500)console.error(entry);else console.warn(entry);
       }
     });next();
   });
@@ -89,6 +95,14 @@ export function createApp(allowedOrigins: string[] = ["http://localhost:3000"], 
     }catch{
       return res.status(503).json({data:{status:"unavailable"}});
     }
+  });
+  app.get("/api/v1/ops/performance",(req,res)=>{
+    res.set("Cache-Control","no-store");
+    const expected=process.env.OPS_MONITOR_TOKEN;
+    const candidate=req.get("x-ops-token")??"";
+    if(!authService||!expected||expected.length<32||Buffer.byteLength(candidate)!==Buffer.byteLength(expected)||!timingSafeEqual(Buffer.from(candidate),Buffer.from(expected)))
+      return res.status(404).json({error:{code:"NOT_FOUND",message:"Route not found"}});
+    return res.json({data:{uptimeSeconds:Math.floor(process.uptime()),routes:performanceSnapshot(),redis:workspaceReadCache().snapshot()}});
   });
   app.get("/api/v1/ops/health",async(req,res)=>{
     res.set("Cache-Control","no-store");

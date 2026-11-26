@@ -66,6 +66,8 @@ export default function LeadsPage(){
  const [sourceFilter,setSourceFilter]=useState<""|LeadSource>("");
  const [temperatureFilter,setTemperatureFilter]=useState<""|LeadTemperature>("");
  const [search,setSearch]=useState("");
+ const [debouncedSearch,setDebouncedSearch]=useState("");
+ useEffect(()=>{const timer=window.setTimeout(()=>setDebouncedSearch(search),200);return()=>window.clearTimeout(timer);},[search]);
  const [history,setHistory]=useState<string[]>([]);
  const [sortBy,setSortBy]=useState<SortKey>("createdAt"),[descending,setDescending]=useState(false);
  const [preferencesReady,setPreferencesReady]=useState(false);
@@ -124,7 +126,7 @@ export default function LeadsPage(){
  useEffect(()=>{setCheckedLeads({});},[stage,sourceFilter,temperatureFilter,search,sortBy,descending,session?.identity.userId]);
  const changeCycle=(choice:string)=>{if(choice===cycleChoice)return;loadSequence.current++;setCycleChoice(choice);setCursor(null);setHistory([]);setTotalLeads(null);setItems([]);setMetrics(null);setNextCursor(null);setCheckedLeads({});setStage("");setLoading(true);};
  useEffect(()=>{setCursor(null);setHistory([]);setCheckedLeads({});},[cycleKey]);
- const load=useCallback(async()=>{
+ const load=useCallback(async(force=true)=>{
    if(!canRead){setLoading(false);return;}
    if(!preferencesReady)return;
    const sequence=++loadSequence.current;
@@ -133,24 +135,24 @@ export default function LeadsPage(){
      const q=new URLSearchParams({limit:"10",sort:sortBy,direction:descending?"desc":"asc"});
      if(cycleKey)q.set("cycle",cycleKey);
      if(temperatureFilter)q.set("temperature",temperatureFilter);
-     if(stage)q.set("stage",stage);if(sourceFilter)q.set("source",sourceFilter);if(search.trim())q.set("q",search.trim());
+     if(stage)q.set("stage",stage);if(sourceFilter)q.set("source",sourceFilter);if(debouncedSearch.trim())q.set("q",debouncedSearch.trim());
      if(cursor)q.set("cursor",cursor);
      let result:Page;
-     try{result=await request<Page>("/leads?"+q);setLegacySort(false);}
+     try{result=await request<Page>("/leads?"+q,{cache:force?"reload":"prefer"});setLegacySort(false);}
      catch(e){
       if(!(e instanceof ApiError)||e.status!==422)throw e;
       q.delete("sort");q.delete("direction");
-      result=await request<Page>("/leads?"+q);setLegacySort(true);
+      result=await request<Page>("/leads?"+q,{cache:force?"reload":"prefer"});setLegacySort(true);
      }
      if(sequence!==loadSequence.current)return;
      setItems(result.items);setNextCursor(result.nextCursor);setTotalLeads(result.total);setError("");
-     void request<Metrics>("/leads/metrics"+cycleQuery).then(result=>{
+     void request<Metrics>("/leads/metrics"+cycleQuery,{cache:force?"reload":"prefer"}).then(result=>{
        if(sequence===loadSequence.current)setMetrics(result);
      }).catch(()=>{});
    }catch(e){if(sequence===loadSequence.current)setError(errText(e));}
    finally{if(sequence===loadSequence.current)setLoading(false);}
- },[canRead,preferencesReady,request,stage,sourceFilter,temperatureFilter,search,cursor,sortBy,descending,cycleKey,cycleQuery]);
- useEffect(()=>{void load();},[load]);
+ },[canRead,preferencesReady,request,stage,sourceFilter,temperatureFilter,debouncedSearch,cursor,sortBy,descending,cycleKey,cycleQuery]);
+ useEffect(()=>{void load(false);},[load]);
  useEffect(()=>{if(!canAssign)return;void request<StaffUser[]>("/leads/assignees").then(setStaff).catch(()=>{});},[canAssign,request]);
  const focusedRef=useRef(false);
  const mobileScrollLeadId=useRef<string|null>(null);
