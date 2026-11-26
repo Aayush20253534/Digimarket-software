@@ -8,6 +8,7 @@ export type ApiOptions = {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
   token?: string;
+  signal?: AbortSignal;
 };
 
 export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
@@ -18,6 +19,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     method: options.method ?? "GET",
     cache: "no-store",
     credentials: "same-origin",
+    signal: options.signal,
     headers: {
       accept: "application/json",
       ...(options.body === undefined ? {} : { "content-type": "application/json" }),
@@ -46,6 +48,7 @@ export type SessionPayload = {
   next: "SIGNED_IN";
   accessToken: string;
   user: LoginUser;
+  identity?: Identity;
 };
 export type ChallengePayload = {
   next: "CHANGE_PASSWORD";

@@ -23,7 +23,7 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
  const [scope,setScope]=useState<"current"|"expired"|"all">(section),[expiring,setExpiring]=useState(false),[summary,setSummary]=useState<Summary|null>(null),[total,setTotal]=useState<number|null>(null),[today,setToday]=useState(agencyToday),[view,setView]=useState<"register"|"readiness">("register");
  const [rows,setRows]=useState<Client[]>([]),[search,setSearch]=useState(""),[filter,setFilter]=useState(""),[cursor,setCursor]=useState<string|null>(null),[next,setNext]=useState<string|null>(null);
  const [history,setHistory]=useState<string[]>([]),[sortBy,setSortBy]=useState<"businessName"|"businessType"|"location"|"status"|"contractEndOn">("businessName"),[descending,setDescending]=useState(false),[legacy,setLegacy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState("");
- const load=useCallback(async()=>{
+ const load=useCallback(async(force=false)=>{
   if(!canRead){setLoading(false);return;}
   const version=++loadVersion.current;
   setLoading(true);setRows([]);setNext(null);
@@ -34,10 +34,10 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
    if(expiring)q.set("expiring","1");
    if(cursor)q.set("cursor",cursor);
    let response:Register;
-   try{response=await request<Register>("/clients?"+q);setLegacy(false);}
+   try{response=await request<Register>("/clients?"+q,{cache:force?"reload":"prefer"});setLegacy(false);}
    catch(e){
     if(!(e instanceof ApiError)||e.status!==422||expiring||sortBy==="contractEndOn")throw e;
-    q.delete("workspace");q.delete("sort");q.delete("direction");response=await request<Register>("/clients?"+q);setLegacy(true);
+    q.delete("workspace");q.delete("sort");q.delete("direction");response=await request<Register>("/clients?"+q,{cache:force?"reload":"prefer"});setLegacy(true);
    }
    if(version===loadVersion.current){setRows(response.items);setNext(response.nextCursor);setError("");setSummary(response.summary??null);setTotal(response.total??null);setToday(response.today??agencyToday());}
   }catch(e){if(version===loadVersion.current){setError(readable(e));setSummary(null);setTotal(null);}}finally{if(version===loadVersion.current)setLoading(false);}
@@ -61,7 +61,7 @@ export function ClientDirectory({section}:{section:"current"|"expired"}){
     <Link href="/app/clients/post-readiness" className="aw-client-btn"><Newspaper size={16}/>Post readiness</Link>
     {!session.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN")&&session.identity.permissions.includes("assets.read")&&
      <Link href="/app/clients/assets" className="aw-client-btn">Files & Assets</Link>}
-    <button className="aw-client-btn" onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button></div>}/>
+    <button className="aw-client-btn" onClick={()=>void load(true)}><RefreshCw size={16}/>Refresh</button></div>}/>
   <nav className="flex flex-wrap gap-3" aria-label="Client sections">
    <Link className={scope==="current"?"aw-client-primary":"aw-client-btn"} href="/app/clients" aria-current={scope==="current"?"page":undefined} onClick={()=>{setScope("current");setFilter("");setExpiring(false);setCursor(null);setHistory([]);}}>Clients</Link>
    <Link className={scope==="expired"?"aw-client-primary":"aw-client-btn"} href="/app/clients/expired" aria-current={scope==="expired"?"page":undefined}>Past Clients</Link>
