@@ -4,8 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {affectedReadGroups,readFreshness,readGroup} from "@/lib/read-policy";
 
 // Refresh cookies are shared between tabs. Serialize rotations where Web Locks is available.
-function withSessionLock<T>(work:()=>Promise<T>):Promise<T>{
-  return typeof navigator!=="undefined"&&navigator.locks ? navigator.locks.request("aw-session-rotation",work) : work();
+async function withSessionLock<T>(work:()=>Promise<T>):Promise<T>{
+  if(typeof navigator!=="undefined"&&navigator.locks)return await navigator.locks.request("aw-session-rotation",work);
+  return await work();
 }
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
