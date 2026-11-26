@@ -11,7 +11,8 @@ permissions:
 
 jobs:
   browser:
-    runs-on: ubuntu-latest
+    # Pin the supported runner used by the Playwright browser dependencies.
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     services:
       postgres:
