@@ -6,7 +6,7 @@ import { BusinessPeriodPicker } from "@/components/business-period-picker";
 import { useAuth } from "@/components/auth-provider";
 import { Notice, PageHeader, Spinner } from "@/components/ui";
 export function money(value: string | number | null | undefined) {
-  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(String(value ?? 0));
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(String(value ?? ""));
   if (!match) return "Unavailable";
   const fraction = (match[3] ?? "").padEnd(3, "0");
   const cents =
@@ -51,6 +51,7 @@ function useLocalFinanceWindow({ syncUrl = true, enabled = true }: { syncUrl?: b
     )
       setView("all");
     const explicit = !!(from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to);
+    if(!session.identity.permissions.some(p=>p==="finance.read.all"||p==="finance.entry.read.own")){setReady(true);return;}
     void request<FinanceCycleState>("/finance/cycle-state").then(state => {
       if (!active) return;
       if (state?.current && Array.isArray(state.history)) {

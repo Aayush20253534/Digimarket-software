@@ -556,12 +556,12 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
           </div>
           </div>
           <div className="sm:col-span-2 flex flex-wrap gap-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||salarySelected||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
-            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?(compact?(kind==="EXPENSE"?"Save expense":"Save income"):directExpense?"Save expense":"Save entry"):"Submit for approval"}</button></div>
+            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?(compact?(kind==="EXPENSE"?"Save expense":"Save income"):directExpense?"Save expense":"Save entry"):"Submit for approval"}</button>{compact&&<span className="text-xs text-slate-400 self-center">Save clears the form so you can add another entry.</span>}</div>
         </form>
       </Card>;
   if(!session)return <Spinner label="Checking finance access…"/>;
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
-  if(formOnly)return <div className="space-y-3">{error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}{entryForm}</div>;
+  if(formOnly)return <div className="space-y-3">{!isFounder&&!loading&&!financeReady&&<Notice kind="error">Finance approvals are not currently enabled. Ask an administrator to enable the finance approval policy.</Notice>}{error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}{entryForm}</div>;
   return <div className="aw-finance-page aw-v5-finance-page space-y-7" data-aw-module="finance">
     {!context&&<><BusinessWorkspaceNav/>
     <Link className="inline-flex text-sm text-violet-300 underline" href={"/app/finance?"+windowState.query}>← Finance overview</Link></>}

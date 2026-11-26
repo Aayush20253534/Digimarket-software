@@ -26,7 +26,7 @@ const rupees=(s:string|number)=>new Intl.NumberFormat("en-IN",{style:"currency",
  minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(s)||0);
 const err=(error:unknown)=>error instanceof Error?error.message:"The operation was not completed.";
 const methods=["UPI","BANK_TRANSFER","CASH","CARD","OTHER"] as const;
-export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOnly?:boolean;historyOnly?:boolean}={}){
+export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly=false}:{paymentOnly?:boolean;historyOnly?:boolean;fundingOnly?:boolean}={}){
  const context=useFinanceContext();
  const {session,request}=useAuth();
  const founder=!!session?.identity.roles.includes("FOUNDER");
@@ -59,10 +59,10 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
      request<Credit[]>("/salary/credits"),request<Salary[]>("/salary/payments?"+params),
      request<Overview>("/salary/summary?"+params)
     ]);
-    setPeople(ps);setAccounts(as);setCredits(cs);setPayments(history);setOverview(summary);
+    setPeople(Array.isArray(ps)?ps:[]);setAccounts(Array.isArray(as)?as:[]);setCredits(Array.isArray(cs)?cs:[]);setPayments(Array.isArray(history)?history:[]);setOverview(summary&&Array.isArray(summary.founderFunding)&&Array.isArray(summary.founderBalances)&&Array.isArray(summary.monthly)?summary:null);
    }else{
     const history=await request<Salary[]>("/salary/payments?"+params);
-    setPayments(history);
+    setPayments(Array.isArray(history)?history:[]);
    }
   }catch(e){setError(err(e));}finally{setLoading(false);}
  },[session,founder,request,dateFrom,dateTo,context?.window.period.from,context?.window.period.to,context?.window.ready,context?.refresh]);
@@ -86,7 +86,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
   const available=activeAccounts.find(x=>x.founderUserId===id);
   return !!available&&total<=Number(available.availableBalance)+0.000001;
  });
- const canPay=!!recipient&&Number(amount)>0&&confirmed&&shares.every(x=>x.accountId&&Number(x.amount)>0)
+ const canPay=!loading&&!!recipient&&Number(amount)>0&&confirmed&&shares.every(x=>x.accountId&&Number(x.amount)>0)
   &&!duplicateShares&&Math.abs(difference)<0.005&&withinFinance;
  async function action(work:()=>Promise<unknown>,message:string){
   setBusy(true);setError("");setSuccess("");
@@ -111,7 +111,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
   {success&&<div role="status" className="rounded-lg border border-emerald-500/40 p-3">{success}</div>}
   {!context&&<BusinessPeriodPicker value={{from:dateFrom,to:dateTo}} onChange={period=>{setDateFrom(period.from);setDateTo(period.to);}} disabled={busy}/>}
   {!paymentOnly&&<p className="text-sm opacity-70">Salary costs use the selected payment dates. Available funding carries forward across cycles and always reflects all-time entries.</p>}
-  {founder&&!historyOnly&&<section className="rounded-xl border border-white/10 p-5 space-y-4">
+  {founder&&!historyOnly&&!fundingOnly&&<section className="rounded-xl border border-white/10 p-5 space-y-4">
     <h2 className="text-xl font-semibold flex gap-2 items-center"><Banknote size={21}/>Record a salary payment</h2>
     <p className="text-sm opacity-70">Choose a recipient and allocate the salary between sources. The combined amount funded by each founder cannot exceed their remaining Finance Net posted. DigiMarket records a payment already made, not a transfer.</p>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -119,7 +119,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
       <option value="">Choose staff member</option>{people.map(p=><option value={p.id} key={p.id}>{p.displayName}{p.isFounder?" (Founder)":""}</option>)}
      </select></label>
      <label className="text-sm space-y-1">Salary amount (₹)<input type="number" step="0.01" min="0.01" className="field w-full" value={amount}
-      onChange={e=>setAmount(e.target.value)}/></label>
+      onChange={e=>{setAmount(e.target.value);if(shares.length===1)setShares(v=>[{...v[0],amount:e.target.value}]);}}/></label>
      <label className="text-sm space-y-1">Salary for month<input type="month" className="field w-full" value={salaryMonth}
       onChange={e=>setSalaryMonth(e.target.value)}/></label>
      <label className="text-sm space-y-1">Paid on<input type="date" className="field w-full" value={paidOn}
@@ -133,7 +133,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
     </div>
     <h3 className="font-semibold">Funding sources</h3>
     <div className="fc-funding-balances">{(overview?.founderBalances??[]).map(f=><div key={f.founderUserId}><span>{f.name}</span><strong>{rupees(f.remaining)}</strong></div>)}</div>
-    {shares.map((share,i)=><div key={i} className="grid gap-2 grid-cols-[minmax(0,1fr)_minmax(100px,160px)_auto] items-end">
+    {shares.map((share,i)=><div key={i} className="fc-salary-share grid gap-2 grid-cols-[minmax(0,1fr)_minmax(100px,160px)_auto] items-end">
      <label className="text-sm space-y-1">Founder account
       <select className="field w-full" value={share.accountId} onChange={e=>updateShare(i,"accountId",e.target.value)}>
        <option value="">Select source</option>{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.founderName} · {a.name}</option>)}
@@ -162,7 +162,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
     </button>
    </section>}
   {!paymentOnly&&founder&&<>
-   <section className="grid gap-3 sm:grid-cols-3">
+   {!fundingOnly&&<section className="grid gap-3 sm:grid-cols-3">
     {[["Total salaries paid",overview?.totalPaid??"Unavailable","Company salary expense, counted once"],
       ["Salary payments",overview?String(overview.paymentCount):"Unavailable","Confirmed payments in range"],
       ["Founder sources",overview?String(totals.length):"Unavailable","Funding founders in range"]].map(([label,value,desc],i)=>
@@ -171,7 +171,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
       <strong className="block text-2xl">{i===0&&value!=="Unavailable"?rupees(value):value}</strong>
       <p className="text-xs opacity-65">{desc}</p>
      </article>)}
-   </section>
+   </section>}
    <div className="grid gap-5 lg:grid-cols-2">
     <section className="rounded-xl border border-white/10 p-5 space-y-4">
      <h2 className="font-semibold text-lg flex gap-2 items-center"><Wallet size={19}/>Founder funding accounts</h2>
@@ -213,7 +213,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
      </details>}
     </section>
    </div>
-   <div className="grid gap-5 lg:grid-cols-2">
+   {!fundingOnly&&<div className="grid gap-5 lg:grid-cols-2">
     <section className="rounded-xl border border-white/10 p-5 space-y-3">
      <h2 className="text-lg font-semibold">Founder salary funding expenses</h2>
      <p className="text-xs opacity-70">Expense chart by funding founder, not by the founder recording the payment. Salary received is never income here.</p>
@@ -231,9 +231,9 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOn
      </div>)}
      {!(overview?.monthly||[]).length&&<p className="text-sm opacity-60">No salary costs in this period.</p>}
     </section>
-   </div>
+   </div>}
   </>}
-  {!paymentOnly&&<section className="rounded-xl border border-white/10 p-5 space-y-4">
+  {!paymentOnly&&!fundingOnly&&<section className="rounded-xl border border-white/10 p-5 space-y-4">
    <h2 className="text-lg font-semibold flex gap-2 items-center"><Users size={20}/>{founder?"Salary payment history":"My salary history"}</h2>
    <p className="text-sm opacity-70">All amounts are recorded payments, not bank transfer confirmations generated by DigiMarket. Voided records remain in history for audit.</p>
    <label className="block text-sm">Search salary payments<input type="search" className="field w-full" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recipient or salary month"/></label>
