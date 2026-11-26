@@ -26,6 +26,7 @@ const totalExpenseQuery = pagination.extend({
   view: z.enum(["mine", "all"]).default("mine"),
   type: z.enum(["ALL", "OTHER", "SELF_ADS", "CLIENT_ADS", "SALARY"]).default("ALL"),
 });
+const activityQuery=pagination.extend({view:z.enum(["mine","all"]).default("mine"),type:z.enum(["ALL","INCOME","OTHER","SELF_ADS","CLIENT_ADS","SALARY","SETTLEMENT"]).default("ALL"),status:z.enum(["ALL","POSTED","PENDING","REJECTED","CANCELLED"]).default("ALL")});
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = schema.safeParse(value);
   if (!r.success) throw new AuthError(422, "VALIDATION_ERROR", "Invalid finance fields");
@@ -72,6 +73,8 @@ export function registerFinanceLedgerRoutes(app: Express, auth: AuthService) {
         else next(e);
       }
     };
+  app.get(root+"/activity",authenticate,run(async(req,res)=>{res.json({data:await totalExpenses.activity(actor(res),{...await period(req,res),...parse(activityQuery,req.query)})});}));
+  app.get(root+"/activity/export",authenticate,run(async(req,res)=>{res.json({data:await totalExpenses.exportActivity(actor(res),{...await period(req,res),...parse(activityQuery,req.query)})});}));
   app.get(
     root + "/total-expenses/summary",
     authenticate,

@@ -174,6 +174,23 @@ export async function verifyTotalExpenses(db: PrismaClient) {
     },
   };
   assert.deepEqual(await report.summary(f, q), expected);
+  const activityQuery={...q,status:"ALL" as const};
+  await db.internalSettlement.create({data:{organizationId:org.id,senderId:f.userId,recipientId:second.userId,amount:"25",occurredOn:new Date("2026-11-03"),method:"UPI",idempotencyKey:randomUUID()}});
+  const activity=await report.activity(f,activityQuery);
+  assert.equal(activity.items.filter(r=>r.type==="SETTLEMENT").length,1);
+  assert.equal(activity.items.filter(r=>r.type==="SALARY").length,1);
+  assert.equal(activity.items.find(r=>r.type==="SALARY")?.amount,"250.0000");
+  assert.equal(activity.items.filter(r=>r.type==="INCOME").length,1);
+  assert.equal((await report.activity(f,{...activityQuery,type:"CLIENT_ADS"})).total,1);
+  assert.equal((await report.activity(f,{...activityQuery,type:"OTHER",status:"PENDING"})).total,1);
+  assert.equal((await report.activity(f,{...activityQuery,view:"mine",type:"SALARY"})).items[0]?.amount,"100.0000");
+  assert.equal((await report.activity(second,{...activityQuery,view:"mine",type:"SETTLEMENT"})).items[0]?.direction,"INCOMING");
+  const masked=JSON.stringify(await report.activity(admin,activityQuery));
+  assert.ok(!masked.includes("Confidential payroll note"));assert.ok(!masked.includes(salary.id));
+  assert.ok(!(await report.exportActivity(admin,activityQuery)).csv.includes("Confidential payroll note"));
+  assert.equal((await report.activity({...f,organizationId:other.id},activityQuery)).total,0);
+  await assert.rejects(()=>report.activity(employee,activityQuery),(e:unknown)=>(e as {status:number}).status===403);
+  assert.deepEqual(await report.summary(f,q),expected,"settlements do not affect expense or income totals");
   const all = await report.records(f, q);
   assert.deepEqual(all.summary, expected);
   assert.equal(all.matchingAmount, expected.postedTotalExpense);

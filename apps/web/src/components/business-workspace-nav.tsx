@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {Banknote,ChartNoAxesCombined,FileStack,Wallet} from "lucide-react";
+import {ChartNoAxesCombined,FileStack,Wallet} from "lucide-react";
 import {useAuth} from "@/components/auth-provider";
 
 /** Page-level wayfinding. Existing server-side authorisation remains in place. */
@@ -14,8 +14,7 @@ export function BusinessWorkspaceNav(){
   role==="FOUNDER"||role==="ADMIN"||role==="SUPER_ADMIN");
  const links=[
   {label:"Finance",href:"/app/finance",icon:Wallet,
-   allowed:grants.has("finance.read.all")||grants.has("finance.entry.read.own")},
-  {label:"Salary",href:"/app/salary",icon:Banknote,allowed:true},
+   allowed:true},
   {label:"Documents",href:"/app/documents",icon:FileStack,allowed:documentRole},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,
    allowed:grants.has("reports.business.read")},
@@ -23,7 +22,7 @@ export function BusinessWorkspaceNav(){
  if(links.length<2)return null;
  return <nav className="aw-v5-business-nav" aria-label="Business workspace sections">
   {links.map(({label,href,icon:Icon})=>{
-   const active=pathname===href||(href==="/app/documents"&&
+   const active=pathname===href||(href==="/app/finance"&&(pathname.startsWith("/app/finance/")||pathname==="/app/salary"))||(href==="/app/documents"&&
     (pathname.startsWith("/app/documents/")||pathname==="/app/quotations"||pathname==="/app/agreements"))||
     (href==="/app/reports"&&pathname.startsWith("/app/reports/"));
    return <Link key={href} href={href} aria-current={active?"page":undefined}

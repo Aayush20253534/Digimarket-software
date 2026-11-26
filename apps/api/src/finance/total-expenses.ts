@@ -12,6 +12,8 @@ export type TotalExpenseQuery = ReportingPeriod & {
   q: string;
   type: "ALL" | ExpenseType;
 };
+export type ActivityQuery=Omit<TotalExpenseQuery,"type">&{type:"ALL"|ExpenseType|"INCOME"|"SETTLEMENT";status:"ALL"|"POSTED"|"PENDING"|"REJECTED"|"CANCELLED"};
+type ActivityRow=Omit<ExpenseRow,"type">&{type:Exclude<ActivityQuery["type"],"ALL">;status:string;method:string;direction:string};
 type ExpenseRow = {
   id: string;
   date: Date;
@@ -82,6 +84,63 @@ export class TotalExpenseService {
         ${afterSettlementExpense}
       UNION ALL ${salaries}
     )`;
+  }
+
+  // Read-only classification across the existing ledgers. The expense CTE
+  // remains the single source for posted salary attribution and payroll privacy.
+  private activitySource(a:Principal,q:ActivityQuery){
+    const from=new Date(q.from+"T00:00:00Z"),to=new Date(q.to+"T00:00:00Z");
+    const scope=q.view==="mine"?Prisma.sql`AND t."enteredById"=${a.userId}::uuid`:Prisma.empty;
+    const settlements=q.view==="all"||isFounder(a)?Prisma.sql`
+      UNION ALL SELECT 'settlement:'||s.id::text,s."occurredOn",'SETTLEMENT'::text,'Internal settlement'::text,
+        concat(sender."displayName",' → ',recipient."displayName"),''::text,COALESCE(s.note,''),s.amount,false,
+        CASE WHEN s."voidedAt" IS NULL THEN 'POSTED' ELSE 'CANCELLED' END,s.method::text,
+        ${q.view==="mine"?Prisma.sql`CASE WHEN s."senderId"=${a.userId}::uuid THEN 'OUTGOING' ELSE 'INCOMING' END`:Prisma.sql`'TRANSFER'::text`}
+      FROM "InternalSettlement" s JOIN "User" sender ON sender.id=s."senderId" JOIN "User" recipient ON recipient.id=s."recipientId"
+      WHERE s."organizationId"=${a.organizationId}::uuid AND s."occurredOn" BETWEEN ${from} AND ${to}
+        ${q.view==="mine"?Prisma.sql`AND (s."senderId"=${a.userId}::uuid OR s."recipientId"=${a.userId}::uuid)`:Prisma.empty}
+    `:Prisma.empty;
+    return Prisma.sql`${this.source(a,q)}, activity AS (
+      SELECT e.*, 'POSTED'::text AS status, COALESCE(t.method::text,'') AS method,'OUTGOING'::text AS direction
+        FROM expenses e LEFT JOIN "FinancialTransaction" t ON e.id='finance:'||t.id::text AND t."organizationId"=${a.organizationId}::uuid
+      UNION ALL SELECT 'finance:'||t.id::text,t."occurredOn",
+        CASE WHEN t.kind='INCOME' THEN 'INCOME' WHEN c.purpose='META_ADS' THEN CASE WHEN t."clientId" IS NULL THEN 'SELF_ADS' ELSE 'CLIENT_ADS' END ELSE 'OTHER' END,
+        c.name,u."displayName",COALESCE(client."businessName",''),COALESCE(t.description,t."merchantOrSource",''),t.amount,t."reversesId" IS NOT NULL,
+        t.status::text,t.method::text,CASE WHEN t.kind='INCOME' THEN 'INCOMING' ELSE 'OUTGOING' END
+      FROM "FinancialTransaction" t JOIN "FinancialCategory" c ON c.id=t."categoryId" JOIN "User" u ON u.id=t."enteredById" LEFT JOIN "Client" client ON client.id=t."clientId"
+      WHERE t."organizationId"=${a.organizationId}::uuid AND t."occurredOn" BETWEEN ${from} AND ${to}
+        AND (t.kind='INCOME' OR t.status<>'POSTED') ${scope}
+      ${settlements}
+    )`;
+  }
+  private activityFilter(q:ActivityQuery){
+    return Prisma.sql`WHERE true
+      ${q.type==="ALL"?Prisma.empty:Prisma.sql`AND type=${q.type}`}
+      ${q.status==="ALL"?Prisma.empty:Prisma.sql`AND status=${q.status}`}
+      ${q.q?Prisma.sql`AND strpos(lower(concat_ws(' ',category,person,client,description,type,method)),lower(${q.q}))>0`:Prisma.empty}`;
+  }
+  async activity(a:Principal,q:ActivityQuery){
+    const source=this.activitySource(a,q),filter=this.activityFilter(q);
+    return this.db.$transaction(async tx=>{
+      const [[count],rows]=await Promise.all([
+        tx.$queryRaw<{count:bigint}[]>(Prisma.sql`${source} SELECT COUNT(*) AS count FROM activity ${filter}`),
+        tx.$queryRaw<ActivityRow[]>(Prisma.sql`${source} SELECT * FROM activity ${filter} ORDER BY date DESC,id DESC LIMIT ${q.limit} OFFSET ${(q.page-1)*q.limit}`)
+      ]);
+      return {items:rows.map(r=>({...r,date:r.date.toISOString().slice(0,10),amount:money(r.amount)})),total:Number(count.count),page:q.page,limit:q.limit};
+    },{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead});
+  }
+  async exportActivity(a:Principal,q:ActivityQuery){
+    const source=this.activitySource(a,q),filter=this.activityFilter(q);
+    const csv=await this.db.$transaction(async tx=>{
+      const lines=["ID,Date,Type,Category,Person,Client,Description,Amount,Direction,Status,Method,Reversal"];
+      for(let skip=0;;skip+=1000){
+        const rows=await tx.$queryRaw<ActivityRow[]>(Prisma.sql`${source} SELECT * FROM activity ${filter} ORDER BY date DESC,id DESC LIMIT 1000 OFFSET ${skip}`);
+        for(const r of rows)lines.push([r.id,r.date.toISOString().slice(0,10),r.type,r.category,r.person,r.client,r.description,money(r.amount),r.direction,r.status,r.method,r.reversal?"Yes":"No"].map(csvCell).join(","));
+        if(rows.length<1000)break;
+      }
+      return lines.join("\r\n");
+    },{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead,timeout:60000});
+    return {csv,filename:"financial-activity-"+q.from+"-"+q.to+".csv"};
   }
 
   private filter(q: TotalExpenseQuery) {

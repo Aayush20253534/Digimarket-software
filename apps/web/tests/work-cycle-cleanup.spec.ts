@@ -7,7 +7,7 @@ async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
   status:"PENDING",source:"COLD_CALL",version:1,createdAt:"2026-11-10T10:00:00Z",updatedAt:"2026-11-10T10:00:00Z",
   businessType:null,location:null,googleMapsUrl:null,stageNote:null,meetingAt:null,assignedToId:null,assignee:null}));
  const deleted:string[][]=[];
- const permissions=["leads.read","clients.read","tasks.read","finance.entry.read.own","finance.read.all","reports.business.read"];
+ const permissions=["leads.read","clients.read","tasks.read","finance.entry.read.own","finance.read.all","finance.entry.create","reports.business.read"];
  const totals={currency:"INR",postedIncome:"1000",postedExpense:"200",postedSalaryExpense:"50",postedExpenseIncludingSalary:"250",
   agencyOperatingNet:"750",postedNet:"650",pendingIncome:"0",pendingExpense:"0",groups:[],clientAdSpend:{posted:"100",pending:"0",count:1},recurringIncome:{monthlyCombinedTotal:"5000.0000"}};
  await page.clock.setFixedTime(new Date("2026-11-17T12:00:00Z"));
@@ -30,6 +30,9 @@ async function mockWorkspace(page:Page,role="FOUNDER",cycleClosed=false){
    deleted.push(rows.map(row=>row.id));leads=leads.filter(lead=>!rows.some(row=>row.id===lead.id));
    data={deletedCount:rows.length,ids:rows.map(row=>row.id)};
   }else if(path==="/finance/cycle-state")data=cycleClosed?{current:{from:"2026-11-22",to:"2026-12-21"},history:[{from:"2026-10-22",to:"2026-11-21",closedAt:"2026-11-22"}],plannedThrough:"2026-12-21",canClose:false}:{current:{from:"2026-10-22",to:"2026-11-21"},history:[],plannedThrough:"2026-11-21",canClose:false};
+  else if(path==="/finance/categories")data=[{id:"cat1",kind:"EXPENSE",name:"Travel",active:true,purpose:"GENERAL"},{id:"cat2",kind:"INCOME",name:"Service fees",active:true,purpose:"GENERAL"}];
+  else if(path==="/finance/expenses/mine")data={status:"POSTED"};
+  else if(path==="/finance/activity"){const type=url.searchParams.get("type");const items=[{id:"a1",date:"2026-11-17",type:"SELF_ADS",category:"Meta Ads",person:"Test Founder",client:"",description:"Agency campaign",amount:"50.0000",status:"POSTED",method:"UPI",direction:"OUTGOING",reversal:false},{id:"a2",date:"2026-11-17",type:"CLIENT_ADS",category:"Meta Ads",person:"Test Founder",client:"Example Cafe",description:"Client campaign",amount:"100.0000",status:"POSTED",method:"UPI",direction:"OUTGOING",reversal:false},{id:"a3",date:"2026-11-16",type:"SETTLEMENT",category:"Internal settlement",person:"Founder A → Founder B",client:"",description:"Reimbursement",amount:"25.0000",status:"POSTED",method:"UPI",direction:"INCOMING",reversal:false}].filter(r=>!type||type==="ALL"||r.type===type);data={items,total:items.length,page:1,limit:25};}
   else if(path==="/finance/register")data={items:[],total:0,page:1,limit:25};
   else if(path==="/finance/summary")data=url.searchParams.get("from")==="2026-11-22"
     ? {...totals,postedIncome:"0",postedExpense:"0",postedNet:"0"}:totals;
@@ -95,16 +98,23 @@ test("changing a lead filter clears bulk selection and cancel deletes nothing",a
  await expect(page.getByRole("button",{name:"Delete selected (0)",exact:true})).toBeDisabled();
 });
 
-test("finance overview cards keep details on separate pages and preserve the work cycle",async({page})=>{
+test("unified Finance keeps quick entry, classification and shared work cycle",async({page})=>{
  const {requests}=await mockWorkspace(page);
  await page.goto("/app/finance");
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
  await expect(page.getByLabel("Work cycle through")).toHaveValue("2026-11-21");
  await expect(page.getByText("Operating net (before settlements)",{exact:true})).toBeVisible();
  await expect(page.getByRole("navigation",{name:"Finance categories"})).toBeVisible();
- await expect(page.getByRole("heading",{name:"New income or expense"})).toHaveCount(0);
+ await expect(page.getByRole("heading",{name:"Record expense",exact:true})).toBeVisible();
+ await expect(page.getByRole("navigation",{name:"Finance workspace sections"}).getByRole("button",{name:"Salary",exact:true})).toBeVisible();
+ await expect(page.getByRole("region",{name:"Expense classification"})).toBeVisible();
  await expect(page.getByRole("region",{name:"Financial register",exact:true})).toHaveCount(0);
- expect(requests.some(row=>row.path==="/finance/register")).toBe(false);
+ await expect(page.getByLabel("Amount (INR)",{exact:true})).toBeVisible();
+ await page.getByLabel("Category",{exact:true}).selectOption("cat1");
+ await page.getByLabel("Amount (INR)",{exact:true}).fill("25");
+ await page.getByRole("button",{name:"Save expense",exact:true}).click();
+ await expect(page.getByText("Entry saved and included in posted totals.")).toBeVisible();
+ await expect(page.getByLabel("Amount (INR)",{exact:true})).toHaveValue("");
  await expect(page.getByRole("button",{name:"Next cycle",exact:true})).toBeDisabled();
  await page.getByRole("link",{name:/Meta Ads Self and client/}).click();
  await expect(page).toHaveURL(/finance\/ads/);
@@ -112,9 +122,22 @@ test("finance overview cards keep details on separate pages and preserve the wor
  for(const path of ["/finance/register","/finance/meta-ads-distribution"])
   await expect.poll(()=>requests.some(row=>row.path===path&&row.from==="2026-10-22"&&row.to==="2026-11-21")).toBe(true);
  await page.getByRole("link",{name:"← Finance overview"}).click();
- await page.getByRole("link",{name:"New entry / register"}).click();
+ await page.getByRole("navigation",{name:"Finance workspace sections"}).getByRole("button",{name:"Transactions",exact:true}).click();
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
+ const unified=page.getByRole("region",{name:"Unified transaction register"});
+ await expect(unified).toBeVisible();
+ await expect(unified.getByText("Agency Meta Ads",{exact:false}).first()).toBeVisible();
+ await expect(unified.getByText("Example Cafe",{exact:false})).toBeVisible();
+ await unified.getByLabel("Transaction type").selectOption("SETTLEMENT");
+ await expect(unified.getByText("Founder A → Founder B")).toBeVisible();
+ await expect(unified.getByText("Example Cafe",{exact:false})).toHaveCount(0);
+ await page.getByRole("group",{name:"Transaction classification"}).getByRole("button",{name:"Income & operating expenses"}).click();
  await expect.poll(()=>requests.some(row=>row.path==="/salary/summary"&&row.from==="2026-10-22")).toBe(true);
+ await page.getByRole("navigation",{name:"Finance workspace sections"}).getByRole("button",{name:"Salary",exact:true}).click();
+ await expect(page.getByRole("heading",{name:"Record a salary payment"})).toBeVisible();
+ await expect(page.getByRole("heading",{name:"Salary payment history"})).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+2)).toBe(true);
 });
 
 test("a founder's received settlement reduces personal deficit but never creates new income",async({page})=>{

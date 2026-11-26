@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { reportingPreset, type ReportingPeriod } from "@digimarket/contracts";
 import { BusinessPeriodPicker } from "@/components/business-period-picker";
 import { useAuth } from "@/components/auth-provider";
 import { Notice, PageHeader, Spinner } from "@/components/ui";
 export function money(value: string | number | null | undefined) {
-  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(String(value ?? 0));
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(String(value ?? ""));
   if (!match) return "Unavailable";
   const fraction = (match[3] ?? "").padEnd(3, "0");
   const cents =
@@ -20,7 +20,7 @@ export function money(value: string | number | null | undefined) {
   );
 }
 export type FinanceCycleState = { current: ReportingPeriod; history: (ReportingPeriod & {closedAt: string})[]; closePeriod: ReportingPeriod; canClose: boolean; plannedThrough: string };
-export function useFinanceWindow({ syncUrl = true }: { syncUrl?: boolean } = {}) {
+function useLocalFinanceWindow({ syncUrl = true, enabled = true }: { syncUrl?: boolean; enabled?: boolean } = {}) {
   const { session, request } = useAuth();
   const [cycleState, setCycleState] = useState<FinanceCycleState | null>(null);
   const [cycleError, setCycleError] = useState("");
@@ -29,7 +29,7 @@ export function useFinanceWindow({ syncUrl = true }: { syncUrl?: boolean } = {})
   const [ready, setReady] = useState(false);
   const [cycleContext,setCycleContext]=useState(false);
   useEffect(() => {
-    if (!session) return;
+    if (!session || !enabled) return;
     let active = true;
     const q = new URLSearchParams(window.location.search);
     setCycleContext(q.get("cycle")==="1");
@@ -51,6 +51,7 @@ export function useFinanceWindow({ syncUrl = true }: { syncUrl?: boolean } = {})
     )
       setView("all");
     const explicit = !!(from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to);
+    if(!session.identity.permissions.some(p=>p==="finance.read.all"||p==="finance.entry.read.own")){setReady(true);return;}
     void request<FinanceCycleState>("/finance/cycle-state").then(state => {
       if (!active) return;
       if (state?.current && Array.isArray(state.history)) {
@@ -65,19 +66,30 @@ export function useFinanceWindow({ syncUrl = true }: { syncUrl?: boolean } = {})
       if (explicit) setReady(true);
     } });
     return () => { active = false; };
-  }, [session, request]);
+  }, [session, request, enabled]);
   const query = new URLSearchParams({ ...period, view, ...(cycleContext?{cycle:"1"}:{}) }).toString();
   useEffect(() => {
     // Category management is cycle-independent. Do not rewrite the router
     // URL from a late cycle-state response while a category link is navigating.
-    if (!ready || !syncUrl) return;
+    if (!ready || !syncUrl || !enabled) return;
     const q = new URLSearchParams(window.location.search);
     q.set("from", period.from);
     q.set("to", period.to);
     q.set("view", view);
     window.history.replaceState(null, "", window.location.pathname + "?" + q.toString());
-  }, [ready, period, view, syncUrl]);
+  }, [ready, period, view, syncUrl, enabled]);
   return { period, setPeriod, view, setView, query, ready, cycleState, cycleError, cycleContext };
+}
+type FinanceWindow=ReturnType<typeof useLocalFinanceWindow>;
+const FinanceContext=createContext<{window:FinanceWindow;refresh:number;onMutation:()=>void}|null>(null);
+export const useFinanceContext=()=>useContext(FinanceContext);
+export function useFinanceWindow(options:{syncUrl?:boolean}={}){
+ const context=useFinanceContext();
+ const local=useLocalFinanceWindow({...options,enabled:!context});
+ return context?.window??local;
+}
+export function FinanceScope({window,refresh,onMutation,children}:{window:FinanceWindow;refresh:number;onMutation:()=>void;children:ReactNode}){
+ return <FinanceContext.Provider value={{window,refresh,onMutation}}>{children}</FinanceContext.Provider>;
 }
 export function FinanceFrame({
   title,
@@ -97,6 +109,7 @@ export function FinanceFrame({
   actions?: ReactNode;
 }) {
   const { session } = useAuth();
+  const embedded=useFinanceContext();
   if (!session) return <Spinner label="Checking finance access…" />;
   const all = session.identity.permissions.includes("finance.read.all");
   if (
@@ -104,6 +117,7 @@ export function FinanceFrame({
     (!all && !session.identity.permissions.includes("finance.entry.read.own"))
   )
     return <Notice kind="error">Finance access is not available for this account.</Notice>;
+  if(embedded)return <section className="aw-finance-page space-y-4"><PageHeader title={title} description={description} actions={actions}/>{children}</section>;
   return (
     <div className="aw-finance-page space-y-6" data-aw-module="finance">
       {!overview && (

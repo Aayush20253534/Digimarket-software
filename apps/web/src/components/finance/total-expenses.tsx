@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, Spinner } from "@/components/ui";
-import { FinanceFrame, FinancePager, money, useFinanceWindow } from "./shared";
+import { FinanceFrame, FinancePager, money, useFinanceWindow, useFinanceContext } from "./shared";
 import {PersonalNetAfterSettlements} from "./personal-net-after-settlements";
 import {ExpenseEditDialog,type EditableExpense,type EditOptions} from "./expense-edit-dialog";
 
@@ -40,16 +40,17 @@ type Records = {
   limit: number;
 };
 
-export function TotalExpenses() {
+export function TotalExpenses({initialType="ALL"}:{initialType?:"ALL"|ExpenseType}={}) {
+  const context=useFinanceContext();
   const w = useFinanceWindow(),
     { session, request } = useAuth();
   const [data, setData] = useState<Records | null>(null),
     [error, setError] = useState("");
   const [page, setPage] = useState(1),
-    [type, setType] = useState<"ALL" | ExpenseType>("ALL");
+    [type, setType] = useState<"ALL" | ExpenseType>(initialType);
   useEffect(()=>{
     const value=new URLSearchParams(window.location.search).get("type");
-    if(value&&Object.prototype.hasOwnProperty.call(expenseTypes,value))setType(value as ExpenseType);
+    if(!context&&value&&Object.prototype.hasOwnProperty.call(expenseTypes,value))setType(value as ExpenseType);
   },[]);
   const [search, setSearch] = useState(""),
     [exporting, setExporting] = useState(false);
@@ -90,7 +91,7 @@ export function TotalExpenses() {
     return () => {
       active = false;
     };
-  }, [w.ready, permitted, query, request, refresh]);
+  }, [w.ready, permitted, query, request, refresh,context?.refresh]);
 
   async function deleteExpense(row: Records["items"][number]) {
     if (!canEdit || !row.id.startsWith("finance:") || row.reversal || editSaving) return;
@@ -99,7 +100,7 @@ export function TotalExpenses() {
     try {
       await request("/finance/entries/" + encodeURIComponent(row.id.slice("finance:".length)), { method: "DELETE" });
       setNotice("Expense deleted from financial totals.");
-      setPage(1); setRefresh(v => v + 1);
+      setPage(1); setRefresh(v => v + 1);context?.onMutation();
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to delete expense."); }
     finally { setEditSaving(false); }
   }
@@ -164,7 +165,7 @@ export function TotalExpenses() {
       });
       setEditing(null);setEditOptions(null);
       setNotice("Expense updated. User-wise totals reflect the assigned user; agency totals are unaffected by reassignment.");
-      setRefresh(value => value + 1);
+      setRefresh(value => value + 1);context?.onMutation();
     } catch(e) {
       setError(e instanceof Error ? e.message : "Unable to save the expense.");
     } finally {
