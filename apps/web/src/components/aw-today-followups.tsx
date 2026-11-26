@@ -37,17 +37,17 @@ export function AWTodayFollowUps(){
    document.addEventListener("visibilitychange",visible);
    return ()=>{window.clearInterval(tick);document.removeEventListener("visibilitychange",visible);};
  },[]);
- const refresh=useCallback(async()=>{
+ const refresh=useCallback(async(force=true)=>{
    if(!permitted||!date)return;
    setLoading(true);setError("");
    try{
      const response=await request<DueResponse>("/leads/follow-ups/today?"+
-       new URLSearchParams({date}).toString());
+       new URLSearchParams({date}).toString(),{cache:force?"reload":"prefer"});
      setReport(response);
    }catch(e){setReport(null);setError(e instanceof Error?e.message:"Unavailable");}
    finally{setLoading(false);}
  },[date,permitted,request]);
- useEffect(()=>{void refresh();},[refresh]);
+ useEffect(()=>{void refresh(false);},[refresh]);
  // Future follow-ups stay in CRM; the Overview card appears on the exact chosen day.
  if(!permitted||!date||report?.date!==date||report.items.length===0)return null;
  return <section className="aw-today-followups" aria-label="Today's lead follow-ups"

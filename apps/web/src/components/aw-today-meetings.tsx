@@ -37,17 +37,17 @@ export function AWTodayMeetings(){
    document.addEventListener("visibilitychange",visible);
    return ()=>{window.clearInterval(timer);document.removeEventListener("visibilitychange",visible);};
  },[]);
- const refresh=useCallback(async()=>{
+ const refresh=useCallback(async(force=true)=>{
    if(!permitted||!date)return;
    setLoading(true);setError("");
    try{
      const result=await request<MeetingResponse>("/leads/meetings/today?"+
-       new URLSearchParams({date}).toString());
+       new URLSearchParams({date}).toString(),{cache:force?"reload":"prefer"});
      setReport(result);
    }catch(e){setReport(null);setError(e instanceof Error?e.message:"Meetings unavailable");}
    finally{setLoading(false);}
  },[date,permitted,request]);
- useEffect(()=>{void refresh();},[refresh]);
+ useEffect(()=>{void refresh(false);},[refresh]);
  if(!permitted||!date)return null;
  if(error)return <section className="aw-today-meetings" aria-label="Meeting schedule unavailable">
    <p role="alert">Unable to load today's meetings: {error}</p>

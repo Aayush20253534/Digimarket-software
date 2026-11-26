@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, Sun, Moon, UserRound, Settings2, X } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
+import {prefetchPaths} from "@/lib/read-policy";
 import { BrandLogo } from "@/components/brand-logo";
 import { AWButton, AWNotice } from "@/components/aw-ui";
 import { currentSection, permittedGroups, WorkspaceNav } from "@/components/workspace-navigation";
@@ -139,6 +140,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
    <AWButton onClick={()=>void refresh()}>Retry connection</AWButton></div>
  </main>;
 
+ const prefetch=(href:string)=>{
+  for(const path of prefetchPaths(href))void request(path,{cache:"prefer"}).catch(()=>{});
+ };
  const isAdmin=session.identity.roles.some(role=>role==="ADMIN"||role==="SUPER_ADMIN");
   const groups=permittedGroups(session.identity.permissions,session.identity.roles);
  const current=currentSection(groups,pathname);
@@ -157,7 +161,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
      {collapsed?<PanelLeftOpen size={19} aria-hidden="true"/>:<PanelLeftClose size={19} aria-hidden="true"/>}
     </button>
    </div>
-   <WorkspaceNav groups={groups} pathname={pathname} compact={collapsed}/>
+   <WorkspaceNav groups={groups} pathname={pathname} compact={collapsed} onPrefetch={prefetch}/>
    <SidebarFooter name={name} photo={photo} roles={session.identity.roles} busy={signingOut} logout={()=>void signOut()}/>
   </aside>
 

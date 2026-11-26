@@ -112,13 +112,13 @@ export default function LeadBreakdownPage(){
  const query=useMemo(()=>new URLSearchParams(Object.entries({
   from,to,page:String(page),limit:"20",source,stage,assignedToId:owner,businessType:category,location,q:search,
  }).filter((entry):entry is [string,string]=>entry[1]!=="")),[from,to,page,source,stage,owner,category,location,search]);
- const refresh=useCallback(async()=>{
+ const refresh=useCallback(async(force=true)=>{
   if(!ready||!allowed||!session)return;
   if(!from||!to||from>to){setError("Select a valid reporting period.");return;}
   const current=++sequence.current;
   setBusy(true);setError("");
   try{
-   const result=await request<ResponseData>("/reports/leads?"+query.toString());
+   const result=await request<ResponseData>("/reports/leads?"+query.toString(),{cache:force?"reload":"prefer"});
    if(current!==sequence.current)return;
    setReport(result);
    if(!options)setOptions({assignees:result.assignees,
@@ -127,7 +127,7 @@ export default function LeadBreakdownPage(){
   }catch(e){if(current===sequence.current)setError(getError(e));}
   finally{if(current===sequence.current)setBusy(false);}
  },[allowed,ready,session,request,query,from,to,options]);
- useEffect(()=>{void refresh();return()=>{sequence.current+=1;};},[refresh]);
+ useEffect(()=>{void refresh(false);return()=>{sequence.current+=1;};},[refresh]);
  const applyPeriod=(start:string,end:string)=>{setFrom(start);setTo(end);setPage(1);};
  const clear=()=>{setSource("");setStage("");setOwner("");setCategory("");setLocation("");setSearch("");setPage(1);};
  const download=async()=>{
