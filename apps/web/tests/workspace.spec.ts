@@ -461,6 +461,22 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByRole("dialog",{name:"Approval inbox panel"})).toBeVisible();
   await expect(page.getByRole("link",{name:"Open all approval workflows"})).toBeVisible();
   await page.getByRole("button",{name:"Close approval inbox"}).click();
+  // The frontend must work against the older production API during independent deployments.
+  const legacyDocuments="**/api/v1/quotations?*";
+  const legacyAgreements="**/api/v1/agreements?*";
+  await page.route(legacyDocuments,route=>route.fulfill({json:{data:{items:[]}}}));
+  await page.route(legacyAgreements,route=>route.fulfill({json:{data:{items:[]}}}));
+  await visitWorkspace(page,"/app/documents");
+  await expect(page.getByRole("heading",{name:"Documents",exact:true})).toBeVisible();
+  await expect(page.getByText("Limited document history:",{exact:false})).toBeVisible();
+  await expect(page.locator(".dc-metrics .dc-number")).toHaveText(["—","—","—","—"]);
+  await expect(page.getByText("No matching documents.",{exact:true})).toBeVisible();
+  await page.unroute(legacyDocuments);
+  await page.unroute(legacyAgreements);
+  // Check the live paginated response and make sure the full overview renders.
+  await page.getByRole("button",{name:"Refresh",exact:true}).click();
+  await expect(page.getByText("Limited document history:",{exact:false})).toHaveCount(0);
+  await expect(page.locator(".dc-metrics .dc-number").first()).toHaveText(/^\d+$/);
   // Documents is one visible section with both fully retained form workflows.
   await visitWorkspace(page,"/app/documents/quotations");
   await expect(page.getByRole("navigation",{name:"Documents sections"})).toBeVisible();
