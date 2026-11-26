@@ -1,7 +1,7 @@
 import type {Express,Request,Response,NextFunction} from "express";
 import {z} from "zod";
 import {agencyToday} from "@digimarket/contracts";
-import {UpstashReadCache} from "../cache/upstash";
+import {workspaceReadCache} from "../cache/upstash";
 import {webPushPublicKey,subscriptionHash,validPushEndpoint} from "./push";
 import {searchQuerySchema,reportsPeriodSchema,notificationListSchema} from "@digimarket/contracts";
 import {AuthService,type Principal} from "../auth/service";
@@ -15,7 +15,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T{
  return checked.data;
 }
 export function registerInsightsRoutes(app:Express,auth:AuthService){
- const cache=new UpstashReadCache();
+ const cache=workspaceReadCache();
  const insights=new InsightsService(auth.database),leadAnalytics=new LeadAnalyticsService(auth.database),notices=new NotificationService(auth.database);
  const authenticate=async(req:Request,res:Response,next:NextFunction)=>{
   try{

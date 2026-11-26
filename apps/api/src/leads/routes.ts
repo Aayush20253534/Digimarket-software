@@ -1,3 +1,4 @@
+import {workspaceReadCache} from "../cache/upstash";
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { leadCreateSchema, leadUpdateSchema, leadAssignSchema, leadNoteSchema, leadDuplicateReviewSchema,
@@ -101,7 +102,10 @@ export function registerLeadRoutes(app:Express,auth:AuthService){
    res.json({data:await svc.detail(actor(res),parse(id,req.params.id))});
  });
  app.put(root+"/:id",authenticated,async(req,res)=>{
-   res.json({data:await svc.update(actor(res),parse(id,req.params.id),parse(leadUpdateSchema,req.body))});
+   const input=parse(leadUpdateSchema,req.body);
+   const data=await svc.update(actor(res),parse(id,req.params.id),input);
+   if(input.status==="APPROVED")await workspaceReadCache().invalidateOrganization(actor(res).organizationId);
+   res.json({data});
  });
  app.put(root+"/:id/assign",authenticated,async(req,res)=>{
    const input=parse(leadAssignSchema,req.body);

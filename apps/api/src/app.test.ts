@@ -24,6 +24,12 @@ describe("Express API foundation", () => {
     expect(apiHealthSchema.safeParse(response.body).success).toBe(true);
   });
 
+  it("does not expose performance diagnostics without an ops token",async()=>{
+    const response=await request(app).get("/api/v1/ops/performance");
+    expect(response.status).toBe(404);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
   it("does not advertise an Express signature", async () => {
     const response = await request(app).get("/api/v1/health");
     expect(response.headers["x-powered-by"]).toBeUndefined();
