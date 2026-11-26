@@ -5,7 +5,7 @@ import type {LucideIcon} from "lucide-react";
 import {
  BriefcaseBusiness,CalendarDays,CalendarClock,ChartNoAxesCombined,ChevronDown,
  FileStack,
- Settings2,Users,Wallet,Banknote
+ Settings2,Users,Wallet
 } from "lucide-react";
 
 export type NavItem={label:string;href:string;icon:LucideIcon;permits?:readonly string[];roles?:readonly string[]};
@@ -22,8 +22,7 @@ const sections:readonly NavGroup[]=[
   // {label:"AI Review Cards",href:"/app/ai-review-cards",icon:QrCode,permits:["clients.read"]}
  ]},
  {title:"Business",items:[
-  {label:"Finance",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]},
-  {label:"Salary",href:"/app/salary",icon:Banknote},
+  {label:"Finance",href:"/app/finance",icon:Wallet},
   {label:"Documents",href:"/app/documents",icon:FileStack,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
@@ -42,6 +41,7 @@ const legacyDestinations:Record<string,string>={
  "/app/founders":"/app/settings",
  "/app/team/users":"/app/settings",
  "/app/integrations/chatgpt":"/app/settings",
+ "/app/salary":"/app/finance",
  "/app/billing":"/app/finance",
  "/app/profitability":"/app/finance",
 };

@@ -1,2 +1,2 @@
-import {FinanceOverview} from "@/components/finance/overview";
-export default function Page(){return <FinanceOverview/>;}
+import {UnifiedFinance} from "@/components/finance/unified";
+export default function Page(){return <UnifiedFinance/>;}

@@ -1,7 +1,7 @@
 "use client";
 import {agencyToday,cycleLabel} from "@digimarket/contracts";
 import {BusinessPeriodPicker} from "@/components/business-period-picker";
-import {FinancePager,useFinanceWindow} from "./shared";
+import {FinancePager,useFinanceWindow,useFinanceContext} from "./shared";
 import {ReversalButton} from "./reversal";
 import {PreviousCycleNetPosted} from "./previous-cycle-carry";
 import {PersonalNetAfterSettlements} from "./personal-net-after-settlements";
@@ -74,7 +74,10 @@ function money(value:string|number|null|undefined){
   return (negative?"−":"")+"₹"+integer+"."+(cents%100n).toString().padStart(2,"0");
 }
 function readable(error:unknown){return error instanceof ApiError?error.message:"Could not complete the finance operation.";}
-export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directExpense=false,onExpenseSaved}:{section:"entries"|"ads"|"categories"|"settlements"|"agreements";categoryType?:Kind;directExpense?:boolean;onExpenseSaved?:()=>void}){
+export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directExpense=false,quickKind,registerOnly=false,onExpenseSaved}:{section:"entries"|"ads"|"categories"|"settlements"|"agreements";categoryType?:Kind;directExpense?:boolean;quickKind?:Kind;registerOnly?:boolean;onExpenseSaved?:()=>void}){
+  const context=useFinanceContext();
+  const compact=!!quickKind;
+  const formOnly=directExpense||compact;
   const windowState=useFinanceWindow({syncUrl:section!=="categories"});
   const {period,setPeriod,view,setView,ready}=windowState;
   const [page,setPage]=useState(1),[total,setTotal]=useState(0),[categoryFilter,setCategoryFilter]=useState("");
@@ -139,7 +142,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [settlementNote,setSettlementNote]=useState("");
   const [settlementKey,setSettlementKey]=useState(()=>crypto.randomUUID());
   const [settlementError,setSettlementError]=useState("");
-  const [kind,setKind]=useState<Kind>("EXPENSE");
+  const [kind,setKind]=useState<Kind>(quickKind??"EXPENSE");
   const [categoryId,setCategoryId]=useState("");
   const [adFunding,setAdFunding]=useState<"SELF"|"CLIENT">("SELF");
   const [clientId,setClientId]=useState("");
@@ -150,6 +153,11 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const [description,setDescription]=useState("");
   const [receipt,setReceipt]=useState<File|null>(null);
   const [uploadStatus,setUploadStatus]=useState("");
+  const [entryKey,setEntryKey]=useState(()=>crypto.randomUUID());
+  const [receiptKey,setReceiptKey]=useState(0);
+  const [moreDetails,setMoreDetails]=useState(false);
+  useEffect(()=>{if(quickKind){setKind(quickKind);setCategoryId("");setClientId("");setAdFunding("SELF");}},[quickKind]);
+  useEffect(()=>{if(compact){try{const saved=localStorage.getItem("aw-finance-method");if(modes.includes(saved as typeof method))setMethod(saved as typeof method);}catch{/* optional preference */}}},[compact]);
   const categoryKind=categoryType;
   const managedCategories=categories.filter(c=>c.kind===categoryKind);
   const [categoryName,setCategoryName]=useState("");
@@ -161,7 +169,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
   const filteredEntries=entries;
   const agencyMetaAdCount=metaAdEntries.filter(row=>!row.clientId).length;
   const clientMetaAdCount=metaAdEntries.length-agencyMetaAdCount;
-  useEffect(()=>{const query=new URLSearchParams(window.location.search);const filter=query.get("kind");if(!directExpense&&(filter==="INCOME"||filter==="EXPENSE")){setEntryKindFilter(filter);setKind(filter);}if(!directExpense)setCategoryFilter(query.get("categoryId")??"");},[directExpense]);
+  useEffect(()=>{const query=new URLSearchParams(window.location.search);const filter=query.get("kind");if(!formOnly&&(filter==="INCOME"||filter==="EXPENSE")){setEntryKindFilter(filter);setKind(filter);}if(!formOnly)setCategoryFilter(query.get("categoryId")??"");},[formOnly]);
   useEffect(()=>setPage(1),[periodQuery,view,entrySearch,entryKindFilter,entryStatusFilter,metaSearch,metaFundingFilter,categoryFilter]);
   const registerParams=new URLSearchParams({from:period.from,to:period.to,view:view==="all"&&canAll?"all":"mine",scope:section==="ads"?"meta_ads":"agency",page:String(page),limit:"25",q:section==="ads"?metaSearch:entrySearch});
   if(section==="ads")registerParams.set("funding",metaFundingFilter);
@@ -192,8 +200,8 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     setLoading(true);setError("");
     const target=view==="all"&&canAll?"all":"mine";
     const [ledger,sums,cats,policies,settlements]=await Promise.allSettled([
-      forms&&!directExpense?request<{items:Entry[];total:number}>("/finance/register?"+registerQuery):Promise.resolve({items:[],total:0}),
-      !directExpense&&(section==="entries"||section==="agreements")?request<Totals>("/finance/summary?view="+(section==="agreements"?"all":target)+"&"+periodQuery):Promise.resolve(zero),
+      forms&&!formOnly?request<{items:Entry[];total:number}>("/finance/register?"+registerQuery):Promise.resolve({items:[],total:0}),
+      !formOnly&&(section==="entries"||section==="agreements")?request<Totals>("/finance/summary?view="+(section==="agreements"?"all":target)+"&"+periodQuery):Promise.resolve(zero),
       forms||section==="categories"?request<Category[]>("/finance/categories"):Promise.resolve([] as Category[]),
       forms&&canCreate?request<FinancePolicy[]>("/approval-policies"):Promise.resolve([] as FinancePolicy[]),
       section==="settlements"&&view==="mine"&&isFounder&&canReadOwn
@@ -209,24 +217,24 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(p=>p.category==="FINANCE"&&p.active));
     const problems=[ledger,sums,cats,policies].flatMap(result=>result.status==="rejected"?[readable(result.reason)]:[]);
     setError(problems.join(" "));setLoading(false);setMetaDistributionRefresh(v=>v+1);
-  },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,directExpense]);
+  },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,formOnly]);
   useEffect(()=>{
-    if(directExpense||section!=="entries"||!ready||!session||view!=="all"||!canAll){
+    if(formOnly||section!=="entries"||!ready||!session||view!=="all"||!canAll){
       setBalance(null);return;
     }
     let active=true;
     void request<{opening:string;movement:string;remaining:string}>("/finance/cycle-balance?view=all&"+periodQuery)
       .then(result=>{if(active)setBalance(result)}).catch(()=>{if(active)setBalance(null)});
     return()=>{active=false};
-  },[directExpense,section,ready,session,request,view,canAll,periodQuery,metaDistributionRefresh]);
+  },[formOnly,section,ready,session,request,view,canAll,periodQuery,metaDistributionRefresh]);
   useEffect(()=>{
-    if(directExpense||!isFounder||section!=="entries"||!ready)return;
+    if(formOnly||!isFounder||section!=="entries"||!ready)return;
     let active=true;
     void request<SalaryFinanceSummary>("/salary/summary?"+periodQuery).then(summary=>{
       if(active){setSalarySummary(summary);setSalaryError("");}
     }).catch(e=>{if(active)setSalaryError(readable(e));});
     return()=>{active=false;};
-  },[isFounder,request,periodQuery,metaDistributionRefresh,section,ready,directExpense]);
+  },[isFounder,request,periodQuery,metaDistributionRefresh,section,ready,formOnly]);
   useEffect(()=>{
     void reload();
     return()=>{reloadSequence.current+=1;};
@@ -240,7 +248,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     return()=>{active=false;};
   },[isFounder,canReadOwn,request,section]);
   useEffect(()=>{
-    if(directExpense||!adminFinance||!forms)return;
+    if(formOnly||!adminFinance||!forms)return;
     let active=true;
     void request<Assignee[]>("/finance/assignees").then(users=>{
       if(active){setAssignees(users);setAssigneesError("");}
@@ -248,7 +256,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       if(active)setAssigneesError(readable(e));
     });
     return()=>{active=false;};
-  },[adminFinance,request,forms,directExpense]);
+  },[adminFinance,request,forms,formOnly]);
   useEffect(()=>{
     const id=new URLSearchParams(window.location.search).get("focus");
     if(!id||![...entries,...metaAdEntries].some(entry=>entry.id===id))return;
@@ -321,18 +329,19 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
        receiptAssetId=proof.id;
       }
       setUploadStatus(isFounder?"Recording transaction…":"Submitting transaction for approval…");
-      const saved=await request<{status:string}>(directExpense?"/finance/expenses/mine":"/finance/entries",{method:"POST",body:{
+      const saved=await request<{status:string}>((directExpense||quickKind==="EXPENSE")?"/finance/expenses/mine":"/finance/entries",{method:"POST",body:{
         kind,categoryId,clientId:metaAdsSelected&&adFunding==="CLIENT"?clientId:null,
         amount:amount.trim(),occurredOn,method,
         merchantOrSource:source.trim(),description:description.trim(),
-        idempotencyKey:crypto.randomUUID(),receiptAssetId,
+        idempotencyKey:entryKey,receiptAssetId,
       }});
       setSuccess(metaAdsSelected&&adFunding==="CLIENT"
         ?(saved.status==="POSTED"?"Client Meta Ads spend saved separately from agency expenses.":"Client Meta Ads spend submitted for approval; it is excluded from agency expenses.")
         :(saved.status==="POSTED"?"Entry saved and included in posted totals.":"Entry submitted for finance approval. Pending amounts are not included in posted totals."));
-      setAmount("");setSource("");setDescription("");setReceipt(null);
+      setAmount("");setSource("");setDescription("");setReceipt(null);setReceiptKey(v=>v+1);setEntryKey(crypto.randomUUID());
+       if(compact){try{localStorage.setItem("aw-finance-method",method);}catch{/* optional preference */}}
       setCategoryId("");setAdFunding("SELF");setClientId("");
-      onExpenseSaved?.();
+      onExpenseSaved?.();context?.onMutation();
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}finally{setBusy(false);setUploadStatus("");}
   }
@@ -492,14 +501,14 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       }});
     return()=>{active=false;};
   },[request,view,canReadOwn,canAll,metaFrom,metaTo,metaDistributionRefresh,section,ready]);
-  const entryForm=forms&&canCreate&&<Card title={directExpense?"Add expense":"New income or expense"} description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
-        <form className="aw-finance-new-form grid gap-4 sm:grid-cols-2" onSubmit={submit}>
-          <FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" disabled={directExpense} value={kind} onChange={e=>{setKind(e.target.value as Kind);setCategoryId("");}}>
-            <option value="EXPENSE">Expense</option>{!directExpense&&section!=="ads"&&<option value="INCOME">Income</option>}</select></FormField>
+  const entryForm=forms&&canCreate&&!registerOnly&&<Card title={compact?(kind==="EXPENSE"?"Record expense":"Record income"):directExpense?"Add expense":"New income or expense"} description={isFounder?"Founder entries are posted immediately. Amounts use exact four-decimal precision.":"Employee entries enter the approval queue. Amounts use exact four-decimal precision."}>
+        <form className={"aw-finance-new-form grid gap-4 sm:grid-cols-2"+(compact?" fc-quick-form":"")} onSubmit={submit}>
+          {!compact&&<FormField id="finance-kind" label="Entry type"><select id="finance-kind" className="field" disabled={directExpense} value={kind} onChange={e=>{setKind(e.target.value as Kind);setCategoryId("");}}>
+            <option value="EXPENSE">Expense</option>{!directExpense&&section!=="ads"&&<option value="INCOME">Income</option>}</select></FormField>}
           <FormField id="finance-category" label="Category"><select id="finance-category" className="field" value={categoryId} required onChange={e=>{setCategoryId(e.target.value);setAdFunding("SELF");setClientId("");}}>
             <option value="">{selected.length?"Select a category":"Create a category first"}</option>
             {selected.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            {!directExpense&&section!=="ads"&&kind==="EXPENSE"&&isFounder&&<option value={SALARY_OPTION}>Salary (linked payroll entry)</option>}
+            {!formOnly&&section!=="ads"&&kind==="EXPENSE"&&isFounder&&<option value={SALARY_OPTION}>Salary (linked payroll entry)</option>}
           </select></FormField>
           {salarySelected&&<div className="sm:col-span-2 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 space-y-2" role="status">
             <p className="font-semibold">Salary expense</p>
@@ -531,28 +540,31 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
           <FormField id="finance-method" label="Payment method"><select id="finance-method" className="field" value={method} onChange={e=>setMethod(e.target.value as typeof method)}>
             {modes.map(m=><option key={m} value={m}>{m.replaceAll("_"," ")}</option>)}</select></FormField>
           <p className="sm:col-span-2 text-sm text-slate-400" data-testid="finance-owner-notice">This entry belongs to your signed-in user. An administrator can reassign it later.</p>
+          {compact&&<button type="button" className="btn-secondary sm:col-span-2 fc-extra" aria-expanded={moreDetails} onClick={()=>setMoreDetails(v=>!v)}>{moreDetails?"Hide optional details":"Payee, notes & receipt"}</button>}
+          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2" hidden={compact&&!moreDetails}>
           <FormField id="finance-source" label={kind==="EXPENSE"?"Merchant / payee":"Income source"}><input id="finance-source" className="field" maxLength={160}
             value={source} onChange={e=>setSource(e.target.value)} placeholder={kind==="EXPENSE"?"Rapido":"Agency service"}/></FormField>
           <div className="sm:col-span-2"><FormField id="finance-description" label="Notes (optional)"><textarea id="finance-description" className="field min-h-20" maxLength={2000}
             value={description} onChange={e=>setDescription(e.target.value)}/></FormField></div>
           <div className="sm:col-span-2"><FormField id="finance-receipt" label="Receipt image or payment proof (optional)">
-             <input id="finance-receipt" className="field" type="file"
+             <input key={receiptKey} id="finance-receipt" className="field" type="file"
                accept="image/jpeg,image/png,image/gif,image/webp,image/avif,image/bmp,image/tiff,image/heic,image/heif,application/pdf,.jpg,.jfif,.jpeg,.gif,.png,.tif,.tiff"
                onChange={e=>setReceipt(e.target.files?.[0]??null)}/>
             </FormField>
             {receipt&&<p className="mt-1 text-xs">{receipt.name} · {(receipt.size/1024/1024).toFixed(2)} MB</p>}
             {uploadStatus&&<p role="status" className="mt-2 text-sm">{uploadStatus}</p>}
           </div>
-          <div className="sm:col-span-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||salarySelected||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
-            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?(directExpense?"Save expense":"Save entry"):"Submit for approval"}</button></div>
+          </div>
+          <div className="sm:col-span-2 flex flex-wrap gap-2"><button className="btn-primary" type="submit" disabled={busy||loading||!categoryId||salarySelected||(!isFounder&&!financeReady)} title={!isFounder&&!financeReady?"Finance approvals are currently disabled. See the notice above.":undefined}>
+            <Plus className="h-4 w-4"/>{busy?"Submitting…":isFounder?(compact?(kind==="EXPENSE"?"Save expense":"Save income"):directExpense?"Save expense":"Save entry"):"Submit for approval"}</button></div>
         </form>
       </Card>;
   if(!session)return <Spinner label="Checking finance access…"/>;
   if(!canReadOwn&&!canAll)return <><PageHeader title="Finance access denied" description="No financial permissions were assigned to your account."/><Notice kind="error">Contact an administrator for access.</Notice></>;
-  if(directExpense)return <div className="space-y-3">{error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}{entryForm}</div>;
+  if(formOnly)return <div className="space-y-3">{error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}{entryForm}</div>;
   return <div className="aw-finance-page aw-v5-finance-page space-y-7" data-aw-module="finance">
-    <BusinessWorkspaceNav/>
-    <Link className="inline-flex text-sm text-violet-300 underline" href={"/app/finance?"+windowState.query}>← Finance overview</Link>
+    {!context&&<><BusinessWorkspaceNav/>
+    <Link className="inline-flex text-sm text-violet-300 underline" href={"/app/finance?"+windowState.query}>← Finance overview</Link></>}
     <PageHeader eyebrow="Financial operations" title={{entries:"Income & expense register",ads:"Meta Ads",categories:categoryKind==="INCOME"?"Income categories":"Expense categories",settlements:"Founder settlements",agreements:"Agreement projections"}[section]}
       description={section==="categories"?"Manage this category type for the whole agency. Historical entries retain their categories.":isFounder?"Your income and expenses post immediately without approval.":"Entries are submitted for approval. Only posted entries count towards net income."}
       actions={<div className="flex flex-wrap gap-2">
@@ -560,13 +572,13 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
         <button className="btn-secondary" type="button" disabled={loading} onClick={()=>void reload()}><RefreshCw className="h-4 w-4"/>Refresh</button>
       </div>}/>
     {error&&<Notice kind="error">{error}</Notice>}{success&&<Notice kind="success">{success}</Notice>}
-    {section!=="categories"&&<BusinessPeriodPicker value={period} onChange={setPeriod} disabled={busy}/>}
+    {!context&&section!=="categories"&&<BusinessPeriodPicker value={period} onChange={setPeriod} disabled={busy}/>}
     {section==="categories"&&<nav className="flex flex-wrap gap-3" aria-label="Category management">
       <Link className="btn-secondary" href={"/app/finance/categories?"+windowState.query}>All category types</Link>
       <Link className={categoryKind==="INCOME"?"btn-primary":"btn-secondary"} href={"/app/finance/categories/income?"+windowState.query}>Income categories</Link>
       <Link className={categoryKind==="EXPENSE"?"btn-primary":"btn-secondary"} href={"/app/finance/categories/expenses?"+windowState.query}>Expense categories</Link>
     </nav>}
-    {(forms||(section==="settlements"&&isFounder&&canAll))&&
+    {!context&&(forms||(section==="settlements"&&isFounder&&canAll))&&
       <div className="aw-v5-finance-visibility flex gap-2" role="group" aria-label="Finance visibility">
       <button className={view==="mine"?"btn-primary":"btn-secondary"} onClick={()=>setView("mine")}>My entries</button>
       {canAll&&<button className={view==="all"?"btn-primary":"btn-secondary"} onClick={()=>setView("all")}>Agency totals & register</button>}
@@ -1018,7 +1030,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     {section==="entries"&&<>
     <div id="finance-register" className="aw-v5-finance-anchor"/>
     <Card title={view==="all"?"Agency financial register":"My financial register"}
-      description="Agency income and expense records. Salary, client ad funds and settlement histories have separate pages. Search and CSV apply to the entire selected range.">
+      description="Agency income and expense records. Use the classified register views for salary, client ads and internal settlements. Search and CSV apply to the entire selected range.">
       <div className="aw-v5-register-filters" aria-label="Financial register filters">
        <label className="aw-v5-register-search"><Search size={16} aria-hidden="true"/>
         <span className="sr-only">Search financial entries</span>

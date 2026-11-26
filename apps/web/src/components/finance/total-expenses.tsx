@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { Card, Notice, Spinner } from "@/components/ui";
-import { FinanceFrame, FinancePager, money, useFinanceWindow } from "./shared";
+import { FinanceFrame, FinancePager, money, useFinanceWindow, useFinanceContext } from "./shared";
 import {PersonalNetAfterSettlements} from "./personal-net-after-settlements";
 import {ExpenseEditDialog,type EditableExpense,type EditOptions} from "./expense-edit-dialog";
 
@@ -40,16 +40,17 @@ type Records = {
   limit: number;
 };
 
-export function TotalExpenses() {
+export function TotalExpenses({initialType="ALL"}:{initialType?:"ALL"|ExpenseType}={}) {
+  const context=useFinanceContext();
   const w = useFinanceWindow(),
     { session, request } = useAuth();
   const [data, setData] = useState<Records | null>(null),
     [error, setError] = useState("");
   const [page, setPage] = useState(1),
-    [type, setType] = useState<"ALL" | ExpenseType>("ALL");
+    [type, setType] = useState<"ALL" | ExpenseType>(initialType);
   useEffect(()=>{
     const value=new URLSearchParams(window.location.search).get("type");
-    if(value&&Object.prototype.hasOwnProperty.call(expenseTypes,value))setType(value as ExpenseType);
+    if(!context&&value&&Object.prototype.hasOwnProperty.call(expenseTypes,value))setType(value as ExpenseType);
   },[]);
   const [search, setSearch] = useState(""),
     [exporting, setExporting] = useState(false);

@@ -1,0 +1,274 @@
+"use client";
+import {agencyToday,businessCycle,cycleLabel,reportingPreset} from "@digimarket/contracts";
+import {BusinessPeriodPicker} from "@/components/business-period-picker";
+import {useCallback,useEffect,useMemo,useState} from "react";
+import Link from "next/link";
+import {Banknote,Check,Plus,RefreshCw,RotateCcw,ShieldCheck,Users,Wallet} from "lucide-react";
+import {BusinessWorkspaceNav} from "@/components/business-workspace-nav";
+import {useFinanceContext} from "./shared";
+import {useAuth} from "@/components/auth-provider";
+import {PageHeader,Spinner} from "@/components/ui";
+
+type Person={id:string;displayName:string;loginId:string;isFounder:boolean};
+type Account={id:string;name:string;founderUserId:string;founderName:string;openingBalance:string;availableBalance:string;financeNetBeforeSalary:string;founderSalaryFunded:string;sharedFinancePool:boolean;active:boolean};
+type Credit={id:string;amount:string;date:string;accountName:string;founderName:string;recordedBy:string;description:string|null};
+type Share={accountId:string;amount:string};
+type Salary={id:string;recipientUserId:string;recipientName:string;recordedBy:string;amount:string;salaryMonth:string;
+ paidOn:string;method:string;status:"PAID"|"VOID";reference:string|null;note:string|null;voidReason:string|null;
+ allocations:{accountId:string;amount:string;accountName:string;founderName:string}[]};
+type Overview={currency:string;totalPaid:string;paymentCount:number;
+ founderFunding:{founderUserId:string;name:string;amount:string;count:number}[];
+ recipients:{userId:string;name:string;amount:string;count:number}[];
+ monthly:{month:string;amount:string;count:number}[];accounts:Account[];
+ founderBalances:{founderUserId:string;name:string;financeNetBeforeSalary:string;salaryFunded:string;remaining:string}[]};
+const today=agencyToday;
+const rupees=(s:string|number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",
+ minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(s)||0);
+const err=(error:unknown)=>error instanceof Error?error.message:"The operation was not completed.";
+const methods=["UPI","BANK_TRANSFER","CASH","CARD","OTHER"] as const;
+export function SalaryWorkspace({paymentOnly=false,historyOnly=false}:{paymentOnly?:boolean;historyOnly?:boolean}={}){
+ const context=useFinanceContext();
+ const {session,request}=useAuth();
+ const founder=!!session?.identity.roles.includes("FOUNDER");
+ const [people,setPeople]=useState<Person[]>([]);
+ const [accounts,setAccounts]=useState<Account[]>([]);
+ const [credits,setCredits]=useState<Credit[]>([]);
+ const [payments,setPayments]=useState<Salary[]>([]);
+ const [overview,setOverview]=useState<Overview|null>(null);
+ const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
+ const [error,setError]=useState(""),[success,setSuccess]=useState("");
+ const [dateFrom,setDateFrom]=useState(()=>reportingPreset("current").from);
+ const [dateTo,setDateTo]=useState(()=>reportingPreset("current").to);
+ const [accountFounder,setAccountFounder]=useState(""),[accountName,setAccountName]=useState("");
+ const [recipient,setRecipient]=useState(""),[amount,setAmount]=useState(""),[salaryMonth,setSalaryMonth]=useState(()=>businessCycle().key),
+  [paidOn,setPaidOn]=useState(today()),[method,setMethod]=useState<(typeof methods)[number]>("UPI"),
+  [reference,setReference]=useState(""),[note,setNote]=useState(""),[confirmed,setConfirmed]=useState(false),
+  [shares,setShares]=useState<Share[]>([{accountId:"",amount:""}]);
+ const [paymentKey,setPaymentKey]=useState(()=>crypto.randomUUID());
+ const [search,setSearch]=useState("");
+ const [voidId,setVoidId]=useState<string|null>(null),[voidReason,setVoidReason]=useState("");
+
+ const load=useCallback(async()=>{
+  if(!session||context&&!context.window.ready)return;
+  setLoading(true);setError("");
+  try{
+   const params=new URLSearchParams(context?.window.period??{from:dateFrom,to:dateTo}).toString();
+   if(founder){
+    const [ps,as,cs,history,summary]=await Promise.all([
+     request<Person[]>("/salary/people"),request<Account[]>("/salary/accounts"),
+     request<Credit[]>("/salary/credits"),request<Salary[]>("/salary/payments?"+params),
+     request<Overview>("/salary/summary?"+params)
+    ]);
+    setPeople(ps);setAccounts(as);setCredits(cs);setPayments(history);setOverview(summary);
+   }else{
+    const history=await request<Salary[]>("/salary/payments?"+params);
+    setPayments(history);
+   }
+  }catch(e){setError(err(e));}finally{setLoading(false);}
+ },[session,founder,request,dateFrom,dateTo,context?.window.period.from,context?.window.period.to,context?.window.ready,context?.refresh]);
+ useEffect(()=>{void load();},[load]);
+
+ const activeAccounts=accounts.filter(x=>x.active);
+ const founders=people.filter(x=>x.isFounder);
+ const sharesTotal=shares.reduce((n,x)=>n+(Number(x.amount)||0),0);
+ const difference=(Number(amount)||0)-sharesTotal;
+ const shareIds=shares.map(x=>x.accountId).filter(Boolean);
+ const duplicateShares=new Set(shareIds).size!==shareIds.length;
+ const byFounder=useMemo(()=>{
+  const assigned=new Map<string,number>();
+  for(const share of shares){
+   const account=activeAccounts.find(x=>x.id===share.accountId);
+   if(account)assigned.set(account.founderUserId,(assigned.get(account.founderUserId)||0)+Number(share.amount||0));
+  }
+  return assigned;
+ },[shares,accounts]);
+ const withinFinance=[...byFounder].every(([id,total])=>{
+  const available=activeAccounts.find(x=>x.founderUserId===id);
+  return !!available&&total<=Number(available.availableBalance)+0.000001;
+ });
+ const canPay=!!recipient&&Number(amount)>0&&confirmed&&shares.every(x=>x.accountId&&Number(x.amount)>0)
+  &&!duplicateShares&&Math.abs(difference)<0.005&&withinFinance;
+ async function action(work:()=>Promise<unknown>,message:string){
+  setBusy(true);setError("");setSuccess("");
+  try{await work();setSuccess(message);context?.onMutation();await load();}
+  catch(e){setError(err(e));}
+  finally{setBusy(false);}
+ }
+ const updateShare=(idx:number,key:keyof Share,value:string)=>setShares(rows=>rows.map((x,i)=>i===idx?{...x,[key]:value}:x));
+ const totals=overview?.founderFunding||[];
+ const maxFounder=Math.max(1,...totals.map(x=>Number(x.amount)));
+ const monthMax=Math.max(1,...(overview?.monthly||[]).map(x=>Number(x.amount)));
+ const isLoading=!session||loading&&!payments.length&&!accounts.length;
+ if(!session)return <Spinner label="Checking salary access…"/>;
+ return <main className="aw-salary-page space-y-6" data-aw-module="salary">
+  {!context&&<><BusinessWorkspaceNav/>
+  <PageHeader eyebrow="TEAM & PAYROLL" title={founder?"Salary & founder funding":"My salary"}
+   description={founder?"Record salary payments funded directly from each founder’s remaining Finance balance. Split across multiple funding sources without creating a second wallet.":
+    "Your recorded salary payments are visible here. Entries are created by founders; no bank transfer is initiated by DigiMarket."}
+   actions={<button className="btn-secondary" disabled={loading} onClick={()=>void load()}><RefreshCw size={16}/>Refresh</button>}/>
+  </>}
+  {error&&<div role="alert" className="rounded-lg border border-red-500/40 p-3 text-red-400">{error}</div>}
+  {success&&<div role="status" className="rounded-lg border border-emerald-500/40 p-3">{success}</div>}
+  {!context&&<BusinessPeriodPicker value={{from:dateFrom,to:dateTo}} onChange={period=>{setDateFrom(period.from);setDateTo(period.to);}} disabled={busy}/>}
+  {!paymentOnly&&<p className="text-sm opacity-70">Salary costs use the selected payment dates. Available funding carries forward across cycles and always reflects all-time entries.</p>}
+  {founder&&!historyOnly&&<section className="rounded-xl border border-white/10 p-5 space-y-4">
+    <h2 className="text-xl font-semibold flex gap-2 items-center"><Banknote size={21}/>Record a salary payment</h2>
+    <p className="text-sm opacity-70">Choose a recipient and allocate the salary between sources. The combined amount funded by each founder cannot exceed their remaining Finance Net posted. DigiMarket records a payment already made, not a transfer.</p>
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+     <label className="text-sm space-y-1">Recipient<select className="field w-full" value={recipient} onChange={e=>setRecipient(e.target.value)}>
+      <option value="">Choose staff member</option>{people.map(p=><option value={p.id} key={p.id}>{p.displayName}{p.isFounder?" (Founder)":""}</option>)}
+     </select></label>
+     <label className="text-sm space-y-1">Salary amount (₹)<input type="number" step="0.01" min="0.01" className="field w-full" value={amount}
+      onChange={e=>setAmount(e.target.value)}/></label>
+     <label className="text-sm space-y-1">Salary for month<input type="month" className="field w-full" value={salaryMonth}
+      onChange={e=>setSalaryMonth(e.target.value)}/></label>
+     <label className="text-sm space-y-1">Paid on<input type="date" className="field w-full" value={paidOn}
+      onChange={e=>setPaidOn(e.target.value)}/></label>
+     <label className="text-sm space-y-1">Payment method<select className="field w-full" value={method}
+      onChange={e=>setMethod(e.target.value as (typeof methods)[number])}>{methods.map(x=><option key={x} value={x}>{x.replaceAll("_"," ")}</option>)}</select></label>
+     <label className="text-sm space-y-1">Reference (optional)<input className="field w-full" maxLength={160}
+      value={reference} onChange={e=>setReference(e.target.value)}/></label>
+     <label className="text-sm space-y-1 sm:col-span-2">Notes (optional)<input className="field w-full" maxLength={500}
+      value={note} onChange={e=>setNote(e.target.value)}/></label>
+    </div>
+    <h3 className="font-semibold">Funding sources</h3>
+    <div className="fc-funding-balances">{(overview?.founderBalances??[]).map(f=><div key={f.founderUserId}><span>{f.name}</span><strong>{rupees(f.remaining)}</strong></div>)}</div>
+    {shares.map((share,i)=><div key={i} className="grid gap-2 grid-cols-[minmax(0,1fr)_minmax(100px,160px)_auto] items-end">
+     <label className="text-sm space-y-1">Founder account
+      <select className="field w-full" value={share.accountId} onChange={e=>updateShare(i,"accountId",e.target.value)}>
+       <option value="">Select source</option>{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.founderName} · {a.name}</option>)}
+      </select></label>
+     <label className="text-sm space-y-1">Share (₹)<input className="field w-full" type="number" min="0.01" step="0.01"
+      value={share.amount} onChange={e=>updateShare(i,"amount",e.target.value)}/></label>
+     <button aria-label={"Remove funding source "+(i+1)} className="btn-secondary" disabled={shares.length===1}
+      onClick={()=>setShares(x=>x.filter((_,j)=>j!==i))}>Remove</button>
+    </div>)}
+    <div className="flex gap-3 items-center flex-wrap">
+     <button type="button" className="btn-secondary" onClick={()=>setShares(x=>[...x,{accountId:"",amount:""}])}
+      disabled={shares.length>=20}><Plus size={16}/>Add another founder funding source</button>
+     <p className="text-sm">Funding allocated: <strong>{rupees(sharesTotal)}</strong> · Remaining: <strong>{rupees(difference)}</strong></p>
+    </div>
+    {duplicateShares&&<p className="text-amber-400 text-sm">Select each funding account only once.</p>}
+    <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>
+     I confirm this salary was actually paid to the recipient.</label>
+    <button type="button" disabled={busy||!canPay} className="btn-primary" onClick={()=>void action(async()=>{
+     await request("/salary/payments",{method:"POST",body:{recipientUserId:recipient,
+      idempotencyKey:paymentKey,amount,salaryMonth,paidOn,method,reference,note,
+      allocations:shares,confirmedPaid:true}});
+     setAmount("");setRecipient("");setShares([{accountId:"",amount:""}]);setConfirmed(false);
+     setReference("");setNote("");setPaymentKey(crypto.randomUUID());
+    },"Salary paid record created. Funders' available balances were reduced.")}>
+     <Check size={16}/>{busy?"Saving…":"Save confirmed salary payment"}
+    </button>
+   </section>}
+  {!paymentOnly&&founder&&<>
+   <section className="grid gap-3 sm:grid-cols-3">
+    {[["Total salaries paid",overview?.totalPaid??"Unavailable","Company salary expense, counted once"],
+      ["Salary payments",overview?String(overview.paymentCount):"Unavailable","Confirmed payments in range"],
+      ["Founder sources",overview?String(totals.length):"Unavailable","Funding founders in range"]].map(([label,value,desc],i)=>
+     <article className="rounded-xl border border-white/10 p-4 space-y-2" key={label}>
+      <span className="text-xs uppercase opacity-65">{label}</span>
+      <strong className="block text-2xl">{i===0&&value!=="Unavailable"?rupees(value):value}</strong>
+      <p className="text-xs opacity-65">{desc}</p>
+     </article>)}
+   </section>
+   <div className="grid gap-5 lg:grid-cols-2">
+    <section className="rounded-xl border border-white/10 p-5 space-y-4">
+     <h2 className="font-semibold text-lg flex gap-2 items-center"><Wallet size={19}/>Founder funding accounts</h2>
+     <p className="text-sm opacity-70">Create source labels (UPI, bank, cash). All sources owned by the same founder share that founder's posted Finance remaining balance.</p>
+     <label className="block text-sm space-y-1">Founder<select className="field w-full" value={accountFounder} onChange={e=>setAccountFounder(e.target.value)}>
+      <option value="">Select founder</option>{founders.map(x=><option key={x.id} value={x.id}>{x.displayName}</option>)}
+     </select></label>
+     <label className="block text-sm space-y-1">Payment source label<input className="field w-full" value={accountName} maxLength={100}
+      placeholder="UPI / Cash / Bank" onChange={e=>setAccountName(e.target.value)}/></label>
+     <button className="btn-secondary" disabled={busy||!accountFounder||!accountName.trim()} onClick={()=>void action(async()=>{
+      await request("/salary/accounts",{method:"POST",body:{founderUserId:accountFounder,name:accountName}});
+      setAccountName("");
+     },"Funding account created.")}><Plus size={16}/>Add account</button>
+     {accounts.length===0?<p className="text-sm opacity-60">No founder salary funding accounts recorded.</p>:
+      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left opacity-60">
+       <th className="py-2">Founder / source</th><th>Finance remaining (shared)</th><th>Status</th></tr></thead>
+       <tbody>{accounts.map(a=><tr key={a.id} className="border-t border-white/10">
+        <td className="py-2"><strong>{a.founderName}</strong><span className="block text-xs opacity-70">{a.name}</span></td>
+        <td>Shared founder balance</td>
+        <td><button className="underline" disabled={busy} onClick={()=>void action(()=>request("/salary/accounts/"+a.id+"/status",
+         {method:"PUT",body:{active:!a.active}}),a.active?"Account paused.":"Account enabled.")}>
+         {a.active?"Active":"Paused"}</button></td>
+       </tr>)}</tbody></table></div>}
+    </section>
+    <section className="rounded-xl border border-white/10 p-5 space-y-4" aria-label="Finance-linked founder balances">
+     <div className="flex items-center justify-between gap-2"><h2 className="font-semibold text-lg flex gap-2 items-center"><Wallet size={19}/>Live Finance balance</h2>
+      {!context&&<Link href="/app/finance" className="underline text-sm">Open Finance</Link>}</div>
+     <p className="text-sm opacity-70">Posted founder income minus agency expenses, client-funded Meta Ads and salary allocations. Finance ledger balances, not verified bank balances.</p>
+     {(overview?.founderBalances||[]).map(x=><div className="rounded-lg border border-white/10 p-3 space-y-2" key={x.founderUserId}>
+      <h3 className="font-semibold">{x.name}</h3>
+      <div className="flex justify-between text-sm"><span>Net before salary</span><strong>{rupees(x.financeNetBeforeSalary)}</strong></div>
+      <div className="flex justify-between text-sm"><span>Salary funded (all time)</span><strong>{rupees(x.salaryFunded)}</strong></div>
+      <div className="flex justify-between text-sm font-semibold border-t border-white/10 pt-2"><span>Net posted remaining</span><strong>{rupees(x.remaining)}</strong></div>
+     </div>)}
+     {!(overview?.founderBalances||[]).length&&<p className="text-sm opacity-60">No founder Finance balances available.</p>}
+     {credits.length>0&&<details className="text-sm opacity-70"><summary>Historical manual salary credits ({credits.length})</summary>
+      <p className="py-2">Legacy credits remain auditable but do not increase Finance-linked salary funds.</p>
+      {credits.slice(0,10).map(c=><div className="py-1" key={c.id}>{c.date}: {c.founderName} · {c.accountName}, {rupees(c.amount)}</div>)}
+     </details>}
+    </section>
+   </div>
+   <div className="grid gap-5 lg:grid-cols-2">
+    <section className="rounded-xl border border-white/10 p-5 space-y-3">
+     <h2 className="text-lg font-semibold">Founder salary funding expenses</h2>
+     <p className="text-xs opacity-70">Expense chart by funding founder, not by the founder recording the payment. Salary received is never income here.</p>
+     {totals.map(x=><div key={x.founderUserId} className="space-y-1">
+      <div className="flex justify-between text-sm"><span>{x.name}</span><strong>{rupees(x.amount)}</strong></div>
+      <div className="h-3 rounded bg-white/10 overflow-hidden"><div className="h-full bg-purple-500" style={{width:Number(x.amount)/maxFounder*100+"%"}}/></div>
+     </div>)}
+     {totals.length===0&&<p className="text-sm opacity-60">No founder-funded salary expenses in this period.</p>}
+    </section>
+    <section className="rounded-xl border border-white/10 p-5 space-y-3">
+     <h2 className="text-lg font-semibold">Salary cost by work cycle</h2>
+     {(overview?.monthly||[]).map(x=><div key={x.month} className="space-y-1">
+      <div className="flex justify-between text-sm"><span>{cycleLabel(x.month)}</span><strong>{rupees(x.amount)}</strong></div>
+      <div className="h-3 rounded bg-white/10 overflow-hidden"><div className="h-full bg-sky-500" style={{width:Number(x.amount)/monthMax*100+"%"}}/></div>
+     </div>)}
+     {!(overview?.monthly||[]).length&&<p className="text-sm opacity-60">No salary costs in this period.</p>}
+    </section>
+   </div>
+  </>}
+  {!paymentOnly&&<section className="rounded-xl border border-white/10 p-5 space-y-4">
+   <h2 className="text-lg font-semibold flex gap-2 items-center"><Users size={20}/>{founder?"Salary payment history":"My salary history"}</h2>
+   <p className="text-sm opacity-70">All amounts are recorded payments, not bank transfer confirmations generated by DigiMarket. Voided records remain in history for audit.</p>
+   <label className="block text-sm">Search salary payments<input type="search" className="field w-full" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Recipient or salary month"/></label>
+   {isLoading?<Spinner label="Loading salary ledger…"/>:payments.length===0?
+    <p className="text-sm opacity-65">No salary entries found for this period.</p>:
+    <div className="overflow-x-auto"><table className="w-full text-sm">
+     <thead><tr className="border-b border-white/10 text-left opacity-65">
+      <th className="py-3">Recipient</th><th>Salary month</th><th>Paid on</th><th>Amount</th>
+      <th>Status</th>{founder&&<th>Founder funding and actions</th>}</tr></thead>
+     <tbody>{payments.filter(x=>(x.recipientName+" "+x.salaryMonth+" "+x.status).toLowerCase().includes(search.toLowerCase().trim())).map(x=><tr key={x.id} className="border-t border-white/10 align-top">
+      <td className="py-3"><strong>{x.recipientName}</strong><span className="text-xs opacity-60 block">Recorded by {x.recordedBy}</span></td>
+      <td className="py-3">{x.salaryMonth}</td><td className="py-3">{x.paidOn}<span className="block text-xs opacity-60">{x.method.replaceAll("_"," ")}</span></td>
+      <td className="py-3 font-semibold">{rupees(x.amount)}</td>
+      <td className="py-3">{x.status==="PAID"?"Paid":"Voided"}{x.voidReason&&<small className="block opacity-60">{x.voidReason}</small>}</td>
+      {founder&&<td className="py-3 space-y-1">
+       {x.allocations.map(a=><div key={a.accountId}>{a.founderName} · {a.accountName}: <strong>{rupees(a.amount)}</strong></div>)}
+       {x.reference&&<small className="block opacity-60">Ref: {x.reference}</small>}
+       {x.status==="PAID"&&<button className="text-xs underline" onClick={()=>{setVoidId(x.id);setVoidReason("");}}>
+        <RotateCcw size={13} className="inline"/> Void entry</button>}
+       {voidId===x.id&&<div className="space-y-2 pt-2">
+        <label className="block text-xs space-y-1">Reason for reversal<input className="field w-full" maxLength={500}
+         value={voidReason} onChange={e=>setVoidReason(e.target.value)} placeholder="Incorrect entry / payment reversed"/></label>
+        <div className="flex gap-2">
+         <button className="btn-secondary" disabled={busy||voidReason.trim().length<4}
+          onClick={()=>void action(async()=>{await request("/salary/payments/"+x.id+"/void",
+           {method:"POST",body:{reason:voidReason.trim()}});setVoidId(null);},
+           "Salary voided. The funding founders’ Finance remaining balances have been restored.")}>Confirm reversal</button>
+         <button className="btn-secondary" onClick={()=>setVoidId(null)}>Cancel</button>
+        </div>
+       </div>}
+      </td>}
+     </tr>)}</tbody></table></div>}
+   <p className="text-xs opacity-60">Up to the latest 400 payments appear for the selected date range. Historical records are never deleted.</p>
+  </section>}
+  {!paymentOnly&&founder&&<p className="flex items-start gap-2 text-sm opacity-65"><ShieldCheck size={18} className="shrink-0"/>
+   Company salary totals count each payment once. Funding splits are displayed separately by founder. Neither employee salary receipts nor founder deposits are added to ordinary Finance income.</p>}
+ </main>;
+}

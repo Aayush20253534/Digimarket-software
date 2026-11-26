@@ -226,7 +226,7 @@ export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
           ...(!cycleDetails&&founder?[{
             title: "Salaries",
             description: "Payroll, funding and payment history",
-            href: "/app/salary",
+            href: "/app/finance?tab=salary",
             amount: totals?.postedSalaryExpense,
             metricLabel:"Paid / funded this cycle",
             icon: ReceiptText,
@@ -294,6 +294,7 @@ export function FinanceOverviewContent({w,refresh=0,cycleDetails=false}:{
           </Card>
         ))}
       </div>}
+      {!cycleDetails&&totalExpense?.breakdown&&<section className="fc-breakdown" aria-label="Expense classification"><h2>Expense classification</h2><p>Posted costs · salary counted once · settlements excluded</p><div className="fc-class-grid">{([["Operating expenses","OTHER"],["Agency-funded Meta Ads","SELF_ADS"],["Client-funded Meta Ads","CLIENT_ADS"],["Salary paid / funded","SALARY"]] as const).map(([label,key])=><Link key={key} href={"/app/finance/total-expenses?type="+key+"&"+w.query}><span>{label}</span><strong>{totalExpense.breakdown[key]===undefined?"Unavailable":money(totalExpense.breakdown[key])}</strong></Link>)}</div><p>Internal settlements are transfers, not company expenses. Client-funded ads remain separately classified.</p></section>}
       <nav className="grid grid-cols-2 gap-4 xl:grid-cols-3" aria-label={cycleDetails?"Cycle finance categories":"Finance categories"}>
         {cards.map(({ title, description, href, amount, metricLabel, metricDetail, icon: Icon }) => (
           <Link
