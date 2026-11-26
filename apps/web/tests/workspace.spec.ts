@@ -16,6 +16,16 @@ async function login(page:Page,id:string,password:string){
   await page.getByLabel("Password",{exact:true}).fill(password);
   await page.getByRole("button",{name:"Sign in",exact:true}).click();
 }
+// Signing out is asynchronous: a hard navigation can abort the request before
+// the server revokes the session and clears the HttpOnly refresh cookie.
+async function signOut(page:Page){
+  const response=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/auth/logout"&&r.request().method()==="POST");
+  await page.getByRole("button",{name:"Sign out"}).click();
+  expect((await response).status()).toBe(204);
+  await expect(page).toHaveURL(/\/login(?:\?.*)?$/);
+  await expect(page.getByLabel("Login ID",{exact:true})).toBeVisible();
+  expect((await page.context().cookies()).some(cookie=>cookie.name==="digimarket_refresh")).toBe(false);
+}
 async function finishPasswordRotation(page:Page,next:string){
   await expect(page.getByRole("heading",{name:"Set your new password"})).toBeVisible();
   await page.getByLabel("New password").fill(next);
@@ -439,8 +449,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await page.getByLabel("Task history scope").selectOption("team");
   await expect(page.getByRole("list",{name:"Completed task records"}).getByText("CI Updated Task")).toHaveCount(0);
   }
-  await page.getByRole("button",{name:"Sign out"}).click();
-  await expect(page).toHaveURL(/\/login/);
+  await signOut(page);
 
   await login(page,"ci-founder",founderInitial);
   const founderPassword="CI-Founder-"+Date.now().toString(36)+"#2026";
@@ -1059,7 +1068,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   await expect(page.getByText("Lead permanently deleted from the database. Linked clients are preserved.")).toBeVisible();
   await visitWorkspace(page,"/app/clients");
   await expect(page.getByRole("table",{name:"Clients directory"}).getByText("Founder CI Lead")).toBeVisible();
-  await page.getByRole("button",{name:"Sign out"}).click();
+  await signOut(page);
 
   await login(page,"ci-employee",employeeInitial);
   const employeePassword="CI-Employee-"+Date.now().toString(36)+"#2026";
@@ -1225,7 +1234,7 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   }
   // Admin controls are visible at the start of the register and can edit both entry types.
   await page.setViewportSize({width:1366,height:768});
-  await page.getByRole("button",{name:"Sign out"}).click();
+  await signOut(page);
   await login(page,"admin-e2e",UPDATED);
   await expect(page).toHaveURL(/\/app\/leads/);
   await visitWorkspace(page,"/app/finance/entries");
