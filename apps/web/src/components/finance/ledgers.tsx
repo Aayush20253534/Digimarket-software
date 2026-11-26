@@ -268,7 +268,7 @@ export function AccountsOverview() {
     >
       <Feedback error={l.error || error || owners.error} success={l.success} />
       {l.founder&&<FounderBalanceCards rows={readFounderBalances(founderSummary.data)} loading={founderSummary.loading||!l.enabled} error={founderSummary.error}/>}
-      <details className="rounded-xl border border-white/10 p-4 space-y-4">
+      <details data-testid="money-account-reconciliation" className="rounded-xl border border-white/10 p-4 space-y-4">
         <summary className="cursor-pointer font-semibold">Money-account reconciliation {Array.isArray(accounts)?"("+accounts.length+" accounts)":""}</summary>
         <Notice>These are account-specific balances based on opening amounts and linked movements for the selected cycle. They are not founder Finance balances or salary funding limits. Unverified clearing accounts may include historical attribution differences.</Notice>
         {Array.isArray(accounts)?<>

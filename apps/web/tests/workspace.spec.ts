@@ -40,9 +40,30 @@ async function createUser(page:Page,id:string,name:string,role:"FOUNDER"|"EMPLOY
 // Hard navigations remount the auth provider and rotate its HttpOnly session cookie.
 // Do not start the next browser action or navigation before authentication settles.
 async function visitWorkspace(page:Page,path:string){
-  await page.goto(path);
-  await expect(page.locator(".aw-workspace"),"Authenticated workspace at "+path)
-    .toBeVisible({timeout:20000});
+  const target=new URL(path,page.url());
+  const shell=page.locator(".aw-workspace");
+  const nav=page.getByRole("navigation",{name:"Workspace navigation"});
+  const links=nav.locator("a").filter({visible:true});
+  const hrefs=await links.evaluateAll(nodes=>nodes.map(node=>(node as HTMLAnchorElement).href));
+  const index=hrefs.indexOf(target.href);
+  const authResponses:{path:string;status:number}[]=[];
+  const onResponse=(response:import("@playwright/test").Response)=>{
+    const url=new URL(response.url());
+    if(url.pathname==="/api/v1/auth/refresh"||url.pathname==="/api/v1/me")authResponses.push({path:url.pathname,status:response.status()});
+  };
+  page.on("response",onResponse);
+  try{
+    if(page.url()!==target.href&&await shell.isVisible()&&index>=0){
+      await links.nth(index).click();
+      await page.waitForURL(url=>url.pathname===target.pathname&&url.search===target.search);
+    }else{
+      await page.goto(path);
+    }
+    await expect(shell,"Authenticated workspace at "+path).toBeVisible({timeout:20000});
+  }catch(error){
+    console.error("Workspace navigation diagnostics",JSON.stringify({route:path,actual:new URL(page.url()).pathname,authResponses,visibleText:(await page.locator("body").innerText().catch(()=>"")).slice(0,350)}));
+    throw error;
+  }finally{page.off("response",onResponse);}
 }
 
 // The existing role test provisions temporary CI users. Capture snapshots at
@@ -1283,5 +1304,9 @@ test("admin policy, founder operations, note persistence, Drive, and employee pe
   }
 });
 test("unauthenticated dashboard access is denied",async({page})=>{
-  await page.goto("/app/dashboard");await expect(page).toHaveURL(/\/login/);
+  const response=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/v1/auth/refresh");
+  await page.goto("/app/dashboard");
+  expect((await response).status(),"Unauthenticated refresh must be rejected").toBe(401);
+  await expect(page).toHaveURL(/\/login/,{timeout:15000});
+  await expect(page.locator(".aw-workspace")).toHaveCount(0);
 });

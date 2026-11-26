@@ -104,7 +104,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   refreshPhoto();
   window.addEventListener("aw-profile-avatar-updated",refreshPhoto);
   return()=>{mounted=false;window.removeEventListener("aw-profile-avatar-updated",refreshPhoto);};
- },[session?.identity.userId,pathname,request]);
+ },[session?.identity.userId,request]);
  useEffect(()=>{
   const dialog=dialogRef.current;
   if(!dialog)return;
@@ -131,7 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   catch{setSignOutError("Sign out could not be confirmed by the server. Your session may still be active.");setMobileOpen(false);}
   finally{setSigningOut(false);}
  }
- if(status==="loading"||(status!=="error"&&!session))return <main className="aw-theme aw-work-loading">
+ if(status==="loading"||status==="unauthenticated")return <main className="aw-theme aw-work-loading">
   <div role="status">Verifying workspace access…</div>
  </main>;
  if(status==="error"||!session)return <main className="aw-theme aw-work-loading">

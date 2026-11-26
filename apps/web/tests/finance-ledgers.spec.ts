@@ -341,8 +341,10 @@ test("founder balances use salary funding ledger and keep legacy clearing separa
  await expect(balances).not.toContainText("20,758.51");
  await expect(balances).not.toContainText("Platform Administrator");
  await expect(page.getByText("₹20,758.51",{exact:true})).toBeHidden();
- await page.getByText("Money-account reconciliation",{exact:false}).first().click();
- await expect(page.getByText("₹20,758.51",{exact:true})).toBeVisible();
+ const reconciliation=page.getByTestId("money-account-reconciliation");
+ await reconciliation.locator("summary").click();
+ await expect(reconciliation).toHaveAttribute("open","");
+ await expect(reconciliation.getByText("₹20,758.51",{exact:true})).toBeVisible();
  expect(calls.some(c=>c.path==="/salary/summary")).toBe(true);
  await page.goto("/app/finance?tab=accounts&"+cycle);
  await expect(page.getByRole("region",{name:"Finance-linked founder balances"}).getByTestId("founder-finance-balance-user")).toContainText("₹925.00");
