@@ -2,10 +2,10 @@
 import {agencyToday,businessCycle,cycleLabel,reportingPreset} from "@digimarket/contracts";
 import {BusinessPeriodPicker} from "@/components/business-period-picker";
 import {useCallback,useEffect,useMemo,useState} from "react";
-import Link from "next/link";
 import {Banknote,Check,Plus,RefreshCw,RotateCcw,ShieldCheck,Users,Wallet} from "lucide-react";
 import {BusinessWorkspaceNav} from "@/components/business-workspace-nav";
 import {useFinanceContext} from "./shared";
+import {FounderBalanceCards,readFounderBalances,type FounderBalance} from "./founder-balances";
 import {useAuth} from "@/components/auth-provider";
 import {PageHeader,Spinner} from "@/components/ui";
 
@@ -20,13 +20,13 @@ type Overview={currency:string;totalPaid:string;paymentCount:number;
  founderFunding:{founderUserId:string;name:string;amount:string;count:number}[];
  recipients:{userId:string;name:string;amount:string;count:number}[];
  monthly:{month:string;amount:string;count:number}[];accounts:Account[];
- founderBalances:{founderUserId:string;name:string;financeNetBeforeSalary:string;salaryFunded:string;remaining:string}[]};
+ founderBalances:FounderBalance[]};
 const today=agencyToday;
 const rupees=(s:string|number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",
  minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(s)||0);
 const err=(error:unknown)=>error instanceof Error?error.message:"The operation was not completed.";
 const methods=["UPI","BANK_TRANSFER","CASH","CARD","OTHER"] as const;
-export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly=false}:{paymentOnly?:boolean;historyOnly?:boolean;fundingOnly?:boolean}={}){
+export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly=false,hideBalances=false}:{paymentOnly?:boolean;historyOnly?:boolean;fundingOnly?:boolean;hideBalances?:boolean}={}){
  const context=useFinanceContext();
  const {session,request}=useAuth();
  const founder=!!session?.identity.roles.includes("FOUNDER");
@@ -59,7 +59,7 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly
      request<Credit[]>("/salary/credits"),request<Salary[]>("/salary/payments?"+params),
      request<Overview>("/salary/summary?"+params)
     ]);
-    setPeople(Array.isArray(ps)?ps:[]);setAccounts(Array.isArray(as)?as:[]);setCredits(Array.isArray(cs)?cs:[]);setPayments(Array.isArray(history)?history:[]);setOverview(summary&&Array.isArray(summary.founderFunding)&&Array.isArray(summary.founderBalances)&&Array.isArray(summary.monthly)?summary:null);
+    setPeople(Array.isArray(ps)?ps:[]);setAccounts(Array.isArray(as)?as:[]);setCredits(Array.isArray(cs)?cs:[]);setPayments(Array.isArray(history)?history:[]);setOverview(summary&&Array.isArray(summary.founderFunding)&&readFounderBalances(summary)!==null&&Array.isArray(summary.monthly)?summary:null);
    }else{
     const history=await request<Salary[]>("/salary/payments?"+params);
     setPayments(Array.isArray(history)?history:[]);
@@ -196,17 +196,8 @@ export function SalaryWorkspace({paymentOnly=false,historyOnly=false,fundingOnly
          {a.active?"Active":"Paused"}</button></td>
        </tr>)}</tbody></table></div>}
     </section>
-    <section className="rounded-xl border border-white/10 p-5 space-y-4" aria-label="Finance-linked founder balances">
-     <div className="flex items-center justify-between gap-2"><h2 className="font-semibold text-lg flex gap-2 items-center"><Wallet size={19}/>Live Finance balance</h2>
-      {!context&&<Link href="/app/finance" className="underline text-sm">Open Finance</Link>}</div>
-     <p className="text-sm opacity-70">Posted founder income minus agency expenses, client-funded Meta Ads and salary allocations. Finance ledger balances, not verified bank balances.</p>
-     {(overview?.founderBalances||[]).map(x=><div className="rounded-lg border border-white/10 p-3 space-y-2" key={x.founderUserId}>
-      <h3 className="font-semibold">{x.name}</h3>
-      <div className="flex justify-between text-sm"><span>Net before salary</span><strong>{rupees(x.financeNetBeforeSalary)}</strong></div>
-      <div className="flex justify-between text-sm"><span>Salary funded (all time)</span><strong>{rupees(x.salaryFunded)}</strong></div>
-      <div className="flex justify-between text-sm font-semibold border-t border-white/10 pt-2"><span>Net posted remaining</span><strong>{rupees(x.remaining)}</strong></div>
-     </div>)}
-     {!(overview?.founderBalances||[]).length&&<p className="text-sm opacity-60">No founder Finance balances available.</p>}
+    <section className="rounded-xl border border-white/10 p-5 space-y-4" hidden={hideBalances&&!credits.length}>
+     {!hideBalances&&<FounderBalanceCards rows={readFounderBalances(overview)} loading={loading} error={error}/>}
      {credits.length>0&&<details className="text-sm opacity-70"><summary>Historical manual salary credits ({credits.length})</summary>
       <p className="py-2">Legacy credits remain auditable but do not increase Finance-linked salary funds.</p>
       {credits.slice(0,10).map(c=><div className="py-1" key={c.id}>{c.date}: {c.founderName} · {c.accountName}, {rupees(c.amount)}</div>)}

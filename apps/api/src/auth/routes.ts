@@ -38,6 +38,14 @@ export function registerAuthRoutes(app: Express, service: AuthService, allowedOr
   });
   const credentialLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: "draft-8", legacyHeaders: false });
   app.use(cookieParser());
+  app.post("/api/v1/auth/refresh",(request,response,next)=>{
+    if(typeof request.cookies?.digimarket_refresh!=="string"){
+      // No session can be established without a refresh cookie. This cheap
+      // rejection does not consume the shared authentication budget.
+      return response.status(401).json({error:{code:"UNAUTHORIZED",message:"Sign in required"}});
+    }
+    next();
+  });
   app.use("/api/v1/auth", authLimit);
 
   // Cookie-authenticated POST endpoints are origin-bound to prevent CSRF.

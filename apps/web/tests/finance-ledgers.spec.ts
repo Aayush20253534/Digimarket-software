@@ -54,7 +54,8 @@ async function workspace(page: Page, role = "FOUNDER") {
       data = [
         { id: categoryId, kind: "EXPENSE", name: "Travel", active: true, purpose: "GENERAL" },
       ];
-    else if (path === "/salary/summary") data = { totalPaid: "0", founderFunding: [] };
+    else if (path === "/salary/summary") data = { totalPaid: "0", founderFunding: [],monthly:[],founderBalances:[{founderUserId:"user",name:"Test Founder",financeNetBeforeSalary:"1200.0000",salaryFunded:"300.0000",remaining:"925.0000"}] };
+    else if(path==="/finance/accounts")data=[{id:accountId,name:"Test Founder - personal clearing (unverified)",ownerName:"Test Founder",kind:"CASH",openingOn:"2026-10-22",openingBalance:"20758.51",opening:"20758.51",movement:"0",closing:"20758.51",isPersonalClearing:true},{id:"admin-account",name:"Platform Administrator - personal clearing (unverified)",ownerName:"Platform Administrator",kind:"CASH",openingOn:"2026-10-22",openingBalance:"0",opening:"0",movement:"0",closing:"0",isPersonalClearing:true}];
     else if (path === "/finance/summary")
       data = {
         currency: "INR",
@@ -329,4 +330,31 @@ test("founder adds an expense automatically attributed to signed-in user", async
   expect(body).not.toHaveProperty("enteredById");
   expect(body).not.toHaveProperty("moneyAccountId");
   await expect(page).toHaveURL(/finance\/expenses/);
+});
+
+test("founder balances use salary funding ledger and keep legacy clearing separate",async({page})=>{
+ const calls=await workspace(page);
+ await page.goto("/app/finance/accounts?"+cycle);
+ const balances=page.getByRole("region",{name:"Finance-linked founder balances"});
+ await expect(balances.getByTestId("founder-finance-balance-user")).toContainText("₹925.00");
+ await expect(balances).toContainText("₹25.00");
+ await expect(balances).not.toContainText("20,758.51");
+ await expect(balances).not.toContainText("Platform Administrator");
+ await expect(page.getByText("₹20,758.51",{exact:true})).toBeHidden();
+ const reconciliation=page.getByTestId("money-account-reconciliation");
+ await reconciliation.locator("summary").click();
+ await expect(reconciliation).toHaveAttribute("open","");
+ await expect(reconciliation.getByText("₹20,758.51",{exact:true})).toBeVisible();
+ expect(calls.some(c=>c.path==="/salary/summary")).toBe(true);
+ await page.goto("/app/finance?tab=accounts&"+cycle);
+ await expect(page.getByRole("region",{name:"Finance-linked founder balances"}).getByTestId("founder-finance-balance-user")).toContainText("₹925.00");
+ await page.setViewportSize({width:390,height:844});
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+2)).toBe(true);
+});
+test("missing founder balance payload never substitutes legacy amounts",async({page})=>{
+ await workspace(page);
+ await page.route("**/api/v1/salary/summary?*",route=>route.fulfill({json:{data:{totalPaid:"0"}}}));
+ await page.goto("/app/finance/accounts?"+cycle);
+ await expect(page.getByText("Founder balances unavailable. No legacy balance will be substituted.")).toBeVisible();
+ await expect(page.getByText("₹20,758.51",{exact:true})).toBeHidden();
 });

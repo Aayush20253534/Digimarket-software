@@ -70,6 +70,7 @@ type Balance = {
   kind: string;
   ownerUserId: string | null;
   ownerName: string | null;
+  isPersonalClearing: boolean;
   openingOn: Date;
   openingBalance: string;
   opening: string;
@@ -220,7 +221,7 @@ export class FinanceLedgerService {
     ledgerRead(a);
     const rows = await db.$queryRaw<
       Balance[]
-    >`SELECT a."id",a."name",a."kind"::text,a."ownerUserId",u."displayName" AS "ownerName",a."openingOn",a."openingBalance"::text,
+    >`SELECT a."id",a."name",a."kind"::text,a."ownerUserId",u."displayName" AS "ownerName",(a."normalizedName"='personal-clearing-'||a."ownerUserId"::text) IS TRUE AS "isPersonalClearing",a."openingOn",a."openingBalance"::text,
    (CASE WHEN a."openingOn"<=${day(p.from)} THEN a."openingBalance" ELSE 0 END+COALESCE(SUM(m."amount") FILTER(WHERE m."occurredOn"<${day(p.from)}),0))::text AS "opening",
    (CASE WHEN a."openingOn">${day(p.from)} AND a."openingOn"<=${day(p.to)} THEN a."openingBalance" ELSE 0 END+COALESCE(SUM(m."amount") FILTER(WHERE m."occurredOn">=${day(p.from)}),0))::text AS "movement",
    (CASE WHEN a."openingOn"<=${day(p.to)} THEN a."openingBalance" ELSE 0 END+COALESCE(SUM(m."amount"),0))::text AS "closing"

@@ -126,7 +126,7 @@ test("unified Finance keeps quick entry, classification and shared work cycle",a
  await expect(page.getByLabel("Work cycle from")).toHaveValue("2026-10-22");
  const unified=page.getByRole("region",{name:"Unified transaction register"});
  await expect(unified).toBeVisible();
- await expect(unified.getByText("Agency Meta Ads",{exact:false}).first()).toBeVisible();
+ await expect(unified.locator("article").filter({hasText:"Agency campaign"}).getByText("Agency Meta Ads",{exact:false})).toBeVisible();
  await expect(unified.getByText("Example Cafe",{exact:false})).toBeVisible();
  await unified.getByLabel("Transaction type").selectOption("SETTLEMENT");
  await expect(unified.getByText("Founder A → Founder B")).toBeVisible();

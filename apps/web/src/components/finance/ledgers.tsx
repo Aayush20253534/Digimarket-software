@@ -6,18 +6,22 @@ import { useAuth } from "@/components/auth-provider";
 import { Card, EmptyState, FormField, Notice, Spinner } from "@/components/ui";
 import { DownloadCSV, FinanceFrame, FinancePager, money, useFinanceWindow } from "./shared";
 import { ReversalButton } from "./reversal";
+import {FounderBalanceCards,readFounderBalances} from "./founder-balances";
 
 type Account = {
   id: string;
   name: string;
   kind: string;
   ownerName: string | null;
+  isPersonalClearing?: boolean;
   openingOn: string;
   openingBalance: string;
   opening: string;
   movement: string;
   closing: string;
 };
+// Older deployed APIs omit the explicit classification flag.
+const personalClearing=(a:Account)=>a.isPersonalClearing??(!!a.ownerName&&a.name.endsWith(" - personal clearing (unverified)"));
 type OwnClientAdSpend={
   posted:string;entries:number;
   byClient:{clientId:string;name:string;posted:string;entries:number}[];
@@ -57,9 +61,11 @@ function useData<T>(url: string, enabled: boolean, version = 0) {
   const { request } = useAuth();
   const [data, setData] = useState<T | null>(null),
     [error, setError] = useState("");
+  const [loading,setLoading]=useState(false);
   useEffect(() => {
     if (!enabled) return;
     let active = true;
+    setLoading(true);
     setError("");
     setData(null);
     void request<T>(url)
@@ -67,13 +73,13 @@ function useData<T>(url: string, enabled: boolean, version = 0) {
         if (active) setData(r);
       })
       .catch((e) => {
-        if (active) setError(e.message);
-      });
+        if (active) setError(e instanceof Error?e.message:"Request failed");
+      }).finally(()=>{if(active)setLoading(false)});
     return () => {
       active = false;
     };
   }, [url, enabled, version, request]);
-  return { data, error };
+  return { data, error, loading };
 }
 function useLedger() {
   const w = useFinanceWindow(),
@@ -222,6 +228,7 @@ export function AccountsOverview() {
       l.enabled,
       l.version,
     );
+  const founderSummary=useData<unknown>("/salary/summary?"+new URLSearchParams(l.w.period),l.enabled&&l.founder,l.version);
   const owners = useData<{ id: string; displayName: string }[]>(
     "/finance/account-owners",
     l.enabled && l.write,
@@ -245,7 +252,7 @@ export function AccountsOverview() {
   return (
     <FinanceFrame
       title="Accounts & transfers"
-      description="Balances carry forward between cycles. Open an account to inspect its movements and reconcile it."
+      description="Founder Finance balances and separate money-account reconciliation."
       window={l.w}
       agencyOnly
       actions={
@@ -260,48 +267,18 @@ export function AccountsOverview() {
       }
     >
       <Feedback error={l.error || error || owners.error} success={l.success} />
-      <Notice>
-        Use each real account once. A founder clearing balance below zero means the agency owes the
-        founder; above zero means the founder holds agency funds. Opening balances are amounts
-        before the opening date's entries.
-      </Notice>
-      {accounts ? (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {accounts.map((a) => (
-              <Link
-                key={a.id}
-                href={"/app/finance/accounts/" + a.id + "?" + l.w.query}
-                className="rounded-xl border border-white/10 p-5 hover:border-violet-400"
-              >
-                <h2 className="text-lg font-semibold">{a.name}</h2>
-                <p className="text-sm text-slate-400">
-                  {a.kind} {a.ownerName && "· " + a.ownerName}
-                </p>
-                <p className="mt-4 text-2xl">{money(a.closing)}</p>
-                <p className="mt-2 text-sm text-slate-400">
-                  Opening {money(a.opening)} · Movement {money(a.movement)}
-                </p>
-              </Link>
-            ))}
-          </div>
-          {!accounts.length && (
-            <EmptyState
-              title="No money accounts yet"
-              description="Create accounts using verified opening balances. Existing transactions remain unassigned until reviewed."
-            />
-          )}
-          <DownloadCSV
-            name={"money-accounts-" + l.w.period.from}
-            rows={[
-              ["Account", "Type", "Opening", "Movement", "Closing"],
-              ...accounts.map((a) => [a.name, a.kind, a.opening, a.movement, a.closing]),
-            ]}
-          />
-        </>
-      ) : (
-        !error && <Spinner label="Loading accounts…" />
-      )}
+      {l.founder&&<FounderBalanceCards rows={readFounderBalances(founderSummary.data)} loading={founderSummary.loading||!l.enabled} error={founderSummary.error}/>}
+      <details data-testid="money-account-reconciliation" className="rounded-xl border border-white/10 p-4 space-y-4">
+        <summary className="cursor-pointer font-semibold">Money-account reconciliation {Array.isArray(accounts)?"("+accounts.length+" accounts)":""}</summary>
+        <Notice>These are account-specific balances based on opening amounts and linked movements for the selected cycle. They are not founder Finance balances or salary funding limits. Unverified clearing accounts may include historical attribution differences.</Notice>
+        {Array.isArray(accounts)?<>
+          {([["Money accounts",accounts.filter(a=>!personalClearing(a))],["Legacy personal clearing accounts (unverified)",accounts.filter(personalClearing)]] as const).map(([label,rows])=>rows.length>0&&<section key={label} className="space-y-3"><h3 className="font-semibold">{label}</h3><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{rows.map(a=><Link key={a.id} href={"/app/finance/accounts/"+a.id+"?"+l.w.query} className="rounded-xl border border-white/10 p-4 hover:border-violet-400 min-w-0">
+            <h4 className="font-semibold break-words">{a.ownerName&&personalClearing(a)?a.ownerName:a.name}</h4><p className="text-xs text-slate-400">{personalClearing(a)?"Legacy clearing · unverified":a.kind}</p><p className="mt-3 text-lg font-semibold break-words">{money(a.closing)}</p><p className="text-xs text-slate-400">Opening {money(a.opening)} · Movement {money(a.movement)}</p>
+          </Link>)}</div></section>)}
+          {!accounts.length&&<EmptyState title="No money accounts yet" description="Create accounts using verified opening balances. Existing transactions remain unassigned until reviewed."/>}
+          <DownloadCSV name={"money-accounts-"+l.w.period.from} rows={[["Account","Type","Opening","Movement","Closing"],...accounts.map(a=>[a.name,a.kind,a.opening,a.movement,a.closing])]}/>
+        </>:!error&&<Spinner label="Loading accounts…"/>}
+      </details>
       {l.write && (
         <details className="rounded-xl border border-white/10 p-5">
           <summary className="cursor-pointer font-semibold">Create money account</summary>
@@ -405,7 +382,7 @@ export function AccountDetails({ id }: { id: string }) {
   return (
     <FinanceFrame
       title={a?.name ?? "Account movements"}
-      description="Signed movements explain the account balance. Opening balance is recorded separately from income."
+      description={a&&personalClearing(a)?"Legacy clearing reconciliation only. This is not the founder’s authoritative Finance balance.":"Signed movements explain the account balance. Opening balance is recorded separately from income."}
       window={l.w}
       agencyOnly
       actions={
