@@ -1,2 +1,2 @@
-import AgreementsPage from "../../agreements/page";
-export default AgreementsPage;
+import {DocumentRegister} from "@/components/documents/workspace";
+export default function Page(){return <DocumentRegister kind="agreement"/>;}

@@ -1,3 +1,4 @@
+import {savePdf,appendTextPages} from "./document-pdf";
 /** Download a vector-layout, image-backed A4 PDF without requiring a PDF provider.
  * Text is drawn onto a high-resolution canvas, then embedded as one JPEG PDF page.
  * The existing approved SVG wordmark is loaded from the same-origin app assets.
@@ -30,42 +31,8 @@ async function loadBrand():Promise<HTMLImageElement>{
  const img=new Image();img.decoding="async";img.src="/brand/amplifyworld-quotation-wordmark.svg";
  await img.decode();return img;
 }
-function pdfFromJpeg(bytes:Uint8Array,width:number,height:number):Uint8Array {
- const enc=new TextEncoder();const pieces:Uint8Array[]=[];const positions:number[]=[0];let length=0;
- const write=(text:string)=>{const b=enc.encode(text);pieces.push(b);length+=b.length;};
- const raw=(b:Uint8Array)=>{pieces.push(b);length+=b.length;};
- const obj=(id:number,body:string)=>{positions[id]=length;write(id+" 0 obj\n"+body+"\nendobj\n");};
- write("%PDF-1.4\n");
- obj(1,"<< /Type /Catalog /Pages 2 0 R >>");
- obj(2,"<< /Type /Pages /Count 1 /Kids [3 0 R] >>");
- obj(3,"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>");
- positions[4]=length;
- write("4 0 obj\n<< /Type /XObject /Subtype /Image /Width "+width+" /Height "+height+" /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+bytes.length+" >>\nstream\n");
- raw(bytes);write("\nendstream\nendobj\n");
- const stream="q\n595 0 0 842 0 0 cm\n/Im0 Do\nQ\n";
- obj(5,"<< /Length "+enc.encode(stream).length+" >>\nstream\n"+stream+"endstream");
- const xref=length;
- write("xref\n0 6\n0000000000 65535 f \n");
- for(let i=1;i<=5;i++)write(String(positions[i]).padStart(10,"0")+" 00000 n \n");
- write("trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n"+xref+"\n%%EOF");
- const result=new Uint8Array(length);let offset=0;
- for(const part of pieces){result.set(part,offset);offset+=part.length;}
- return result;
-}
-
-
-function saveQuotationCanvas(c:HTMLCanvasElement,quote:SavedQuotation){
- const b64=c.toDataURL("image/jpeg",.95).split(",")[1];
- const binary=atob(b64);const jpeg=new Uint8Array(binary.length);
- for(let i=0;i<binary.length;i++)jpeg[i]=binary.charCodeAt(i);
- const pdf=pdfFromJpeg(jpeg,c.width,c.height);
- const blob=new Blob([new Uint8Array(pdf).buffer],{type:"application/pdf"});
- const url=URL.createObjectURL(blob),a=document.createElement("a");
- a.href=url;a.download=quote.quoteNumber+"-"+quote.clientName.replace(/[^a-z0-9-_]+/gi,"-")+".pdf";
- document.body.appendChild(a);a.click();a.remove();
- setTimeout(()=>URL.revokeObjectURL(url),20000);
-}
-async function downloadFixedQuotationPdf(quote:SavedQuotation):Promise<void>{
+export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{savePdf(await renderQuotationPages(quote),quote.quoteNumber,quote.clientName);}
+async function renderFixedQuotation(quote:SavedQuotation):Promise<HTMLCanvasElement[]>{
  const p=quote.payload;
  const c=document.createElement("canvas");c.width=W*2;c.height=H*2;
  const g=c.getContext("2d");
@@ -159,11 +126,11 @@ async function downloadFixedQuotationPdf(quote:SavedQuotation):Promise<void>{
  g.fillStyle=line;g.fillRect(40,810,514,.8);
  text("amplifyworld.in   |   amplifyworld.official@gmail.com   |   +91 89318 01405",40,828,7.5,soft);
  right("1/1",554,828,7.5,soft);
- saveQuotationCanvas(c,quote);
+ return [c];
 }
 
-export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{
- if(quote.payload.mode==="default")return downloadFixedQuotationPdf(quote);
+export async function renderQuotationPages(quote:SavedQuotation):Promise<HTMLCanvasElement[]>{
+ if(quote.payload.mode==="default")return renderFixedQuotation(quote);
  const c=document.createElement("canvas");c.width=W*2;c.height=H*2;
  const g=c.getContext("2d");
  if(!g)throw new Error("Your browser cannot generate the quotation PDF.");
@@ -179,6 +146,7 @@ export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{
   g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
   text(value,rightX-g.measureText(value).width,y,size,color,bold);
  };
+ const overflow:string[]=[];
  const wrap=(value:string,x:number,y:number,max:number,size:number,leading:number,color=muted,bold=false,maxLines=3)=>{
   g.font=(bold?"700 ":"400 ")+size+"px Arial, Helvetica, sans-serif";
   const words=value.trim().split(/\s+/);const lines:string[]=[];let current="";
@@ -189,8 +157,8 @@ export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{
   for(let i=0;i<Math.min(lines.length,maxLines);i++){
    let content=lines[i];
    if(i===maxLines-1&&lines.length>maxLines){
-    while(content.length&&g.measureText(content+"…").width>max)content=content.slice(0,-1);
-    content+="…";
+    overflow.push(value);
+    content="Full text on continuation page";
    }
    text(content,x,y+i*leading,size,color,bold,max);
   }
@@ -246,12 +214,13 @@ export async function downloadQuotationPdf(quote:SavedQuotation):Promise<void>{
   "Additional work requires prior written approval. Valid for "+p.validityDays+" days; service term: "+p.serviceTerm+"."
  ];
  let ty=660;
- for(const item of termLines){rect(22,ty-6,2,2,magenta);wrap(item,30,ty,542,8,11,muted,false,2);ty+=item.length>118?24:16;}
- if(p.exclusions.trim()){text("Exclusions:",22,ty+1,8,violet,true);wrap(p.exclusions,75,ty+1,485,8,10,muted,false,2);ty+=21;}
- const signatureY=Math.max(754,ty+20);
+ for(const item of termLines){if(ty>744){overflow.push(item);continue;}rect(22,ty-6,2,2,magenta);wrap(item,30,ty,542,8,11,muted,false,2);ty+=item.length>118?24:16;}
+ if(p.exclusions.trim()){if(ty>744)overflow.push("Exclusions: "+p.exclusions);else{text("Exclusions:",22,ty+1,8,violet,true);wrap(p.exclusions,75,ty+1,485,8,10,muted,false,2);ty+=21;}}
+ if(overflow.length)text("Additional terms continue on the next page.",20,765,8,muted);
+ const signatureY=784;
  text("For AmplifyWorld",23,signatureY,9,violet,true);
  text("For "+p.clientName,313,signatureY,9,violet,true,256);
  rect(23,signatureY+18,220,.75,line);rect(313,signatureY+18,220,.75,line);
  right("amplifyworld.in   |   amplifyworld.official@gmail.com   |   +91 89318 01405",565,827,7.5,muted);
- saveQuotationCanvas(c,quote);
+ return overflow.length?[c,...await appendTextPages("QUOTATION / CONTINUATION",quote.quoteNumber,overflow)]:[c];
 }

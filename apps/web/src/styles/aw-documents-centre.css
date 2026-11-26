@@ -1,0 +1,38 @@
+.aw-workspace .dc-page,.aw-workspace .dc-editor,.aw-workspace .dc-page>*{min-width:0}
+.aw-workspace .dc-page h1{font-size:25px;font-weight:700;color:var(--ui-strong)}
+.aw-workspace .dc-page h2,.aw-workspace .dc-dialog h2{font-size:16px;font-weight:650;color:var(--ui-strong)}
+.aw-workspace .dc-row,.aw-workspace .dc-actions,.aw-workspace .dc-filters,.aw-workspace .dc-row-id{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.aw-workspace .dc-row{justify-content:space-between}
+.aw-workspace .dc-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.aw-workspace .dc-panel,.aw-workspace .dc-preview,.aw-workspace .dc-draft{border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface);padding:16px;min-width:0;color:var(--ui-strong);display:flex;flex-direction:column;gap:12px}
+.aw-workspace .dc-draft{flex-direction:row}
+.aw-workspace .dc-number{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.aw-workspace .dc-muted,.aw-workspace .dc-table small{color:var(--ui-muted);font-size:12px;line-height:1.5}
+.aw-workspace .dc-table small{display:block;margin-top:3px}
+.aw-workspace .dc-table-scroll,.aw-workspace .dc-preview-scroll{max-width:100%;overflow:auto;min-width:0}
+.aw-workspace .dc-table{width:100%;border-collapse:collapse;font-size:13px}
+.aw-workspace .dc-table th,.aw-workspace .dc-table td{text-align:left;padding:12px 10px;vertical-align:top;border-bottom:1px solid var(--ui-border)}
+.aw-workspace .dc-table th{font-weight:600;color:var(--ui-muted);white-space:nowrap}
+.aw-workspace .dc-table td:first-child{min-width:160px;overflow-wrap:anywhere}
+.aw-workspace .dc-table td:last-child{min-width:200px}
+.aw-workspace .dc-table .btn-secondary{font-size:12px;min-height:32px;padding:6px 9px}
+.aw-workspace .dc-search{display:flex;align-items:center;gap:8px;flex:1 1 240px;border:1px solid var(--ui-border);border-radius:8px;padding:0 10px;color:var(--ui-muted)}
+.aw-workspace .dc-search input{background:transparent!important;border:0!important;box-shadow:none!important;outline:none;width:100%;min-height:38px;color:var(--ui-strong)}
+.aw-workspace .dc-search:focus-within{outline:2px solid #9675d8}
+.aw-workspace .dc-filters select,.aw-workspace .dc-filters label input{width:auto;max-width:100%}
+.aw-workspace .dc-filters label{font-size:12px}
+.aw-workspace .dc-contact,.aw-workspace .dc-link{color:var(--ui-strong);text-align:left;text-decoration:underline;cursor:pointer}
+.aw-workspace .dc-contact{padding:8px;border:1px solid var(--ui-border);border-radius:7px}
+.aw-workspace .dc-preview-scroll{background:var(--ui-raised);padding:8px;border-radius:8px;max-height:65vh}
+.aw-workspace .dc-preview img{display:block;height:auto;margin:auto;box-shadow:0 1px 5px #0003}
+.aw-workspace .dc-dialog{position:fixed;inset:0;margin:auto;width:min(850px,95vw);max-height:94vh;overflow:auto;color:var(--ui-strong);background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;padding:16px}
+.aw-workspace .dc-dialog::backdrop{background:#0009}
+.aw-workspace .dc-menu summary{cursor:pointer;color:var(--ui-strong);font-size:12px;padding:5px}
+.aw-workspace .dc-menu[open]{flex-basis:100%}
+.aw-workspace .dc-editor .aw-quote-mode{padding:10px 14px!important;min-height:0!important}
+.aw-workspace .dc-editor form>aside{position:static!important;min-width:0}
+.aw-workspace .dc-editor form>div{min-width:0}
+@media(max-width:900px){.aw-workspace .dc-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.aw-workspace .dc-panel,.aw-workspace .dc-preview{padding:12px}.aw-workspace .dc-filters select{flex:1;min-width:120px}.aw-workspace .dc-filters label:has(input[type=date]){flex:1;min-width:125px}.aw-workspace .dc-filters input[type=date]{width:100%}.aw-workspace .dc-preview-scroll{max-height:50vh}}
+
+.aw-workspace .dc-step{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ui-border);border-radius:8px;padding:7px 12px;color:var(--ui-muted);font-size:12px;cursor:pointer}.aw-workspace .dc-step[aria-pressed=true]{background:var(--ui-raised);color:var(--ui-strong);border-color:#9675d8}.aw-workspace .dc-editor [hidden]{display:none!important}.aw-workspace .dc-editor .dc-preview .dc-row{font-size:12px}.aw-workspace .dc-editor .dc-preview .btn-secondary{min-height:32px;padding:6px 8px}.aw-workspace .dc-draft .dc-actions{min-width:0}

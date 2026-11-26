@@ -1,2 +1,2 @@
-import {redirect} from "next/navigation";
-export default function DocumentsIndex(){redirect("/app/documents/quotations");}
+import {DocumentRegister} from "@/components/documents/workspace";
+export default function Page(){return <DocumentRegister />;}

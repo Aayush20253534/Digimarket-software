@@ -1,3 +1,4 @@
+import {splitDocument,verifyLinks,registerDraftRoutes,listQuotes,registerDocumentLookup,validityEnd} from "../quotations/document-workspace";
 import type { Express, NextFunction, Request, Response } from "express";
 import { Prisma } from "@digimarket/db";
 import { z } from "zod";
@@ -116,15 +117,9 @@ export function registerQuotationRoutes(app: Express, auth: AuthService) {
   };
   const actor = (res: Response) => res.locals.principal as Principal;
   const base = "/api/v1/quotations";
-  app.get(base, authenticate, async (_req, res) => {
-    const p = actor(res);
-    const items = await db.quotation.findMany({
-      where: { organizationId: p.organizationId },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: 150,
-    });
-    res.set("Cache-Control", "no-store").json({ data: { items } });
-  });
+  registerDraftRoutes(app,db,base,authenticate,"quotation");
+  registerDocumentLookup(app,db,base,authenticate);
+  app.get(base,authenticate,async(req,res)=>{res.set("Cache-Control","no-store").json({data:await listQuotes(db,actor(res),req.query)});});
   app.get(base + "/:id", authenticate, async (req, res) => {
     const id = z.uuid().safeParse(req.params.id);
     if (!id.success) throw new AuthError(422, "VALIDATION_ERROR", "Invalid quotation identifier.");
@@ -135,7 +130,8 @@ export function registerQuotationRoutes(app: Express, auth: AuthService) {
     res.set("Cache-Control", "no-store").json({ data: quote });
   });
   app.post(base, authenticate, async (req, res) => {
-    const input = validated(req.body);
+    const {payload,links}=splitDocument(req.body);
+    const input=validated(payload);
     const p = actor(res);
     const priced = price(input);
     const prefix = "AW-Q-" + input.quoteDate.replaceAll("-", "") + "-";
@@ -154,7 +150,7 @@ export function registerQuotationRoutes(app: Express, auth: AuthService) {
           const quote = await tx.quotation.create({
             data: { organizationId: p.organizationId, createdById: p.userId,
               quoteNumber, clientName: input.clientName, quoteDate: new Date(input.quoteDate + "T00:00:00.000Z"),
-              ...priced, payload: input },
+              ...priced, validThrough:new Date(validityEnd(input.quoteDate,input.validityDays)+"T00:00:00Z"),payload: input,...await verifyLinks(tx,p,"quotation",links) },
           });
           await tx.auditLog.create({ data: { organizationId: p.organizationId, actorId: p.userId,
             action: "quotations.created", entityType: "Quotation", entityId: quote.id } });

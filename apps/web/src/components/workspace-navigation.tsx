@@ -24,7 +24,7 @@ const sections:readonly NavGroup[]=[
  {title:"Business",items:[
   {label:"Finance",href:"/app/finance",icon:Wallet,permits:["finance.entry.read.own","finance.read.all"]},
   {label:"Salary",href:"/app/salary",icon:Banknote},
-  {label:"Documents",href:"/app/documents/quotations",icon:FileStack,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
+  {label:"Documents",href:"/app/documents",icon:FileStack,roles:["FOUNDER","ADMIN","SUPER_ADMIN"]},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,permits:["reports.business.read"]}
  ]},
  // Temporarily hidden from the page list. Restore MessageCircle import when re-enabled.
@@ -35,8 +35,8 @@ const sections:readonly NavGroup[]=[
  ]}
 ];
 const legacyDestinations:Record<string,string>={
- "/app/quotations":"/app/documents/quotations",
- "/app/agreements":"/app/documents/quotations",
+ "/app/quotations":"/app/documents",
+ "/app/agreements":"/app/documents",
  "/app/task-history":"/app/tasks",
  "/app/assets":"/app/clients",
  "/app/founders":"/app/settings",

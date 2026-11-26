@@ -13,6 +13,7 @@ export default function DocumentsLayout({children}:{children:ReactNode}){
  const pathname=usePathname();
  if(!allowed)return <>{children}</>;
  const tabs=[
+  {label:"Overview",href:"/app/documents",icon:FileText},
   {label:"Quotations",href:"/app/documents/quotations",icon:FileText},
   {label:"Agreements",href:"/app/documents/agreements",icon:FileSignature},
  ];
@@ -21,8 +22,8 @@ export default function DocumentsLayout({children}:{children:ReactNode}){
   <div className="aw-v5-documents-intro"><span>COMMERCIAL DOCUMENTS</span><p>Prepare, save and retrieve quotations and service agreements. PDFs are generated from saved document snapshots.</p></div>
   <nav aria-label="Documents sections" className="aw-v2-tabs" data-testid="documents-tabs">
    {tabs.map(({label,href,icon:Icon})=><Link key={href} href={href}
-    aria-current={pathname===href?"page":undefined}
-    className={"aw-v2-tab"+(pathname===href?" aw-v2-tab-active":"")}>
+    aria-current={(pathname===href||(href!=="/app/documents"&&pathname.startsWith(href+"/")))?"page":undefined}
+    className={"aw-v2-tab"+((pathname===href||(href!=="/app/documents"&&pathname.startsWith(href+"/")))?" aw-v2-tab-active":"")}>
     <Icon size={16} aria-hidden="true"/>{label}
    </Link>)}
   </nav>

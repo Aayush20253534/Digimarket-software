@@ -16,14 +16,14 @@ export function BusinessWorkspaceNav(){
   {label:"Finance",href:"/app/finance",icon:Wallet,
    allowed:grants.has("finance.read.all")||grants.has("finance.entry.read.own")},
   {label:"Salary",href:"/app/salary",icon:Banknote,allowed:true},
-  {label:"Documents",href:"/app/documents/quotations",icon:FileStack,allowed:documentRole},
+  {label:"Documents",href:"/app/documents",icon:FileStack,allowed:documentRole},
   {label:"Reports",href:"/app/reports",icon:ChartNoAxesCombined,
    allowed:grants.has("reports.business.read")},
  ].filter(link=>link.allowed);
  if(links.length<2)return null;
  return <nav className="aw-v5-business-nav" aria-label="Business workspace sections">
   {links.map(({label,href,icon:Icon})=>{
-   const active=pathname===href||(href==="/app/documents/quotations"&&
+   const active=pathname===href||(href==="/app/documents"&&
     (pathname.startsWith("/app/documents/")||pathname==="/app/quotations"||pathname==="/app/agreements"))||
     (href==="/app/reports"&&pathname.startsWith("/app/reports/"));
    return <Link key={href} href={href} aria-current={active?"page":undefined}
