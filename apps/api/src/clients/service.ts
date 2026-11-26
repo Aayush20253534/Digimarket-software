@@ -8,6 +8,7 @@ import { AuthError, forbidden, invalid } from "../auth/errors";
 import { agreementExpired, expiredAgreementWhere } from "./agreement-status";
 import {ClientVideoReadinessService} from "./video-readiness-service";
 import {ClientPostReadinessService} from "./post-readiness-service";
+import {bulkClientReadiness} from "./bulk-readiness";
 import {FinanceLedgerService} from "../finance/ledger-service";
 
 const deny=(a:Principal,permission:string)=>{if(!a.permissions.has(permission))throw forbidden();};
@@ -69,9 +70,11 @@ export class ClientsService {
      finance?this.db.client.aggregate({where:active,_sum:{monthlyFee:true}}):Promise.resolve(null),
      this.db.user.findMany({where:{...org,status:"ACTIVE"},select:{id:true,displayName:true},orderBy:{displayName:"asc"}})
    ]);
-   const cycle=businessCycle(today),withStock: (typeof items[number]&{readiness:Awaited<ReturnType<ClientsService["readiness"]>>})[]=[];
-   // Bounded fan-out reuses the canonical stock calculations.
-   for(let i=0;i<items.length;i+=4)withStock.push(...await Promise.all(items.slice(i,i+4).map(async row=>({...row,readiness:await this.readiness(a,row.id,today)}))));
+   const cycle=businessCycle(today),stock=await bulkClientReadiness(this.db,a,items.map(row=>row.id),today);
+   const withStock=items.map(row=>{
+     const {v,p}=stock.get(row.id)!;
+     return {...row,readiness:{from:v.from,to:v.to,videos:v.totalStock,posts:p.totalStock,festival:p.festivalTotalStock,videosDelivered:v.deliveredThisMonth,postsDelivered:p.deliveredThisMonth,festivalDelivered:p.festivalDeliveredThisMonth}};
+   });
    return {items:withStock,nextCursor,total,today,cycle,managers,summary:{all,active:activeCount,paused,archived,past,expiring:ending,monthlyFees:fees?fees._sum.monthlyFee?.toFixed(4)??"0.0000":null}};
  }
  private async readiness(a:Principal,id:string,today:string){
