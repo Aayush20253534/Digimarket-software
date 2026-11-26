@@ -61,9 +61,11 @@ function useData<T>(url: string, enabled: boolean, version = 0) {
   const { request } = useAuth();
   const [data, setData] = useState<T | null>(null),
     [error, setError] = useState("");
+  const [loading,setLoading]=useState(false);
   useEffect(() => {
     if (!enabled) return;
     let active = true;
+    setLoading(true);
     setError("");
     setData(null);
     void request<T>(url)
@@ -71,13 +73,13 @@ function useData<T>(url: string, enabled: boolean, version = 0) {
         if (active) setData(r);
       })
       .catch((e) => {
-        if (active) setError(e.message);
-      });
+        if (active) setError(e instanceof Error?e.message:"Request failed");
+      }).finally(()=>{if(active)setLoading(false)});
     return () => {
       active = false;
     };
   }, [url, enabled, version, request]);
-  return { data, error };
+  return { data, error, loading };
 }
 function useLedger() {
   const w = useFinanceWindow(),
@@ -265,7 +267,7 @@ export function AccountsOverview() {
       }
     >
       <Feedback error={l.error || error || owners.error} success={l.success} />
-      {l.founder&&<FounderBalanceCards rows={readFounderBalances(founderSummary.data)} loading={founderSummary.data===null&&!founderSummary.error} error={founderSummary.error}/>}
+      {l.founder&&<FounderBalanceCards rows={readFounderBalances(founderSummary.data)} loading={founderSummary.loading||!l.enabled} error={founderSummary.error}/>}
       <details className="rounded-xl border border-white/10 p-4 space-y-4">
         <summary className="cursor-pointer font-semibold">Money-account reconciliation {Array.isArray(accounts)?"("+accounts.length+" accounts)":""}</summary>
         <Notice>These are account-specific balances based on opening amounts and linked movements for the selected cycle. They are not founder Finance balances or salary funding limits. Unverified clearing accounts may include historical attribution differences.</Notice>
