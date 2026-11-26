@@ -1,5 +1,7 @@
 import type {Express,Request,Response,NextFunction} from "express";
 import {z} from "zod";
+import {agencyToday} from "@digimarket/contracts";
+import {UpstashReadCache} from "../cache/upstash";
 import {webPushPublicKey,subscriptionHash,validPushEndpoint} from "./push";
 import {searchQuerySchema,reportsPeriodSchema,notificationListSchema} from "@digimarket/contracts";
 import {AuthService,type Principal} from "../auth/service";
@@ -13,6 +15,7 @@ function parse<T>(schema:z.ZodType<T>,value:unknown):T{
  return checked.data;
 }
 export function registerInsightsRoutes(app:Express,auth:AuthService){
+ const cache=new UpstashReadCache();
  const insights=new InsightsService(auth.database),leadAnalytics=new LeadAnalyticsService(auth.database),notices=new NotificationService(auth.database);
  const authenticate=async(req:Request,res:Response,next:NextFunction)=>{
   try{
@@ -28,7 +31,11 @@ export function registerInsightsRoutes(app:Express,auth:AuthService){
  });
  app.get(base+"/reports/client-delivery",authenticate,async(_req,res)=>{
   res.set("Cache-Control","no-store");
-  res.json({data:await insights.clientDelivery(actor(res))});
+  const me=actor(res);
+  // Enforce access even on cache hits; no monetary totals or authorization are cached.
+  auth.require(me,"reports.business.read");auth.require(me,"clients.read");
+  const load=()=>insights.clientDelivery(me);
+  res.json({data:_req.query.fresh==="1"?await load():await cache.read(me,"client-delivery:"+agencyToday(),10,load)});
  });
  app.get(base+"/reports/overview",authenticate,async(req,res)=>{
   res.set("Cache-Control","no-store");

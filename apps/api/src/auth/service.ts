@@ -24,6 +24,20 @@ const publicUser = (user: { id: string; organizationId: string; loginId: string;
 });
 const normalizeLogin = (value: string) => value.trim().toLowerCase();
 
+const identityUserSelect = {
+  id: true, organizationId: true, loginId: true, displayName: true,
+  status: true, mustChangePassword: true, authVersion: true,
+  roles: { select: { role: { select: {
+    organizationId: true, key: true,
+    permissions: { select: { permissionKey: true } },
+  } } } },
+} as const;
+type IdentityUser = {
+  id: string; organizationId: string; loginId: string; displayName: string;
+  status: string; mustChangePassword: boolean; authVersion: number;
+  roles: { role: { organizationId: string; key: string; permissions: { permissionKey: string }[] } }[];
+};
+
 export class AuthService {
   constructor(private readonly db: Database, readonly config: AuthConfig) {}
 
@@ -36,10 +50,19 @@ export class AuthService {
     });
   }
 
-  private rolesFor(user: NonNullable<Awaited<ReturnType<AuthService["fullUser"]>>>) {
+  private rolesFor(user: IdentityUser) {
     // Roles from another organization do not grant power even if a cross-organization
     // row is accidentally created by a future service.
     return user.roles.filter(({ role }) => role.organizationId === user.organizationId).map(({ role }) => role);
+  }
+
+  private identityFor(user: IdentityUser) {
+    const roles = this.rolesFor(user);
+    return {
+      userId: user.id, organizationId: user.organizationId,
+      roles: roles.map(role => role.key),
+      permissions: [...new Set(roles.flatMap(role => role.permissions.map(entry => entry.permissionKey)))].sort(),
+    };
   }
 
   private async challengeUser(token: string, purpose: "change_password") {
@@ -66,7 +89,7 @@ export class AuthService {
     return this.newSession(user);
   }
 
-  private async newSession(user: { id: string; organizationId: string; authVersion: number; loginId: string; displayName: string; status: string; mustChangePassword: boolean }) {
+  private async newSession(user: IdentityUser) {
     const secret = newRefreshSecret();
     const session = await this.db.session.create({
       data: {
@@ -76,7 +99,7 @@ export class AuthService {
       },
     });
     const accessToken = await issueJwt(this.config, "access", user, session.id);
-    return { next: "SIGNED_IN" as const, accessToken, refreshToken: `${session.id}.${secret}`, user: publicUser(user) };
+    return { next: "SIGNED_IN" as const, accessToken, refreshToken: `${session.id}.${secret}`, user: publicUser(user), identity: this.identityFor(user) };
   }
 
   async changePassword(challengeToken: string, oldPassword: string, newPassword: string) {
@@ -98,22 +121,26 @@ export class AuthService {
   async authenticate(accessToken: string): Promise<Principal> {
     let claims;
     try { claims = await decodeJwt(this.config, accessToken, "access"); } catch { throw unauthorized(); }
-    const [user, session] = await Promise.all([this.fullUser(claims.userId), this.db.session.findUnique({ where: { id: claims.sessionId } })]);
+    const session = await this.db.session.findUnique({
+      where: { id: claims.sessionId },
+      select: { id: true, userId: true, revokedAt: true, expiresAt: true, user: { select: identityUserSelect } },
+    });
+    const user = session?.user;
     if (!user || !session || user.status !== "ACTIVE" || user.mustChangePassword ||
-      user.organizationId !== claims.organizationId || user.authVersion !== claims.version ||
+      user.id !== claims.userId || user.organizationId !== claims.organizationId || user.authVersion !== claims.version ||
       session.userId !== user.id || session.revokedAt || session.expiresAt <= new Date()) throw unauthorized();
-    const roles = this.rolesFor(user);
-    return {
-      userId: user.id, organizationId: user.organizationId, sessionId: session.id,
-      roles: roles.map((role) => role.key),
-      permissions: new Set(roles.flatMap((role) => role.permissions.map((entry) => entry.permissionKey))),
-    };
+    const identity = this.identityFor(user);
+    return { ...identity, sessionId: session.id, permissions: new Set(identity.permissions) };
   }
 
   async refresh(refreshToken: string) {
     const [sessionId, secret, ...rest] = refreshToken.split(".");
     if (!sessionId || !secret || rest.length) throw unauthorized();
-    const session = await this.db.session.findUnique({ where: { id: sessionId }, include: { user: true } });
+    const session = await this.db.session.findUnique({
+      where: { id: sessionId },
+      select: { id: true, userId: true, expiresAt: true, revokedAt: true, refreshTokenHash: true,
+        previousRefreshTokenHash: true, user: { select: identityUserSelect } },
+    });
     if (!session || session.revokedAt || session.expiresAt <= new Date() || session.user.status !== "ACTIVE" || session.user.mustChangePassword) throw unauthorized();
     const digest = hashToken(secret);
     if (digest !== session.refreshTokenHash) {
@@ -122,8 +149,7 @@ export class AuthService {
       }
       throw unauthorized();
     }
-    const user = await this.fullUser(session.userId);
-    if (!user) throw unauthorized();
+    const user = session.user;
     const nextSecret = newRefreshSecret();
     const rotated = await this.db.session.updateMany({
       where: { id: session.id, refreshTokenHash: digest, revokedAt: null },
@@ -134,7 +160,7 @@ export class AuthService {
       next: "SIGNED_IN" as const,
       accessToken: await issueJwt(this.config, "access", user, session.id),
       refreshToken: `${session.id}.${nextSecret}`,
-      user: publicUser(user),
+      user: publicUser(user), identity: this.identityFor(user),
     };
   }
 

@@ -77,7 +77,7 @@ export function registerAuthRoutes(app: Express, service: AuthService, allowedOr
   function finishLogin(response: Response, result: Awaited<ReturnType<AuthService["login"]>>) {
     if (result.next === "SIGNED_IN") {
       setRefreshCookie(response, result.refreshToken);
-      response.json({ data: { next: result.next, accessToken: result.accessToken, user: result.user } });
+      response.json({ data: { next: result.next, accessToken: result.accessToken, user: result.user, identity: result.identity } });
     } else {
       response.json({ data: result });
     }

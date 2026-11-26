@@ -339,6 +339,7 @@ model User {
   taskRecurrencesCreated TaskRecurrence[]
 
   @@unique([organizationId, loginId])
+  @@index([loginId])
   @@index([organizationId, status])
 }
 
@@ -711,6 +712,7 @@ model Client {
   revenueRecognitions RevenueRecognition[]
   @@index([organizationId,status,updatedAt])
   @@index([organizationId,businessName])
+  @@index([organizationId, status, contractEndOn])
 }
 
 model ClientContact {
