@@ -217,7 +217,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     if(policies.status==="fulfilled")setFinanceReady(policies.value.some(p=>p.category==="FINANCE"&&p.active));
     const problems=[ledger,sums,cats,policies].flatMap(result=>result.status==="rejected"?[readable(result.reason)]:[]);
     setError(problems.join(" "));setLoading(false);setMetaDistributionRefresh(v=>v+1);
-  },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,formOnly]);
+  },[request,view,canReadOwn,canAll,isFounder,periodQuery,registerQuery,section,forms,canCreate,ready,formOnly,context?.refresh]);
   useEffect(()=>{
     if(formOnly||section!=="entries"||!ready||!session||view!=="all"||!canAll){
       setBalance(null);return;
@@ -372,7 +372,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
         method:settlementMethod,note:settlementNote.trim(),idempotencyKey:settlementKey
       }});
       setSettlementAmount("");setSettlementNote("");setSettlementKey(crypto.randomUUID());
-      setSuccess("Settlement recorded as private history. Work-cycle and agency totals remain unchanged.");
+      setSuccess("Settlement recorded as private history. Work-cycle and agency totals remain unchanged.");context?.onMutation();
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}
     finally{setBusy(false);}
@@ -385,7 +385,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
     setBusy(true);setError("");setSuccess("");
     try{
       await request("/finance/internal-settlements/"+row.settlementId+"/void",{method:"POST",body:{reason:reason.trim()}});
-      setSuccess("Settlement voided for both founders. Company totals remain unchanged.");
+      setSuccess("Settlement voided for both founders. Company totals remain unchanged.");context?.onMutation();
       await reload();
     }catch(e){setError(e instanceof Error?e.message:readable(e));}
     finally{setBusy(false);}
@@ -441,7 +441,7 @@ export function FinanceSectionWorkspace({section,categoryType="EXPENSE",directEx
       await request("/finance/entries/"+editingEntry.id,{method:"PUT",body:{
         ...entryEdit,clientId:editIsMeta&&editAdFunding==="CLIENT"?entryEdit.clientId:null,
       }});
-      setEditingEntry(null);setSuccess("Finance entry updated. User-wise totals now reflect the assigned user, and the original submitter is preserved in the audit history.");
+      context?.onMutation();setEditingEntry(null);setSuccess("Finance entry updated. User-wise totals now reflect the assigned user, and the original submitter is preserved in the audit history.");
       await reload();
     }catch(e){setError(readable(e));}finally{setBusy(false);}
   }

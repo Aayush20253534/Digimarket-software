@@ -55,6 +55,8 @@ const endpoints: Record<string, string[]> = {
   "finance/cycle-close": ["POST"],
   "finance/reversals": ["POST"],
   "finance/category-summary": ["GET"],
+  "finance/activity": ["GET"],
+  "finance/activity/export": ["GET"],
   "finance/total-expenses": ["GET"],
   "finance/total-expenses/summary": ["GET"],
   "finance/total-expenses/export": ["GET"],
@@ -315,7 +317,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
 
   const base = process.env.API_INTERNAL_URL ?? "http://127.0.0.1:4000";
   const url = new URL("/api/v1/" + path, base);
-  if(["finance/cycle-balance","finance/recurring-income","finance/entries","finance/export","finance/summary","finance/internal-settlements/mine","finance/internal-settlements/all","finance/client-ad-spend/mine","finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
+  if(["finance/cycle-balance","finance/recurring-income","finance/entries","finance/export","finance/summary","finance/internal-settlements/mine","finance/internal-settlements/all","finance/client-ad-spend/mine","finance/activity","finance/activity/export","finance/total-expenses","finance/total-expenses/summary","finance/total-expenses/export","finance/register","finance/register/export","finance/category-summary","finance/accounts","finance/account-history","finance/unassigned","finance/client-funds","finance/client-funds/history","finance/transfers","finance/cycle-review"].includes(path)){
     for(const key of ["from","to","view","scope","funding","kind","type","status","categoryId","accountId","clientId","page","limit","q"]){const value=request.nextUrl.searchParams.get(key);if(value!==null)url.searchParams.set(key,value);}
   }
   if (path === "approvals" || ["finance/entries","finance/summary","finance/export","finance/meta-ads-distribution"].includes(path)) {

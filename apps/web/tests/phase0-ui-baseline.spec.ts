@@ -19,6 +19,10 @@ const routes=[
  {slug:"tasks",href:"/app/tasks"},
  {slug:"task-history",href:"/app/task-history"},
  {slug:"finance",href:"/app/finance"},
+ {slug:"documents",href:"/app/documents"},
+ {slug:"salary-in-finance",href:"/app/salary"},
+ {slug:"total-expenses",href:"/app/finance/total-expenses"},
+ {slug:"client-delivery",href:"/app/reports/client-delivery"},
  {slug:"quotations",href:"/app/quotations"},
  {slug:"agreements",href:"/app/agreements"},
  {slug:"reports",href:"/app/reports"},
@@ -27,7 +31,7 @@ const routes=[
  {slug:"settings",href:"/app/settings"},
  {slug:"profile",href:"/app/profile"},
 ] as const;
-const responsive=new Set(["overview","leads","clients","tasks","finance","reports","messages"]);
+const responsive=new Set<string>(routes.map(r=>r.slug));
 type Palette="dark"|"light";
 type Captured={role:"admin";route:string;theme:Palette;viewport:{width:number;height:number};
   documentWidth:number;viewportWidth:number;scrollbarColor:string;sidebarLinks:string[];
